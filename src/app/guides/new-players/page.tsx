@@ -26,7 +26,17 @@ const SECTIONS: GuideSection[] = [
     title: "Welcome to MapleStory",
     image: undefined, // e.g. "/guides/new-players/welcome.png"
     imageAlt: "",
-    body: "Section content goes here.",
+    body: `MapleStory is a free-to-play 2D side-scrolling MMORPG that has been around since 2003. You'll explore a massive world, fight monsters, take on bosses, and progress your character through hundreds of levels — all the way to the level cap of 300.
+
+When you first launch the game, you'll need to pick a World (server). Here's what to know:
+
+Reboot — No trading between players. Mesos (the in-game currency) are your main way to progress. Gear is earned, not bought. Great choice if you prefer a self-found playstyle without worrying about an auction house economy.
+
+Regular Servers (Scania, Bera, etc.) — Full trading and an auction house economy. You can buy, sell, and trade gear with other players. Good if you enjoy market gameplay or want to share progression with friends through trading.
+
+Both options are perfectly viable. Pick whichever playstyle sounds more fun to you — you can always make characters on another world later, but progress doesn't transfer between them.
+
+Once you're in, don't stress about doing everything "right" from the start. MapleStory has over 20 years of content layered on top of itself, so it's normal to feel overwhelmed. Focus on picking a class that looks fun, following the early quest lines, and getting a feel for how your character plays. The rest will come naturally as you go.`,
   },
   {
     id: "choosing-class",
