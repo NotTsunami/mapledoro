@@ -4,6 +4,7 @@
   New Players Guide page.
   A long-form guide with text sections and images for MapleStory beginners.
 */
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import AppShell from "../../../components/AppShell";
@@ -26,24 +27,22 @@ const SECTIONS: GuideSection[] = [
     title: "Welcome to MapleStory",
     image: undefined, // e.g. "/guides/new-players/welcome.png"
     imageAlt: "",
-    body: `MapleStory is a free-to-play 2D side-scrolling MMORPG that has been around since 2003. You'll explore a massive world, fight monsters, take on bosses, and progress your character through hundreds of levels — all the way to the level cap of 300.
+    body: `Welcome to MapleStory. MapleStory is a free-to-play 2D side-scrolling MMORPG that has been running since 2003. You play as a character in the Maple World, leveling from 1 all the way to the cap of 300 by fighting monsters, completing quests, and tackling increasingly difficult bosses.
 
-When you first launch the game, you'll need to pick a World (server). Here's what to know:
+The gameplay loop revolves around dailies, weekly bossing, farming, and gear progression. Each day you'll complete daily quests and bosses to earn resources and strengthen your character. Each week you'll take on harder bosses for mesos and rare drops. In between, you'll farm maps for EXP and mesos, and pour those gains into upgrading your equipment through systems like Star Force, cubing, and flaming.
 
-Reboot — No trading between players. Mesos (the in-game currency) are your main way to progress. Gear is earned, not bought. Great choice if you prefer a self-found playstyle without worrying about an auction house economy.
-
-Regular Servers (Scania, Bera, etc.) — Full trading and an auction house economy. You can buy, sell, and trade gear with other players. Good if you enjoy market gameplay or want to share progression with friends through trading.
-
-Both options are perfectly viable. Pick whichever playstyle sounds more fun to you — you can always make characters on another world later, but progress doesn't transfer between them.
-
-Once you're in, don't stress about doing everything "right" from the start. MapleStory has over 20 years of content layered on top of itself, so it's normal to feel overwhelmed. Focus on picking a class that looks fun, following the early quest lines, and getting a feel for how your character plays. The rest will come naturally as you go.`,
+In this guide, you'll learn how to get started, pick a class, understand the core systems, and begin progressing your character. Whether you're completely new or returning after a long break, this will walk you through the essentials.`,
   },
   {
     id: "choosing-class",
     title: "Choosing Your Class",
     image: undefined,
     imageAlt: "",
-    body: "Section content goes here.",
+    body: `MapleStory has over 50 playable classes, and the best one to pick is whichever one you think looks cool. Seriously — every class can clear all content in the game, so there's no wrong choice. Watch some gameplay videos, try a few out to level 30 or so, and see which playstyle clicks with you.
+
+Some classes are flashy and fast, others are tanky and methodical. Some have huge mobbing skills that wipe the map, others excel at bossing with high single-target damage. You don't need to commit right away either — making multiple characters is actually encouraged since they provide passive stat boosts to your whole account through the Legion system.
+
+Can't decide? Hit the button below and let fate choose for you.`,
   },
   {
     id: "early-leveling",
@@ -68,16 +67,84 @@ Once you're in, don't stress about doing everything "right" from the start. Mapl
   },
 ];
 
+/* ── Class list for randomizer ─────────────────────────────────── */
+
+const CLASSES = [
+  "Hero", "Paladin", "Dark Knight",
+  "Arch Mage (Fire/Poison)", "Arch Mage (Ice/Lightning)", "Bishop",
+  "Bowmaster", "Marksman", "Pathfinder",
+  "Night Lord", "Shadower", "Dual Blade",
+  "Corsair", "Cannoneer", "Buccaneer",
+  "Dawn Warrior", "Blaze Wizard", "Wind Archer",
+  "Night Walker", "Thunder Breaker", "Mihile",
+  "Aran", "Evan", "Mercedes", "Phantom", "Luminous", "Shade",
+  "Battle Mage", "Wild Hunter", "Mechanic", "Blaster",
+  "Demon Slayer", "Demon Avenger", "Xenon",
+  "Kaiser", "Angelic Buster", "Cadena", "Kain",
+  "Illium", "Ark", "Adele", "Khali",
+  "Hoyoung", "Lara",
+  "Zero", "Kinesis", "Lynn",
+  "Hayato", "Kanna", "Beast Tamer",
+];
+
+function ClassRandomizer({ theme }: { theme: AppTheme }) {
+  const [result, setResult] = useState<string | null>(null);
+
+  function roll() {
+    setResult(CLASSES[Math.floor(Math.random() * CLASSES.length)]);
+  }
+
+  return (
+    <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
+      <button
+        onClick={roll}
+        style={{
+          fontFamily: "'Fredoka One', cursive",
+          fontSize: "0.85rem",
+          padding: "0.6rem 1.25rem",
+          borderRadius: "12px",
+          border: "none",
+          background: theme.accent,
+          color: "#fff",
+          cursor: "pointer",
+          transition: "opacity 0.2s ease",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+      >
+        Randomize my class
+      </button>
+      {result && (
+        <div
+          style={{
+            fontSize: "0.9rem",
+            fontWeight: 700,
+            color: theme.text,
+            background: theme.accentSoft,
+            border: `1px solid ${theme.border}`,
+            borderRadius: "10px",
+            padding: "0.5rem 1rem",
+          }}
+        >
+          You should play <span style={{ color: theme.accent }}>{result}</span>!
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Components ────────────────────────────────────────────────── */
 
 function SectionCard({
   section,
   theme,
   index,
+  children,
 }: {
   section: GuideSection;
   theme: AppTheme;
   index: number;
+  children?: React.ReactNode;
 }) {
   return (
     <div
@@ -135,6 +202,8 @@ function SectionCard({
       >
         {section.body}
       </div>
+
+      {children}
     </div>
   );
 }
@@ -239,7 +308,9 @@ function NewPlayersContent({ theme }: { theme: AppTheme }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {SECTIONS.map((section, i) => (
               <div key={section.id} id={section.id}>
-                <SectionCard section={section} theme={theme} index={i} />
+                <SectionCard section={section} theme={theme} index={i}>
+                  {section.id === "choosing-class" && <ClassRandomizer theme={theme} />}
+                </SectionCard>
               </div>
             ))}
           </div>
