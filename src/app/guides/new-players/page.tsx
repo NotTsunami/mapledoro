@@ -38,9 +38,9 @@ In this guide, you'll learn how to get started, pick a class, understand the cor
     title: "Choosing Your Class",
     image: undefined,
     imageAlt: "",
-    body: `MapleStory has over 50 playable classes, and the best one to pick is whichever one you think looks cool. Seriously — every class can clear all content in the game, so there's no wrong choice. Watch some gameplay videos, try a few out to level 30 or so, and see which playstyle clicks with you.
-
-Some classes are flashy and fast, others are tanky and methodical. Some have huge mobbing skills that wipe the map, others excel at bossing with high single-target damage. You don't need to commit right away either — making multiple characters is actually encouraged since they provide passive stat boosts to your whole account through the Legion system.
+    body: `MapleStory has over 50 playable classes, and the best one to pick is whichever one you think looks cool.
+    E
+    Some classes are flashy and fast, others are tanky and methodical. Some have huge mobbing skills that wipe the map, others excel at bossing with high single-target damage. You don't need to commit right away either — making multiple characters is actually encouraged since they provide passive stat boosts to your whole account through the Legion system.
 
 Can't decide? Hit the button below and let fate choose for you.`,
   },
@@ -78,9 +78,11 @@ interface MapleClass {
   difficulty: Difficulty;
   link: string;
   legion: string;
-  /** portrait path inside /public/guides/new-players/classes/ */
+  /** portrait URL — official Nexon CDN art */
   portrait?: string;
 }
+
+import { classPortraitUrl } from "../../../lib/classPortraits";
 
 const CLASS_REGIONS = [
   "Explorers",
@@ -93,72 +95,76 @@ const CLASS_REGIONS = [
   "Anima",
   "Other",
   "Sengoku",
-  "Friends of Maple",
+  "Jianghu",
+  "Shine",
 ] as const;
 
 const CLASSES: MapleClass[] = [
   // ── Explorers ──
-  { name: "Hero", region: "Explorers", summary: "Warrior who wields greatswords with powerful combo attacks.", difficulty: "Easy", link: "Combo Kill Orbs (chance to spawn orbs that grant EXP)", legion: "STR +10/20/40/80/100" },
-  { name: "Paladin", region: "Explorers", summary: "Holy warrior with elemental charges and high survivability.", difficulty: "Easy", link: "Elemental Resistance (+2/4/6% elemental resistance)", legion: "STR +10/20/40/80/100" },
-  { name: "Dark Knight", region: "Explorers", summary: "Spear-wielding warrior who sacrifices HP for devastating power.", difficulty: "Easy", link: "Final Pact (revive on death with invincibility)", legion: "HP +2/3/4/5/6%" },
-  { name: "Arch Mage (Fire/Poison)", region: "Explorers", summary: "Mage specializing in fire and poison DoT magic.", difficulty: "Normal", link: "Elemental Decrease (-2/4/6% enemy elemental resistance)", legion: "INT +10/20/40/80/100" },
-  { name: "Arch Mage (Ice/Lightning)", region: "Explorers", summary: "Mage specializing in ice and lightning AoE spells.", difficulty: "Normal", link: "Elemental Decrease (-2/4/6% enemy elemental resistance)", legion: "INT +10/20/40/80/100" },
-  { name: "Bishop", region: "Explorers", summary: "Support mage with healing, buffs, and holy damage.", difficulty: "Normal", link: "Blessed Ensemble (+EXP when in a party)", legion: "INT +10/20/40/80/100" },
-  { name: "Bowmaster", region: "Explorers", summary: "Archer who rains down arrows with blazing speed.", difficulty: "Normal", link: "Adventurer's Curiosity (+10% crit rate)", legion: "DEX +10/20/40/80/100" },
-  { name: "Marksman", region: "Explorers", summary: "Sniper archer with long-range, high-damage precision shots.", difficulty: "Normal", link: "Adventurer's Curiosity (+10% crit rate)", legion: "DEX +10/20/40/80/100" },
-  { name: "Pathfinder", region: "Explorers", summary: "Ancient archer who channels relic powers through a bow.", difficulty: "Easy", link: "Adventurer's Curiosity (+10% crit rate)", legion: "DEX +10/20/40/80/100" },
-  { name: "Night Lord", region: "Explorers", summary: "Throwing-star assassin with massive burst damage.", difficulty: "Normal", link: "Shadow Meld (chance to dodge attacks)", legion: "LUK +10/20/40/80/100" },
-  { name: "Shadower", region: "Explorers", summary: "Dagger-wielding thief who strikes from the shadows.", difficulty: "Normal", link: "Shadow Meld (chance to dodge attacks)", legion: "LUK +10/20/40/80/100" },
-  { name: "Dual Blade", region: "Explorers", summary: "Agile dual-wielding thief with flashy combo chains.", difficulty: "Normal", link: "Shadow Meld (chance to dodge attacks)", legion: "LUK +10/20/40/80/100" },
-  { name: "Corsair", region: "Explorers", summary: "Gunslinger pirate with summoned crew and ship cannons.", difficulty: "Normal", link: "Pirate Blessing (+STR/DEX/INT/LUK and HP/MP)", legion: "Summon Duration +2/4/6/8/10%" },
-  { name: "Cannoneer", region: "Explorers", summary: "Pirate blasting enemies with a massive hand cannon.", difficulty: "Easy", link: "Pirate Blessing (+STR/DEX/INT/LUK and HP/MP)", legion: "STR +10/20/40/80/100" },
-  { name: "Buccaneer", region: "Explorers", summary: "Brawling pirate who fights with fists and transformation power.", difficulty: "Easy", link: "Pirate Blessing (+STR/DEX/INT/LUK and HP/MP)", legion: "STR +10/20/40/80/100" },
+  { name: "Hero", region: "Explorers", summary: "Warrior who wields greatswords with powerful combo attacks.", difficulty: "Easy", link: "Invincible Belief (Restores 23% Max HP/s for 3s, CD: 370s)", legion: "STR +10/20/40/80/100" },
+  { name: "Paladin", region: "Explorers", summary: "Holy warrior with elemental charges and high survivability.", difficulty: "Easy", link: "Invincible Belief (Restores 23% Max HP/s for 3s, CD: 370s)", legion: "STR +10/20/40/80/100" },
+  { name: "Dark Knight", region: "Explorers", summary: "Spear-wielding warrior who sacrifices HP for devastating power.", difficulty: "Easy", link: "Invincible Belief (Restores 23% Max HP/s for 3s, CD: 370s)", legion: "HP +2/3/4/5/6%" },
+  { name: "Arch Mage (Fire/Poison)", region: "Explorers", summary: "Mage specializing in fire and poison DoT magic.", difficulty: "Normal", link: "Empirical Knowledge (+1% Damage & IED per stack on weakness proc)", legion: "INT +10/20/40/80/100" },
+  { name: "Arch Mage (Ice/Lightning)", region: "Explorers", summary: "Mage specializing in ice and lightning AoE spells.", difficulty: "Normal", link: "Empirical Knowledge (+1% Damage & IED per stack on weakness proc)", legion: "INT +10/20/40/80/100" },
+  { name: "Bishop", region: "Explorers", summary: "Support mage with healing, buffs, and holy damage.", difficulty: "Normal", link: "Empirical Knowledge (+1% Damage & IED per stack on weakness proc)", legion: "INT +10/20/40/80/100" },
+  { name: "Bow Master", region: "Explorers", summary: "Archer who rains down arrows with blazing speed.", difficulty: "Normal", link: "Adventurer's Curiosity (+4% crit rate, +15% Monster Collection)", legion: "DEX +10/20/40/80/100" },
+  { name: "Marksman", region: "Explorers", summary: "Sniper archer with long-range, high-damage precision shots.", difficulty: "Normal", link: "Adventurer's Curiosity (+4% crit rate, +15% Monster Collection)", legion: "DEX +10/20/40/80/100" },
+  { name: "Pathfinder", region: "Explorers", summary: "Ancient archer who channels relic powers through a bow.", difficulty: "Easy", link: "Adventurer's Curiosity (+4% crit rate, +15% Monster Collection)", legion: "DEX +10/20/40/80/100" },
+  { name: "Night Lord", region: "Explorers", summary: "Throwing-star assassin with massive burst damage.", difficulty: "Normal", link: "Thief's Cunning (+6% damage on debuff for 10s, CD: 20s)", legion: "LUK +10/20/40/80/100" },
+  { name: "Shadower", region: "Explorers", summary: "Dagger-wielding thief who strikes from the shadows.", difficulty: "Normal", link: "Thief's Cunning (+6% damage on debuff for 10s, CD: 20s)", legion: "LUK +10/20/40/80/100" },
+  { name: "Dual Blade", region: "Explorers", summary: "Agile dual-wielding thief with flashy combo chains.", difficulty: "Normal", link: "Thief's Cunning (+6% damage on debuff for 10s, CD: 20s)", legion: "LUK +10/20/40/80/100" },
+  { name: "Corsair", region: "Explorers", summary: "Gunslinger pirate with summoned crew and ship cannons.", difficulty: "Normal", link: "Pirate Blessing (+30 all stat, +525 HP/MP, -7% damage taken)", legion: "Summon Duration +2/4/6/8/10%" },
+  { name: "Cannoneer", region: "Explorers", summary: "Pirate blasting enemies with a massive hand cannon.", difficulty: "Easy", link: "Pirate Blessing (+30 all stat, +525 HP/MP, -7% damage taken)", legion: "STR +10/20/40/80/100" },
+  { name: "Buccaneer", region: "Explorers", summary: "Brawling pirate who fights with fists and transformation power.", difficulty: "Easy", link: "Pirate Blessing (+30 all stat, +525 HP/MP, -7% damage taken)", legion: "STR +10/20/40/80/100" },
   // ── Cygnus Knights ──
-  { name: "Dawn Warrior", region: "Cygnus Knights", summary: "Cygnus knight wielding the power of light and dark swords.", difficulty: "Hard", link: "True Sight (+10% crit rate, +5% boss damage at max)", legion: "HP +2/3/4/5/6%" },
-  { name: "Blaze Wizard", region: "Cygnus Knights", summary: "Cygnus fire mage who controls orbital flames.", difficulty: "Hard", link: "Orbital Flame (+1 additional Flames for Blaze Wizards)", legion: "INT +10/20/40/80/100" },
-  { name: "Wind Archer", region: "Cygnus Knights", summary: "Cygnus archer who commands the power of wind.", difficulty: "Normal", link: "Sylph's Aid (+10% knockback resistance)", legion: "DEX +10/20/40/80/100" },
-  { name: "Night Walker", region: "Cygnus Knights", summary: "Cygnus assassin who strikes from darkness with throwing stars.", difficulty: "Hard", link: "Shadow Bat (summon bats that attack enemies)", legion: "LUK +10/20/40/80/100" },
-  { name: "Thunder Breaker", region: "Cygnus Knights", summary: "Cygnus pirate channeling lightning through martial arts.", difficulty: "Hard", link: "Lightning Boost (+2/4/6% damage)", legion: "STR +10/20/40/80/100" },
-  { name: "Mihile", region: "Cygnus Knights", summary: "Cygnus knight with a royal guard shield mechanic.", difficulty: "Hard", link: "Knight's Watch (+100% knockback resistance at max)", legion: "HP +2/3/4/5/6%" },
+  { name: "Dawn Warrior", region: "Cygnus Knights", summary: "Cygnus knight wielding the power of light and dark swords.", difficulty: "Hard", link: "Cygnus Blessing (+9 ATT/MATT, +3 status resist, +3% elemental resist)", legion: "HP +2/3/4/5/6%" },
+  { name: "Blaze Wizard", region: "Cygnus Knights", summary: "Cygnus fire mage who controls orbital flames.", difficulty: "Hard", link: "Cygnus Blessing (+9 ATT/MATT, +3 status resist, +3% elemental resist)", legion: "INT +10/20/40/80/100" },
+  { name: "Wind Archer", region: "Cygnus Knights", summary: "Cygnus archer who commands the power of wind.", difficulty: "Normal", link: "Cygnus Blessing (+9 ATT/MATT, +3 status resist, +3% elemental resist)", legion: "DEX +10/20/40/80/100" },
+  { name: "Night Walker", region: "Cygnus Knights", summary: "Cygnus assassin who strikes from darkness with throwing stars.", difficulty: "Hard", link: "Cygnus Blessing (+9 ATT/MATT, +3 status resist, +3% elemental resist)", legion: "LUK +10/20/40/80/100" },
+  { name: "Thunder Breaker", region: "Cygnus Knights", summary: "Cygnus pirate channeling lightning through martial arts.", difficulty: "Hard", link: "Cygnus Blessing (+9 ATT/MATT, +3 status resist, +3% elemental resist)", legion: "STR +10/20/40/80/100" },
+  { name: "Mihile", region: "Cygnus Knights", summary: "Cygnus knight with a royal guard shield mechanic.", difficulty: "Hard", link: "Knight's Watch (15s stance, +100 status resist, CD: 120s)", legion: "HP +2/3/4/5/6%" },
   // ── Heroes of Maple ──
-  { name: "Aran", region: "Heroes of Maple", summary: "Polearm hero of legend with fast combo attacks.", difficulty: "Easy", link: "Combo Kill Blessing (+650% EXP for combo kills)", legion: "EXP +2/3/4/5/6%" },
-  { name: "Evan", region: "Heroes of Maple", summary: "Dragon master who fights alongside the dragon Mir.", difficulty: "Normal", link: "Rune Mastery (+30% rune duration at max)", legion: "EXP +2/3/4/5/6%" },
-  { name: "Mercedes", region: "Heroes of Maple", summary: "Elf queen with dual bowguns and acrobatic combos.", difficulty: "Hard", link: "Elven Blessing (+15% EXP at max)", legion: "Cooldown Skip +2/3/4/5/6%" },
-  { name: "Phantom", region: "Heroes of Maple", summary: "Gentleman thief who steals and uses other classes' skills.", difficulty: "Hard", link: "Phantom Instinct (+15% crit rate at max)", legion: "Meso Obtained +2/3/4/5/6%" },
-  { name: "Luminous", region: "Heroes of Maple", summary: "Mage of light and dark with screen-clearing attacks.", difficulty: "Easy", link: "Luminous Link (+15% IED at max)", legion: "INT +10/20/40/80/100" },
-  { name: "Shade", region: "Heroes of Maple", summary: "Lonely spirit fighter with fox spirit powers.", difficulty: "Easy", link: "Close Call (chance to survive lethal attack at 1 HP)", legion: "Crit Damage +1/2/3/4/5%" },
+  { name: "Aran", region: "Heroes of Maple", summary: "Polearm hero of legend with fast combo attacks.", difficulty: "Easy", link: "Combo Kill Blessing (+650% combo kill EXP)", legion: "EXP +2/3/4/5/6%" },
+  { name: "Evan", region: "Heroes of Maple", summary: "Dragon master who fights alongside the dragon Mir.", difficulty: "Normal", link: "Rune Persistence (+50% rune duration)", legion: "EXP +2/3/4/5/6%" },
+  { name: "Mercedes", region: "Heroes of Maple", summary: "Elf queen with dual bowguns and acrobatic combos.", difficulty: "Hard", link: "Elven Blessing (+15% EXP)", legion: "Cooldown Skip +2/3/4/5/6%" },
+  { name: "Phantom", region: "Heroes of Maple", summary: "Gentleman thief who steals and uses other classes' skills.", difficulty: "Hard", link: "Phantom Instinct (+15% crit rate)", legion: "Meso Obtained +2/3/4/5/6%" },
+  { name: "Luminous", region: "Heroes of Maple", summary: "Mage of light and dark with screen-clearing attacks.", difficulty: "Easy", link: "Light Wash (+15% IED)", legion: "INT +10/20/40/80/100" },
+  { name: "Shade", region: "Heroes of Maple", summary: "Lonely spirit fighter with fox spirit powers.", difficulty: "Easy", link: "Close Call (10% chance to survive lethal attack)", legion: "Crit Damage +1/2/3/4/5%" },
   // ── Resistance ──
-  { name: "Battle Mage", region: "Resistance", summary: "Resistance mage using a staff in close-range combat with auras.", difficulty: "Normal", link: "Battle Rage (+5% damage and +5% boss damage at max)", legion: "INT +10/20/40/80/100" },
-  { name: "Wild Hunter", region: "Resistance", summary: "Resistance archer who rides a jaguar into battle.", difficulty: "Normal", link: "Wild Instinct (+4/8/12/16/20% damage)", legion: "Flat Damage +10/20/30/40/50" },
-  { name: "Mechanic", region: "Resistance", summary: "Resistance engineer piloting a mech suit with gadgets.", difficulty: "Normal", link: "Mechanic Dash (+Buff Duration 5/10/15%)", legion: "Buff Duration +5/10/15/20/25%" },
-  { name: "Blaster", region: "Resistance", summary: "Resistance warrior with a massive arm cannon and combo dashes.", difficulty: "Hard", link: "Arm Cannon Boost (+2/4/6% IED)", legion: "IED +1/2/3/5/6%" },
-  { name: "Xenon", region: "Resistance", summary: "Hybrid thief/pirate android with three stat lines.", difficulty: "Normal", link: "Multilateral (+10% all stat at max)", legion: "STR/DEX/LUK +5/10/20/40/50" },
+  { name: "Battle Mage", region: "Resistance", summary: "Resistance mage using a staff in close-range combat with auras.", difficulty: "Normal", link: "Spirit of Freedom (2s invincibility after revive)", legion: "INT +10/20/40/80/100" },
+  { name: "Wild Hunter", region: "Resistance", summary: "Resistance archer who rides a jaguar into battle.", difficulty: "Normal", link: "Spirit of Freedom (2s invincibility after revive)", legion: "Flat Damage +10/20/30/40/50" },
+  { name: "Mechanic", region: "Resistance", summary: "Resistance engineer piloting a mech suit with gadgets.", difficulty: "Normal", link: "Spirit of Freedom (2s invincibility after revive)", legion: "Buff Duration +5/10/15/20/25%" },
+  { name: "Blaster", region: "Resistance", summary: "Resistance warrior with a massive arm cannon and combo dashes.", difficulty: "Hard", link: "Spirit of Freedom (2s invincibility after revive)", legion: "IED +1/2/3/5/6%" },
+  { name: "Xenon", region: "Resistance", summary: "Hybrid thief/pirate android with three stat lines.", difficulty: "Normal", link: "Hybrid Logic (+10% all stats)", legion: "STR/DEX/LUK +5/10/20/40/50" },
   // ── Demons ──
-  { name: "Demon Slayer", region: "Demons", summary: "Demon warrior using Fury to unleash devastating axe attacks.", difficulty: "Easy", link: "Fury Unleashed (+15% boss damage at max)", legion: "Status Resistance +1/2/3/4/5" },
-  { name: "Demon Avenger", region: "Demons", summary: "Demon who sacrifices HP instead of MP for powerful attacks.", difficulty: "Easy", link: "Wild Rage (+10% damage at max)", legion: "Boss Damage +1/2/3/5/6%" },
+  { name: "Demon Slayer", region: "Demons", summary: "Demon warrior using Fury to unleash devastating axe attacks.", difficulty: "Easy", link: "Fury Unleashed (+15% boss damage)", legion: "Status Resistance +1/2/3/4/5" },
+  { name: "Demon Avenger", region: "Demons", summary: "Demon who sacrifices HP instead of MP for powerful attacks.", difficulty: "Easy", link: "Wild Rage (+10% damage)", legion: "Boss Damage +1/2/3/5/6%" },
   // ── Nova ──
-  { name: "Kaiser", region: "Nova", summary: "Dragon warrior who transforms into a powerful dragon form.", difficulty: "Normal", link: "Iron Will (+15% HP at max)", legion: "STR +10/20/40/80/100" },
-  { name: "Angelic Buster", region: "Nova", summary: "Magical girl pirate with flashy energy blasts.", difficulty: "Easy", link: "Terms and Conditions (+60% skip chance at max)", legion: "DEX +10/20/40/80/100" },
-  { name: "Cadena", region: "Nova", summary: "Chain-wielding thief with fast, fluid combo attacks.", difficulty: "Hard", link: "Cadena's Link (+6/12% damage to statused enemies)", legion: "LUK +10/20/40/80/100" },
-  { name: "Kain", region: "Nova", summary: "Archer wielding a malice-infused weapon with transformation skills.", difficulty: "Normal", link: "Kain's Link (+3/6% damage)", legion: "DEX +10/20/40/80/100" },
+  { name: "Kaiser", region: "Nova", summary: "Dragon warrior who transforms into a powerful dragon form.", difficulty: "Normal", link: "Iron Will (+15% Max HP)", legion: "STR +10/20/40/80/100" },
+  { name: "Angelic Buster", region: "Nova", summary: "Magical girl pirate with flashy energy blasts.", difficulty: "Easy", link: "Terms and Conditions (+45% damage for 10s, CD: 60s)", legion: "DEX +10/20/40/80/100" },
+  { name: "Cadena", region: "Nova", summary: "Chain-wielding thief with fast, fluid combo attacks.", difficulty: "Hard", link: "Unfair Advantage (+6% damage to weaker enemies, +6% to afflicted)", legion: "LUK +10/20/40/80/100" },
+  { name: "Kain", region: "Nova", summary: "Archer wielding a malice-infused weapon with transformation skills.", difficulty: "Normal", link: "Time to Prepare (5 stacks → +17% damage for 20s, CD: 40s)", legion: "DEX +10/20/40/80/100" },
   // ── Flora ──
-  { name: "Illium", region: "Flora", summary: "Mage who commands crystal wings and magical constructs.", difficulty: "Normal", link: "Illium Link (+Damage when moving)", legion: "INT +10/20/40/80/100" },
-  { name: "Ark", region: "Flora", summary: "Pirate who channels chaotic flora powers through martial arts.", difficulty: "Normal", link: "Ark Link (+1/2% damage per second in combat, up to 11%)", legion: "STR +10/20/40/80/100" },
-  { name: "Adele", region: "Flora", summary: "Knight who summons ethereal swords to fight alongside her.", difficulty: "Easy", link: "Noble Fire (+2/4% damage + 1/2% boss damage)", legion: "STR +10/20/40/80/100" },
-  { name: "Khali", region: "Flora", summary: "Thief who wields chakrams with swift aerial combos.", difficulty: "Normal", link: "Khali Link (+4/8% damage to normal monsters)", legion: "LUK +10/20/40/80/100" },
+  { name: "Illium", region: "Flora", summary: "Mage who commands crystal wings and magical constructs.", difficulty: "Normal", link: "Tide of Battle (+3% damage per stack, 4 stacks max, 10s)", legion: "INT +10/20/40/80/100" },
+  { name: "Ark", region: "Flora", summary: "Pirate who channels chaotic flora powers through martial arts.", difficulty: "Normal", link: "Solus (+1% damage, +2% per stack up to 5, 5s duration)", legion: "STR +10/20/40/80/100" },
+  { name: "Adele", region: "Flora", summary: "Knight who summons ethereal swords to fight alongside her.", difficulty: "Easy", link: "Noble Fire (+4% boss damage, +2% party damage per member, max 8%)", legion: "STR +10/20/40/80/100" },
+  { name: "Khali", region: "Flora", summary: "Thief who wields chakrams with swift aerial combos.", difficulty: "Normal", link: "Innate Gift (+5% damage, heals 2% HP/MP per sec for 5s, CD: 30s)", legion: "LUK +10/20/40/80/100" },
   // ── Anima ──
-  { name: "Hoyoung", region: "Anima", summary: "Sage who uses talismans, clones, and flashy Eastern magic.", difficulty: "Hard", link: "Hoyoung Link (+7/14% IED)", legion: "LUK +10/20/40/80/100" },
-  { name: "Lara", region: "Anima", summary: "Nature mage who channels mountain energy and bell magic.", difficulty: "Normal", link: "Lara Link (+3/6% damage)", legion: "INT +10/20/40/80/100" },
+  { name: "Hoyoung", region: "Anima", summary: "Sage who uses talismans, clones, and flashy Eastern magic.", difficulty: "Hard", link: "Bravado (+10% IED, +14% damage to full HP enemies)", legion: "LUK +10/20/40/80/100" },
+  { name: "Lara", region: "Anima", summary: "Nature mage who channels mountain energy and bell magic.", difficulty: "Normal", link: "Nature's Friend (+5% damage, +11% normal monster damage for 30s, CD: 30s)", legion: "INT +10/20/40/80/100" },
+  { name: "Ren", region: "Anima", summary: "Sword-wielding warrior who channels Imugi spirit powers.", difficulty: "Normal", link: "Grounded Body (-4% damage taken)", legion: "Movement Speed +2/4/6/8/10" },
   // ── Other ──
-  { name: "Zero", region: "Other", summary: "Tag-team duo wielding a sword and lapis — two characters in one.", difficulty: "Hard", link: "Rhinne's Blessing (+10% EXP at max)", legion: "EXP +2/3/4/5/6%" },
-  { name: "Kinesis", region: "Other", summary: "Psychic who hurls objects and controls gravity with telekinesis.", difficulty: "Hard", link: "Kinesis Link (+4% crit damage)", legion: "INT +10/20/40/80/100" },
-  { name: "Lynn", region: "Other", summary: "Swordswoman with a unique stance-switching combat system.", difficulty: "Normal", link: "Lynn Link (+3/6% boss damage)", legion: "STR +10/20/40/80/100" },
+  { name: "Zero", region: "Other", summary: "Tag-team duo wielding a sword and lapis — two characters in one.", difficulty: "Hard", link: "Rhinne's Blessing (-6% damage taken, +4% IED)", legion: "EXP +2/3/4/5/6%" },
+  { name: "Kinesis", region: "Other", summary: "Psychic who hurls objects and controls gravity with telekinesis.", difficulty: "Hard", link: "Judgment (+4% crit damage)", legion: "INT +10/20/40/80/100" },
   // ── Sengoku ──
-  { name: "Hayato", region: "Sengoku", summary: "Samurai with quick-draw sword techniques.", difficulty: "Normal", link: "Keen Edge (+10/15/25 all stat and +5/10/15% HP)", legion: "Crit Damage +1/2/3/4/5%" },
-  { name: "Kanna", region: "Sengoku", summary: "Fox spirit mage with fan-based attacks and Kishin summons.", difficulty: "Normal", link: "Elementalism (+5/10% damage)", legion: "INT +10/20/40/80/100" },
-  // ── Friends of Maple ──
-  { name: "Beast Tamer", region: "Friends of Maple", summary: "Mage who summons animal companions to fight.", difficulty: "Easy", link: "Focus Spirit (+4/7/10% boss damage, +4/7/10% crit rate, +3/5/7% HP/MP)", legion: "Crit Rate +1/2/3/4/5%" },
-];
+  { name: "Hayato", region: "Sengoku", summary: "Samurai with quick-draw sword techniques.", difficulty: "Normal", link: "Moonlit Blade Learnings (+5% crit damage; requires 100% crit rate)", legion: "Crit Damage +1/2/3/4/5%" },
+  { name: "Kanna", region: "Sengoku", summary: "Fox spirit mage with fan-based attacks and Kishin summons.", difficulty: "Normal", link: "Elementalism (+15% damage for 12s after 40 attack skills)", legion: "INT +10/20/40/80/100" },
+  // ── Jianghu ──
+  { name: "Lynn", region: "Jianghu", summary: "Swordswoman with a unique stance-switching combat system.", difficulty: "Normal", link: "Focus Spirit (+7% boss damage, +7% crit rate, +4% HP/MP)", legion: "STR +10/20/40/80/100" },
+  { name: "Mo Xuan", region: "Jianghu", summary: "Martial arts pirate with fluid stance-switching and combo chains.", difficulty: "Hard", link: "Qi Cultivation (+4% boss damage, +2% per boss attack, max 6 stacks)", legion: "Crit Damage +1/2/3/4/5/6%" },
+  // ── Shine ──
+  { name: "Sia Astelle", region: "Shine", summary: "Constellation mage who fuses marking skills into powerful stellar attacks.", difficulty: "Normal", link: "Tree of Stars (+7% buff duration, +2% crit damage)", legion: "Abnormal Status Damage +1/2/3/5/6%" },
+].map((cls) => ({ ...cls, portrait: classPortraitUrl(cls.name) })) as MapleClass[];
 
 const DIFFICULTY_COLORS: Record<Difficulty, string> = {
   Easy: "#2d8a2d",
@@ -223,17 +229,13 @@ function ClassRandomizer({ theme }: { theme: AppTheme }) {
               justifyContent: "center",
             }}
           >
-            {result.portrait ? (
-              <Image
-                src={result.portrait}
-                alt={result.name}
-                width={120}
-                height={120}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <span style={{ fontSize: "2.5rem" }}>⚔️</span>
-            )}
+            <img
+              src={result.portrait}
+              alt={result.name}
+              width={120}
+              height={120}
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            />
           </div>
 
           {/* Details */}
@@ -306,17 +308,13 @@ function ClassInfoPanel({ cls, theme }: { cls: MapleClass; theme: AppTheme }) {
           justifyContent: "center",
         }}
       >
-        {cls.portrait ? (
-          <Image
-            src={cls.portrait}
-            alt={cls.name}
-            width={100}
-            height={100}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <span style={{ fontSize: "2rem" }}>⚔️</span>
-        )}
+        <img
+          src={cls.portrait}
+          alt={cls.name}
+          width={100}
+          height={100}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
       </div>
 
       {/* Details */}
@@ -376,7 +374,7 @@ function ClassDirectory({ theme }: { theme: AppTheme }) {
           color: theme.text,
         }}
       >
-        All Classes by Region
+        All Classes by Faction
       </div>
 
       {grouped.map(({ region, classes }) => (
@@ -436,17 +434,13 @@ function ClassDirectory({ theme }: { theme: AppTheme }) {
                         boxShadow: isSelected ? `0 0 0 2px ${theme.accentSoft}` : "none",
                       }}
                     >
-                      {cls.portrait ? (
-                        <Image
-                          src={cls.portrait}
-                          alt={cls.name}
-                          width={72}
-                          height={72}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: "1.5rem", opacity: isSelected ? 1 : 0.4 }}>⚔️</span>
-                      )}
+                      <img
+                        src={cls.portrait}
+                        alt={cls.name}
+                        width={72}
+                        height={72}
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
                     </div>
                     <div
                       style={{
