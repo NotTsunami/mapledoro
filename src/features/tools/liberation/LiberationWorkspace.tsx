@@ -185,44 +185,60 @@ function calculate(
 
 // -- Component ----------------------------------------------------------------
 
-export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
-  const [type, setType] = useState<LiberationType>("genesis");
-  const [questIdx, setQuestIdx] = useState(0);
-  const [currentTraces, setCurrentTraces] = useState(0);
-  const [genesisPass, setGenesisPass] = useState(false);
-  const [startDate, setStartDate] = useState(todayStr);
-  const [selections, setSelections] = useState<Record<string, BossSelection>>(
-    defaultSelections,
-  );
-  const [loaded, setLoaded] = useState(false);
+interface FormState {
+  type: LiberationType;
+  questIdx: number;
+  currentTraces: number;
+  genesisPass: boolean;
+  startDate: string;
+  selections: Record<string, BossSelection>;
+}
 
-  // Load
-  useEffect(() => {
-    const saved = loadState();
-    if (saved) {
-      setType(saved.type);
-      setQuestIdx(saved.currentQuestIdx);
-      setCurrentTraces(saved.currentTraces);
-      setGenesisPass(saved.genesisPass);
-      setStartDate(saved.startDate);
-      setSelections(saved.bosses);
-    }
-    setLoaded(true);
-  }, []);
+function initFormState(): FormState {
+  const saved = loadState();
+  if (saved) {
+    return {
+      type: saved.type,
+      questIdx: saved.currentQuestIdx,
+      currentTraces: saved.currentTraces,
+      genesisPass: saved.genesisPass,
+      startDate: saved.startDate,
+      selections: saved.bosses,
+    };
+  }
+  return {
+    type: "genesis",
+    questIdx: 0,
+    currentTraces: 0,
+    genesisPass: false,
+    startDate: todayStr(),
+    selections: defaultSelections(),
+  };
+}
+
+export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
+  const [form, setForm] = useState<FormState>(initFormState);
+
+  const { type, questIdx, currentTraces, genesisPass, startDate, selections } = form;
+
+  const setType = useCallback((v: LiberationType) => setForm((f) => ({ ...f, type: v })), []);
+  const setQuestIdx = useCallback((v: number) => setForm((f) => ({ ...f, questIdx: v })), []);
+  const setCurrentTraces = useCallback((v: number) => setForm((f) => ({ ...f, currentTraces: v })), []);
+  const setGenesisPass = useCallback((updater: (prev: boolean) => boolean) => setForm((f) => ({ ...f, genesisPass: updater(f.genesisPass) })), []);
+  const setStartDate = useCallback((v: string) => setForm((f) => ({ ...f, startDate: v })), []);
+  const setSelections = useCallback((updater: (prev: Record<string, BossSelection>) => Record<string, BossSelection>) => setForm((f) => ({ ...f, selections: updater(f.selections) })), []);
 
   // Persist
   useEffect(() => {
-    if (loaded) {
-      saveState({
-        type,
-        currentQuestIdx: questIdx,
-        currentTraces,
-        genesisPass,
-        startDate,
-        bosses: selections,
-      });
-    }
-  }, [type, questIdx, currentTraces, genesisPass, startDate, selections, loaded]);
+    saveState({
+      type,
+      currentQuestIdx: questIdx,
+      currentTraces,
+      genesisPass,
+      startDate,
+      bosses: selections,
+    });
+  }, [type, questIdx, currentTraces, genesisPass, startDate, selections]);
 
   const bosses = type === "genesis" ? GENESIS_BOSSES : DESTINY_BOSSES;
   const quests = type === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS;
@@ -238,7 +254,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
         },
       }));
     },
-    [type],
+    [type, setSelections],
   );
 
   const setPartySize = useCallback(
@@ -251,7 +267,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
         },
       }));
     },
-    [type],
+    [type, setSelections],
   );
 
   const setCleared = useCallback(
@@ -264,7 +280,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
         },
       }));
     },
-    [type],
+    [type, setSelections],
   );
 
   const resetBosses = useCallback(() => {
@@ -279,17 +295,16 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
       }
       return next;
     });
-  }, [type]);
+  }, [type, setSelections]);
 
   // Switch type, clamp quest index
   const switchType = useCallback(
     (t: LiberationType) => {
       setType(t);
-      const maxQuest = (t === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS).length - 1;
-      setQuestIdx((prev) => Math.min(prev, maxQuest));
+      setQuestIdx((prev) => Math.min(prev, (t === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS).length - 1));
       setCurrentTraces(0);
     },
-    [],
+    [setType, setQuestIdx, setCurrentTraces],
   );
 
   // Calculate
