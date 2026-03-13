@@ -300,11 +300,14 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
   // Switch type, clamp quest index
   const switchType = useCallback(
     (t: LiberationType) => {
-      setType(t);
-      setQuestIdx((prev) => Math.min(prev, (t === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS).length - 1));
-      setCurrentTraces(0);
+      setForm((f) => ({
+        ...f,
+        type: t,
+        questIdx: Math.min(f.questIdx, (t === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS).length - 1),
+        currentTraces: 0,
+      }));
     },
-    [setType, setQuestIdx, setCurrentTraces],
+    [],
   );
 
   // Calculate
