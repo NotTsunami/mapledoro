@@ -82,16 +82,13 @@ function fmt(ms: number) {
   return [h, m, sc].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-function pct(elapsed: number, total: number) {
-  return `${Math.min(100, Math.max(0, (elapsed / total) * 100)).toFixed(1)}%`;
-}
 
 // -- Ursus 2× meso helpers ----------------------------------------------------
 // Two 4-hour windows daily (EST → UTC+0):
 //   9 PM – 1 AM EST  →  02:00 – 06:00 UTC
 //   2 PM – 6 PM EST  →  19:00 – 23:00 UTC
 function getUrsusStatus(now: Date):
-  | { active: true; remaining: number; elapsed: number; total: number }
+  | { active: true; remaining: number }
   | { active: false; until: number } {
   const h = now.getUTCHours();
   const nowMs = now.getTime();
@@ -109,8 +106,6 @@ function getUrsusStatus(now: Date):
     return {
       active: true as const,
       remaining: end.getTime() - nowMs,
-      elapsed: (nowMs - start.getTime()) / 1000,
-      total: 4 * 3600,
     };
   }
 
@@ -165,13 +160,11 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
       label: "Daily Reset",
       color: theme.accent,
       countdown: fmt(daily.getTime() - now.getTime()),
-      progress: pct(86400 - (daily.getTime() - now.getTime()) / 1000, 86400),
     },
     {
       label: "Weekly Reset",
       color: theme.accent,
       countdown: fmt(weekly.getTime() - now.getTime()),
-      progress: pct(604800 - (weekly.getTime() - now.getTime()) / 1000, 604800),
     },
   ];
 
@@ -353,37 +346,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                         {r.countdown}
                       </div>
                     </div>
-                    <div style={{ width: "90px" }}>
-                      <div
-                        style={{
-                          height: "6px",
-                          background: theme.border,
-                          borderRadius: "3px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            background: r.color,
-                            width: r.progress,
-                            borderRadius: "3px",
-                            transition: "width 1s linear",
-                          }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.65rem",
-                          color: theme.muted,
-                          marginTop: "4px",
-                          textAlign: "right",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {r.progress} elapsed
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -468,39 +430,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                       {ursus.active ? fmt(ursus.remaining) : fmt(ursus.until)}
                     </div>
                   </div>
-                  {ursus.active && (
-                    <div style={{ width: "90px" }}>
-                      <div
-                        style={{
-                          height: "6px",
-                          background: theme.border,
-                          borderRadius: "3px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            background: theme.accent,
-                            width: pct(ursus.elapsed, ursus.total),
-                            borderRadius: "3px",
-                            transition: "width 1s linear",
-                          }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.65rem",
-                          color: theme.muted,
-                          marginTop: "4px",
-                          textAlign: "right",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {pct(ursus.elapsed, ursus.total)} elapsed
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div
                   style={{
