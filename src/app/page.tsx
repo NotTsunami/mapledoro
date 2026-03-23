@@ -463,7 +463,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                     </div>
                     <div
                       className="countdown"
-                      style={{ color: ursus.active ? "#10b981" : theme.accent }}
+                      style={{ color: theme.accent }}
                     >
                       {ursus.active ? fmt(ursus.remaining) : fmt(ursus.until)}
                     </div>
@@ -481,7 +481,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                         <div
                           style={{
                             height: "100%",
-                            background: "#10b981",
+                            background: theme.accent,
                             width: pct(ursus.elapsed, ursus.total),
                             borderRadius: "3px",
                             transition: "width 1s linear",
