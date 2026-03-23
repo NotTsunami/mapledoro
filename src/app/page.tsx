@@ -186,8 +186,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
         .panel:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
 
         .row-hover:hover { background: ${theme.accentSoft} !important; }
-        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: blink 2s infinite; }
-        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
         .countdown { font-family: 'Fredoka One', cursive; font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
 
@@ -292,25 +290,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                 >
                   Reset Timers
                 </span>
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <div className="live-dot" />
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      color: theme.muted,
-                    }}
-                  >
-                    LIVE
-                  </span>
-                </div>
               </div>
 
               <div style={{ padding: "0.75rem" }}>
