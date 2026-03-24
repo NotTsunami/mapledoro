@@ -154,7 +154,7 @@
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 920px) {
   .topNav {
     gap: 0.8rem !important;
   }
