@@ -82,8 +82,42 @@ function fmt(ms: number) {
   return [h, m, sc].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-function pct(elapsed: number, total: number) {
-  return `${Math.min(100, Math.max(0, (elapsed / total) * 100)).toFixed(1)}%`;
+
+// -- Ursus 2× meso helpers ----------------------------------------------------
+function getUrsusStatus(now: Date):
+  | { active: true; remaining: number }
+  | { active: false; until: number } {
+  const h = now.getUTCHours();
+  const nowMs = now.getTime();
+
+  const inWindow1 = h >= 1 && h < 5;
+  const inWindow2 = h >= 18 && h < 22;
+
+  if (inWindow1 || inWindow2) {
+    const endHour = inWindow1 ? 5 : 22;
+    const end = new Date(now);
+    end.setUTCHours(endHour, 0, 0, 0);
+    return {
+      active: true as const,
+      remaining: end.getTime() - nowMs,
+    };
+  }
+
+  // Next window start
+  let nextStart: Date;
+  if (h < 1) {
+    nextStart = new Date(now);
+    nextStart.setUTCHours(1, 0, 0, 0);
+  } else if (h >= 5 && h < 18) {
+    nextStart = new Date(now);
+    nextStart.setUTCHours(18, 0, 0, 0);
+  } else {
+    // h >= 22
+    nextStart = new Date(now);
+    nextStart.setUTCDate(nextStart.getUTCDate() + 1);
+    nextStart.setUTCHours(1, 0, 0, 0);
+  }
+  return { active: false as const, until: nextStart.getTime() - nowMs };
 }
 
 function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
@@ -120,15 +154,24 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
       label: "Daily Reset",
       color: theme.accent,
       countdown: fmt(daily.getTime() - now.getTime()),
-      progress: pct(86400 - (daily.getTime() - now.getTime()) / 1000, 86400),
     },
     {
       label: "Weekly Reset",
-      color: "#f59e0b",
+      color: theme.accent,
       countdown: fmt(weekly.getTime() - now.getTime()),
-      progress: pct(604800 - (weekly.getTime() - now.getTime()) / 1000, 604800),
     },
   ];
+
+  const ursus = getUrsusStatus(now);
+
+  const fmtLocal = (utcHour: number) => {
+    const d = new Date(now);
+    d.setUTCHours(utcHour, 0, 0, 0);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+  const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: "short" })
+    .formatToParts(now)
+    .find((p) => p.type === "timeZoneName")?.value ?? "Local";
 
   const allFilteredPatchNotes =
     patchFilter === "All"
@@ -146,8 +189,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
         .panel:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
 
         .row-hover:hover { background: ${theme.accentSoft} !important; }
-        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: blink 2s infinite; }
-        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
         .countdown { font-family: 'Fredoka One', cursive; font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
 
@@ -252,25 +293,6 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                 >
                   Reset Timers
                 </span>
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <div className="live-dot" />
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      color: theme.muted,
-                    }}
-                  >
-                    LIVE
-                  </span>
-                </div>
               </div>
 
               <div style={{ padding: "0.75rem" }}>
@@ -306,39 +328,102 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                         {r.countdown}
                       </div>
                     </div>
-                    <div style={{ width: "90px" }}>
-                      <div
-                        style={{
-                          height: "6px",
-                          background: theme.border,
-                          borderRadius: "3px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            background: r.color,
-                            width: r.progress,
-                            borderRadius: "3px",
-                            transition: "width 1s linear",
-                          }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.65rem",
-                          color: theme.muted,
-                          marginTop: "4px",
-                          textAlign: "right",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {r.progress} elapsed
-                      </div>
-                    </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div
+              className="fade-in panel"
+              style={{
+                animationDelay: "0.25s",
+                background: theme.panel,
+                border: `1px solid ${theme.border}`,
+                borderRadius: "18px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1rem 1.25rem 0.8rem",
+                  borderBottom: `1px solid ${theme.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontSize: "1.1rem" }}>🐻</span>
+                <span
+                  style={{
+                    fontFamily: "'Fredoka One', cursive",
+                    fontSize: "1.15rem",
+                    color: theme.text,
+                  }}
+                >
+                  Ursus 2× Meso
+                </span>
+                {ursus.active && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      color: "#fff",
+                      background: "#10b981",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    ACTIVE
+                  </span>
+                )}
+              </div>
+              <div style={{ padding: "0.75rem" }}>
+                <div
+                  style={{
+                    background: theme.timerBg,
+                    borderRadius: "14px",
+                    padding: "1rem 1.25rem",
+                    border: `1px solid ${theme.border}`,
+                    transition: "background 0.35s, border-color 0.35s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        fontWeight: 800,
+                        color: theme.muted,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      {ursus.active ? "Ends In" : "Starts In"}
+                    </div>
+                    <div
+                      className="countdown"
+                      style={{ color: theme.accent }}
+                    >
+                      {ursus.active ? fmt(ursus.remaining) : fmt(ursus.until)}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    fontSize: "0.65rem",
+                    color: theme.muted,
+                    fontWeight: 700,
+                    textAlign: "center",
+                  }}
+                >
+                  {fmtLocal(1)} – {fmtLocal(5)} &amp; {fmtLocal(18)} – {fmtLocal(22)} {tzLabel}
+                </div>
               </div>
             </div>
 
