@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import type { AppTheme } from "../../../components/themes";
+import { ToolHeader } from "../../../components/ToolHeader";
 import {
   type LiberationType,
   type LiberationBoss,
@@ -407,41 +407,11 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
         }}
       >
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-          {/* Header */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <Link
-              href="/tools"
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 800,
-                color: theme.accent,
-                textDecoration: "none",
-              }}
-            >
-              ← Back to Tools
-            </Link>
-            <div
-              style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: "1.5rem",
-                color: theme.text,
-                marginTop: "0.5rem",
-              }}
-            >
-              Liberation Calculator
-            </div>
-            <div
-              style={{
-                fontSize: "0.8rem",
-                color: theme.muted,
-                fontWeight: 600,
-                marginTop: "0.15rem",
-                lineHeight: 1.5,
-              }}
-            >
-              Estimate your Genesis or Destiny liberation completion date.
-            </div>
-          </div>
+          <ToolHeader
+            theme={theme}
+            title="Liberation Calculator"
+            description="Estimate your Genesis or Destiny liberation completion date."
+          />
 
           {/* Type toggle */}
           <div className="fade-in" style={sectionPanel}>
