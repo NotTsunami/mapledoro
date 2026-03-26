@@ -1,21 +1,71 @@
 import { toCharacterKey } from "./characterKeys";
-import { getRequiredSetupFlowId, type SetupFlowId } from "../setup/flows";
+import { getRequiredSetupFlowId } from "../setup/flows";
 import type { NormalizedCharacterData } from "./types";
 import { readAllSetupDrafts, readLastSetupDraft } from "./setupDraftStorage";
 
 export const CHARACTERS_STORE_VERSION = 1 as const;
 export const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
 
+export interface StoredTripleStatField {
+  base: string;
+  percent: string;
+  percentUnapplied: string;
+}
+
+export interface StoredCooldownReductionField {
+  seconds: string;
+  percent: string;
+}
+
+export interface StoredCharacterStats {
+  hp: StoredTripleStatField;
+  mp: StoredTripleStatField;
+  str: StoredTripleStatField;
+  dex: StoredTripleStatField;
+  int: StoredTripleStatField;
+  luk: StoredTripleStatField;
+  damage: string;
+  bossDamage: string;
+  ignoreDefense: string;
+  attackPower: string;
+  magicAtt: string;
+  criticalRate: string;
+  criticalDamage: string;
+  buffDuration: string;
+  cooldownReduction: StoredCooldownReductionField;
+  cooldownSkip: string;
+  ignoreElementalResistance: string;
+  additionalStatusDamage: string;
+  summonDuration: string;
+  arcanePower: string;
+  sacredPower: string;
+}
+
 export interface StoredCharacterRecord {
-  id: string;
   ign: string;
   worldId: number;
-  data: NormalizedCharacterData;
-  setup: {
-    activeFlowId: SetupFlowId;
-    completedFlowIds: SetupFlowId[];
-    hasCompletedRequiredFlow: boolean;
-  };
+  characterID: number;
+  characterName: string;
+  worldID: number;
+  level: number;
+  exp: number;
+  jobName: string;
+  characterImgURL: string;
+  isSearchTarget: boolean;
+  startRank: number;
+  overallRank: number;
+  overallGap: number;
+  legionRank: number;
+  legionGap: number;
+  legionLevel: number;
+  raidPower: number;
+  tierID: number;
+  score: number;
+  fetchedAt: number;
+  expiresAt: number;
+  gender: "male" | "female" | null;
+  stats: StoredCharacterStats;
+  equipmentCore: string;
   meta: {
     addedAt: number;
     updatedAt: number;
@@ -68,8 +118,85 @@ function isNormalizedCharacterData(value: unknown): value is NormalizedCharacter
   );
 }
 
-function uniqueFlowIds(flowIds: SetupFlowId[]) {
-  return Array.from(new Set(flowIds));
+export function createEmptyTripleStatField(): StoredTripleStatField {
+  return {
+    base: "",
+    percent: "",
+    percentUnapplied: "",
+  };
+}
+
+export function createEmptyCharacterStats(): StoredCharacterStats {
+  return {
+    hp: createEmptyTripleStatField(),
+    mp: createEmptyTripleStatField(),
+    str: createEmptyTripleStatField(),
+    dex: createEmptyTripleStatField(),
+    int: createEmptyTripleStatField(),
+    luk: createEmptyTripleStatField(),
+    damage: "",
+    bossDamage: "",
+    ignoreDefense: "",
+    attackPower: "",
+    magicAtt: "",
+    criticalRate: "",
+    criticalDamage: "",
+    buffDuration: "",
+    cooldownReduction: {
+      seconds: "",
+      percent: "",
+    },
+    cooldownSkip: "",
+    ignoreElementalResistance: "",
+    additionalStatusDamage: "",
+    summonDuration: "",
+    arcanePower: "",
+    sacredPower: "",
+  };
+}
+
+function isStoredTripleStatField(value: unknown): value is StoredTripleStatField {
+  return (
+    isObject(value) &&
+    typeof value.base === "string" &&
+    typeof value.percent === "string" &&
+    typeof value.percentUnapplied === "string"
+  );
+}
+
+function isStoredCooldownReductionField(value: unknown): value is StoredCooldownReductionField {
+  return (
+    isObject(value) &&
+    typeof value.seconds === "string" &&
+    typeof value.percent === "string"
+  );
+}
+
+function isStoredCharacterStats(value: unknown): value is StoredCharacterStats {
+  return (
+    isObject(value) &&
+    isStoredTripleStatField(value.hp) &&
+    isStoredTripleStatField(value.mp) &&
+    isStoredTripleStatField(value.str) &&
+    isStoredTripleStatField(value.dex) &&
+    isStoredTripleStatField(value.int) &&
+    isStoredTripleStatField(value.luk) &&
+    typeof value.damage === "string" &&
+    typeof value.bossDamage === "string" &&
+    typeof value.ignoreDefense === "string" &&
+    typeof value.attackPower === "string" &&
+    typeof value.magicAtt === "string" &&
+    typeof value.criticalRate === "string" &&
+    typeof value.criticalDamage === "string" &&
+    typeof value.buffDuration === "string" &&
+    isStoredCooldownReductionField(value.cooldownReduction) &&
+    typeof value.cooldownSkip === "string" &&
+    typeof value.ignoreElementalResistance === "string" &&
+    typeof value.additionalStatusDamage === "string" &&
+    typeof value.summonDuration === "string" &&
+    typeof value.arcanePower === "string" &&
+    typeof value.sacredPower === "string"
+  );
 }
 
 export function createEmptyCharactersStore(): CharactersStore {
@@ -85,23 +212,19 @@ export function createEmptyCharactersStore(): CharactersStore {
 
 export function createStoredCharacterRecord(args: {
   character: NormalizedCharacterData;
-  activeFlowId: SetupFlowId;
-  completedFlowIds: SetupFlowId[];
+  gender?: "male" | "female" | null;
+  stats?: StoredCharacterStats;
+  equipmentCore?: string;
   addedAt?: number;
   updatedAt?: number;
 }): StoredCharacterRecord {
-  const requiredFlowId = getRequiredSetupFlowId();
-  const completedFlowIds = uniqueFlowIds(args.completedFlowIds);
   return {
-    id: toCharacterKey(args.character),
     ign: args.character.characterName,
     worldId: args.character.worldID,
-    data: args.character,
-    setup: {
-      activeFlowId: args.activeFlowId,
-      completedFlowIds,
-      hasCompletedRequiredFlow: completedFlowIds.includes(requiredFlowId),
-    },
+    ...args.character,
+    gender: args.gender ?? null,
+    stats: args.stats ?? createEmptyCharacterStats(),
+    equipmentCore: args.equipmentCore ?? "",
     meta: {
       addedAt: args.addedAt ?? Date.now(),
       updatedAt: args.updatedAt ?? Date.now(),
@@ -116,34 +239,19 @@ function parseStoredCharacterRecord(
   if (!isObject(value)) return null;
   const ign = typeof value.ign === "string" ? value.ign : null;
   const worldId = typeof value.worldId === "number" ? value.worldId : null;
-  const data = isNormalizedCharacterData(value.data) ? value.data : null;
-  const setup = isObject(value.setup) ? value.setup : null;
+  const normalizedCharacterData = isNormalizedCharacterData(value) ? value : null;
   const meta = isObject(value.meta) ? value.meta : null;
-  if (!ign || worldId === null || !data || !setup || !meta) return null;
-
-  const activeFlowId =
-    typeof setup.activeFlowId === "string"
-      ? (setup.activeFlowId as SetupFlowId)
-      : getRequiredSetupFlowId();
-  const completedFlowIds = Array.isArray(setup.completedFlowIds)
-    ? setup.completedFlowIds.filter((entry): entry is SetupFlowId => typeof entry === "string")
-    : [];
-  const derivedId = typeof value.id === "string" ? value.id : idHint;
-  const id = derivedId || toCharacterKey(data);
+  if (!ign || worldId === null || !normalizedCharacterData || !meta) return null;
+  const derivedIgn = ign || idHint || normalizedCharacterData.characterName;
 
   return {
-    id,
-    ign,
+    ...normalizedCharacterData,
+    ign: derivedIgn,
     worldId,
-    data,
-    setup: {
-      activeFlowId,
-      completedFlowIds,
-      hasCompletedRequiredFlow:
-        typeof setup.hasCompletedRequiredFlow === "boolean"
-          ? setup.hasCompletedRequiredFlow
-          : completedFlowIds.includes(getRequiredSetupFlowId()),
-    },
+    gender:
+      value.gender === "male" ? "male" : value.gender === "female" ? "female" : null,
+    stats: isStoredCharacterStats(value.stats) ? value.stats : createEmptyCharacterStats(),
+    equipmentCore: typeof value.equipmentCore === "string" ? value.equipmentCore : "",
     meta: {
       addedAt: typeof meta.addedAt === "number" ? meta.addedAt : Date.now(),
       updatedAt: typeof meta.updatedAt === "number" ? meta.updatedAt : Date.now(),
@@ -162,7 +270,7 @@ function parseCharactersStore(raw: string): CharactersStore | null {
     for (const [id, entry] of Object.entries(charactersByIdInput)) {
       const parsedEntry = parseStoredCharacterRecord(entry, id);
       if (!parsedEntry) continue;
-      charactersById[parsedEntry.id] = parsedEntry;
+      charactersById[id] = parsedEntry;
     }
 
     const order = Array.isArray(parsed.order)
@@ -214,16 +322,23 @@ function buildLegacyCharactersStore(): CharactersStore {
 
   for (const draft of drafts) {
     if (!draft.confirmedCharacter) continue;
-    const existing = charactersById[draft.characterKey];
-    charactersById[draft.characterKey] = createStoredCharacterRecord({
+    const draftId = toCharacterKey(draft.confirmedCharacter);
+    const existing = charactersById[draftId];
+    charactersById[draftId] = createStoredCharacterRecord({
       character: draft.confirmedCharacter,
-      activeFlowId: draft.activeFlowId,
-      completedFlowIds: draft.completedFlowIds,
+      gender:
+        draft.setupStepTestByStep.gender?.toLowerCase() === "male"
+          ? "male"
+          : draft.setupStepTestByStep.gender?.toLowerCase() === "female"
+            ? "female"
+            : null,
+      stats: createEmptyCharacterStats(),
+      equipmentCore: draft.setupStepTestByStep.equipment_core ?? "",
       addedAt: existing?.meta.addedAt ?? draft.savedAt,
       updatedAt: draft.savedAt,
     });
-    if (!order.includes(draft.characterKey)) {
-      order.push(draft.characterKey);
+    if (!order.includes(draftId)) {
+      order.push(draftId);
     }
   }
 
@@ -284,7 +399,7 @@ export function selectCharacterById(store: CharactersStore, id: string) {
 export function selectCharacterByIgn(store: CharactersStore, ign: string) {
   const normalizedIgn = ign.trim().toLowerCase();
   return (
-    selectCharactersList(store).find((entry) => entry.ign.trim().toLowerCase() === normalizedIgn) ??
+    selectCharactersList(store).find((entry) => toCharacterKey(entry) === normalizedIgn) ??
     null
   );
 }
@@ -301,7 +416,7 @@ export function selectChampionCharacters(store: CharactersStore) {
 }
 
 export function hasStoredCompletedRequiredSetup(store: CharactersStore) {
-  return selectCharactersList(store).some((entry) => entry.setup.hasCompletedRequiredFlow);
+  return selectCharactersList(store).length > 0;
 }
 
 export function readCharactersStoreView(): CharactersStoreView {
@@ -312,5 +427,29 @@ export function readCharactersStoreView(): CharactersStoreView {
     byId: store.charactersById,
     main: selectMainCharacter(store),
     champions: selectChampionCharacters(store),
+  };
+}
+
+export function toNormalizedCharacterData(record: StoredCharacterRecord): NormalizedCharacterData {
+  return {
+    characterID: record.characterID,
+    characterName: record.characterName,
+    worldID: record.worldID,
+    level: record.level,
+    exp: record.exp,
+    jobName: record.jobName,
+    characterImgURL: record.characterImgURL,
+    isSearchTarget: record.isSearchTarget,
+    startRank: record.startRank,
+    overallRank: record.overallRank,
+    overallGap: record.overallGap,
+    legionRank: record.legionRank,
+    legionGap: record.legionGap,
+    legionLevel: record.legionLevel,
+    raidPower: record.raidPower,
+    tierID: record.tierID,
+    score: record.score,
+    fetchedAt: record.fetchedAt,
+    expiresAt: record.expiresAt,
   };
 }

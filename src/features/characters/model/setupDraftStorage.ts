@@ -4,6 +4,7 @@
 import type { SetupStepInputById } from "../setup/types";
 import { clampFlowStepIndex, getRequiredSetupFlowId, type SetupFlowId } from "../setup/flows";
 import type { NormalizedCharacterData } from "./types";
+import { normalizeCharacterKey, normalizeCharacterName } from "./characterKeys";
 import { SETUP_DRAFT_LAST_KEY, SETUP_DRAFT_STORAGE_PREFIX, type SetupMode } from "./constants";
 
 export interface SetupDraft {
@@ -27,12 +28,8 @@ export interface SetupDraft {
   savedAt: number;
 }
 
-function normalizeCharacterName(value: string) {
-  return value.trim().toLowerCase();
-}
-
 export function makeDraftCharacterKey(character: NormalizedCharacterData) {
-  return `${character.worldID}:${normalizeCharacterName(character.characterName)}`;
+  return normalizeCharacterName(character.characterName);
 }
 
 function parseSetupDraft(raw: string): SetupDraft | null {
@@ -67,7 +64,7 @@ function parseSetupDraft(raw: string): SetupDraft | null {
       : [];
     return {
       version: 1,
-      characterKey: parsed.characterKey,
+      characterKey: normalizeCharacterKey(parsed.characterKey),
       query: parsed.query,
       setupMode: parsed.setupMode === "search" || parsed.setupMode === "import" ? parsed.setupMode : "search",
       setupFlowStarted: Boolean(parsed.setupFlowStarted),
@@ -99,7 +96,8 @@ function getSetupDraftStorageKey(characterKey: string) {
 
 export function readSetupDraftByCharacter(character: NormalizedCharacterData): SetupDraft | null {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(getSetupDraftStorageKey(makeDraftCharacterKey(character)));
+  const characterKey = makeDraftCharacterKey(character);
+  const raw = window.localStorage.getItem(getSetupDraftStorageKey(characterKey));
   if (!raw) return null;
   return parseSetupDraft(raw);
 }
@@ -145,7 +143,10 @@ export function readLastSetupDraft(): SetupDraft | null {
   if (typeof window === "undefined") return null;
   const draftKey = window.localStorage.getItem(SETUP_DRAFT_LAST_KEY);
   if (draftKey) {
-    const raw = window.localStorage.getItem(getSetupDraftStorageKey(draftKey));
+    const normalizedDraftKey = normalizeCharacterKey(draftKey);
+    const raw =
+      window.localStorage.getItem(getSetupDraftStorageKey(normalizedDraftKey)) ??
+      window.localStorage.getItem(getSetupDraftStorageKey(draftKey));
     if (raw) {
       const parsed = parseSetupDraft(raw);
       if (parsed) return parsed;
@@ -167,7 +168,7 @@ export function readLastSetupDraft(): SetupDraft | null {
   }
 
   if (newestDraft) {
-    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, newestDraft.characterKey);
+    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(newestDraft.characterKey));
   } else {
     window.localStorage.removeItem(SETUP_DRAFT_LAST_KEY);
   }
@@ -197,7 +198,7 @@ export function writeSetupDraft(draft: SetupDraft) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(getSetupDraftStorageKey(draft.characterKey), JSON.stringify(draft));
-    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, draft.characterKey);
+    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(draft.characterKey));
   } catch {
     // Ignore localStorage write failures.
   }
@@ -236,7 +237,7 @@ export function removeSetupDraftForCharacter(character: NormalizedCharacterData)
       }
 
       if (newestDraft) {
-        window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, newestDraft.characterKey);
+        window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(newestDraft.characterKey));
       } else {
         window.localStorage.removeItem(SETUP_DRAFT_LAST_KEY);
       }

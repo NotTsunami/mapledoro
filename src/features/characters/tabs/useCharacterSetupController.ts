@@ -6,10 +6,13 @@ import {
 } from "../model/constants";
 import { findRosterCharacterByName, toCharacterKey } from "../model/characterKeys";
 import {
+  createEmptyCharacterStats,
   createStoredCharacterRecord,
   hasStoredCompletedRequiredSetup,
   readCharactersStore,
+  selectCharacterById,
   selectCharactersList,
+  toNormalizedCharacterData,
   writeCharactersStore,
 } from "../model/charactersStore";
 import {
@@ -153,7 +156,7 @@ export function useCharacterSetupController() {
   useEffect(() => {
     const draft = readLastSetupDraft();
     const charactersStore = readCharactersStore();
-    const storedRoster = selectCharactersList(charactersStore).map((entry) => entry.data);
+    const storedRoster = selectCharactersList(charactersStore).map(toNormalizedCharacterData);
     const accountHasCompletedRequiredFlow = hasStoredCompletedRequiredSetup(charactersStore);
     const hydrateTimer = window.setTimeout(() => {
       if (draft) {
@@ -161,6 +164,10 @@ export function useCharacterSetupController() {
         const hasCompletedRequiredFlow = nextCompletedFlowIds.includes(requiredFlowId);
         const hasActiveFlowInProgress =
           Boolean(draft.setupFlowStarted) && !Boolean(draft.showFlowOverview);
+
+        if (hasCompletedRequiredFlow && draft.confirmedCharacter) {
+          removeSetupDraftForCharacter(draft.confirmedCharacter);
+        }
 
         setHasCompletedRequiredSetupEver(
           accountHasCompletedRequiredFlow || hasCompletedRequiredFlow,
@@ -277,22 +284,30 @@ export function useCharacterSetupController() {
         const id = toCharacterKey(character);
         const existingRecord = existingStore.charactersById[id];
         const isCurrentCharacter = currentCharacterKey === id;
-        const completedFlowIdsForCharacter = isCurrentCharacter
-          ? normalizeCompletedFlowIds(
-              completedFlowIds.length > 0 ? completedFlowIds : existingRecord?.setup.completedFlowIds ?? [],
-            )
-          : existingRecord?.setup.completedFlowIds ?? [requiredFlowId];
-        const activeFlowIdForCharacter = isCurrentCharacter
-          ? activeFlowId
-          : existingRecord?.setup.activeFlowId ?? requiredFlowId;
+        const genderRaw = isCurrentCharacter
+          ? setupStepTestByStep.gender ?? ""
+          : existingRecord?.gender ?? "";
+        const gender =
+          genderRaw.toLowerCase() === "male"
+            ? "male"
+            : genderRaw.toLowerCase() === "female"
+              ? "female"
+              : null;
+        const stats = isCurrentCharacter
+          ? existingRecord?.stats ?? createEmptyCharacterStats()
+          : existingRecord?.stats ?? createEmptyCharacterStats();
+        const equipmentCore = isCurrentCharacter
+          ? setupStepTestByStep.equipment_core ?? existingRecord?.equipmentCore ?? ""
+          : existingRecord?.equipmentCore ?? "";
 
         acc[id] = createStoredCharacterRecord({
           character,
-          activeFlowId: activeFlowIdForCharacter,
-          completedFlowIds: completedFlowIdsForCharacter,
+          gender,
+          stats,
+          equipmentCore,
           addedAt: existingRecord?.meta.addedAt ?? now,
           updatedAt:
-            existingRecord && existingRecord.data.fetchedAt === character.fetchedAt
+            existingRecord && existingRecord.fetchedAt === character.fetchedAt
               ? existingRecord.meta.updatedAt
               : now,
         });
@@ -313,19 +328,27 @@ export function useCharacterSetupController() {
 
     writeCharactersStore(nextStore);
   }, [
-    activeFlowId,
     championCharacterKeys,
     characterRoster,
-    completedFlowIds,
     confirmedCharacter,
     mainCharacterKey,
-    requiredFlowId,
+    setupStepTestByStep,
   ]);
 
   useEffect(() => {
     if (!hasHydratedSetupDraftRef.current) return;
     if (typeof window === "undefined") return;
     if (!confirmedCharacter) return;
+
+    const hasCompletedRequiredFlow = completedFlowIds.includes(requiredFlowId);
+    if (hasCompletedRequiredFlow) {
+      removeSetupDraftForCharacter(confirmedCharacter);
+      const clearResumeStateTimer = window.setTimeout(() => {
+        setCanResumeSetup(false);
+        setResumeSetupCharacterName(null);
+      }, 0);
+      return () => clearTimeout(clearResumeStateTimer);
+    }
 
     const characterKey = makeDraftCharacterKey(confirmedCharacter);
     const draft: SetupDraft = {
@@ -367,6 +390,7 @@ export function useCharacterSetupController() {
     isResumableDraft,
     mainCharacterKey,
     query,
+    requiredFlowId,
     setupFlowStarted,
     setupMode,
     setupStepDirection,
@@ -595,6 +619,7 @@ export function useCharacterSetupController() {
       if (isQuickSetupFlow && confirmedCharacter) {
         upsertRosterCharacter(confirmedCharacter);
         setHasCompletedRequiredSetupEver(true);
+        removeSetupDraftForCharacter(confirmedCharacter);
       }
       setIsAddingCharacter(false);
 
@@ -631,20 +656,23 @@ export function useCharacterSetupController() {
       setIsSwitchingToProfile(true);
       transitions.queueTransitionTimer(() => {
         setIsAddingCharacter(false);
-        const draft = readSetupDraftByCharacter(character);
+        const store = readCharactersStore();
+        const storedCharacter = selectCharacterById(store, toCharacterKey(character));
         setConfirmedCharacter(character);
         setSetupMode("search");
         setSetupFlowStarted(true);
         setShowCharacterDirectory(false);
         setSetupStepDirection("backward");
-        setActiveFlowId(draft?.activeFlowId ?? requiredFlowId);
-        setCompletedFlowIds(normalizeCompletedFlowIds(draft?.completedFlowIds ?? []));
+        setActiveFlowId(requiredFlowId);
+        setCompletedFlowIds([requiredFlowId]);
         setShowFlowOverview(false);
-        setSetupStepIndex(
-          draft ? clampFlowStepIndex(draft.activeFlowId, draft.setupStepIndex) : 0,
-        );
-        setSetupStepDirection(draft?.setupStepDirection ?? "forward");
-        setSetupStepTestByStep(draft?.setupStepTestByStep ?? {});
+        setSetupStepIndex(0);
+        setSetupStepDirection("forward");
+        setSetupStepTestByStep({
+          gender: storedCharacter?.gender ?? "",
+          stats: storedCharacter?.stats ?? "",
+          equipment_core: storedCharacter?.equipmentCore ?? "",
+        });
         transitions.setSetupPanelVisible(true);
         setIsSwitchingToProfile(false);
         immediateUiLockRef.current = false;
@@ -810,7 +838,7 @@ export function useCharacterSetupController() {
       setIsSwitchingToDirectory(false);
     }, CHARACTERS_TRANSITION_MS.slow);
 
-    if (confirmedCharacter) {
+    if (confirmedCharacter && !completedFlowIds.includes(requiredFlowId)) {
       const characterKey = makeDraftCharacterKey(confirmedCharacter);
       const existingDraft = readSetupDraftByCharacter(confirmedCharacter);
       writeSetupDraft({
@@ -842,6 +870,7 @@ export function useCharacterSetupController() {
     confirmedCharacter,
     mainCharacterKey,
     query,
+    requiredFlowId,
     setupStepTestByStep,
     transitions,
   ]);

@@ -1,15 +1,23 @@
 import type { NormalizedCharacterData } from "./types";
 
+export function normalizeCharacterName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+export function normalizeCharacterKey(key: string) {
+  return normalizeCharacterName(key);
+}
+
 export function toCharacterKey(character: NormalizedCharacterData) {
-  return `${character.worldID}:${character.characterName.trim().toLowerCase()}`;
+  return normalizeCharacterName(character.characterName);
 }
 
 export function findRosterCharacterByName(
   roster: NormalizedCharacterData[],
   name: string,
 ) {
-  const normalizedName = name.trim().toLowerCase();
+  const normalizedName = normalizeCharacterName(name);
   return roster.find(
-    (entry) => entry.characterName.trim().toLowerCase() === normalizedName,
+    (entry) => normalizeCharacterName(entry.characterName) === normalizedName,
   );
 }
