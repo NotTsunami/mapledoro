@@ -7,6 +7,7 @@ import {
 import { findRosterCharacterByName, toCharacterKey } from "../model/characterKeys";
 import {
   createEmptyCharacterStats,
+  createEmptyCharacterEquipment,
   createStoredCharacterRecord,
   hasStoredCompletedRequiredSetup,
   readCharactersStore,
@@ -296,15 +297,13 @@ export function useCharacterSetupController() {
         const stats = isCurrentCharacter
           ? existingRecord?.stats ?? createEmptyCharacterStats()
           : existingRecord?.stats ?? createEmptyCharacterStats();
-        const equipmentCore = isCurrentCharacter
-          ? setupStepTestByStep.equipment_core ?? existingRecord?.equipmentCore ?? ""
-          : existingRecord?.equipmentCore ?? "";
+        const equipment = existingRecord?.equipment ?? createEmptyCharacterEquipment();
 
         acc[id] = createStoredCharacterRecord({
           character,
           gender,
           stats,
-          equipmentCore,
+          equipment,
           addedAt: existingRecord?.meta.addedAt ?? now,
           updatedAt:
             existingRecord && existingRecord.fetchedAt === character.fetchedAt
@@ -670,8 +669,8 @@ export function useCharacterSetupController() {
         setSetupStepDirection("forward");
         setSetupStepTestByStep({
           gender: storedCharacter?.gender ?? "",
-          stats: storedCharacter?.stats ?? "",
-          equipment_core: storedCharacter?.equipmentCore ?? "",
+          stats: "",
+          equipment_core: "",
         });
         transitions.setSetupPanelVisible(true);
         setIsSwitchingToProfile(false);

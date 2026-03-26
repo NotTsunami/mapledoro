@@ -41,6 +41,32 @@ export interface StoredCharacterStats {
   sacredPower: string;
 }
 
+export interface StoredEquipmentItem {
+  name: string;
+}
+
+export interface StoredCharacterEquipment {
+  rings: [StoredEquipmentItem | null, StoredEquipmentItem | null, StoredEquipmentItem | null, StoredEquipmentItem | null];
+  pocket: StoredEquipmentItem | null;
+  eye: StoredEquipmentItem | null;
+  face: StoredEquipmentItem | null;
+  pendants: [StoredEquipmentItem | null, StoredEquipmentItem | null];
+  weapon: StoredEquipmentItem | null;
+  secondary: StoredEquipmentItem | null;
+  emblem: StoredEquipmentItem | null;
+  hat: StoredEquipmentItem | null;
+  top: StoredEquipmentItem | null;
+  bottom: StoredEquipmentItem | null;
+  shoulder: StoredEquipmentItem | null;
+  android: StoredEquipmentItem | null;
+  cape: StoredEquipmentItem | null;
+  glove: StoredEquipmentItem | null;
+  shoe: StoredEquipmentItem | null;
+  medal: StoredEquipmentItem | null;
+  heart: StoredEquipmentItem | null;
+  totems: [StoredEquipmentItem | null, StoredEquipmentItem | null, StoredEquipmentItem | null];
+}
+
 export interface StoredCharacterRecord {
   ign: string;
   worldId: number;
@@ -65,7 +91,7 @@ export interface StoredCharacterRecord {
   expiresAt: number;
   gender: "male" | "female" | null;
   stats: StoredCharacterStats;
-  equipmentCore: string;
+  equipment: StoredCharacterEquipment;
   meta: {
     addedAt: number;
     updatedAt: number;
@@ -155,6 +181,36 @@ export function createEmptyCharacterStats(): StoredCharacterStats {
   };
 }
 
+export function createEmptyEquipmentItem(): StoredEquipmentItem {
+  return {
+    name: "",
+  };
+}
+
+export function createEmptyCharacterEquipment(): StoredCharacterEquipment {
+  return {
+    rings: [null, null, null, null],
+    pocket: null,
+    eye: null,
+    face: null,
+    pendants: [null, null],
+    weapon: null,
+    secondary: null,
+    emblem: null,
+    hat: null,
+    top: null,
+    bottom: null,
+    shoulder: null,
+    android: null,
+    cape: null,
+    glove: null,
+    shoe: null,
+    medal: null,
+    heart: null,
+    totems: [null, null, null],
+  };
+}
+
 function isStoredTripleStatField(value: unknown): value is StoredTripleStatField {
   return (
     isObject(value) &&
@@ -199,6 +255,45 @@ function isStoredCharacterStats(value: unknown): value is StoredCharacterStats {
   );
 }
 
+function isStoredEquipmentItem(value: unknown): value is StoredEquipmentItem {
+  return isObject(value) && typeof value.name === "string";
+}
+
+function isNullableStoredEquipmentItem(value: unknown): value is StoredEquipmentItem | null {
+  return value === null || isStoredEquipmentItem(value);
+}
+
+function isStoredCharacterEquipment(value: unknown): value is StoredCharacterEquipment {
+  return (
+    isObject(value) &&
+    Array.isArray(value.rings) &&
+    value.rings.length === 4 &&
+    value.rings.every(isNullableStoredEquipmentItem) &&
+    isNullableStoredEquipmentItem(value.pocket) &&
+    isNullableStoredEquipmentItem(value.eye) &&
+    isNullableStoredEquipmentItem(value.face) &&
+    Array.isArray(value.pendants) &&
+    value.pendants.length === 2 &&
+    value.pendants.every(isNullableStoredEquipmentItem) &&
+    isNullableStoredEquipmentItem(value.weapon) &&
+    isNullableStoredEquipmentItem(value.secondary) &&
+    isNullableStoredEquipmentItem(value.emblem) &&
+    isNullableStoredEquipmentItem(value.hat) &&
+    isNullableStoredEquipmentItem(value.top) &&
+    isNullableStoredEquipmentItem(value.bottom) &&
+    isNullableStoredEquipmentItem(value.shoulder) &&
+    isNullableStoredEquipmentItem(value.android) &&
+    isNullableStoredEquipmentItem(value.cape) &&
+    isNullableStoredEquipmentItem(value.glove) &&
+    isNullableStoredEquipmentItem(value.shoe) &&
+    isNullableStoredEquipmentItem(value.medal) &&
+    isNullableStoredEquipmentItem(value.heart) &&
+    Array.isArray(value.totems) &&
+    value.totems.length === 3 &&
+    value.totems.every(isNullableStoredEquipmentItem)
+  );
+}
+
 export function createEmptyCharactersStore(): CharactersStore {
   return {
     version: CHARACTERS_STORE_VERSION,
@@ -214,7 +309,7 @@ export function createStoredCharacterRecord(args: {
   character: NormalizedCharacterData;
   gender?: "male" | "female" | null;
   stats?: StoredCharacterStats;
-  equipmentCore?: string;
+  equipment?: StoredCharacterEquipment;
   addedAt?: number;
   updatedAt?: number;
 }): StoredCharacterRecord {
@@ -224,7 +319,7 @@ export function createStoredCharacterRecord(args: {
     ...args.character,
     gender: args.gender ?? null,
     stats: args.stats ?? createEmptyCharacterStats(),
-    equipmentCore: args.equipmentCore ?? "",
+    equipment: args.equipment ?? createEmptyCharacterEquipment(),
     meta: {
       addedAt: args.addedAt ?? Date.now(),
       updatedAt: args.updatedAt ?? Date.now(),
@@ -251,7 +346,9 @@ function parseStoredCharacterRecord(
     gender:
       value.gender === "male" ? "male" : value.gender === "female" ? "female" : null,
     stats: isStoredCharacterStats(value.stats) ? value.stats : createEmptyCharacterStats(),
-    equipmentCore: typeof value.equipmentCore === "string" ? value.equipmentCore : "",
+    equipment: isStoredCharacterEquipment(value.equipment)
+      ? value.equipment
+      : createEmptyCharacterEquipment(),
     meta: {
       addedAt: typeof meta.addedAt === "number" ? meta.addedAt : Date.now(),
       updatedAt: typeof meta.updatedAt === "number" ? meta.updatedAt : Date.now(),
@@ -333,7 +430,7 @@ function buildLegacyCharactersStore(): CharactersStore {
             ? "female"
             : null,
       stats: createEmptyCharacterStats(),
-      equipmentCore: draft.setupStepTestByStep.equipment_core ?? "",
+      equipment: createEmptyCharacterEquipment(),
       addedAt: existing?.meta.addedAt ?? draft.savedAt,
       updatedAt: draft.savedAt,
     });
