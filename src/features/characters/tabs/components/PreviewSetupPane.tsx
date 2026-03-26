@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { getDirectoryRevealDelays } from "../charactersDirectory";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
 import CharacterDirectoryScreen from "../screens/CharacterDirectoryScreen";
@@ -12,6 +13,58 @@ interface PreviewSetupPaneProps {
   actions: PreviewPaneActions;
 }
 
+type PreviewScreenId = "directory" | "quick-setup-intro" | "setup-flow" | "none";
+
+function getActiveScreenId(setup: PreviewPaneModel["setup"]): PreviewScreenId {
+  const inCharacterDirectoryView = setup.showFlowOverview && setup.showCharacterDirectory;
+  const hasCompletedRequiredFlow = setup.completedFlowIds.includes("quick_setup");
+  if (inCharacterDirectoryView) return "directory";
+  if (!hasCompletedRequiredFlow && setup.setupStepIndex === 0) return "quick-setup-intro";
+  if (!hasCompletedRequiredFlow && setup.setupStepIndex > 0) return "setup-flow";
+  return "none";
+}
+
+function getActiveScreenClassName(
+  activeScreenId: PreviewScreenId,
+  setupStepDirection: PreviewPaneModel["setup"]["setupStepDirection"],
+) {
+  return activeScreenId === "directory" || activeScreenId === "none"
+    ? "setup-step-content directory-step-content"
+    : `setup-step-content ${setupStepDirection === "forward" ? "step-forward" : "step-backward"}`;
+}
+
+function getSetupPanelClassName(setup: PreviewPaneModel["setup"]) {
+  return [
+    "character-search-panel",
+    "setup-panel",
+    setup.setupPanelVisible ? "setup-panel-visible" : "",
+    setup.isBackTransitioning ? "setup-panel-fade" : "",
+    setup.isFinishingSetup ? "setup-finish-fade" : "",
+    setup.isSwitchingToDirectory || setup.isSwitchingToProfile ? "profile-to-directory-fade" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getSetupPanelInlineStyle(
+  theme: PreviewPaneModel["theme"],
+  inCharacterDirectoryView: boolean,
+  shouldShowDirectoryPanel: boolean,
+): CSSProperties {
+  const visibility: CSSProperties["visibility"] =
+    inCharacterDirectoryView && !shouldShowDirectoryPanel ? "hidden" : "visible";
+
+  return {
+    ...panelCardStyle(theme, "1rem"),
+    position: "relative" as const,
+    opacity: inCharacterDirectoryView && !shouldShowDirectoryPanel ? 0 : 1,
+    transform:
+      inCharacterDirectoryView && !shouldShowDirectoryPanel ? "translateY(8px)" : "translateY(0)",
+    visibility,
+    transition: "opacity 0.2s ease, transform 0.2s ease",
+  };
+}
+
 export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
   const { theme, setup } = model;
   const [directorySortBy, setDirectorySortBy] = useState<"name" | "level" | "class">("name");
@@ -21,20 +74,17 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     inCharacterDirectoryView &&
     !setup.isSwitchingToDirectory &&
     directoryRevealPhase > 0;
-  const hasCompletedRequiredFlow = setup.completedFlowIds.includes("quick_setup");
-  const activeScreenId = inCharacterDirectoryView
-    ? "directory"
-    : !hasCompletedRequiredFlow && setup.setupStepIndex === 0
-        ? "quick-setup-intro"
-        : !hasCompletedRequiredFlow && setup.setupStepIndex > 0
-          ? "setup-flow"
-          : "none";
-  const activeScreenClassName =
-    activeScreenId === "directory" || activeScreenId === "none"
-      ? "setup-step-content directory-step-content"
-      : `setup-step-content ${
-          setup.setupStepDirection === "forward" ? "step-forward" : "step-backward"
-        }`;
+  const activeScreenId = getActiveScreenId(setup);
+  const activeScreenClassName = getActiveScreenClassName(
+    activeScreenId,
+    setup.setupStepDirection,
+  );
+  const setupPanelClassName = getSetupPanelClassName(setup);
+  const setupPanelStyle = getSetupPanelInlineStyle(
+    theme,
+    inCharacterDirectoryView,
+    shouldShowDirectoryPanel,
+  );
 
   useEffect(() => {
     if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) {
@@ -75,19 +125,8 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
 
       {setup.setupFlowStarted && activeScreenId !== "none" && (
         <aside
-          className={`character-search-panel setup-panel ${setup.setupPanelVisible ? "setup-panel-visible" : ""} ${setup.isBackTransitioning ? "setup-panel-fade" : ""} ${setup.isFinishingSetup ? "setup-finish-fade" : ""} ${setup.isSwitchingToDirectory || setup.isSwitchingToProfile ? "profile-to-directory-fade" : ""}`}
-          style={{
-            ...panelCardStyle(theme, "1rem"),
-            position: "relative",
-            opacity: inCharacterDirectoryView && !shouldShowDirectoryPanel ? 0 : 1,
-            transform:
-              inCharacterDirectoryView && !shouldShowDirectoryPanel
-                ? "translateY(8px)"
-                : "translateY(0)",
-            visibility:
-              inCharacterDirectoryView && !shouldShowDirectoryPanel ? "hidden" : "visible",
-            transition: "opacity 0.2s ease, transform 0.2s ease",
-          }}
+          className={setupPanelClassName}
+          style={setupPanelStyle}
         >
           <div
             key={`preview-screen-${activeScreenId}-${setup.activeFlowId}-${setup.setupStepIndex}-${setup.showCharacterDirectory ? "directory" : "profile"}`}

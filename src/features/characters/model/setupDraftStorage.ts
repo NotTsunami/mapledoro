@@ -32,6 +32,41 @@ export function makeDraftCharacterKey(character: NormalizedCharacterData) {
   return normalizeCharacterName(character.characterName);
 }
 
+function isNormalizedCharacterDataSummary(value: unknown): value is NormalizedCharacterData {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as Partial<NormalizedCharacterData>).characterName === "string" &&
+      typeof (value as Partial<NormalizedCharacterData>).worldID === "number",
+  );
+}
+
+function parseDraftActiveFlowId(value: unknown): SetupFlowId {
+  return typeof value === "string" ? (value as SetupFlowId) : getRequiredSetupFlowId();
+}
+
+function parseDraftCompletedFlowIds(value: unknown): SetupFlowId[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is SetupFlowId => typeof entry === "string")
+    : [];
+}
+
+function parseDraftCharacterRoster(value: unknown): NormalizedCharacterData[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is NormalizedCharacterData => isNormalizedCharacterDataSummary(entry))
+    : [];
+}
+
+function parseDraftChampionCharacterKeys(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function parseDraftStepTestByStep(value: unknown): SetupStepInputById {
+  return value && typeof value === "object" ? (value as SetupStepInputById) : {};
+}
+
 function parseSetupDraft(raw: string): SetupDraft | null {
   try {
     const parsed = JSON.parse(raw) as Partial<SetupDraft>;
@@ -39,29 +74,11 @@ function parseSetupDraft(raw: string): SetupDraft | null {
     if (!parsed.confirmedCharacter) return null;
     if (typeof parsed.query !== "string") return null;
     if (typeof parsed.characterKey !== "string" || !parsed.characterKey.trim()) return null;
-    const activeFlowId =
-      typeof parsed.activeFlowId === "string"
-        ? (parsed.activeFlowId as SetupFlowId)
-        : getRequiredSetupFlowId();
-    const completedFlowIds = Array.isArray(parsed.completedFlowIds)
-      ? parsed.completedFlowIds.filter((entry): entry is SetupFlowId => typeof entry === "string")
-      : [];
-    const characterRoster = Array.isArray(parsed.characterRoster)
-      ? parsed.characterRoster.filter(
-          (entry): entry is NormalizedCharacterData =>
-            Boolean(
-              entry &&
-                typeof entry === "object" &&
-                typeof (entry as Partial<NormalizedCharacterData>).characterName === "string" &&
-                typeof (entry as Partial<NormalizedCharacterData>).worldID === "number",
-            ),
-        )
-      : [];
-    const mainCharacterKey =
-      typeof parsed.mainCharacterKey === "string" ? parsed.mainCharacterKey : null;
-    const championCharacterKeys = Array.isArray(parsed.championCharacterKeys)
-      ? parsed.championCharacterKeys.filter((entry): entry is string => typeof entry === "string")
-      : [];
+    const activeFlowId = parseDraftActiveFlowId(parsed.activeFlowId);
+    const completedFlowIds = parseDraftCompletedFlowIds(parsed.completedFlowIds);
+    const characterRoster = parseDraftCharacterRoster(parsed.characterRoster);
+    const mainCharacterKey = typeof parsed.mainCharacterKey === "string" ? parsed.mainCharacterKey : null;
+    const championCharacterKeys = parseDraftChampionCharacterKeys(parsed.championCharacterKeys);
     return {
       version: 1,
       characterKey: normalizeCharacterKey(parsed.characterKey),
@@ -78,10 +95,7 @@ function parseSetupDraft(raw: string): SetupDraft | null {
       championCharacterKeys,
       setupStepIndex: clampFlowStepIndex(activeFlowId, Number(parsed.setupStepIndex ?? 0)),
       setupStepDirection: parsed.setupStepDirection === "backward" ? "backward" : "forward",
-      setupStepTestByStep:
-        parsed.setupStepTestByStep && typeof parsed.setupStepTestByStep === "object"
-          ? (parsed.setupStepTestByStep as SetupStepInputById)
-          : {},
+      setupStepTestByStep: parseDraftStepTestByStep(parsed.setupStepTestByStep),
       confirmedCharacter: parsed.confirmedCharacter,
       savedAt: Number(parsed.savedAt ?? Date.now()),
     };

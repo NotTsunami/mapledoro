@@ -45,6 +45,17 @@ function normalizeCompletedFlowIds(flowIds: SetupFlowId[]) {
   return Array.from(new Set(flowIds));
 }
 
+function getCurrentCharacterGender(
+  setupStepTestByStep: SetupStepInputById,
+): "male" | "female" | null {
+  const currentCharacterGenderRaw = (setupStepTestByStep.gender ?? "").toLowerCase();
+  return currentCharacterGenderRaw === "male"
+    ? "male"
+    : currentCharacterGenderRaw === "female"
+      ? "female"
+      : null;
+}
+
 export function useCharacterSetupController() {
   const immediateUiLockRef = useRef(false);
   const [query, setQuery] = useState("");
@@ -123,6 +134,37 @@ export function useCharacterSetupController() {
     setMainCharacterKey((prev) => prev ?? toCharacterKey(character));
   }, []);
 
+  const applyDraftFlowState = useCallback(
+    (
+      draft: SetupDraft,
+      completedFlowIds: SetupFlowId[],
+      options?: {
+        includeSetupMode?: boolean;
+        includeStartedFlags?: boolean;
+        includeVisibility?: boolean;
+      },
+    ) => {
+      setCompletedFlowIds(completedFlowIds);
+      setActiveFlowId(draft.activeFlowId);
+      setSetupStepIndex(draft.setupStepIndex);
+      setSetupStepDirection(draft.setupStepDirection);
+      setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
+      setConfirmedCharacter(draft.confirmedCharacter);
+
+      if (options?.includeSetupMode) {
+        setSetupMode(draft.setupMode);
+      }
+      if (options?.includeStartedFlags) {
+        setSetupFlowStarted(draft.setupFlowStarted);
+      }
+      if (options?.includeVisibility) {
+        setShowFlowOverview(Boolean(draft.showFlowOverview));
+        setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!foundCharacter) {
       const resetTimer = window.setTimeout(() => {
@@ -185,17 +227,12 @@ export function useCharacterSetupController() {
         setChampionCharacterKeys(charactersStore.championCharacterIds);
 
         if (draft.autoResumeOnLoad && hasActiveFlowInProgress) {
-          setCompletedFlowIds(nextCompletedFlowIds);
-          setActiveFlowId(draft.activeFlowId);
-          setSetupStepIndex(draft.setupStepIndex);
-          setSetupStepDirection(draft.setupStepDirection);
-          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
-          setConfirmedCharacter(draft.confirmedCharacter);
-          setSetupMode(draft.setupMode);
+          applyDraftFlowState(draft, nextCompletedFlowIds, {
+            includeSetupMode: true,
+            includeStartedFlags: true,
+            includeVisibility: true,
+          });
           setSuppressLayoutTransition(draft.setupFlowStarted);
-          setSetupFlowStarted(draft.setupFlowStarted);
-          setShowFlowOverview(Boolean(draft.showFlowOverview));
-          setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
           setSetupPanelVisible(false);
           if (draft.setupFlowStarted) {
             queueTransitionTimer(() => {
@@ -223,23 +260,13 @@ export function useCharacterSetupController() {
           setSuppressLayoutTransition(false);
           setHasCompletedRequiredSetupEver(true);
         } else if (draft.autoResumeOnLoad) {
-          setCompletedFlowIds(nextCompletedFlowIds);
-          setActiveFlowId(draft.activeFlowId);
-          setSetupStepIndex(draft.setupStepIndex);
-          setSetupStepDirection(draft.setupStepDirection);
-          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
-          setConfirmedCharacter(draft.confirmedCharacter);
-          setSetupMode(draft.setupMode);
-          setSetupFlowStarted(draft.setupFlowStarted);
-          setShowFlowOverview(Boolean(draft.showFlowOverview));
-          setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
+          applyDraftFlowState(draft, nextCompletedFlowIds, {
+            includeSetupMode: true,
+            includeStartedFlags: true,
+            includeVisibility: true,
+          });
         } else {
-          setCompletedFlowIds(nextCompletedFlowIds);
-          setActiveFlowId(draft.activeFlowId);
-          setSetupStepIndex(draft.setupStepIndex);
-          setSetupStepDirection(draft.setupStepDirection);
-          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
-          setConfirmedCharacter(draft.confirmedCharacter);
+          applyDraftFlowState(draft, nextCompletedFlowIds);
         }
       } else if (accountHasCompletedRequiredFlow) {
         setCharacterRoster(storedRoster);
@@ -266,6 +293,7 @@ export function useCharacterSetupController() {
     }, 0);
     return () => clearTimeout(hydrateTimer);
   }, [
+    applyDraftFlowState,
     isResumableDraft,
     queueTransitionTimer,
     requiredFlowId,
@@ -912,57 +940,53 @@ export function useCharacterSetupController() {
   );
   const canSetCurrentChampion =
     isCurrentChampionCharacter || championCharacterKeys.length < MAX_CHAMPIONS;
-  const currentCharacterGenderRaw = (setupStepTestByStep.gender ?? "").toLowerCase();
-  const currentCharacterGender: "male" | "female" | null =
-    currentCharacterGenderRaw === "male"
-      ? "male"
-      : currentCharacterGenderRaw === "female"
-        ? "female"
-        : null;
+  const currentCharacterGender = getCurrentCharacterGender(setupStepTestByStep);
+
+  const state = {
+    query,
+    foundCharacter,
+    previewCardReady,
+    previewContentReady,
+    setupMode,
+    confirmedCharacter,
+    previewImageLoaded,
+    confirmedImageLoaded,
+    setupFlowStarted,
+    activeFlowId,
+    completedFlowIds,
+    showFlowOverview,
+    showCharacterDirectory,
+    isSwitchingToDirectory,
+    isSwitchingToProfile,
+    isFinishingSetup,
+    deleteNoticeCharacterName,
+    showDeleteNotice,
+    isAddingCharacter,
+    fastDirectoryRevealOnce,
+    characterRoster,
+    mainCharacterKey,
+    championCharacterKeys,
+    setupStepIndex,
+    setupStepDirection,
+    canResumeSetup,
+    resumeSetupCharacterName,
+    hasCompletedRequiredSetupEver,
+    isDraftHydrated,
+    isUiLocked,
+    activeSetupStepValue,
+    isCurrentMainCharacter,
+    isCurrentChampionCharacter,
+    canSetCurrentChampion,
+    currentCharacterGender,
+    requiredFlowId,
+    queryInvalid: lookup.queryInvalid,
+    isSearching: lookup.isSearching,
+    statusMessage: lookup.statusMessage,
+    statusTone: lookup.statusTone,
+  };
 
   return {
-    state: {
-      query,
-      foundCharacter,
-      previewCardReady,
-      previewContentReady,
-      setupMode,
-      confirmedCharacter,
-      previewImageLoaded,
-      confirmedImageLoaded,
-      setupFlowStarted,
-      activeFlowId,
-      completedFlowIds,
-      showFlowOverview,
-      showCharacterDirectory,
-      isSwitchingToDirectory,
-      isSwitchingToProfile,
-      isFinishingSetup,
-      deleteNoticeCharacterName,
-      showDeleteNotice,
-      isAddingCharacter,
-      fastDirectoryRevealOnce,
-      characterRoster,
-      mainCharacterKey,
-      championCharacterKeys,
-      setupStepIndex,
-      setupStepDirection,
-      canResumeSetup,
-      resumeSetupCharacterName,
-      hasCompletedRequiredSetupEver,
-      isDraftHydrated,
-      isUiLocked,
-      activeSetupStepValue,
-      isCurrentMainCharacter,
-      isCurrentChampionCharacter,
-      canSetCurrentChampion,
-      currentCharacterGender,
-      requiredFlowId,
-      queryInvalid: lookup.queryInvalid,
-      isSearching: lookup.isSearching,
-      statusMessage: lookup.statusMessage,
-      statusTone: lookup.statusTone,
-    },
+    state,
     transitions,
     actions: {
       setPreviewImageLoaded,
