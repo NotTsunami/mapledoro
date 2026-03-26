@@ -4,6 +4,7 @@
 */
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
+import SetupStepFrame from "./SetupStepFrame";
 
 interface GenericSetupStepProps {
   theme: AppTheme;
@@ -28,46 +29,17 @@ export default function GenericSetupStep({
   onNext,
   onFinish,
 }: GenericSetupStepProps) {
-  const isLastStep = stepNumber >= totalSteps;
-
   return (
-    <>
-      <p
-        style={{
-          margin: 0,
-          marginBottom: "0.35rem",
-          fontSize: "0.8rem",
-          color: theme.muted,
-          fontWeight: 800,
-          letterSpacing: "0.03em",
-          textTransform: "uppercase",
-        }}
-      >
-        Step {stepNumber} of {totalSteps}
-      </p>
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "0.45rem",
-          fontFamily: "'Fredoka One', cursive",
-          fontSize: "1.3rem",
-          lineHeight: 1.2,
-          color: theme.text,
-        }}
-      >
-        {step.label}
-      </h2>
-      <p
-        style={{
-          margin: 0,
-          fontSize: "0.9rem",
-          color: theme.muted,
-          fontWeight: 700,
-          marginBottom: "0.6rem",
-        }}
-      >
-        Placeholder for {step.label} setup inputs.
-      </p>
+    <SetupStepFrame
+      theme={theme}
+      stepLabel={step.label}
+      stepNumber={stepNumber}
+      totalSteps={totalSteps}
+      description={`Placeholder for ${step.label} setup inputs.`}
+      onBack={onBack}
+      onNext={onNext}
+      onFinish={onFinish}
+    >
       <label
         style={{
           display: "block",
@@ -98,42 +70,6 @@ export default function GenericSetupStep({
           marginBottom: "0.8rem",
         }}
       />
-      <div style={{ display: "flex", gap: "0.6rem", justifyContent: "space-between", alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: "10px",
-            background: theme.bg,
-            color: theme.text,
-            fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
-            cursor: "pointer",
-          }}
-        >
-          Prev Step
-        </button>
-        <button
-          type="button"
-          onClick={isLastStep ? onFinish : onNext}
-          style={{
-            border: "none",
-            borderRadius: "10px",
-            background: theme.accent,
-            color: "#fff",
-            fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
-            cursor: "pointer",
-          }}
-        >
-          {isLastStep ? "Finish" : "Next Step"}
-        </button>
-      </div>
-    </>
+    </SetupStepFrame>
   );
 }

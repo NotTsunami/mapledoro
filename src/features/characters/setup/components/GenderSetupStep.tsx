@@ -1,5 +1,6 @@
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
+import SetupStepFrame from "./SetupStepFrame";
 
 interface GenderSetupStepProps {
   theme: AppTheme;
@@ -42,49 +43,21 @@ export default function GenderSetupStep({
   onNext,
   onFinish,
 }: GenderSetupStepProps) {
-  const isLastStep = stepNumber >= totalSteps;
   const normalized = value.toLowerCase();
   const isMale = normalized === "male";
   const isFemale = normalized === "female";
 
   return (
-    <>
-      <p
-        style={{
-          margin: 0,
-          marginBottom: "0.35rem",
-          fontSize: "0.8rem",
-          color: theme.muted,
-          fontWeight: 800,
-          letterSpacing: "0.03em",
-          textTransform: "uppercase",
-        }}
-      >
-        Step {stepNumber} of {totalSteps}
-      </p>
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "0.45rem",
-          fontFamily: "'Fredoka One', cursive",
-          fontSize: "1.3rem",
-          lineHeight: 1.2,
-          color: theme.text,
-        }}
-      >
-        {step.label}
-      </h2>
-      <p
-        style={{
-          margin: 0,
-          fontSize: "0.9rem",
-          color: theme.muted,
-          fontWeight: 700,
-          marginBottom: "0.7rem",
-        }}
-      >
-        Optional. You can skip now and set this from the character profile later.
-      </p>
+    <SetupStepFrame
+      theme={theme}
+      stepLabel={step.label}
+      stepNumber={stepNumber}
+      totalSteps={totalSteps}
+      description="Optional. You can skip now and set this from the character profile later."
+      onBack={onBack}
+      onNext={onNext}
+      onFinish={onFinish}
+    >
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.8rem" }}>
         <button
           type="button"
@@ -101,42 +74,6 @@ export default function GenderSetupStep({
           ♀ Female
         </button>
       </div>
-      <div style={{ display: "flex", gap: "0.6rem", justifyContent: "space-between", alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: "10px",
-            background: theme.bg,
-            color: theme.text,
-            fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
-            cursor: "pointer",
-          }}
-        >
-          Prev Step
-        </button>
-        <button
-          type="button"
-          onClick={isLastStep ? onFinish : onNext}
-          style={{
-            border: "none",
-            borderRadius: "10px",
-            background: theme.accent,
-            color: "#fff",
-            fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
-            cursor: "pointer",
-          }}
-        >
-          {isLastStep ? "Finish" : "Next Step"}
-        </button>
-      </div>
-    </>
+    </SetupStepFrame>
   );
 }

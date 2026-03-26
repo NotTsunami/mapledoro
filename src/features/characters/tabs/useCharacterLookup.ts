@@ -57,9 +57,42 @@ export function useCharacterLookup({
     cacheRef.current = persistBrowserCharacterCache(cacheRef.current, MAX_BROWSER_CACHE_ENTRIES);
   };
 
+  const clearLookupTimers = (slowTimer: ReturnType<typeof setTimeout>, timeoutTimer: ReturnType<typeof setTimeout>) => {
+    clearTimeout(slowTimer);
+    clearTimeout(timeoutTimer);
+  };
+
   const resetSearchStateMessage = () => {
     setStatusTone("neutral");
     setStatusMessage(getUsageMessage(MIN_QUERY_LENGTH, MAX_QUERY_LENGTH));
+  };
+
+  const applyCachedLookupResult = (cached: CharacterCacheEntry) => {
+    onFoundCharacterChange(cached.found && cached.data ? cached.data : null);
+    setStatusTone(cached.found ? "neutral" : "error");
+    setStatusMessage(cached.found ? getFoundMessage(0) : getNotFoundMessage(0));
+  };
+
+  const applyLookupResult = (name: string, normalized: string, result: LookupResponse) => {
+    const found = result.found;
+    const resolvedName = found ? result.data.characterName : result.characterName || name;
+    cacheRef.current.set(normalized, {
+      characterName: resolvedName,
+      found: result.found,
+      expiresAt: result.expiresAt,
+      savedAt: Date.now(),
+      data: result.found ? result.data : null,
+    });
+    persistCache();
+    if (found) {
+      setStatusTone("neutral");
+      onFoundCharacterChange(result.data);
+      setStatusMessage(getFoundMessage(result.queuedMs));
+      return;
+    }
+    setStatusTone("error");
+    onFoundCharacterChange(null);
+    setStatusMessage(getNotFoundMessage(result.queuedMs));
   };
 
   const runLookup = async (name: string) => {
@@ -72,9 +105,7 @@ export function useCharacterLookup({
 
     const cached = cacheRef.current.get(normalized);
     if (cached && Date.now() < cached.expiresAt) {
-      onFoundCharacterChange(cached.found && cached.data ? cached.data : null);
-      setStatusTone(cached.found ? "neutral" : "error");
-      setStatusMessage(cached.found ? getFoundMessage(0) : getNotFoundMessage(0));
+      applyCachedLookupResult(cached);
       return;
     }
     if (cached && Date.now() >= cached.expiresAt) {
@@ -105,8 +136,7 @@ export function useCharacterLookup({
         `/api/characters/lookup?character_name=${encodeURIComponent(name)}&schema_version=${LOOKUP_RESPONSE_SCHEMA_VERSION}`,
         { cache: "no-store", signal: controller.signal },
       );
-      clearTimeout(slowTimer);
-      clearTimeout(timeoutTimer);
+      clearLookupTimers(slowTimer, timeoutTimer);
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as
           | { error?: string }
@@ -114,28 +144,9 @@ export function useCharacterLookup({
         throw new Error(errorPayload?.error ?? `Lookup failed with status ${response.status}`);
       }
       const result = (await response.json()) as LookupResponse;
-      const found = result.found;
-      const resolvedName = found ? result.data.characterName : result.characterName || name;
-      cacheRef.current.set(normalized, {
-        characterName: resolvedName,
-        found: result.found,
-        expiresAt: result.expiresAt,
-        savedAt: Date.now(),
-        data: result.found ? result.data : null,
-      });
-      persistCache();
-      if (found) {
-        setStatusTone("neutral");
-        onFoundCharacterChange(result.data);
-        setStatusMessage(getFoundMessage(result.queuedMs));
-      } else {
-        setStatusTone("error");
-        onFoundCharacterChange(null);
-        setStatusMessage(getNotFoundMessage(result.queuedMs));
-      }
+      applyLookupResult(name, normalized, result);
     } catch (error) {
-      clearTimeout(slowTimer);
-      clearTimeout(timeoutTimer);
+      clearLookupTimers(slowTimer, timeoutTimer);
       setStatusTone("error");
       onFoundCharacterChange(null);
       if (error instanceof Error && error.name === "AbortError") {
