@@ -1,12 +1,21 @@
 import type { AppTheme } from "../../../components/themes";
+import { CHARACTERS_TRANSITION_MS } from "./useSetupFlowTransitions";
 
 export function getCharacterSetupFlowStyles(theme: AppTheme) {
       return `
         :root {
           scrollbar-gutter: stable;
+          --characters-fast: ${CHARACTERS_TRANSITION_MS.fast}ms;
+          --characters-standard: ${CHARACTERS_TRANSITION_MS.standard}ms;
+          --characters-slow: ${CHARACTERS_TRANSITION_MS.slow}ms;
+          --characters-search-fade: ${CHARACTERS_TRANSITION_MS.searchFadeIn}ms;
         }
 
-        .character-search-panel { transition: background 0.35s ease, border-color 0.35s ease; }
+        .character-search-panel {
+          transition:
+            background var(--characters-slow) ease,
+            border-color var(--characters-slow) ease;
+        }
 
         .characters-main {
           display: flex;
@@ -39,12 +48,14 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         .search-pane {
           flex: 1 1 auto;
           min-width: 0;
-          transition: flex-basis 0.35s ease;
+          transition: flex-basis var(--characters-slow) ease;
         }
 
         .search-card {
           width: 100%;
-          transition: opacity 0.22s ease, transform 0.22s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .search-card.confirm-fade {
@@ -54,36 +65,40 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
         .search-card.profile-to-directory-fade,
         .setup-panel.profile-to-directory-fade {
-          animation: profileToDirectoryOut 0.16s ease forwards !important;
+          animation: profileToDirectoryOut var(--characters-fast) ease forwards !important;
         }
 
         .profile-actions-card.profile-to-directory-fade {
-          animation: profileToDirectoryOut 0.16s ease forwards !important;
+          animation: profileToDirectoryOut var(--characters-fast) ease forwards !important;
         }
 
         .setup-step-content.profile-to-directory-fade,
         .confirmed-summary-card.profile-to-directory-fade {
-          animation: profileToDirectoryFadeOnly 0.16s ease forwards !important;
+          animation: profileToDirectoryFadeOnly var(--characters-fast) ease forwards !important;
         }
 
         .profile-actions-card {
-          transition: opacity 0.2s ease, transform 0.2s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .profile-actions-card.profile-actions-fade-in {
-          animation: profileActionsFadeIn 0.22s ease both;
+          animation: profileActionsFadeIn var(--characters-standard) ease both;
         }
 
         .profile-actions-card.profile-actions-fade-out {
-          animation: profileActionsFadeOut 0.14s ease both;
+          animation: profileActionsFadeOut var(--characters-fast) ease both;
         }
 
         .search-card.search-fade-in {
-          animation: searchCardFadeIn 0.26s ease;
+          animation: searchCardFadeIn var(--characters-search-fade) ease;
         }
 
         .preview-card {
-          transition: opacity 0.22s ease, transform 0.22s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .preview-card.confirm-fade {
@@ -92,7 +107,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         }
 
         .preview-card.back-fade {
-          animation: previewBackFade 0.22s ease forwards;
+          animation: previewBackFade var(--characters-standard) ease forwards;
         }
 
         .image-skeleton-wrap {
@@ -122,7 +137,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
         .image-fade-in {
           opacity: 0;
-          transition: opacity 0.2s ease;
+          transition: opacity var(--characters-standard) ease;
         }
 
         .image-fade-in.image-loaded {
@@ -140,10 +155,10 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           opacity: 0;
           transform: translateY(8px);
           transition:
-            flex-basis 0.35s ease,
-            max-width 0.35s ease,
-            opacity 0.2s ease 0.12s,
-            transform 0.2s ease 0.12s;
+            flex-basis var(--characters-slow) ease,
+            max-width var(--characters-slow) ease,
+            opacity var(--characters-standard) ease var(--characters-fast),
+            transform var(--characters-standard) ease var(--characters-fast);
         }
 
         .characters-content.has-preview .search-pane {
@@ -177,7 +192,9 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           width: 100%;
           opacity: 1;
           transform: translateY(0);
-          transition: opacity 0.2s ease, transform 0.2s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .preview-pane > .character-search-panel {
@@ -185,27 +202,31 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         }
 
         .preview-content {
-          transition: opacity 0.2s ease, transform 0.2s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .preview-char-swap {
-          animation: previewSwap 0.24s ease;
+          animation: previewSwap var(--characters-standard) ease;
         }
 
         .preview-confirm-fade {
           opacity: 0 !important;
           transform: none !important;
-          transition: opacity 0.2s ease;
+          transition: opacity var(--characters-standard) ease;
         }
 
         .preview-content.back-fade-content {
-          animation: previewBackFade 0.22s ease forwards;
+          animation: previewBackFade var(--characters-standard) ease forwards;
         }
 
         .setup-panel {
           opacity: 0;
           transform: translateY(8px);
-          transition: opacity 0.25s ease, transform 0.25s ease;
+          transition:
+            opacity var(--characters-standard) ease,
+            transform var(--characters-standard) ease;
         }
 
         .setup-panel.setup-panel-visible {
@@ -221,15 +242,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         .setup-panel.setup-finish-fade {
           opacity: 0 !important;
           transform: none !important;
-          transition: opacity 0.2s ease !important;
+          transition: opacity var(--characters-standard) ease !important;
         }
 
         .setup-panel.setup-panel-fade-out {
-          animation: setupPanelFadeOut 0.16s ease both;
+          animation: setupPanelFadeOut var(--characters-fast) ease both;
         }
 
         .setup-step-content {
-          animation-duration: 0.24s;
+          animation-duration: var(--characters-standard);
           animation-timing-function: ease;
           animation-fill-mode: both;
           opacity: 0;
@@ -256,15 +277,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         }
 
         .setup-panel.step-panel-fade-in {
-          animation: stepPanelFadeIn 0.22s ease both;
+          animation: stepPanelFadeIn var(--characters-standard) ease both;
         }
 
         .setup-step-content.step-flow-fade-in {
-          animation: stepFlowFadeIn 0.22s ease both;
+          animation: stepFlowFadeIn var(--characters-standard) ease both;
         }
 
         .summary-panel-fade-in {
-          animation: summaryFadeIn 0.22s ease both;
+          animation: summaryFadeIn var(--characters-standard) ease both;
         }
 
         .desktop-back-label {
@@ -281,15 +302,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         }
 
         .profile-shell-fade-in {
-          animation: profileShellFadeIn 0.22s ease both;
+          animation: profileShellFadeIn var(--characters-standard) ease both;
         }
 
         .profile-shell-fade-out {
-          animation: profileShellFadeOut 0.16s ease both;
+          animation: profileShellFadeOut var(--characters-fast) ease both;
         }
 
         .profile-shell-state-fade-in {
-          animation: profileShellStateFadeIn 0.22s ease both;
+          animation: profileShellStateFadeIn var(--characters-standard) ease both;
         }
 
         @keyframes previewSwap {

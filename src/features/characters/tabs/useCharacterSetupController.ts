@@ -1,0 +1,942 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CHARACTER_NAME_INPUT_FILTER_REGEX,
+  MAX_QUERY_LENGTH,
+  type SetupMode,
+} from "../model/constants";
+import { findRosterCharacterByName, toCharacterKey } from "../model/characterKeys";
+import {
+  hasAnyCompletedRequiredSetupFlow,
+  makeDraftCharacterKey,
+  readMergedCharacterRoster,
+  readLastSetupDraft,
+  readSetupDraftByCharacter,
+  removeSetupDraftForCharacter,
+  setLastSetupDraftAutoResume,
+  type SetupDraft,
+  writeSetupDraft,
+} from "../model/setupDraftStorage";
+import type { NormalizedCharacterData } from "../model/types";
+import {
+  clampFlowStepIndex,
+  getFlowStepByIndex,
+  getRequiredSetupFlowId,
+  type SetupFlowId,
+} from "../setup/flows";
+import type { SetupStepInputById } from "../setup/types";
+import { LOOKUP_MESSAGES } from "./messages";
+import { useCharacterLookup } from "./useCharacterLookup";
+import {
+  CHARACTERS_TRANSITION_MS,
+  useSetupFlowTransitions,
+} from "./useSetupFlowTransitions";
+
+const MAX_CHAMPIONS = 4;
+const OPTIONAL_FLOW_FADE_OUT_MS = CHARACTERS_TRANSITION_MS.fast;
+const OPTIONAL_FLOW_TRANSITION_TOTAL_MS = CHARACTERS_TRANSITION_MS.slow;
+
+function normalizeCompletedFlowIds(flowIds: SetupFlowId[]) {
+  return Array.from(new Set(flowIds));
+}
+
+export function useCharacterSetupController() {
+  const immediateUiLockRef = useRef(false);
+  const [query, setQuery] = useState("");
+  const [foundCharacter, setFoundCharacter] = useState<NormalizedCharacterData | null>(null);
+  const [previewCardReady, setPreviewCardReady] = useState(false);
+  const [previewContentReady, setPreviewContentReady] = useState(false);
+  const [setupMode, setSetupMode] = useState<SetupMode>("intro");
+  const [confirmedCharacter, setConfirmedCharacter] = useState<NormalizedCharacterData | null>(
+    null,
+  );
+  const [previewImageLoaded, setPreviewImageLoaded] = useState(false);
+  const [confirmedImageLoaded, setConfirmedImageLoaded] = useState(false);
+  const [setupFlowStarted, setSetupFlowStarted] = useState(false);
+  const [activeFlowId, setActiveFlowId] = useState<SetupFlowId>(getRequiredSetupFlowId());
+  const [completedFlowIds, setCompletedFlowIds] = useState<SetupFlowId[]>([]);
+  const [showFlowOverview, setShowFlowOverview] = useState(false);
+  const [showCharacterDirectory, setShowCharacterDirectory] = useState(false);
+  const [isSwitchingToDirectory, setIsSwitchingToDirectory] = useState(false);
+  const [isSwitchingToProfile, setIsSwitchingToProfile] = useState(false);
+  const [isFinishingSetup, setIsFinishingSetup] = useState(false);
+  const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
+  const [deleteNoticeCharacterName, setDeleteNoticeCharacterName] = useState<string | null>(null);
+  const [showDeleteNotice, setShowDeleteNotice] = useState(false);
+  const [isAddingCharacter, setIsAddingCharacter] = useState(false);
+  const [fastDirectoryRevealOnce, setFastDirectoryRevealOnce] = useState(false);
+  const [isStartingOptionalFlow, setIsStartingOptionalFlow] = useState(false);
+  const [isOptionalFlowFadeIn, setIsOptionalFlowFadeIn] = useState(false);
+  const [characterRoster, setCharacterRoster] = useState<NormalizedCharacterData[]>([]);
+  const [mainCharacterKey, setMainCharacterKey] = useState<string | null>(null);
+  const [championCharacterKeys, setChampionCharacterKeys] = useState<string[]>([]);
+  const [setupStepIndex, setSetupStepIndex] = useState(0);
+  const [setupStepDirection, setSetupStepDirection] = useState<"forward" | "backward">("forward");
+  const [setupStepTestByStep, setSetupStepTestByStep] = useState<SetupStepInputById>({});
+  const [canResumeSetup, setCanResumeSetup] = useState(false);
+  const [resumeSetupCharacterName, setResumeSetupCharacterName] = useState<string | null>(null);
+  const [hasCompletedRequiredSetupEver, setHasCompletedRequiredSetupEver] = useState(false);
+  const [isDraftHydrated, setIsDraftHydrated] = useState(false);
+  const hasHydratedSetupDraftRef = useRef(false);
+  const lookup = useCharacterLookup({
+    query,
+    onFoundCharacterChange: setFoundCharacter,
+  });
+
+  const transitions = useSetupFlowTransitions();
+  const requiredFlowId = getRequiredSetupFlowId();
+  const isUiLocked =
+    transitions.isConfirmFadeOut ||
+    transitions.isModeTransitioning ||
+    transitions.isBackTransitioning ||
+    isSwitchingToDirectory ||
+    isSwitchingToProfile ||
+    isFinishingSetup ||
+    isDeleteTransitioning;
+
+  const isResumableDraft = useCallback(
+    (draft: SetupDraft | null) =>
+      Boolean(draft?.confirmedCharacter) &&
+      !Boolean(draft?.completedFlowIds?.includes(requiredFlowId)),
+    [requiredFlowId],
+  );
+
+  const upsertRosterCharacter = useCallback((character: NormalizedCharacterData) => {
+    setCharacterRoster((prev) => {
+      const key = toCharacterKey(character);
+      const existingIndex = prev.findIndex((entry) => toCharacterKey(entry) === key);
+      if (existingIndex === -1) {
+        return [...prev, character];
+      }
+      const next = [...prev];
+      next[existingIndex] = character;
+      return next;
+    });
+    setMainCharacterKey((prev) => prev ?? toCharacterKey(character));
+  }, []);
+
+  useEffect(() => {
+    if (!foundCharacter) {
+      const resetTimer = window.setTimeout(() => {
+        setPreviewCardReady(false);
+        setPreviewContentReady(false);
+        setPreviewImageLoaded(false);
+      }, 0);
+      return () => clearTimeout(resetTimer);
+    }
+    const prepTimer = window.setTimeout(() => {
+      setPreviewImageLoaded(false);
+    }, 0);
+    const cardTimer = setTimeout(() => setPreviewCardReady(true), CHARACTERS_TRANSITION_MS.slow);
+    const contentTimer = setTimeout(
+      () => setPreviewContentReady(true),
+      CHARACTERS_TRANSITION_MS.slow + CHARACTERS_TRANSITION_MS.fast,
+    );
+    return () => {
+      clearTimeout(prepTimer);
+      clearTimeout(cardTimer);
+      clearTimeout(contentTimer);
+    };
+  }, [foundCharacter]);
+
+  useEffect(() => {
+    const resetTimer = window.setTimeout(() => {
+      setConfirmedImageLoaded(false);
+    }, 0);
+    return () => clearTimeout(resetTimer);
+  }, [confirmedCharacter]);
+
+  useEffect(() => {
+    const draft = readLastSetupDraft();
+    const mergedRoster = readMergedCharacterRoster();
+    const accountHasCompletedRequiredFlow = hasAnyCompletedRequiredSetupFlow();
+    const hydrateTimer = window.setTimeout(() => {
+      if (draft) {
+        const nextCompletedFlowIds = normalizeCompletedFlowIds(draft.completedFlowIds ?? []);
+        const hasCompletedRequiredFlow = nextCompletedFlowIds.includes(requiredFlowId);
+        const hasActiveFlowInProgress =
+          Boolean(draft.setupFlowStarted) && !Boolean(draft.showFlowOverview);
+
+        setHasCompletedRequiredSetupEver(
+          accountHasCompletedRequiredFlow || hasCompletedRequiredFlow,
+        );
+
+        const canResumeFromDraft = isResumableDraft(draft);
+        setCanResumeSetup(canResumeFromDraft);
+        setResumeSetupCharacterName(
+          canResumeFromDraft ? (draft.confirmedCharacter?.characterName ?? draft.query) : null,
+        );
+        setQuery(draft.query);
+        setCharacterRoster(mergedRoster);
+        setMainCharacterKey(draft.mainCharacterKey ?? null);
+        setChampionCharacterKeys(draft.championCharacterKeys ?? []);
+
+        if (draft.autoResumeOnLoad && hasActiveFlowInProgress) {
+          setCompletedFlowIds(nextCompletedFlowIds);
+          setActiveFlowId(draft.activeFlowId);
+          setSetupStepIndex(draft.setupStepIndex);
+          setSetupStepDirection(draft.setupStepDirection);
+          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
+          setConfirmedCharacter(draft.confirmedCharacter);
+          setSetupMode(draft.setupMode);
+          transitions.setSuppressLayoutTransition(draft.setupFlowStarted);
+          setSetupFlowStarted(draft.setupFlowStarted);
+          setShowFlowOverview(Boolean(draft.showFlowOverview));
+          setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
+          transitions.setSetupPanelVisible(false);
+          if (draft.setupFlowStarted) {
+            transitions.queueTransitionTimer(() => {
+              transitions.setSetupPanelVisible(true);
+            }, CHARACTERS_TRANSITION_MS.setupPanelRevealDelay);
+            transitions.queueTransitionTimer(() => {
+              transitions.setSuppressLayoutTransition(false);
+            }, CHARACTERS_TRANSITION_MS.slow + CHARACTERS_TRANSITION_MS.setupPanelRevealDelay);
+          }
+        } else if (hasCompletedRequiredFlow || accountHasCompletedRequiredFlow) {
+          setIsAddingCharacter(false);
+          setConfirmedCharacter(hasCompletedRequiredFlow ? draft.confirmedCharacter : null);
+          setActiveFlowId(hasCompletedRequiredFlow ? draft.activeFlowId : requiredFlowId);
+          setCompletedFlowIds(hasCompletedRequiredFlow ? nextCompletedFlowIds : []);
+          setSetupStepIndex(hasCompletedRequiredFlow ? draft.setupStepIndex : 0);
+          setSetupStepDirection(hasCompletedRequiredFlow ? draft.setupStepDirection : "forward");
+          setSetupStepTestByStep(
+            hasCompletedRequiredFlow ? (draft.setupStepTestByStep ?? {}) : {},
+          );
+          setSetupMode("search");
+          setSetupFlowStarted(true);
+          setShowFlowOverview(true);
+          setShowCharacterDirectory(true);
+          transitions.setSetupPanelVisible(true);
+          transitions.setSuppressLayoutTransition(false);
+          setHasCompletedRequiredSetupEver(true);
+        } else if (draft.autoResumeOnLoad) {
+          setCompletedFlowIds(nextCompletedFlowIds);
+          setActiveFlowId(draft.activeFlowId);
+          setSetupStepIndex(draft.setupStepIndex);
+          setSetupStepDirection(draft.setupStepDirection);
+          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
+          setConfirmedCharacter(draft.confirmedCharacter);
+          setSetupMode(draft.setupMode);
+          setSetupFlowStarted(draft.setupFlowStarted);
+          setShowFlowOverview(Boolean(draft.showFlowOverview));
+          setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
+        } else {
+          setCompletedFlowIds(nextCompletedFlowIds);
+          setActiveFlowId(draft.activeFlowId);
+          setSetupStepIndex(draft.setupStepIndex);
+          setSetupStepDirection(draft.setupStepDirection);
+          setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
+          setConfirmedCharacter(draft.confirmedCharacter);
+        }
+      } else if (accountHasCompletedRequiredFlow) {
+        setCharacterRoster(mergedRoster);
+        setIsAddingCharacter(false);
+        setSetupMode("search");
+        setSetupFlowStarted(true);
+        setShowFlowOverview(true);
+        setShowCharacterDirectory(true);
+        transitions.setSetupPanelVisible(true);
+        transitions.setSuppressLayoutTransition(false);
+        setCanResumeSetup(false);
+        setResumeSetupCharacterName(null);
+        setHasCompletedRequiredSetupEver(true);
+      } else {
+        setCanResumeSetup(false);
+        setResumeSetupCharacterName(null);
+        setHasCompletedRequiredSetupEver(false);
+      }
+
+      hasHydratedSetupDraftRef.current = true;
+      setIsDraftHydrated(true);
+    }, 0);
+    return () => clearTimeout(hydrateTimer);
+  }, [isResumableDraft, requiredFlowId, transitions]);
+
+  useEffect(() => {
+    if (!hasHydratedSetupDraftRef.current) return;
+    if (typeof window === "undefined") return;
+    if (!confirmedCharacter) return;
+
+    const characterKey = makeDraftCharacterKey(confirmedCharacter);
+    const draft: SetupDraft = {
+      version: 1,
+      characterKey,
+      query,
+      setupMode,
+      setupFlowStarted,
+      autoResumeOnLoad: setupFlowStarted,
+      activeFlowId,
+      completedFlowIds,
+      showFlowOverview,
+      showCharacterDirectory,
+      characterRoster,
+      mainCharacterKey,
+      championCharacterKeys,
+      setupStepIndex: clampFlowStepIndex(activeFlowId, setupStepIndex),
+      setupStepDirection,
+      setupStepTestByStep,
+      confirmedCharacter,
+      savedAt: Date.now(),
+    };
+
+    writeSetupDraft(draft);
+    const resumeStateTimer = window.setTimeout(() => {
+      const canResumeFromDraft = isResumableDraft(draft);
+      setCanResumeSetup(canResumeFromDraft);
+      setResumeSetupCharacterName(
+        canResumeFromDraft ? confirmedCharacter.characterName : null,
+      );
+    }, 0);
+    return () => clearTimeout(resumeStateTimer);
+  }, [
+    activeFlowId,
+    championCharacterKeys,
+    characterRoster,
+    completedFlowIds,
+    confirmedCharacter,
+    isResumableDraft,
+    mainCharacterKey,
+    query,
+    setupFlowStarted,
+    setupMode,
+    setupStepDirection,
+    setupStepIndex,
+    setupStepTestByStep,
+    showCharacterDirectory,
+    showFlowOverview,
+  ]);
+
+  useEffect(() => {
+    immediateUiLockRef.current = isUiLocked;
+  }, [isUiLocked]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [setupFlowStarted, setupMode, setupStepIndex, showFlowOverview]);
+
+  const beginSetupFlowTransition = useCallback(
+    (args: {
+      character: NormalizedCharacterData;
+      flowId: SetupFlowId;
+      completedFlowIds: SetupFlowId[];
+      showFlowOverview: boolean;
+      showCharacterDirectory: boolean;
+      stepIndex: number;
+      stepDirection: "forward" | "backward";
+      stepData: SetupStepInputById;
+    }) => {
+      transitions.beginSetupFlowTransition(args, {
+        setSetupMode,
+        setFoundCharacter,
+        setConfirmedCharacter,
+        setSetupFlowStarted,
+        setActiveFlowId,
+        setCompletedFlowIds,
+        setShowFlowOverview,
+        setShowCharacterDirectory,
+        setSetupStepIndex,
+        setSetupStepDirection,
+        setSetupStepTestByStep,
+      });
+    },
+    [transitions],
+  );
+
+  const runBackToIntroTransition = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    setIsAddingCharacter(false);
+    transitions.runBackToIntroTransition({
+      setLastSetupDraftAutoResume,
+      resetSearchStateMessage: lookup.resetSearchStateMessage,
+      setSetupMode,
+      setFoundCharacter,
+      setConfirmedCharacter,
+      setSetupFlowStarted,
+      setActiveFlowId,
+      setCompletedFlowIds,
+      setShowFlowOverview,
+      setShowCharacterDirectory,
+      setSetupStepIndex,
+      setSetupStepDirection,
+      setSetupStepTestByStep,
+    });
+  }, [lookup, transitions]);
+
+  const runTransitionToMode = useCallback(
+    (nextMode: SetupMode) => {
+      if (immediateUiLockRef.current) return;
+      immediateUiLockRef.current = true;
+      setIsAddingCharacter(false);
+      transitions.runTransitionToMode(nextMode, {
+        resetSearchStateMessage: lookup.resetSearchStateMessage,
+        setSetupMode,
+        setFoundCharacter,
+        setConfirmedCharacter,
+        setSetupFlowStarted,
+        setActiveFlowId,
+        setCompletedFlowIds,
+        setShowFlowOverview,
+        setShowCharacterDirectory,
+        setSetupStepIndex,
+        setSetupStepDirection,
+        setSetupStepTestByStep,
+      });
+    },
+    [lookup, transitions],
+  );
+
+  const backFromSetupFlowToAddCharacter = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    transitions.runBackTransition(() => {
+      setIsAddingCharacter(true);
+      setSetupFlowStarted(false);
+      setShowFlowOverview(false);
+      setShowCharacterDirectory(false);
+      setFoundCharacter(null);
+      setConfirmedCharacter(null);
+      setSetupStepIndex(0);
+      setSetupStepDirection("forward");
+      setSetupStepTestByStep({});
+      lookup.resetSearchStateMessage();
+      setLastSetupDraftAutoResume(false);
+    });
+  }, [lookup, transitions]);
+
+  const backToCharactersDirectory = useCallback(() => {
+    setIsAddingCharacter(false);
+    setSetupMode("search");
+    setSetupFlowStarted(true);
+    transitions.setSetupPanelVisible(true);
+    setShowFlowOverview(true);
+    setShowCharacterDirectory(true);
+    setSetupStepIndex(0);
+    setSetupStepDirection("backward");
+  }, [transitions]);
+
+  const setSetupStepWithDirection = useCallback(
+    (nextStep: number) => {
+      const boundedStep = clampFlowStepIndex(activeFlowId, nextStep);
+      if (boundedStep === setupStepIndex) return;
+      setSetupStepDirection(boundedStep > setupStepIndex ? "forward" : "backward");
+      setSetupStepIndex(boundedStep);
+    },
+    [activeFlowId, setupStepIndex],
+  );
+
+  const resumeSavedSetup = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    const draft = readLastSetupDraft();
+    if (!draft || !isResumableDraft(draft)) {
+      setCanResumeSetup(false);
+      setResumeSetupCharacterName(null);
+      return;
+    }
+
+    setCanResumeSetup(true);
+    setResumeSetupCharacterName(draft.confirmedCharacter?.characterName ?? draft.query);
+    setIsAddingCharacter(false);
+    setQuery("");
+    setSetupMode("search");
+
+    if (draft.confirmedCharacter) {
+      immediateUiLockRef.current = true;
+      beginSetupFlowTransition({
+        character: draft.confirmedCharacter,
+        flowId: requiredFlowId,
+        completedFlowIds: normalizeCompletedFlowIds(draft.completedFlowIds ?? []),
+        showFlowOverview: Boolean(
+          draft.completedFlowIds?.includes(requiredFlowId) || draft.showFlowOverview,
+        ),
+        showCharacterDirectory: Boolean(draft.showCharacterDirectory),
+        stepIndex: clampFlowStepIndex(
+          draft.activeFlowId,
+          draft.completedFlowIds?.includes(requiredFlowId) ? 0 : draft.setupStepIndex,
+        ),
+        stepDirection: draft.setupStepDirection,
+        stepData: draft.setupStepTestByStep ?? {},
+      });
+    }
+
+    writeSetupDraft({
+      ...draft,
+      setupFlowStarted: true,
+      autoResumeOnLoad: true,
+      savedAt: draft.savedAt,
+    });
+  }, [beginSetupFlowTransition, isResumableDraft, requiredFlowId]);
+
+  const confirmFoundCharacter = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    if (!foundCharacter) return;
+
+    const foundKey = toCharacterKey(foundCharacter);
+    const alreadyAdded = characterRoster.some((entry) => toCharacterKey(entry) === foundKey);
+    if (alreadyAdded) {
+      lookup.setStatusTone("error");
+      lookup.setStatusMessage(`${foundCharacter.characterName} is already added.`);
+      return;
+    }
+
+    const existingCharacterDraft = readSetupDraftByCharacter(foundCharacter);
+    immediateUiLockRef.current = true;
+    beginSetupFlowTransition({
+      character: foundCharacter,
+      flowId: requiredFlowId,
+      completedFlowIds: normalizeCompletedFlowIds(
+        existingCharacterDraft?.completedFlowIds ?? [],
+      ),
+      showFlowOverview: Boolean(
+        existingCharacterDraft?.completedFlowIds?.includes(requiredFlowId) ||
+          existingCharacterDraft?.showFlowOverview,
+      ),
+      showCharacterDirectory: Boolean(existingCharacterDraft?.showCharacterDirectory),
+      stepIndex: existingCharacterDraft
+        ? clampFlowStepIndex(
+            existingCharacterDraft.activeFlowId,
+            existingCharacterDraft.completedFlowIds?.includes(requiredFlowId)
+              ? 0
+              : existingCharacterDraft.setupStepIndex,
+          )
+        : 0,
+      stepDirection: "forward",
+      stepData: existingCharacterDraft?.setupStepTestByStep ?? {},
+    });
+  }, [
+    beginSetupFlowTransition,
+    characterRoster,
+    foundCharacter,
+    requiredFlowId,
+    lookup,
+  ]);
+
+  const finishSetupFlow = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    setIsFinishingSetup(true);
+
+    transitions.queueTransitionTimer(() => {
+      const isQuickSetupFlow = activeFlowId === requiredFlowId;
+      if (isQuickSetupFlow && confirmedCharacter) {
+        upsertRosterCharacter(confirmedCharacter);
+        setHasCompletedRequiredSetupEver(true);
+      }
+      setIsAddingCharacter(false);
+
+      const updatedCompleted = Array.from(new Set([...completedFlowIds, activeFlowId]));
+      const hasCompletedRequired = updatedCompleted.includes(requiredFlowId);
+      setCompletedFlowIds(updatedCompleted);
+      setShowFlowOverview(hasCompletedRequired);
+      setShowCharacterDirectory(false);
+      setActiveFlowId(requiredFlowId);
+      setSetupStepIndex(0);
+      setSetupStepDirection("forward");
+
+      if (activeFlowId === requiredFlowId) {
+        lookup.setStatusTone("neutral");
+        lookup.setStatusMessage(LOOKUP_MESSAGES.setupSaved);
+      }
+
+      setIsFinishingSetup(false);
+      immediateUiLockRef.current = false;
+    }, CHARACTERS_TRANSITION_MS.standard);
+  }, [
+    activeFlowId,
+    completedFlowIds,
+    confirmedCharacter,
+    requiredFlowId,
+    lookup,
+    transitions,
+    upsertRosterCharacter,
+  ]);
+
+  const startOptionalFlow = useCallback(
+    (flowId: SetupFlowId) => {
+      if (immediateUiLockRef.current) return;
+      immediateUiLockRef.current = true;
+      setIsStartingOptionalFlow(true);
+      setIsOptionalFlowFadeIn(false);
+      transitions.queueTransitionTimer(() => {
+        setIsAddingCharacter(false);
+        setActiveFlowId(flowId);
+        setShowFlowOverview(false);
+        setShowCharacterDirectory(false);
+        setSetupStepDirection("forward");
+        setSetupStepIndex(1);
+        setIsStartingOptionalFlow(false);
+        setIsOptionalFlowFadeIn(true);
+      }, OPTIONAL_FLOW_FADE_OUT_MS);
+      transitions.queueTransitionTimer(() => {
+        setIsOptionalFlowFadeIn(false);
+        immediateUiLockRef.current = false;
+      }, OPTIONAL_FLOW_TRANSITION_TOTAL_MS);
+    },
+    [transitions],
+  );
+
+  const switchToCharacterProfile = useCallback(
+    (character: NormalizedCharacterData) => {
+      if (immediateUiLockRef.current) return;
+      immediateUiLockRef.current = true;
+      setIsSwitchingToProfile(true);
+      transitions.queueTransitionTimer(() => {
+        setIsAddingCharacter(false);
+        const draft = readSetupDraftByCharacter(character);
+        setConfirmedCharacter(character);
+        setSetupMode("search");
+        setSetupFlowStarted(true);
+        setShowCharacterDirectory(false);
+        setSetupStepDirection("backward");
+        setActiveFlowId(draft?.activeFlowId ?? requiredFlowId);
+        setCompletedFlowIds(normalizeCompletedFlowIds(draft?.completedFlowIds ?? []));
+        setShowFlowOverview(
+          Boolean(
+            draft?.completedFlowIds?.includes(requiredFlowId) || draft?.showFlowOverview,
+          ),
+        );
+        setSetupStepIndex(
+          draft ? clampFlowStepIndex(draft.activeFlowId, draft.setupStepIndex) : 0,
+        );
+        setSetupStepDirection(draft?.setupStepDirection ?? "forward");
+        setSetupStepTestByStep(draft?.setupStepTestByStep ?? {});
+        transitions.setSetupPanelVisible(true);
+        setIsSwitchingToProfile(false);
+        immediateUiLockRef.current = false;
+      }, CHARACTERS_TRANSITION_MS.fast);
+    },
+    [requiredFlowId, transitions],
+  );
+
+  const setMainCharacter = useCallback(
+    (character: NormalizedCharacterData) => {
+      setMainCharacterKey(toCharacterKey(character));
+      switchToCharacterProfile(character);
+    },
+    [switchToCharacterProfile],
+  );
+
+  const toggleChampionCharacter = useCallback((character: NormalizedCharacterData) => {
+    const key = toCharacterKey(character);
+    setChampionCharacterKeys((prev) => {
+      if (prev.includes(key)) return prev.filter((entry) => entry !== key);
+      if (prev.length >= MAX_CHAMPIONS) return prev;
+      return [...prev, key];
+    });
+  }, []);
+
+  const toggleCharacterDirectory = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    if (!showCharacterDirectory) {
+      immediateUiLockRef.current = true;
+      setFastDirectoryRevealOnce(false);
+      setIsSwitchingToDirectory(true);
+      setSetupStepDirection("forward");
+      transitions.queueTransitionTimer(() => {
+        setShowCharacterDirectory(true);
+      }, CHARACTERS_TRANSITION_MS.fast);
+      transitions.queueTransitionTimer(() => {
+        setIsSwitchingToDirectory(false);
+        immediateUiLockRef.current = false;
+      }, CHARACTERS_TRANSITION_MS.searchFadeIn);
+      return;
+    }
+    setSetupStepDirection("backward");
+    setIsSwitchingToDirectory(false);
+    setFastDirectoryRevealOnce(false);
+    setShowCharacterDirectory(false);
+  }, [showCharacterDirectory, transitions]);
+
+  const removeCurrentCharacter = useCallback(() => {
+    if (!confirmedCharacter) return;
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+
+    const removedCharacter = confirmedCharacter;
+    const removedKey = toCharacterKey(removedCharacter);
+    const remainingRoster = characterRoster.filter(
+      (entry) => toCharacterKey(entry) !== removedKey,
+    );
+    const remainingChampionKeys = championCharacterKeys.filter((key) => key !== removedKey);
+    const nextMainKey =
+      mainCharacterKey && mainCharacterKey !== removedKey ? mainCharacterKey : null;
+
+    removeSetupDraftForCharacter(removedCharacter);
+    setIsDeleteTransitioning(true);
+    setIsSwitchingToDirectory(true);
+    setSetupStepDirection("forward");
+
+    transitions.queueTransitionTimer(() => {
+      setCharacterRoster(remainingRoster);
+      setChampionCharacterKeys(remainingChampionKeys);
+      setMainCharacterKey(nextMainKey);
+      setConfirmedCharacter(null);
+      setFoundCharacter(null);
+      setQuery("");
+      setCanResumeSetup(false);
+      setResumeSetupCharacterName(null);
+      setIsAddingCharacter(false);
+      lookup.resetSearchStateMessage();
+      setHasCompletedRequiredSetupEver(hasAnyCompletedRequiredSetupFlow());
+      setSetupMode("search");
+      setSetupFlowStarted(true);
+      setShowFlowOverview(true);
+      setShowCharacterDirectory(true);
+      transitions.setSetupPanelVisible(true);
+      setSetupStepIndex(0);
+      setSetupStepDirection("forward");
+      setDeleteNoticeCharacterName(removedCharacter.characterName);
+    }, CHARACTERS_TRANSITION_MS.standard);
+
+    transitions.queueTransitionTimer(() => {
+      setShowDeleteNotice(true);
+    }, CHARACTERS_TRANSITION_MS.standard + 30);
+
+    transitions.queueTransitionTimer(() => {
+      setShowDeleteNotice(false);
+    }, CHARACTERS_TRANSITION_MS.standard + 30 + CHARACTERS_TRANSITION_MS.deleteNoticeVisible);
+
+    transitions.queueTransitionTimer(() => {
+      setDeleteNoticeCharacterName(null);
+      setIsDeleteTransitioning(false);
+      setIsSwitchingToDirectory(false);
+      immediateUiLockRef.current = false;
+    }, CHARACTERS_TRANSITION_MS.standard + CHARACTERS_TRANSITION_MS.deleteNoticeTotal);
+  }, [
+    championCharacterKeys,
+    characterRoster,
+    confirmedCharacter,
+    mainCharacterKey,
+    lookup,
+    transitions,
+  ]);
+
+  const openAddCharacterSearch = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    const draft = readLastSetupDraft();
+    const canResumeFromDraft = isResumableDraft(draft);
+    transitions.runBackTransition(() => {
+      setIsAddingCharacter(true);
+      setShowCharacterDirectory(false);
+      setShowFlowOverview(false);
+      setSetupMode("search");
+      setSetupFlowStarted(false);
+      setFoundCharacter(null);
+      setConfirmedCharacter(null);
+      setQuery("");
+      setCanResumeSetup(canResumeFromDraft);
+      setResumeSetupCharacterName(
+        canResumeFromDraft
+          ? (draft?.confirmedCharacter?.characterName ?? draft?.query ?? null)
+          : null,
+      );
+      lookup.resetSearchStateMessage();
+    });
+  }, [isResumableDraft, lookup, transitions]);
+
+  const backFromAddCharacter = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    setIsSwitchingToDirectory(true);
+    const targetShowFlowOverview = true;
+    const targetShowCharacterDirectory = true;
+    const targetStepIndex = 0;
+    const targetStepDirection: "forward" | "backward" = "backward";
+
+    transitions.runBackTransition(
+      () => {
+        setFastDirectoryRevealOnce(true);
+        setIsAddingCharacter(false);
+        setFoundCharacter(null);
+        setSetupFlowStarted(true);
+        transitions.setSetupPanelVisible(true);
+        setShowFlowOverview(targetShowFlowOverview);
+        setShowCharacterDirectory(targetShowCharacterDirectory);
+        setSetupStepDirection(targetStepDirection);
+        setSetupStepIndex(targetStepIndex);
+      },
+      { enableSearchFadeIn: false },
+    );
+
+    transitions.queueTransitionTimer(() => {
+      setIsSwitchingToDirectory(false);
+    }, CHARACTERS_TRANSITION_MS.slow);
+
+    if (confirmedCharacter) {
+      const characterKey = makeDraftCharacterKey(confirmedCharacter);
+      const existingDraft = readSetupDraftByCharacter(confirmedCharacter);
+      writeSetupDraft({
+        version: 1,
+        characterKey,
+        query,
+        setupMode: "search",
+        setupFlowStarted: true,
+        autoResumeOnLoad: true,
+        activeFlowId,
+        completedFlowIds,
+        showFlowOverview: targetShowFlowOverview,
+        showCharacterDirectory: targetShowCharacterDirectory,
+        characterRoster,
+        mainCharacterKey,
+        championCharacterKeys,
+        setupStepIndex: targetStepIndex,
+        setupStepDirection: targetStepDirection,
+        setupStepTestByStep,
+        confirmedCharacter,
+        savedAt: existingDraft?.savedAt ?? 0,
+      });
+    }
+  }, [
+    activeFlowId,
+    championCharacterKeys,
+    characterRoster,
+    completedFlowIds,
+    confirmedCharacter,
+    mainCharacterKey,
+    query,
+    setupStepTestByStep,
+    transitions,
+  ]);
+
+  const returnToSummaryProfile = useCallback(() => {
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    setIsStartingOptionalFlow(true);
+    setIsOptionalFlowFadeIn(false);
+    transitions.queueTransitionTimer(() => {
+      setShowFlowOverview(true);
+      setShowCharacterDirectory(false);
+      setSetupStepDirection("backward");
+      setSetupStepIndex(0);
+      setIsStartingOptionalFlow(false);
+    }, OPTIONAL_FLOW_FADE_OUT_MS);
+    transitions.queueTransitionTimer(() => {
+      immediateUiLockRef.current = false;
+    }, OPTIONAL_FLOW_TRANSITION_TOTAL_MS);
+  }, [transitions]);
+
+  const handleQueryInput = useCallback((rawValue: string) => {
+    const sanitized = rawValue
+      .replace(CHARACTER_NAME_INPUT_FILTER_REGEX, "")
+      .slice(0, MAX_QUERY_LENGTH);
+    setQuery(sanitized);
+  }, []);
+
+  const handleSearchSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const duplicateByName = findRosterCharacterByName(characterRoster, lookup.trimmedQuery);
+      if (duplicateByName) {
+        lookup.setStatusTone("error");
+        lookup.setStatusMessage(`${duplicateByName.characterName} is already added.`);
+        setFoundCharacter(null);
+        return;
+      }
+      setSetupFlowStarted(false);
+      transitions.setSetupPanelVisible(false);
+      setConfirmedCharacter(null);
+      await lookup.runLookup(lookup.trimmedQuery);
+    },
+    [characterRoster, lookup, transitions],
+  );
+
+  const activeSetupStep = getFlowStepByIndex(activeFlowId, setupStepIndex);
+  const activeSetupStepValue = activeSetupStep
+    ? setupStepTestByStep[activeSetupStep.id] ?? ""
+    : "";
+  const currentCharacterKey = confirmedCharacter ? toCharacterKey(confirmedCharacter) : null;
+  const isCurrentMainCharacter = Boolean(
+    currentCharacterKey && mainCharacterKey && currentCharacterKey === mainCharacterKey,
+  );
+  const isCurrentChampionCharacter = Boolean(
+    currentCharacterKey && championCharacterKeys.includes(currentCharacterKey),
+  );
+  const canSetCurrentChampion =
+    isCurrentChampionCharacter || championCharacterKeys.length < MAX_CHAMPIONS;
+  const currentCharacterGenderRaw = (setupStepTestByStep.gender ?? "").toLowerCase();
+  const currentCharacterGender: "male" | "female" | null =
+    currentCharacterGenderRaw === "male"
+      ? "male"
+      : currentCharacterGenderRaw === "female"
+        ? "female"
+        : null;
+
+  return {
+    state: {
+      query,
+      foundCharacter,
+      previewCardReady,
+      previewContentReady,
+      setupMode,
+      confirmedCharacter,
+      previewImageLoaded,
+      confirmedImageLoaded,
+      setupFlowStarted,
+      activeFlowId,
+      completedFlowIds,
+      showFlowOverview,
+      showCharacterDirectory,
+      isSwitchingToDirectory,
+      isSwitchingToProfile,
+      isFinishingSetup,
+      deleteNoticeCharacterName,
+      showDeleteNotice,
+      isAddingCharacter,
+      fastDirectoryRevealOnce,
+      isStartingOptionalFlow,
+      isOptionalFlowFadeIn,
+      characterRoster,
+      mainCharacterKey,
+      championCharacterKeys,
+      setupStepIndex,
+      setupStepDirection,
+      canResumeSetup,
+      resumeSetupCharacterName,
+      hasCompletedRequiredSetupEver,
+      isDraftHydrated,
+      isUiLocked,
+      activeSetupStepValue,
+      isCurrentMainCharacter,
+      isCurrentChampionCharacter,
+      canSetCurrentChampion,
+      currentCharacterGender,
+      requiredFlowId,
+      queryInvalid: lookup.queryInvalid,
+      isSearching: lookup.isSearching,
+      statusMessage: lookup.statusMessage,
+      statusTone: lookup.statusTone,
+    },
+    transitions,
+    actions: {
+      setPreviewImageLoaded,
+      setConfirmedImageLoaded,
+      updateActiveStepValue: (value: string) => {
+        if (!activeSetupStep) return;
+        setSetupStepTestByStep((prev) => ({
+          ...prev,
+          [activeSetupStep.id]: value,
+        }));
+      },
+      setSetupStepWithDirection,
+      runBackToIntroTransition,
+      runTransitionToMode,
+      backFromSetupFlowToAddCharacter,
+      backToCharactersDirectory,
+      resumeSavedSetup,
+      confirmFoundCharacter,
+      finishSetupFlow,
+      startOptionalFlow,
+      setMainCharacter,
+      toggleChampionCharacter,
+      switchToCharacterProfile,
+      toggleCharacterDirectory,
+      removeCurrentCharacter,
+      openAddCharacterSearch,
+      backFromAddCharacter,
+      returnToSummaryProfile,
+      handleQueryInput,
+      handleSearchSubmit,
+    },
+  };
+}

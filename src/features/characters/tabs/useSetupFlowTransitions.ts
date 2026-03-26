@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NormalizedCharacterData } from "../model/types";
-import type { SetupStepInputById } from "../setup/types";
 import type { SetupMode } from "../model/constants";
+import type { NormalizedCharacterData } from "../model/types";
 import { getRequiredSetupFlowId, type SetupFlowId } from "../setup/flows";
+import type { SetupStepInputById } from "../setup/types";
+
+export const CHARACTERS_TRANSITION_MS = {
+  fast: 160,
+  standard: 220,
+  slow: 320,
+  searchFadeIn: 260,
+  setupPanelRevealDelay: 80,
+  deleteNoticeVisible: 1000,
+  deleteNoticeTotal: 1500,
+} as const;
 
 interface SetupTransitionSetters {
   setSetupMode: (mode: SetupMode) => void;
@@ -33,6 +43,17 @@ interface SetupFlowTransitionArgs {
   stepData: SetupStepInputById;
 }
 
+interface TransitionSequenceOptions {
+  type: "mode" | "back" | "confirm";
+  beforeCommit?: () => void;
+  onCommit: () => void;
+  afterCommit?: () => void;
+  durationMs?: number;
+  enableSearchFadeIn?: boolean;
+  suppressLayoutDuring?: boolean;
+  restoreLayoutAfterCommit?: boolean;
+}
+
 export function useSetupFlowTransitions() {
   const [isConfirmFadeOut, setIsConfirmFadeOut] = useState(false);
   const [isModeTransitioning, setIsModeTransitioning] = useState(false);
@@ -61,35 +82,51 @@ export function useSetupFlowTransitions() {
     };
   }, [clearTransitionTimers]);
 
-  const runBackToSearchTransition = useCallback(
-    (
-      callbacks: CommonTransitionCallbacks & {
-        setLastSetupDraftAutoResume: (value: boolean) => void;
-      },
-    ) => {
-      setIsBackTransitioning(true);
-      setSuppressLayoutTransition(false);
-      setSetupPanelVisible(false);
-      callbacks.setLastSetupDraftAutoResume(false);
+  const runTransitionSequence = useCallback(
+    ({
+      type,
+      beforeCommit,
+      onCommit,
+      afterCommit,
+      durationMs = CHARACTERS_TRANSITION_MS.standard,
+      enableSearchFadeIn = false,
+      suppressLayoutDuring = false,
+      restoreLayoutAfterCommit = false,
+    }: TransitionSequenceOptions) => {
+      clearTransitionTimers();
+      setIsConfirmFadeOut(type === "confirm");
+      setIsModeTransitioning(type === "mode");
+      setIsBackTransitioning(type === "back");
+      setIsSearchFadeIn(false);
+      if (type !== "confirm") {
+        setSetupPanelVisible(false);
+      }
+      setSuppressLayoutTransition(suppressLayoutDuring);
+      beforeCommit?.();
+
       queueTransitionTimer(() => {
-        callbacks.setSetupFlowStarted(false);
-        callbacks.setActiveFlowId(getRequiredSetupFlowId());
-        callbacks.setCompletedFlowIds([]);
-        callbacks.setShowFlowOverview(false);
-        callbacks.setShowCharacterDirectory(false);
-        callbacks.setFoundCharacter(null);
-        callbacks.setConfirmedCharacter(null);
-        callbacks.setSetupStepIndex(0);
-        callbacks.setSetupStepTestByStep({});
-        callbacks.resetSearchStateMessage();
+        onCommit();
+        setIsConfirmFadeOut(false);
+        setIsModeTransitioning(false);
         setIsBackTransitioning(false);
-        setIsSearchFadeIn(true);
-        queueTransitionTimer(() => {
-          setIsSearchFadeIn(false);
-        }, 260);
-      }, 230);
+
+        if (enableSearchFadeIn) {
+          setIsSearchFadeIn(true);
+          queueTransitionTimer(() => {
+            setIsSearchFadeIn(false);
+          }, CHARACTERS_TRANSITION_MS.searchFadeIn);
+        }
+
+        afterCommit?.();
+
+        if (restoreLayoutAfterCommit) {
+          queueTransitionTimer(() => {
+            setSuppressLayoutTransition(false);
+          }, durationMs);
+        }
+      }, durationMs);
     },
-    [queueTransitionTimer],
+    [clearTransitionTimers, queueTransitionTimer],
   );
 
   const runBackToIntroTransition = useCallback(
@@ -98,94 +135,84 @@ export function useSetupFlowTransitions() {
         setLastSetupDraftAutoResume: (value: boolean) => void;
       },
     ) => {
-      setIsModeTransitioning(true);
-      setSuppressLayoutTransition(false);
       callbacks.setLastSetupDraftAutoResume(false);
-      queueTransitionTimer(() => {
-        callbacks.setSetupMode("intro");
-        callbacks.setFoundCharacter(null);
-        callbacks.setConfirmedCharacter(null);
-        callbacks.setSetupFlowStarted(false);
-        callbacks.setActiveFlowId(getRequiredSetupFlowId());
-        callbacks.setCompletedFlowIds([]);
-        callbacks.setShowFlowOverview(false);
-        callbacks.setShowCharacterDirectory(false);
-        setSetupPanelVisible(false);
-        callbacks.setSetupStepIndex(0);
-        callbacks.setSetupStepTestByStep({});
-        callbacks.resetSearchStateMessage();
-        setIsModeTransitioning(false);
-        setIsSearchFadeIn(true);
-        queueTransitionTimer(() => {
-          setIsSearchFadeIn(false);
-        }, 260);
-      }, 220);
+      runTransitionSequence({
+        type: "mode",
+        enableSearchFadeIn: true,
+        onCommit: () => {
+          callbacks.setSetupMode("intro");
+          callbacks.setFoundCharacter(null);
+          callbacks.setConfirmedCharacter(null);
+          callbacks.setSetupFlowStarted(false);
+          callbacks.setActiveFlowId(getRequiredSetupFlowId());
+          callbacks.setCompletedFlowIds([]);
+          callbacks.setShowFlowOverview(false);
+          callbacks.setShowCharacterDirectory(false);
+          setSetupPanelVisible(false);
+          callbacks.setSetupStepIndex(0);
+          callbacks.setSetupStepTestByStep({});
+          callbacks.resetSearchStateMessage();
+        },
+      });
     },
-    [queueTransitionTimer],
+    [runTransitionSequence],
   );
 
   const runTransitionToMode = useCallback(
     (nextMode: SetupMode, callbacks: CommonTransitionCallbacks) => {
-      setIsModeTransitioning(true);
-      setSuppressLayoutTransition(false);
-      queueTransitionTimer(() => {
-        callbacks.setSetupMode(nextMode);
-        callbacks.setFoundCharacter(null);
-        callbacks.setConfirmedCharacter(null);
-        callbacks.setSetupFlowStarted(false);
-        callbacks.setActiveFlowId(getRequiredSetupFlowId());
-        callbacks.setCompletedFlowIds([]);
-        callbacks.setShowFlowOverview(false);
-        callbacks.setShowCharacterDirectory(false);
-        setSetupPanelVisible(false);
-        callbacks.setSetupStepIndex(0);
-        callbacks.setSetupStepTestByStep({});
-        if (nextMode === "search") {
-          callbacks.resetSearchStateMessage();
-        }
-        setIsModeTransitioning(false);
-        setIsSearchFadeIn(true);
-        queueTransitionTimer(() => {
-          setIsSearchFadeIn(false);
-        }, 260);
-      }, 220);
+      runTransitionSequence({
+        type: "mode",
+        enableSearchFadeIn: true,
+        onCommit: () => {
+          callbacks.setSetupMode(nextMode);
+          callbacks.setFoundCharacter(null);
+          callbacks.setConfirmedCharacter(null);
+          callbacks.setSetupFlowStarted(false);
+          callbacks.setActiveFlowId(getRequiredSetupFlowId());
+          callbacks.setCompletedFlowIds([]);
+          callbacks.setShowFlowOverview(false);
+          callbacks.setShowCharacterDirectory(false);
+          setSetupPanelVisible(false);
+          callbacks.setSetupStepIndex(0);
+          callbacks.setSetupStepTestByStep({});
+          if (nextMode === "search") {
+            callbacks.resetSearchStateMessage();
+          }
+        },
+      });
     },
-    [queueTransitionTimer],
+    [runTransitionSequence],
   );
 
   const beginSetupFlowTransition = useCallback(
     (args: SetupFlowTransitionArgs, setters: SetupTransitionSetters) => {
-      clearTransitionTimers();
-      setIsSearchFadeIn(false);
-      setIsModeTransitioning(false);
-      setIsBackTransitioning(false);
-      setSuppressLayoutTransition(true);
-      setSetupPanelVisible(false);
-      setters.setConfirmedCharacter(args.character);
-      setters.setActiveFlowId(args.flowId);
-      setters.setCompletedFlowIds(args.completedFlowIds);
-      setters.setShowFlowOverview(args.showFlowOverview);
-      setters.setShowCharacterDirectory(args.showCharacterDirectory);
-      setters.setSetupStepDirection(args.stepDirection);
-      setters.setSetupStepIndex(args.stepIndex);
-      setters.setSetupStepTestByStep(args.stepData);
-      setIsConfirmFadeOut(true);
-
-      queueTransitionTimer(() => {
-        setters.setFoundCharacter(null);
-        setters.setSetupFlowStarted(true);
-        setIsConfirmFadeOut(false);
-      }, 240);
-
-      queueTransitionTimer(() => {
-        setSetupPanelVisible(true);
-      }, 620);
-
-      queueTransitionTimer(() => {
-        setSuppressLayoutTransition(false);
-      }, 820);
+      runTransitionSequence({
+        type: "confirm",
+        suppressLayoutDuring: true,
+        restoreLayoutAfterCommit: true,
+        beforeCommit: () => {
+          setters.setConfirmedCharacter(args.character);
+          setters.setActiveFlowId(args.flowId);
+          setters.setCompletedFlowIds(args.completedFlowIds);
+          setters.setShowFlowOverview(args.showFlowOverview);
+          setters.setShowCharacterDirectory(args.showCharacterDirectory);
+          setters.setSetupStepDirection(args.stepDirection);
+          setters.setSetupStepIndex(args.stepIndex);
+          setters.setSetupStepTestByStep(args.stepData);
+          setSetupPanelVisible(false);
+        },
+        onCommit: () => {
+          setters.setFoundCharacter(null);
+          setters.setSetupFlowStarted(true);
+        },
+        afterCommit: () => {
+          queueTransitionTimer(() => {
+            setSetupPanelVisible(true);
+          }, CHARACTERS_TRANSITION_MS.setupPanelRevealDelay);
+        },
+      });
     },
-    [clearTransitionTimers, queueTransitionTimer],
+    [queueTransitionTimer, runTransitionSequence],
   );
 
   const runBackTransition = useCallback(
@@ -195,22 +222,13 @@ export function useSetupFlowTransitions() {
         enableSearchFadeIn?: boolean;
       },
     ) => {
-      const enableSearchFadeIn = options?.enableSearchFadeIn ?? true;
-      setIsBackTransitioning(true);
-      setSuppressLayoutTransition(false);
-      setSetupPanelVisible(false);
-      queueTransitionTimer(() => {
-        onMidTransition();
-        setIsBackTransitioning(false);
-        if (enableSearchFadeIn) {
-          setIsSearchFadeIn(true);
-          queueTransitionTimer(() => {
-            setIsSearchFadeIn(false);
-          }, 260);
-        }
-      }, 220);
+      runTransitionSequence({
+        type: "back",
+        enableSearchFadeIn: options?.enableSearchFadeIn ?? true,
+        onCommit: onMidTransition,
+      });
     },
-    [queueTransitionTimer],
+    [runTransitionSequence],
   );
 
   return {
@@ -224,7 +242,6 @@ export function useSetupFlowTransitions() {
     setSuppressLayoutTransition,
     clearTransitionTimers,
     queueTransitionTimer,
-    runBackToSearchTransition,
     runBackToIntroTransition,
     runTransitionToMode,
     beginSetupFlowTransition,
