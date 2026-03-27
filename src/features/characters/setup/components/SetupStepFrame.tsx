@@ -45,7 +45,7 @@ export default function SetupStepFrame({
         style={{
           margin: 0,
           marginBottom: "0.45rem",
-          fontFamily: "'Fredoka One', cursive",
+          fontFamily: "var(--font-heading)",
           fontSize: "1.3rem",
           lineHeight: 1.2,
           color: theme.text,

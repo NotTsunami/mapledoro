@@ -9,53 +9,25 @@ import type { AppTheme } from "../../components/themes";
 
 function GuidesContent({ theme }: { theme: AppTheme }) {
   return (
-    <div
-      style={{
-        flex: 1,
-        width: "100%",
-        padding: "1.5rem 1.5rem 2rem 2.75rem",
-      }}
-    >
-      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        <div
-          style={{
-            fontFamily: "'Fredoka One', cursive",
-            fontSize: "1.5rem",
-            color: theme.text,
-            marginBottom: "0.25rem",
-          }}
-        >
+    <div className="page-content">
+      <div className="page-container">
+        <div className="page-title" style={{ color: theme.text }}>
           Guides
         </div>
-        <div
-          style={{
-            fontSize: "0.85rem",
-            color: theme.muted,
-            fontWeight: 600,
-            marginBottom: "1.5rem",
-          }}
-        >
+        <div className="page-subtitle" style={{ color: theme.muted }}>
           MapleStory guides and resources
         </div>
 
         <div
-          className="fade-in"
+          className="fade-in panel-card empty-state"
           style={{
             background: theme.panel,
             border: `1px solid ${theme.border}`,
-            borderRadius: "18px",
             padding: "3rem 1.5rem",
-            textAlign: "center",
           }}
         >
           <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>📖</div>
-          <div
-            style={{
-              fontSize: "0.9rem",
-              color: theme.muted,
-              fontWeight: 600,
-            }}
-          >
+          <div style={{ fontSize: "0.9rem", color: theme.muted, fontWeight: 600 }}>
             Guides coming soon.
           </div>
         </div>

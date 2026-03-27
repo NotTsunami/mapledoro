@@ -9,37 +9,14 @@ interface ToolHeaderProps {
 
 export function ToolHeader({ theme, title, description }: ToolHeaderProps) {
   return (
-    <div style={{ marginBottom: "1.25rem" }}>
-      <Link
-        href="/tools"
-        style={{
-          fontSize: "0.78rem",
-          fontWeight: 800,
-          color: theme.accent,
-          textDecoration: "none",
-        }}
-      >
+    <div className="tool-header">
+      <Link href="/tools" className="tool-header-back" style={{ color: theme.accent }}>
         ← Back to Tools
       </Link>
-      <div
-        style={{
-          fontFamily: "'Fredoka One', cursive",
-          fontSize: "1.5rem",
-          color: theme.text,
-          marginTop: "0.5rem",
-        }}
-      >
+      <div className="tool-header-title" style={{ color: theme.text }}>
         {title}
       </div>
-      <div
-        style={{
-          fontSize: "0.8rem",
-          color: theme.muted,
-          fontWeight: 600,
-          marginTop: "0.15rem",
-          lineHeight: 1.5,
-        }}
-      >
+      <div className="tool-header-desc" style={{ color: theme.muted }}>
         {description}
       </div>
     </div>

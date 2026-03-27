@@ -246,7 +246,7 @@ function BossCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
-              fontFamily: "'Fredoka One', cursive",
+              fontFamily: "var(--font-heading)",
               fontSize: "0.9rem",
               color: theme.text,
             }}
@@ -284,7 +284,7 @@ function BossCard({
         {boss.difficulties.map((diff, di) => (
           <div
             key={diff.label}
-            className="lib-diff-btn"
+            className="lib-diff-btn pill-btn"
             onClick={() => onDifficultyChange(sel.difficultyIdx === di ? null : di)}
             style={pillBtn(sel.difficultyIdx === di)}
           >
@@ -332,6 +332,7 @@ function BossCard({
               if (v > boss.maxParty) v = boss.maxParty;
               onPartySizeChange(v);
             }}
+            className="tool-input"
             style={{
               ...inputStyle,
               width: "48px",
@@ -519,26 +520,15 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
   const inputStyle: React.CSSProperties = {
     background: theme.timerBg,
     border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
     padding: "6px 10px",
     color: theme.text,
-    fontFamily: "'Nunito', sans-serif",
     fontSize: "0.82rem",
-    fontWeight: 700,
-    outline: "none",
   };
 
   const pillBtn = (
     active: boolean,
     accent?: boolean,
   ): React.CSSProperties => ({
-    padding: "6px 14px",
-    borderRadius: "8px",
-    fontSize: "0.78rem",
-    fontWeight: 800,
-    cursor: "pointer",
-    userSelect: "none",
-    transition: "all 0.15s",
     color: active
       ? accent
         ? "#fff"
@@ -555,18 +545,8 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
   const sectionPanel: React.CSSProperties = {
     background: theme.panel,
     border: `1px solid ${theme.border}`,
-    borderRadius: "18px",
     padding: "1.25rem",
     marginBottom: "1.25rem",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: "0.7rem",
-    fontWeight: 800,
-    color: theme.muted,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    marginBottom: "8px",
   };
 
   const traceName = type === "genesis" ? "Traces of Darkness" : "Determination";
@@ -602,7 +582,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           />
 
           {/* Type toggle */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -638,8 +618,8 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           </div>
 
           {/* Configuration */}
-          <div className="fade-in" style={sectionPanel}>
-            <div style={labelStyle}>Configuration</div>
+          <div className="fade-in panel-card" style={sectionPanel}>
+            <div className="section-label" style={{ color: theme.muted }}>Configuration</div>
             <div
               style={{
                 display: "flex",
@@ -661,6 +641,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                   Current Quest
                 </div>
                 <select
+                  className="tool-input"
                   value={questIdx}
                   onChange={(e) => {
                     setQuestIdx(Number(e.target.value));
@@ -693,6 +674,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                   Current {traceNameShort}
                 </div>
                 <input
+                  className="tool-input"
                   type="number"
                   min={0}
                   max={quests[questIdx]?.required ?? 9999}
@@ -721,6 +703,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                   Start Date (UTC)
                 </div>
                 <input
+                  className="tool-input"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
@@ -732,7 +715,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
               {type === "genesis" && (
                 <div style={{ flex: "0 0 auto" }}>
                   <div
-                    className="lib-btn"
+                    className="lib-btn pill-btn"
                     onClick={() => setGenesisPass((p) => !p)}
                     style={pillBtn(genesisPass, true)}
                   >
@@ -744,7 +727,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           </div>
 
           {/* Progress bar */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -753,7 +736,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                 marginBottom: "8px",
               }}
             >
-              <div style={labelStyle}>Liberation Progress</div>
+              <div className="section-label" style={{ color: theme.muted }}>Liberation Progress</div>
               <div
                 style={{
                   fontSize: "0.78rem",
@@ -799,7 +782,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           </div>
 
           {/* Boss Selection */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -809,7 +792,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                 marginBottom: "1rem",
               }}
             >
-              <div style={{ ...labelStyle, marginBottom: 0 }}>
+              <div className="section-label" style={{ color: theme.muted, marginBottom: 0 }}>
                 Boss Selection
               </div>
 
@@ -885,7 +868,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           >
             <div
               style={{
-                fontFamily: "'Fredoka One', cursive",
+                fontFamily: "var(--font-heading)",
                 fontSize: "1.15rem",
                 color: theme.text,
                 marginBottom: "1rem",
@@ -906,10 +889,10 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
               }}
             >
               <div>
-                <div style={labelStyle}>Completion Date</div>
+                <div className="section-label" style={{ color: theme.muted }}>Completion Date</div>
                 <div
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.2rem",
                     color:
                       result.completionDate === "Never"
@@ -923,10 +906,10 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                 </div>
               </div>
               <div>
-                <div style={labelStyle}>Weeks Remaining</div>
+                <div className="section-label" style={{ color: theme.muted }}>Weeks Remaining</div>
                 <div
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.2rem",
                     color:
                       result.weeksToComplete === Infinity
@@ -940,10 +923,10 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                 </div>
               </div>
               <div>
-                <div style={labelStyle}>{traceNameShort} Remaining</div>
+                <div className="section-label" style={{ color: theme.muted }}>{traceNameShort} Remaining</div>
                 <div
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.2rem",
                     color: theme.text,
                   }}
@@ -954,7 +937,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
             </div>
 
             {/* Weekly breakdown */}
-            <div style={labelStyle}>
+            <div className="section-label" style={{ color: theme.muted }}>
               Weekly {traceName} Breakdown
             </div>
             {result.breakdown.length === 0 ? (
@@ -1013,7 +996,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                 >
                   <span
                     style={{
-                      fontFamily: "'Fredoka One', cursive",
+                      fontFamily: "var(--font-heading)",
                       fontSize: "0.9rem",
                       color: theme.text,
                     }}
@@ -1022,7 +1005,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
                   </span>
                   <span
                     style={{
-                      fontFamily: "'Fredoka One', cursive",
+                      fontFamily: "var(--font-heading)",
                       fontSize: "1rem",
                       color: theme.accent,
                     }}

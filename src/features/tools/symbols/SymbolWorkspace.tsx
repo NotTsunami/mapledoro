@@ -216,30 +216,16 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
   const inputStyle: React.CSSProperties = {
     background: theme.timerBg,
     border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
     padding: "6px 10px",
     color: theme.text,
-    fontFamily: "'Nunito', sans-serif",
     fontSize: "0.82rem",
-    fontWeight: 700,
-    outline: "none",
   };
 
   const sectionPanel: React.CSSProperties = {
     background: theme.panel,
     border: `1px solid ${theme.border}`,
-    borderRadius: "18px",
     padding: "1.25rem",
     marginBottom: "1.25rem",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: "0.7rem",
-    fontWeight: 800,
-    color: theme.muted,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    marginBottom: "8px",
   };
 
   return (
@@ -264,43 +250,20 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
       >
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           {/* Header */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <Link
-              href="/tools"
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 800,
-                color: theme.accent,
-                textDecoration: "none",
-              }}
-            >
+          <div className="tool-header">
+            <Link href="/tools" className="tool-header-back" style={{ color: theme.accent }}>
               ← Back to Tools
             </Link>
-            <div
-              style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: "1.5rem",
-                color: theme.text,
-                marginTop: "0.5rem",
-              }}
-            >
+            <div className="tool-header-title" style={{ color: theme.text }}>
               Symbol Calculator
             </div>
-            <div
-              style={{
-                fontSize: "0.8rem",
-                color: theme.muted,
-                fontWeight: 600,
-                marginTop: "0.15rem",
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="tool-header-desc" style={{ color: theme.muted }}>
               Track your Arcane and Sacred symbol progress and estimate completion dates.
             </div>
           </div>
 
           {/* Type toggle */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -334,7 +297,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
           </div>
 
           {/* Overall Progress */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -343,7 +306,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                 marginBottom: "8px",
               }}
             >
-              <div style={labelStyle}>Overall Progress</div>
+              <div className="section-label" style={{ color: theme.muted }}>Overall Progress</div>
               <div
                 style={{
                   fontSize: "0.78rem",
@@ -399,7 +362,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
           </div>
 
           {/* Symbol Cards */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -409,7 +372,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                 marginBottom: "1rem",
               }}
             >
-              <div style={{ ...labelStyle, marginBottom: 0 }}>
+              <div className="section-label" style={{ color: theme.muted, marginBottom: 0 }}>
                 {type === "arcane" ? "Arcane River" : "Grandis"} Symbols
               </div>
               <div style={{ marginLeft: "auto" }}>
@@ -488,7 +451,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            fontFamily: "'Fredoka One', cursive",
+                            fontFamily: "var(--font-heading)",
                             fontSize: "0.9rem",
                             color: theme.text,
                           }}
@@ -586,6 +549,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                           Level
                         </div>
                         <select
+                          className="tool-input"
                           value={state.level}
                           disabled={isSacred && !isTracked}
                           onChange={(e) => {
@@ -633,6 +597,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                             }}
                           >
                             <input
+                              className="tool-input"
                               type="number"
                               min={0}
                               max={levelMax}
@@ -740,6 +705,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                           <input
                             type="number"
                             min={0}
+                            className="tool-input"
                             max={dailyMax}
                             value={state.daily}
                             disabled={isSacred && !isTracked}
@@ -822,12 +788,12 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Completion Summary */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{ ...sectionPanel, marginBottom: "1.25rem" }}
           >
             <div
               style={{
-                fontFamily: "'Fredoka One', cursive",
+                fontFamily: "var(--font-heading)",
                 fontSize: "1.15rem",
                 color: theme.text,
                 marginBottom: "1rem",
@@ -916,7 +882,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                 >
                   <span
                     style={{
-                      fontFamily: "'Fredoka One', cursive",
+                      fontFamily: "var(--font-heading)",
                       fontSize: "0.9rem",
                       color: theme.text,
                     }}
@@ -925,7 +891,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                   </span>
                   <span
                     style={{
-                      fontFamily: "'Fredoka One', cursive",
+                      fontFamily: "var(--font-heading)",
                       fontSize: "1rem",
                       color: anyInfinite ? "#e05a5a" : theme.accent,
                     }}

@@ -31,7 +31,6 @@ export default function AppShell({ currentPath, children }: AppShellProps) {
         minHeight: "100dvh",
         background: theme.bg,
         color: theme.text,
-        fontFamily: "'Nunito', sans-serif",
         transition: "all 0.35s ease",
         overflowX: "hidden",
       }}

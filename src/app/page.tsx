@@ -190,27 +190,17 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
 
         .row-hover:hover { background: ${theme.accentSoft} !important; }
 
-        .countdown { font-family: 'Fredoka One', cursive; font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
+        .countdown { font-family: var(--font-heading); font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
 
         @media (max-width: 860px) {
-          .dashboard-main { padding: 1rem !important; }
           .dashboard-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <div
-        className="dashboard-main"
-        style={{
-          flex: 1,
-          width: "100%",
-          padding: "1.5rem 1.5rem 2rem 2.75rem",
-        }}
-      >
+      <div className="page-content">
         <div
-          className="dashboard-grid"
+          className="page-container dashboard-grid"
           style={{
-            maxWidth: "1100px",
-            margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "1fr 330px",
             gap: "1.25rem",
@@ -218,33 +208,17 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
           }}
         >
           <div
-            className="fade-in panel"
+            className="fade-in panel panel-card"
             style={{
               animationDelay: "0.1s",
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
               minHeight: "400px",
             }}
           >
-            <div
-              style={{
-                padding: "1rem 1.25rem 0.8rem",
-                borderBottom: `1px solid ${theme.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
+            <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
               <span style={{ fontSize: "1.1rem" }}>⭐</span>
-              <span
-                style={{
-                  fontFamily: "'Fredoka One', cursive",
-                  fontSize: "1.15rem",
-                  color: theme.text,
-                }}
-              >
+              <span className="panel-header-title" style={{ color: theme.text }}>
                 Favorite Characters
               </span>
             </div>
@@ -265,32 +239,16 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             <div
-              className="fade-in panel"
+              className="fade-in panel panel-card"
               style={{
                 animationDelay: "0.2s",
                 background: theme.panel,
                 border: `1px solid ${theme.border}`,
-                borderRadius: "18px",
-                overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  padding: "1rem 1.25rem 0.8rem",
-                  borderBottom: `1px solid ${theme.border}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
+              <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
                 <span style={{ fontSize: "1.1rem" }}>⏱</span>
-                <span
-                  style={{
-                    fontFamily: "'Fredoka One', cursive",
-                    fontSize: "1.15rem",
-                    color: theme.text,
-                  }}
-                >
+                <span className="panel-header-title" style={{ color: theme.text }}>
                   Reset Timers
                 </span>
               </div>
@@ -312,16 +270,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: "0.7rem",
-                          fontWeight: 800,
-                          color: theme.muted,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                          marginBottom: "6px",
-                        }}
-                      >
+                      <div className="section-label" style={{ color: theme.muted, marginBottom: "6px" }}>
                         {r.label}
                       </div>
                       <div className="countdown" style={{ color: r.color }}>
@@ -334,32 +283,16 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
             </div>
 
             <div
-              className="fade-in panel"
+              className="fade-in panel panel-card"
               style={{
                 animationDelay: "0.25s",
                 background: theme.panel,
                 border: `1px solid ${theme.border}`,
-                borderRadius: "18px",
-                overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  padding: "1rem 1.25rem 0.8rem",
-                  borderBottom: `1px solid ${theme.border}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
+              <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
                 <span style={{ fontSize: "1.1rem" }}>🐻</span>
-                <span
-                  style={{
-                    fontFamily: "'Fredoka One', cursive",
-                    fontSize: "1.15rem",
-                    color: theme.text,
-                  }}
-                >
+                <span className="panel-header-title" style={{ color: theme.text }}>
                   Ursus 2× Meso
                 </span>
                 {ursus.active && (
@@ -393,16 +326,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
-                        fontWeight: 800,
-                        color: theme.muted,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.1em",
-                        marginBottom: "6px",
-                      }}
-                    >
+                    <div className="section-label" style={{ color: theme.muted, marginBottom: "6px" }}>
                       {ursus.active ? "Ends In" : "Starts In"}
                     </div>
                     <div
@@ -428,13 +352,11 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
             </div>
 
             <div
-              className="fade-in panel"
+              className="fade-in panel panel-card"
               style={{
                 animationDelay: "0.3s",
                 background: theme.panel,
                 border: `1px solid ${theme.border}`,
-                borderRadius: "18px",
-                overflow: "hidden",
               }}
             >
               <div
@@ -445,13 +367,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "0.5rem" }}>
                   <span>📋</span>
-                  <span
-                    style={{
-                      fontFamily: "'Fredoka One', cursive",
-                      fontSize: "1.1rem",
-                      color: theme.text,
-                    }}
-                  >
+                  <span className="panel-header-title" style={{ color: theme.text, fontSize: "1.1rem" }}>
                     Patch Notes
                   </span>
                   <a
@@ -497,7 +413,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                 </div>
               </div>
               {filteredPatchNotes.length === 0 ? (
-                <div style={{ padding: "1.5rem 1.25rem", textAlign: "center", color: theme.muted, fontSize: "0.85rem", fontWeight: 600 }}>
+                <div className="empty-state" style={{ padding: "1.5rem 1.25rem", color: theme.muted, fontWeight: 600 }}>
                   No notes for this filter.
                 </div>
               ) : (
