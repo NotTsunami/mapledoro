@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import type { AppTheme } from "../../../components/themes";
+import { ToolHeader } from "../../../components/ToolHeader";
+import { WikiAttribution } from "../../../components/WikiAttribution";
 import {
   type SymbolType,
   type SymbolArea,
@@ -33,6 +34,30 @@ interface SymbolState {
 interface SavedState {
   type: SymbolType;
   symbols: Record<string, SymbolState>;
+}
+
+interface PerSymbolData {
+  area: SymbolArea;
+  state: SymbolState;
+  remaining: number;
+  days: number;
+  consumed: number;
+  levelMax: number;
+  isMaxed: boolean;
+  isTracked: boolean;
+}
+
+interface SymbolStats {
+  perSymbol: PerSymbolData[];
+  tracked: PerSymbolData[];
+  totalConsumed: number;
+  totalSymbolsNeeded: number;
+  totalForOneArea: number;
+  maxDaysVal: number;
+  overallPct: number;
+  allMaxed: boolean;
+  anyInfinite: boolean;
+  noneTracked: boolean;
 }
 
 // -- Constants ----------------------------------------------------------------
@@ -99,7 +124,753 @@ function effectiveWeekly(symbolType: SymbolType, weeklyEnabled: boolean): number
   return symbolType === "arcane" && weeklyEnabled ? WEEKLY_SYMBOLS : 0;
 }
 
-// -- Component ----------------------------------------------------------------
+function computeSymbolStats(
+  areas: SymbolArea[],
+  symbols: Record<string, SymbolState>,
+  growth: number[],
+  type: SymbolType,
+  maxLevel: number,
+): SymbolStats {
+  let totalConsumed = 0;
+  let totalSymbolsNeeded = 0;
+  let maxDaysVal = 0;
+  const totalForOneArea = growth.reduce((a, b) => a + b, 0);
+  const perSymbol: PerSymbolData[] = [];
+
+  for (const area of areas) {
+    const s = getSymbolState(symbols, area, type);
+    const isTracked = type === "arcane" || s.enabled;
+    const weekly = effectiveWeekly(type, s.weeklyEnabled);
+    const remaining = symbolsRemaining(growth, s.level, s.current);
+    const days = daysToMax(remaining, s.daily, weekly);
+    const consumed = symbolsConsumed(growth, s.level, s.current, maxLevel);
+    const isMaxed = s.level >= maxLevel;
+
+    if (isTracked) {
+      totalConsumed += consumed;
+      totalSymbolsNeeded += totalForOneArea;
+      if (days !== Infinity && days > maxDaysVal) maxDaysVal = days;
+    }
+
+    perSymbol.push({
+      area, state: s, remaining, days, consumed,
+      levelMax: symbolsForLevel(growth, s.level),
+      isMaxed, isTracked,
+    });
+  }
+
+  const tracked = perSymbol.filter((p) => p.isTracked);
+  const overallPct = totalSymbolsNeeded > 0
+    ? Math.min(100, (totalConsumed / totalSymbolsNeeded) * 100)
+    : 0;
+
+  return {
+    perSymbol, tracked, totalConsumed, totalSymbolsNeeded, totalForOneArea, maxDaysVal, overallPct,
+    allMaxed: tracked.length > 0 && tracked.every((p) => p.isMaxed),
+    anyInfinite: tracked.some((p) => p.days === Infinity && !p.isMaxed),
+    noneTracked: tracked.length === 0,
+  };
+}
+
+// -- Symbol Card: Header ------------------------------------------------------
+
+function SymbolCardHeader({
+  area,
+  state,
+  days,
+  isMaxed,
+  isTracked,
+  isSacred,
+  theme,
+  updateSymbol,
+}: {
+  area: SymbolArea;
+  state: SymbolState;
+  days: number;
+  isMaxed: boolean;
+  isTracked: boolean;
+  isSacred: boolean;
+  theme: AppTheme;
+  updateSymbol: (areaName: string, patch: Partial<SymbolState>) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        marginBottom: "0.75rem",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={area.icon}
+        alt={area.name}
+        width={38}
+        height={38}
+        style={{
+          borderRadius: "8px",
+          objectFit: "contain",
+          flexShrink: 0,
+          background: theme.panel,
+          border: `1px solid ${theme.border}`,
+          padding: "2px",
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontSize: "0.9rem",
+            color: theme.text,
+          }}
+        >
+          {area.name}
+        </div>
+        <div
+          style={{
+            fontSize: "0.68rem",
+            fontWeight: 700,
+            color: theme.muted,
+          }}
+        >
+          Lv. {area.requiredLevel}+
+        </div>
+      </div>
+
+      {isSacred && (
+        <div
+          className="sym-btn"
+          onClick={() => updateSymbol(area.name, { enabled: !state.enabled })}
+          style={{
+            padding: "4px 10px",
+            borderRadius: "8px",
+            fontSize: "0.72rem",
+            fontWeight: 800,
+            cursor: "pointer",
+            color: isTracked ? theme.accentText : theme.muted,
+            background: isTracked ? theme.accentSoft : "transparent",
+            border: `1px solid ${isTracked ? theme.accent + "44" : theme.border}`,
+          }}
+        >
+          {isTracked ? "Tracking" : "Not tracking"}
+        </div>
+      )}
+
+      {(!isSacred || isTracked) && (
+        <div
+          style={{
+            fontSize: "0.72rem",
+            fontWeight: 800,
+            padding: "2px 8px",
+            borderRadius: "6px",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+            color: isMaxed ? "#fff" : days === Infinity ? "#e05a5a" : theme.accent,
+            background: isMaxed ? theme.accent : theme.accentSoft,
+          }}
+        >
+          {isMaxed ? "MAX" : days === Infinity ? "--" : `~${days}d`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -- Symbol Card: Level Controls ----------------------------------------------
+
+function SymbolLevelControls({
+  area,
+  state,
+  isMaxed,
+  disabled,
+  maxLevel,
+  levelMax,
+  inputStyle,
+  theme,
+  updateSymbol,
+}: {
+  area: SymbolArea;
+  state: SymbolState;
+  isMaxed: boolean;
+  disabled: boolean;
+  maxLevel: number;
+  levelMax: number;
+  inputStyle: React.CSSProperties;
+  theme: AppTheme;
+  updateSymbol: (areaName: string, patch: Partial<SymbolState>) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "0.5rem",
+        alignItems: "center",
+        marginBottom: "0.5rem",
+        opacity: disabled ? 0.4 : 1,
+        transition: "opacity 0.15s",
+      }}
+    >
+      <div style={{ flex: "0 0 auto" }}>
+        <div
+          style={{
+            fontSize: "0.68rem",
+            fontWeight: 700,
+            color: theme.muted,
+            marginBottom: "3px",
+          }}
+        >
+          Level
+        </div>
+        <select
+          className="tool-input"
+          value={state.level}
+          disabled={disabled}
+          onChange={(e) => {
+            const newLevel = Number(e.target.value);
+            updateSymbol(area.name, { level: newLevel, current: 0 });
+          }}
+          style={{
+            ...inputStyle,
+            width: "70px",
+            cursor: disabled ? "not-allowed" : "pointer",
+            padding: "4px 6px",
+            fontSize: "0.78rem",
+          }}
+        >
+          {Array.from({ length: maxLevel }, (_, i) => i + 1).map((lvl) => (
+            <option key={lvl} value={lvl}>
+              {lvl}{lvl === maxLevel ? " (MAX)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!isMaxed && (
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              color: theme.muted,
+              marginBottom: "3px",
+            }}
+          >
+            Current / Needed
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <input
+              className="tool-input"
+              type="number"
+              min={0}
+              max={levelMax}
+              value={state.current}
+              disabled={disabled}
+              onChange={(e) => {
+                let v = parseInt(e.target.value) || 0;
+                if (v < 0) v = 0;
+                if (v > levelMax) v = levelMax;
+                updateSymbol(area.name, { current: v });
+              }}
+              style={{
+                ...inputStyle,
+                width: "64px",
+                textAlign: "center",
+                padding: "4px 6px",
+                fontSize: "0.78rem",
+                cursor: disabled ? "not-allowed" : "text",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                color: theme.muted,
+              }}
+            >
+              / {levelMax.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isMaxed && (
+        <div
+          style={{
+            flex: 1,
+            fontSize: "0.82rem",
+            fontWeight: 800,
+            color: theme.accent,
+            textAlign: "center",
+            padding: "8px 0",
+          }}
+        >
+          Symbol Maxed
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -- Symbol Card: Income Controls ---------------------------------------------
+
+function SymbolIncomeControls({
+  area,
+  state,
+  disabled,
+  isSacred,
+  dailyMax,
+  inputStyle,
+  theme,
+  updateSymbol,
+}: {
+  area: SymbolArea;
+  state: SymbolState;
+  disabled: boolean;
+  isSacred: boolean;
+  dailyMax: number;
+  inputStyle: React.CSSProperties;
+  theme: AppTheme;
+  updateSymbol: (areaName: string, patch: Partial<SymbolState>) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "0.75rem",
+        alignItems: "center",
+        marginBottom: "0.6rem",
+        opacity: disabled ? 0.4 : 1,
+        transition: "opacity 0.15s",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            color: theme.muted,
+          }}
+        >
+          Daily
+        </span>
+        <input
+          type="number"
+          min={0}
+          className="tool-input"
+          max={dailyMax}
+          value={state.daily}
+          disabled={disabled}
+          onChange={(e) => {
+            let v = parseInt(e.target.value) || 0;
+            if (v < 0) v = 0;
+            if (v > dailyMax) v = dailyMax;
+            updateSymbol(area.name, { daily: v });
+          }}
+          style={{
+            ...inputStyle,
+            width: "52px",
+            textAlign: "center",
+            padding: "3px 4px",
+            fontSize: "0.75rem",
+            cursor: disabled ? "not-allowed" : "text",
+          }}
+        />
+      </div>
+
+      {!isSacred && (
+        <div
+          className="sym-btn"
+          onClick={() =>
+            updateSymbol(area.name, { weeklyEnabled: !state.weeklyEnabled })
+          }
+          style={{
+            padding: "4px 10px",
+            borderRadius: "8px",
+            fontSize: "0.72rem",
+            fontWeight: 800,
+            color: state.weeklyEnabled ? theme.accentText : theme.muted,
+            background: state.weeklyEnabled ? theme.accentSoft : "transparent",
+            border: `1px solid ${state.weeklyEnabled ? theme.accent + "44" : theme.border}`,
+          }}
+        >
+          Weekly {state.weeklyEnabled ? "120" : "OFF"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -- Symbol Card --------------------------------------------------------------
+
+function SymbolCard({
+  area,
+  state,
+  days,
+  consumed,
+  levelMax,
+  isMaxed,
+  isTracked,
+  type,
+  maxLevel,
+  totalForOneArea,
+  inputStyle,
+  theme,
+  updateSymbol,
+}: {
+  area: SymbolArea;
+  state: SymbolState;
+  days: number;
+  consumed: number;
+  levelMax: number;
+  isMaxed: boolean;
+  isTracked: boolean;
+  type: SymbolType;
+  maxLevel: number;
+  totalForOneArea: number;
+  inputStyle: React.CSSProperties;
+  theme: AppTheme;
+  updateSymbol: (areaName: string, patch: Partial<SymbolState>) => void;
+}) {
+  const levelPct = isMaxed ? 100 : levelMax > 0 ? (state.current / levelMax) * 100 : 0;
+  const areaPct = totalForOneArea > 0 ? (consumed / totalForOneArea) * 100 : 0;
+  const isSacred = type === "sacred";
+  const dailyMax = area.daily + DAILY_EVENT_BONUS;
+  const disabledSacred = isSacred && !isTracked;
+
+  return (
+    <div
+      style={{
+        background: theme.timerBg,
+        border: `1px solid ${isMaxed && isTracked ? theme.accent + "55" : theme.border}`,
+        borderRadius: "14px",
+        padding: "1rem",
+        transition: "border-color 0.15s, opacity 0.15s",
+        opacity: disabledSacred ? 0.5 : 1,
+      }}
+    >
+      <SymbolCardHeader
+        area={area}
+        state={state}
+        days={days}
+        isMaxed={isMaxed}
+        isTracked={isTracked}
+        isSacred={isSacred}
+        theme={theme}
+        updateSymbol={updateSymbol}
+      />
+
+      <SymbolLevelControls
+        area={area}
+        state={state}
+        isMaxed={isMaxed}
+        disabled={disabledSacred}
+        maxLevel={maxLevel}
+        levelMax={levelMax}
+        inputStyle={inputStyle}
+        theme={theme}
+        updateSymbol={updateSymbol}
+      />
+
+      {/* Level progress bar */}
+      {!isMaxed && (
+        <div
+          style={{
+            height: "6px",
+            borderRadius: "3px",
+            background: theme.panel,
+            border: `1px solid ${theme.border}`,
+            overflow: "hidden",
+            marginBottom: "0.6rem",
+            opacity: disabledSacred ? 0.4 : 1,
+            transition: "opacity 0.15s",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${levelPct}%`,
+              background: theme.accent,
+              borderRadius: "3px",
+              transition: "width 0.25s ease",
+            }}
+          />
+        </div>
+      )}
+
+      {!isMaxed && (
+        <SymbolIncomeControls
+          area={area}
+          state={state}
+          disabled={disabledSacred}
+          isSacred={isSacred}
+          dailyMax={dailyMax}
+          inputStyle={inputStyle}
+          theme={theme}
+          updateSymbol={updateSymbol}
+        />
+      )}
+
+      {/* Overall area progress + completion */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: theme.muted,
+          opacity: disabledSacred ? 0.4 : 1,
+          transition: "opacity 0.15s",
+        }}
+      >
+        <span>{areaPct.toFixed(1)}% complete</span>
+        {!isMaxed && isTracked && days !== Infinity && (
+          <span style={{ color: theme.accent, fontWeight: 800 }}>
+            {addDays(days)}
+          </span>
+        )}
+        {!isMaxed && isTracked && days === Infinity && (
+          <span style={{ color: "#e05a5a", fontWeight: 800 }}>
+            No income set
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -- Overall Progress Panel ---------------------------------------------------
+
+function OverallProgressPanel({
+  theme,
+  sectionPanel,
+  stats,
+}: {
+  theme: AppTheme;
+  sectionPanel: React.CSSProperties;
+  stats: SymbolStats;
+}) {
+  const { noneTracked, totalConsumed, totalSymbolsNeeded, overallPct, allMaxed, anyInfinite, maxDaysVal } = stats;
+
+  return (
+    <div className="fade-in panel-card" style={sectionPanel}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: "8px",
+        }}
+      >
+        <div className="section-label" style={{ color: theme.muted }}>Overall Progress</div>
+        <div
+          style={{
+            fontSize: "0.78rem",
+            fontWeight: 800,
+            color: theme.accent,
+          }}
+        >
+          {noneTracked
+            ? "No symbols tracked"
+            : `${totalConsumed.toLocaleString()} / ${totalSymbolsNeeded.toLocaleString()} symbols`}
+        </div>
+      </div>
+      <div
+        style={{
+          height: "12px",
+          borderRadius: "6px",
+          background: theme.timerBg,
+          border: `1px solid ${theme.border}`,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${overallPct}%`,
+            background: theme.accent,
+            borderRadius: "6px",
+            transition: "width 0.35s ease",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: "6px",
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: theme.muted,
+        }}
+      >
+        <span>
+          {noneTracked
+            ? "Select symbols below to start tracking"
+            : allMaxed
+              ? "All symbols maxed!"
+              : anyInfinite
+                ? "Set daily symbols to estimate completion"
+                : `All maxed in ~${maxDaysVal} days (${addDays(maxDaysVal)})`}
+        </span>
+        <span>{noneTracked ? "" : `${overallPct.toFixed(1)}%`}</span>
+      </div>
+    </div>
+  );
+}
+
+// -- Completion Summary Panel -------------------------------------------------
+
+function CompletionSummaryPanel({
+  theme,
+  sectionPanel,
+  stats,
+  type,
+}: {
+  theme: AppTheme;
+  sectionPanel: React.CSSProperties;
+  stats: SymbolStats;
+  type: SymbolType;
+}) {
+  const { tracked, noneTracked, allMaxed, anyInfinite, maxDaysVal } = stats;
+  const incomplete = tracked.filter((p) => !p.isMaxed);
+
+  return (
+    <div
+      className="fade-in panel-card"
+      style={{ ...sectionPanel, marginBottom: "1.25rem" }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-heading)",
+          fontSize: "1.15rem",
+          color: theme.text,
+          marginBottom: "1rem",
+          paddingBottom: "0.8rem",
+          borderBottom: `1px solid ${theme.border}`,
+        }}
+      >
+        Completion Summary
+      </div>
+
+      {noneTracked ? (
+        <div
+          style={{
+            fontSize: "0.82rem",
+            fontWeight: 600,
+            color: theme.muted,
+            fontStyle: "italic",
+            textAlign: "center",
+            padding: "1rem 0",
+          }}
+        >
+          {type === "sacred"
+            ? "Enable symbols above to see completion estimates."
+            : "No symbols to track."}
+        </div>
+      ) : incomplete.length === 0 ? (
+        <div
+          style={{
+            fontSize: "0.88rem",
+            fontWeight: 700,
+            color: theme.accent,
+            textAlign: "center",
+            padding: "1rem 0",
+          }}
+        >
+          All {type === "arcane" ? "Arcane" : "tracked Sacred"} Symbols are maxed!
+        </div>
+      ) : (
+        <>
+          {incomplete
+            .sort((a, b) => (b.days === Infinity ? -1 : a.days === Infinity ? 1 : b.days - a.days))
+            .map(({ area, remaining, days }) => (
+              <div
+                key={area.name}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "5px 0",
+                  borderBottom: `1px solid ${theme.border}`,
+                  fontSize: "0.82rem",
+                  fontWeight: 700,
+                }}
+              >
+                <span style={{ color: theme.text }}>
+                  {area.name}
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      color: theme.muted,
+                      marginLeft: "6px",
+                    }}
+                  >
+                    ({remaining.toLocaleString()} left)
+                  </span>
+                </span>
+                <span
+                  style={{
+                    color: days === Infinity ? "#e05a5a" : theme.accent,
+                    fontWeight: 800,
+                  }}
+                >
+                  {days === Infinity ? "--" : `${days} days`}
+                </span>
+              </div>
+            ))}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingTop: "8px",
+              marginTop: "4px",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-heading)",
+                fontSize: "0.9rem",
+                color: theme.text,
+              }}
+            >
+              All Maxed By
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-heading)",
+                fontSize: "1rem",
+                color: anyInfinite ? "#e05a5a" : theme.accent,
+              }}
+            >
+              {allMaxed
+                ? "Done!"
+                : anyInfinite
+                  ? "Needs daily income"
+                  : addDays(maxDaysVal)}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// -- Main Component -----------------------------------------------------------
 
 interface FormState {
   type: SymbolType;
@@ -160,86 +931,21 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
     });
   }, []);
 
-  // Compute totals — only count enabled (tracked) symbols
-  let totalConsumed = 0;
-  let totalSymbolsNeeded = 0;
-  let maxDaysVal = 0;
-  const totalForOneArea = growth.reduce((a, b) => a + b, 0);
-  const perSymbol: {
-    area: SymbolArea;
-    state: SymbolState;
-    remaining: number;
-    days: number;
-    consumed: number;
-    levelMax: number;
-    isMaxed: boolean;
-    isTracked: boolean;
-  }[] = [];
-
-  for (const area of areas) {
-    const s = getSymbolState(symbols, area, type);
-    const isTracked = type === "arcane" || s.enabled;
-    const weekly = effectiveWeekly(type, s.weeklyEnabled);
-    const remaining = symbolsRemaining(growth, s.level, s.current);
-    const days = daysToMax(remaining, s.daily, weekly);
-    const consumed = symbolsConsumed(growth, s.level, s.current, maxLevel);
-    const isMaxed = s.level >= maxLevel;
-
-    if (isTracked) {
-      totalConsumed += consumed;
-      totalSymbolsNeeded += totalForOneArea;
-      if (days !== Infinity && days > maxDaysVal) maxDaysVal = days;
-    }
-
-    perSymbol.push({
-      area,
-      state: s,
-      remaining,
-      days,
-      consumed,
-      levelMax: symbolsForLevel(growth, s.level),
-      isMaxed,
-      isTracked,
-    });
-  }
-
-  const tracked = perSymbol.filter((p) => p.isTracked);
-  const overallPct = totalSymbolsNeeded > 0
-    ? Math.min(100, (totalConsumed / totalSymbolsNeeded) * 100)
-    : 0;
-  const allMaxed = tracked.length > 0 && tracked.every((p) => p.isMaxed);
-  const anyInfinite = tracked.some((p) => p.days === Infinity && !p.isMaxed);
-  const noneTracked = tracked.length === 0;
-
-  // -- Styles -----------------------------------------------------------------
+  const stats = computeSymbolStats(areas, symbols, growth, type, maxLevel);
 
   const inputStyle: React.CSSProperties = {
     background: theme.timerBg,
     border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
     padding: "6px 10px",
     color: theme.text,
-    fontFamily: "'Nunito', sans-serif",
     fontSize: "0.82rem",
-    fontWeight: 700,
-    outline: "none",
   };
 
   const sectionPanel: React.CSSProperties = {
     background: theme.panel,
     border: `1px solid ${theme.border}`,
-    borderRadius: "18px",
     padding: "1.25rem",
     marginBottom: "1.25rem",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: "0.7rem",
-    fontWeight: 800,
-    color: theme.muted,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    marginBottom: "8px",
   };
 
   return (
@@ -263,44 +969,14 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
         }}
       >
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-          {/* Header */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <Link
-              href="/tools"
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 800,
-                color: theme.accent,
-                textDecoration: "none",
-              }}
-            >
-              ← Back to Tools
-            </Link>
-            <div
-              style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: "1.5rem",
-                color: theme.text,
-                marginTop: "0.5rem",
-              }}
-            >
-              Symbol Calculator
-            </div>
-            <div
-              style={{
-                fontSize: "0.8rem",
-                color: theme.muted,
-                fontWeight: 600,
-                marginTop: "0.15rem",
-                lineHeight: 1.5,
-              }}
-            >
-              Track your Arcane and Sacred symbol progress and estimate completion dates.
-            </div>
-          </div>
+          <ToolHeader
+            theme={theme}
+            title="Symbol Calculator"
+            description="Track your Arcane and Sacred symbol progress and estimate completion dates."
+          />
 
           {/* Type toggle */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -333,73 +1009,10 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
             </div>
           </div>
 
-          {/* Overall Progress */}
-          <div className="fade-in" style={sectionPanel}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                marginBottom: "8px",
-              }}
-            >
-              <div style={labelStyle}>Overall Progress</div>
-              <div
-                style={{
-                  fontSize: "0.78rem",
-                  fontWeight: 800,
-                  color: theme.accent,
-                }}
-              >
-                {noneTracked
-                  ? "No symbols tracked"
-                  : `${totalConsumed.toLocaleString()} / ${totalSymbolsNeeded.toLocaleString()} symbols`}
-              </div>
-            </div>
-            <div
-              style={{
-                height: "12px",
-                borderRadius: "6px",
-                background: theme.timerBg,
-                border: `1px solid ${theme.border}`,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${overallPct}%`,
-                  background: theme.accent,
-                  borderRadius: "6px",
-                  transition: "width 0.35s ease",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: "6px",
-                fontSize: "0.72rem",
-                fontWeight: 700,
-                color: theme.muted,
-              }}
-            >
-              <span>
-                {noneTracked
-                  ? "Select symbols below to start tracking"
-                  : allMaxed
-                    ? "All symbols maxed!"
-                    : anyInfinite
-                      ? "Set daily symbols to estimate completion"
-                      : `All maxed in ~${maxDaysVal} days (${addDays(maxDaysVal)})`}
-              </span>
-              <span>{noneTracked ? "" : `${overallPct.toFixed(1)}%`}</span>
-            </div>
-          </div>
+          <OverallProgressPanel theme={theme} sectionPanel={sectionPanel} stats={stats} />
 
           {/* Symbol Cards */}
-          <div className="fade-in" style={sectionPanel}>
+          <div className="fade-in panel-card" style={sectionPanel}>
             <div
               style={{
                 display: "flex",
@@ -409,7 +1022,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                 marginBottom: "1rem",
               }}
             >
-              <div style={{ ...labelStyle, marginBottom: 0 }}>
+              <div className="section-label" style={{ color: theme.muted, marginBottom: 0 }}>
                 {type === "arcane" ? "Arcane River" : "Grandis"} Symbols
               </div>
               <div style={{ marginLeft: "auto" }}>
@@ -439,538 +1052,30 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
                 gap: "0.75rem",
               }}
             >
-              {perSymbol.map(({ area, state, days, levelMax, isMaxed, isTracked, consumed }) => {
-                const levelPct = isMaxed
-                  ? 100
-                  : levelMax > 0
-                    ? (state.current / levelMax) * 100
-                    : 0;
-                const areaPct = totalForOneArea > 0 ? (consumed / totalForOneArea) * 100 : 0;
-                const isSacred = type === "sacred";
-                const dailyMax = area.daily + DAILY_EVENT_BONUS;
-
-                return (
-                  <div
-                    key={area.name}
-                    style={{
-                      background: theme.timerBg,
-                      border: `1px solid ${isMaxed && isTracked ? theme.accent + "55" : theme.border}`,
-                      borderRadius: "14px",
-                      padding: "1rem",
-                      transition: "border-color 0.15s, opacity 0.15s",
-                      opacity: isSacred && !isTracked ? 0.5 : 1,
-                    }}
-                  >
-                    {/* Header */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        marginBottom: "0.75rem",
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={area.icon}
-                        alt={area.name}
-                        width={38}
-                        height={38}
-                        style={{
-                          borderRadius: "8px",
-                          objectFit: "contain",
-                          flexShrink: 0,
-                          background: theme.panel,
-                          border: `1px solid ${theme.border}`,
-                          padding: "2px",
-                        }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontFamily: "'Fredoka One', cursive",
-                            fontSize: "0.9rem",
-                            color: theme.text,
-                          }}
-                        >
-                          {area.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            color: theme.muted,
-                          }}
-                        >
-                          Lv. {area.requiredLevel}+
-                        </div>
-                      </div>
-
-                      {/* Sacred: tracking toggle */}
-                      {isSacred && (
-                        <div
-                          className="sym-btn"
-                          onClick={() => updateSymbol(area.name, { enabled: !state.enabled })}
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "8px",
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            color: isTracked ? theme.accentText : theme.muted,
-                            background: isTracked ? theme.accentSoft : "transparent",
-                            border: `1px solid ${isTracked ? theme.accent + "44" : theme.border}`,
-                          }}
-                        >
-                          {isTracked ? "Tracking" : "Not tracking"}
-                        </div>
-                      )}
-
-                      {/* Arcane: days badge */}
-                      {!isSacred && (
-                        <div
-                          style={{
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                            padding: "2px 8px",
-                            borderRadius: "6px",
-                            flexShrink: 0,
-                            whiteSpace: "nowrap",
-                            color: isMaxed ? "#fff" : days === Infinity ? "#e05a5a" : theme.accent,
-                            background: isMaxed ? theme.accent : theme.accentSoft,
-                          }}
-                        >
-                          {isMaxed ? "MAX" : days === Infinity ? "--" : `~${days}d`}
-                        </div>
-                      )}
-
-                      {/* Sacred tracked: days badge */}
-                      {isSacred && isTracked && (
-                        <div
-                          style={{
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                            padding: "2px 8px",
-                            borderRadius: "6px",
-                            flexShrink: 0,
-                            whiteSpace: "nowrap",
-                            color: isMaxed ? "#fff" : days === Infinity ? "#e05a5a" : theme.accent,
-                            background: isMaxed ? theme.accent : theme.accentSoft,
-                          }}
-                        >
-                          {isMaxed ? "MAX" : days === Infinity ? "--" : `~${days}d`}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Level + Current */}
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        alignItems: "center",
-                        marginBottom: "0.5rem",
-                        opacity: isSacred && !isTracked ? 0.4 : 1,
-                        transition: "opacity 0.15s",
-                      }}
-                    >
-                      <div style={{ flex: "0 0 auto" }}>
-                        <div
-                          style={{
-                            fontSize: "0.68rem",
-                            fontWeight: 700,
-                            color: theme.muted,
-                            marginBottom: "3px",
-                          }}
-                        >
-                          Level
-                        </div>
-                        <select
-                          value={state.level}
-                          disabled={isSacred && !isTracked}
-                          onChange={(e) => {
-                            const newLevel = Number(e.target.value);
-                            updateSymbol(area.name, {
-                              level: newLevel,
-                              current: 0,
-                            });
-                          }}
-                          style={{
-                            ...inputStyle,
-                            width: "70px",
-                            cursor: isSacred && !isTracked ? "not-allowed" : "pointer",
-                            padding: "4px 6px",
-                            fontSize: "0.78rem",
-                          }}
-                        >
-                          {Array.from({ length: maxLevel }, (_, i) => i + 1).map(
-                            (lvl) => (
-                              <option key={lvl} value={lvl}>
-                                {lvl}{lvl === maxLevel ? " (MAX)" : ""}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </div>
-
-                      {!isMaxed && (
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              color: theme.muted,
-                              marginBottom: "3px",
-                            }}
-                          >
-                            Current / Needed
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <input
-                              type="number"
-                              min={0}
-                              max={levelMax}
-                              value={state.current}
-                              disabled={isSacred && !isTracked}
-                              onChange={(e) => {
-                                let v = parseInt(e.target.value) || 0;
-                                if (v < 0) v = 0;
-                                if (v > levelMax) v = levelMax;
-                                updateSymbol(area.name, { current: v });
-                              }}
-                              style={{
-                                ...inputStyle,
-                                width: "64px",
-                                textAlign: "center",
-                                padding: "4px 6px",
-                                fontSize: "0.78rem",
-                                cursor: isSacred && !isTracked ? "not-allowed" : "text",
-                              }}
-                            />
-                            <span
-                              style={{
-                                fontSize: "0.78rem",
-                                fontWeight: 700,
-                                color: theme.muted,
-                              }}
-                            >
-                              / {levelMax.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {isMaxed && (
-                        <div
-                          style={{
-                            flex: 1,
-                            fontSize: "0.82rem",
-                            fontWeight: 800,
-                            color: theme.accent,
-                            textAlign: "center",
-                            padding: "8px 0",
-                          }}
-                        >
-                          Symbol Maxed
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Level progress bar */}
-                    {!isMaxed && (
-                      <div
-                        style={{
-                          height: "6px",
-                          borderRadius: "3px",
-                          background: theme.panel,
-                          border: `1px solid ${theme.border}`,
-                          overflow: "hidden",
-                          marginBottom: "0.6rem",
-                          opacity: isSacred && !isTracked ? 0.4 : 1,
-                          transition: "opacity 0.15s",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${levelPct}%`,
-                            background: theme.accent,
-                            borderRadius: "3px",
-                            transition: "width 0.25s ease",
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Daily + Weekly controls */}
-                    {!isMaxed && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.75rem",
-                          alignItems: "center",
-                          marginBottom: "0.6rem",
-                          opacity: isSacred && !isTracked ? 0.4 : 1,
-                          transition: "opacity 0.15s",
-                        }}
-                      >
-                        {/* Daily input (both arcane and sacred) */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "0.7rem",
-                              fontWeight: 700,
-                              color: theme.muted,
-                            }}
-                          >
-                            Daily
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={dailyMax}
-                            value={state.daily}
-                            disabled={isSacred && !isTracked}
-                            onChange={(e) => {
-                              let v = parseInt(e.target.value) || 0;
-                              if (v < 0) v = 0;
-                              if (v > dailyMax) v = dailyMax;
-                              updateSymbol(area.name, { daily: v });
-                            }}
-                            style={{
-                              ...inputStyle,
-                              width: "52px",
-                              textAlign: "center",
-                              padding: "3px 4px",
-                              fontSize: "0.75rem",
-                              cursor: isSacred && !isTracked ? "not-allowed" : "text",
-                            }}
-                          />
-                        </div>
-
-                        {/* Arcane only: weekly toggle pill */}
-                        {!isSacred && (
-                          <div
-                            className="sym-btn"
-                            onClick={() =>
-                              updateSymbol(area.name, {
-                                weeklyEnabled: !state.weeklyEnabled,
-                              })
-                            }
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: "8px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: state.weeklyEnabled
-                                ? theme.accentText
-                                : theme.muted,
-                              background: state.weeklyEnabled
-                                ? theme.accentSoft
-                                : "transparent",
-                              border: `1px solid ${state.weeklyEnabled ? theme.accent + "44" : theme.border}`,
-                            }}
-                          >
-                            Weekly {state.weeklyEnabled ? "120" : "OFF"}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Overall area progress + completion */}
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: "0.72rem",
-                        fontWeight: 700,
-                        color: theme.muted,
-                        opacity: isSacred && !isTracked ? 0.4 : 1,
-                        transition: "opacity 0.15s",
-                      }}
-                    >
-                      <span>{areaPct.toFixed(1)}% complete</span>
-                      {!isMaxed && isTracked && days !== Infinity && (
-                        <span style={{ color: theme.accent, fontWeight: 800 }}>
-                          {addDays(days)}
-                        </span>
-                      )}
-                      {!isMaxed && isTracked && days === Infinity && (
-                        <span style={{ color: "#e05a5a", fontWeight: 800 }}>
-                          No income set
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {stats.perSymbol.map(({ area, state, days, levelMax, isMaxed, isTracked, consumed }) => (
+                <SymbolCard
+                  key={area.name}
+                  area={area}
+                  state={state}
+                  days={days}
+                  consumed={consumed}
+                  levelMax={levelMax}
+                  isMaxed={isMaxed}
+                  isTracked={isTracked}
+                  type={type}
+                  maxLevel={maxLevel}
+                  totalForOneArea={stats.totalForOneArea}
+                  inputStyle={inputStyle}
+                  theme={theme}
+                  updateSymbol={updateSymbol}
+                />
+              ))}
             </div>
           </div>
 
-          {/* Completion Summary */}
-          <div
-            className="fade-in"
-            style={{ ...sectionPanel, marginBottom: "1.25rem" }}
-          >
-            <div
-              style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: "1.15rem",
-                color: theme.text,
-                marginBottom: "1rem",
-                paddingBottom: "0.8rem",
-                borderBottom: `1px solid ${theme.border}`,
-              }}
-            >
-              Completion Summary
-            </div>
+          <CompletionSummaryPanel theme={theme} sectionPanel={sectionPanel} stats={stats} type={type} />
 
-            {noneTracked ? (
-              <div
-                style={{
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  color: theme.muted,
-                  fontStyle: "italic",
-                  textAlign: "center",
-                  padding: "1rem 0",
-                }}
-              >
-                {type === "sacred"
-                  ? "Enable symbols above to see completion estimates."
-                  : "No symbols to track."}
-              </div>
-            ) : tracked.filter((p) => !p.isMaxed).length === 0 ? (
-              <div
-                style={{
-                  fontSize: "0.88rem",
-                  fontWeight: 700,
-                  color: theme.accent,
-                  textAlign: "center",
-                  padding: "1rem 0",
-                }}
-              >
-                All {type === "arcane" ? "Arcane" : "tracked Sacred"} Symbols are maxed!
-              </div>
-            ) : (
-              <>
-                {tracked
-                  .filter((p) => !p.isMaxed)
-                  .sort((a, b) => (b.days === Infinity ? -1 : a.days === Infinity ? 1 : b.days - a.days))
-                  .map(({ area, remaining, days }) => (
-                    <div
-                      key={area.name}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "5px 0",
-                        borderBottom: `1px solid ${theme.border}`,
-                        fontSize: "0.82rem",
-                        fontWeight: 700,
-                      }}
-                    >
-                      <span style={{ color: theme.text }}>
-                        {area.name}
-                        <span
-                          style={{
-                            fontSize: "0.68rem",
-                            color: theme.muted,
-                            marginLeft: "6px",
-                          }}
-                        >
-                          ({remaining.toLocaleString()} left)
-                        </span>
-                      </span>
-                      <span
-                        style={{
-                          color: days === Infinity ? "#e05a5a" : theme.accent,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {days === Infinity ? "--" : `${days} days`}
-                      </span>
-                    </div>
-                  ))}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    paddingTop: "8px",
-                    marginTop: "4px",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "'Fredoka One', cursive",
-                      fontSize: "0.9rem",
-                      color: theme.text,
-                    }}
-                  >
-                    All Maxed By
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "'Fredoka One', cursive",
-                      fontSize: "1rem",
-                      color: anyInfinite ? "#e05a5a" : theme.accent,
-                    }}
-                  >
-                    {allMaxed
-                      ? "Done!"
-                      : anyInfinite
-                        ? "Needs daily income"
-                        : addDays(maxDaysVal)}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Attribution */}
-          <div
-            style={{
-              fontSize: "0.68rem",
-              color: theme.muted,
-              fontWeight: 600,
-              lineHeight: 1.6,
-              padding: "0 0.25rem",
-            }}
-          >
-            Symbol images sourced from{" "}
-            <a
-              href="https://maplestorywiki.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: theme.accent, textDecoration: "none" }}
-            >
-              MapleStory Wiki
-            </a>
-            , licensed under{" "}
-            <a
-              href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: theme.accent, textDecoration: "none" }}
-            >
-              CC BY-NC-SA 4.0
-            </a>
-            .
-          </div>
+          <WikiAttribution theme={theme} subject="Symbol images" />
         </div>
       </div>
     </>

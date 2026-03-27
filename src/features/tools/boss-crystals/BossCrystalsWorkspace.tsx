@@ -300,15 +300,11 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
   const inputStyle: React.CSSProperties = {
     background: theme.timerBg,
     border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
     padding: "4px 6px",
     color: theme.text,
-    fontFamily: "'Nunito', sans-serif",
     fontSize: "0.78rem",
-    fontWeight: 700,
     width: "42px",
     textAlign: "center",
-    outline: "none",
   };
 
   const checkboxStyle = (checked: boolean, disabled: boolean): React.CSSProperties => ({
@@ -362,11 +358,10 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Controls panel */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
               padding: "1.25rem",
               marginBottom: "1.25rem",
               display: "flex",
@@ -490,7 +485,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
               <span
                 style={{
-                  fontFamily: "'Fredoka One', cursive",
+                  fontFamily: "var(--font-heading)",
                   fontSize: "0.9rem",
                   color: theme.text,
                 }}
@@ -499,7 +494,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
               </span>
               <span
                 style={{
-                  fontFamily: "'Fredoka One', cursive",
+                  fontFamily: "var(--font-heading)",
                   fontSize: "1.1rem",
                   color: theme.accent,
                 }}
@@ -556,12 +551,10 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Boss table */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
               marginBottom: "1.25rem",
             }}
           >
@@ -588,7 +581,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                         background: theme.panel,
                         padding: "0.75rem 1rem",
                         textAlign: "left",
-                        fontFamily: "'Fredoka One', cursive",
+                        fontFamily: "var(--font-heading)",
                         fontSize: "0.85rem",
                         color: theme.text,
                         borderBottom: `1px solid ${theme.border}`,
@@ -601,7 +594,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                       style={{
                         padding: "0.75rem 0.75rem",
                         textAlign: "right",
-                        fontFamily: "'Fredoka One', cursive",
+                        fontFamily: "var(--font-heading)",
                         fontSize: "0.85rem",
                         color: theme.text,
                         borderBottom: `1px solid ${theme.border}`,
@@ -661,7 +654,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                               borderRadius: "8px",
                               padding: "5px 8px",
                               color: theme.text,
-                              fontFamily: "'Nunito', sans-serif",
+                              fontFamily: "var(--font-body)",
                               fontSize: "0.78rem",
                               fontWeight: 700,
                               flex: 1,
@@ -795,6 +788,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                                     if (v > max) v = max;
                                     updatePartySize(ci, bi, v);
                                   }}
+                                  className="tool-input"
                                   style={inputStyle}
                                 />
                               </div>
@@ -812,30 +806,14 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Results panel */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "1rem 1.25rem 0.8rem",
-                borderBottom: `1px solid ${theme.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "'Fredoka One', cursive",
-                  fontSize: "1.15rem",
-                  color: theme.text,
-                }}
-              >
+            <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
+              <span className="panel-header-title" style={{ color: theme.text }}>
                 Weekly Income
               </span>
             </div>
@@ -843,14 +821,8 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
             <div style={{ padding: "1rem 1.25rem" }}>
               {/* Per-character income */}
               <div
-                style={{
-                  fontSize: "0.7rem",
-                  fontWeight: 800,
-                  color: theme.muted,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "8px",
-                }}
+                className="section-label"
+                style={{ color: theme.muted }}
               >
                 Bossing
               </div>
@@ -889,7 +861,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
               >
                 <span
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.1rem",
                     color: theme.text,
                   }}
@@ -898,7 +870,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                 </span>
                 <span
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.3rem",
                     color: theme.accent,
                   }}

@@ -118,7 +118,7 @@ export default function CharacterDirectoryScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
-        <h2 style={{ margin: 0, fontFamily: "'Fredoka One', cursive", fontSize: "1.2rem", lineHeight: 1.2, color: theme.text }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.2rem", lineHeight: 1.2, color: theme.text }}>
           {CHARACTERS_COPY.characterDirectory.title}
         </h2>
       </div>
@@ -152,7 +152,7 @@ export default function CharacterDirectoryScreen({
 
         <div style={{ borderTop: `1px solid ${theme.border}`, marginTop: "0.15rem" }} />
         <section style={getDirectoryRevealStyle(shouldShowDirectoryPanel && directoryRevealPhase >= 1)}>
-          <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "0.5rem" }}>
+          <p className="section-label" style={{ color: theme.muted }}>
             {CHARACTERS_COPY.characterDirectory.mainCharacterLabel}
           </p>
           {mainCharacter ? (
@@ -171,7 +171,7 @@ export default function CharacterDirectoryScreen({
         {(championCharactersForDirectory.length > 0 || isMainAlsoChampion) && (
           <section style={getDirectoryRevealStyle(shouldShowDirectoryPanel && directoryRevealPhase >= 2)}>
             <div style={{ borderTop: `1px solid ${theme.border}`, marginBottom: "0.7rem" }} />
-            <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "0.5rem" }}>
+            <p className="section-label" style={{ color: theme.muted }}>
               {CHARACTERS_COPY.characterDirectory.championsLabel} ({championCharacters.length}/{directory.maxChampions})
             </p>
             {isMainAlsoChampion && (
@@ -187,7 +187,7 @@ export default function CharacterDirectoryScreen({
 
         <section style={getDirectoryRevealStyle(shouldShowDirectoryPanel && directoryRevealPhase >= (hasChampionSection ? 3 : 2))}>
           <div style={{ borderTop: `1px solid ${theme.border}`, marginBottom: "0.7rem" }} />
-          <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "0.5rem" }}>
+          <p className="section-label" style={{ color: theme.muted }}>
             {CHARACTERS_COPY.characterDirectory.mulesLabel} ({otherCharacters.length}/{muleCapacity})
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-start", alignItems: "flex-start", gap: "0.6rem", overflow: "hidden", width: "100%", paddingBottom: "0.15rem" }}>

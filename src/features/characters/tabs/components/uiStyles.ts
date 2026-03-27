@@ -13,7 +13,7 @@ export function panelCardStyle(theme: AppTheme, padding: string): CSSProperties 
 
 export function titleStyle(): CSSProperties {
   return {
-    fontFamily: "'Fredoka One', cursive",
+    fontFamily: "var(--font-heading)",
     fontSize: "1.8rem",
     lineHeight: 1.15,
     margin: 0,
