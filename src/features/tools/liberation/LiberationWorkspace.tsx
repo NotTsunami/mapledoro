@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { ToolHeader } from "../../../components/ToolHeader";
+import { WikiAttribution } from "../../../components/WikiAttribution";
 import {
   type LiberationType,
   type LiberationBoss,
@@ -1017,36 +1018,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
             )}
           </div>
 
-          {/* Attribution notice for MapleWiki images */}
-          <div
-            style={{
-              fontSize: "0.68rem",
-              color: theme.muted,
-              fontWeight: 600,
-              lineHeight: 1.6,
-              padding: "0 0.25rem",
-            }}
-          >
-            Boss images sourced from{" "}
-            <a
-              href="https://maplestorywiki.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: theme.accent, textDecoration: "none" }}
-            >
-              MapleStory Wiki
-            </a>
-            , licensed under{" "}
-            <a
-              href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: theme.accent, textDecoration: "none" }}
-            >
-              CC BY-NC-SA 4.0
-            </a>
-            .
-          </div>
+          <WikiAttribution theme={theme} subject="Boss images" />
         </div>
       </div>
     </>
