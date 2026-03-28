@@ -6,17 +6,15 @@ import {
 } from "../model/constants";
 import { findRosterCharacterByName, toCharacterKey } from "../model/characterKeys";
 import {
-  createEmptyCharacterStats,
-  createEmptyCharacterEquipment,
   createStoredCharacterRecord,
   hasStoredCompletedRequiredSetup,
   readCharactersStore,
   selectCharacterById,
   selectCharactersList,
-  toNormalizedCharacterData,
   writeCharactersStore,
 } from "../model/charactersStore";
 import {
+  readAllSetupDrafts,
   makeDraftCharacterKey,
   readLastSetupDraft,
   readSetupDraftByCharacter,
@@ -25,6 +23,7 @@ import {
   type SetupDraft,
   writeSetupDraft,
 } from "../model/setupDraftStorage";
+import type { StoredCharacterRecord } from "../model/charactersStore";
 import type { NormalizedCharacterData } from "../model/types";
 import {
   clampFlowStepIndex,
@@ -64,6 +63,43 @@ function getCurrentCharacterGender(
       : null;
 }
 
+// Helpers for world-scoped main/champion key maps
+function getMainKeyForWorld(
+  mainCharacterKeyByWorld: Record<string, string>,
+  worldId: number,
+): string | null {
+  return mainCharacterKeyByWorld[String(worldId)] ?? null;
+}
+
+function getChampionKeysForWorld(
+  championCharacterKeysByWorld: Record<string, string[]>,
+  worldId: number,
+): string[] {
+  return championCharacterKeysByWorld[String(worldId)] ?? [];
+}
+
+function setMainKeyForWorld(
+  prev: Record<string, string>,
+  worldId: number,
+  key: string | null,
+): Record<string, string> {
+  const next = { ...prev };
+  if (key === null) {
+    delete next[String(worldId)];
+  } else {
+    next[String(worldId)] = key;
+  }
+  return next;
+}
+
+function setChampionKeysForWorld(
+  prev: Record<string, string[]>,
+  worldId: number,
+  keys: string[],
+): Record<string, string[]> {
+  return { ...prev, [String(worldId)]: keys };
+}
+
 export function useCharacterSetupController() {
   const immediateUiLockRef = useRef(false);
   const [query, setQuery] = useState("");
@@ -89,9 +125,12 @@ export function useCharacterSetupController() {
   const [showDeleteNotice, setShowDeleteNotice] = useState(false);
   const [isAddingCharacter, setIsAddingCharacter] = useState(false);
   const [fastDirectoryRevealOnce, setFastDirectoryRevealOnce] = useState(false);
-  const [characterRoster, setCharacterRoster] = useState<NormalizedCharacterData[]>([]);
-  const [mainCharacterKey, setMainCharacterKey] = useState<string | null>(null);
-  const [championCharacterKeys, setChampionCharacterKeys] = useState<string[]>([]);
+  const [characterRoster, setCharacterRoster] = useState<StoredCharacterRecord[]>([]);
+
+  // World-scoped main and champion keys
+  const [mainCharacterKeyByWorld, setMainCharacterKeyByWorld] = useState<Record<string, string>>({});
+  const [championCharacterKeysByWorld, setChampionCharacterKeysByWorld] = useState<Record<string, string[]>>({});
+
   const [setupStepIndex, setSetupStepIndex] = useState(0);
   const [setupStepDirection, setSetupStepDirection] = useState<"forward" | "backward">("forward");
   const [setupStepTestByStep, setSetupStepTestByStep] = useState<SetupStepInputById>({});
@@ -121,6 +160,15 @@ export function useCharacterSetupController() {
     isFinishingSetup ||
     isDeleteTransitioning;
 
+  // Convenience: get main/champion keys for the confirmed character's world
+  const confirmedWorldId = confirmedCharacter?.worldID ?? null;
+  const mainCharacterKey = confirmedWorldId !== null
+    ? getMainKeyForWorld(mainCharacterKeyByWorld, confirmedWorldId)
+    : null;
+  const championCharacterKeys = confirmedWorldId !== null
+    ? getChampionKeysForWorld(championCharacterKeysByWorld, confirmedWorldId)
+    : [];
+
   const isResumableDraft = useCallback(
     (draft: SetupDraft | null) =>
       Boolean(draft?.confirmedCharacter) &&
@@ -128,18 +176,21 @@ export function useCharacterSetupController() {
     [requiredFlowId],
   );
 
-  const upsertRosterCharacter = useCallback((character: NormalizedCharacterData) => {
+  const upsertRosterCharacter = useCallback((character: StoredCharacterRecord) => {
     setCharacterRoster((prev) => {
       const key = toCharacterKey(character);
       const existingIndex = prev.findIndex((entry) => toCharacterKey(entry) === key);
-      if (existingIndex === -1) {
-        return [...prev, character];
-      }
+      if (existingIndex === -1) return [...prev, character];
       const next = [...prev];
       next[existingIndex] = character;
       return next;
     });
-    setMainCharacterKey((prev) => prev ?? toCharacterKey(character));
+    // Set as main for their world only if no main exists yet for that world
+    setMainCharacterKeyByWorld((prev) => {
+      const worldKey = String(character.worldID);
+      if (prev[worldKey]) return prev;
+      return { ...prev, [worldKey]: toCharacterKey(character) };
+    });
   }, []);
 
   const applyDraftFlowState = useCallback(
@@ -159,12 +210,8 @@ export function useCharacterSetupController() {
       setSetupStepTestByStep(draft.setupStepTestByStep ?? {});
       setConfirmedCharacter(draft.confirmedCharacter);
 
-      if (options?.includeSetupMode) {
-        setSetupMode(draft.setupMode);
-      }
-      if (options?.includeStartedFlags) {
-        setSetupFlowStarted(draft.setupFlowStarted);
-      }
+      if (options?.includeSetupMode) setSetupMode(draft.setupMode);
+      if (options?.includeStartedFlags) setSetupFlowStarted(draft.setupFlowStarted);
       if (options?.includeVisibility) {
         setShowFlowOverview(Boolean(draft.showFlowOverview));
         setShowCharacterDirectory(Boolean(draft.showCharacterDirectory));
@@ -176,11 +223,11 @@ export function useCharacterSetupController() {
   const showCompletedDirectoryState = useCallback(
     (
       store: ReturnType<typeof readCharactersStore>,
-      roster: NormalizedCharacterData[],
+      roster: StoredCharacterRecord[],
     ) => {
       setCharacterRoster(roster);
-      setMainCharacterKey(store.mainCharacterId);
-      setChampionCharacterKeys(store.championCharacterIds);
+      setMainCharacterKeyByWorld(store.mainCharacterIdByWorld);
+      setChampionCharacterKeysByWorld(store.championCharacterIdsByWorld);
       setSetupMode("search");
       setSetupFlowStarted(true);
       setShowFlowOverview(true);
@@ -238,7 +285,7 @@ export function useCharacterSetupController() {
     (
       draft: SetupDraft,
       store: ReturnType<typeof readCharactersStore>,
-      storedRoster: NormalizedCharacterData[],
+      storedRoster: StoredCharacterRecord[],
       accountHasCompletedRequiredFlow: boolean,
     ) => {
       const nextCompletedFlowIds = normalizeCompletedFlowIds(draft.completedFlowIds ?? []);
@@ -259,8 +306,8 @@ export function useCharacterSetupController() {
       );
       setQuery(draft.query);
       setCharacterRoster(storedRoster);
-      setMainCharacterKey(store.mainCharacterId);
-      setChampionCharacterKeys(store.championCharacterIds);
+      setMainCharacterKeyByWorld(store.mainCharacterIdByWorld);
+      setChampionCharacterKeysByWorld(store.championCharacterIdsByWorld);
 
       return { nextCompletedFlowIds, hasCompletedRequiredFlow };
     },
@@ -271,7 +318,7 @@ export function useCharacterSetupController() {
     (
       draft: SetupDraft | null,
       store: ReturnType<typeof readCharactersStore>,
-      storedRoster: NormalizedCharacterData[],
+      storedRoster: StoredCharacterRecord[],
       accountHasCompletedRequiredFlow: boolean,
     ) => {
       if (!draft) {
@@ -337,7 +384,7 @@ export function useCharacterSetupController() {
   useEffect(() => {
     const draft = readLastSetupDraft();
     const store = readCharactersStore();
-    const storedRoster = selectCharactersList(store).map(toNormalizedCharacterData);
+    const storedRoster = selectCharactersList(store);
     const accountHasCompletedRequiredFlow = hasStoredCompletedRequiredSetup(store);
 
     const hydrateTimer = window.setTimeout(() => {
@@ -348,6 +395,7 @@ export function useCharacterSetupController() {
     return () => clearTimeout(hydrateTimer);
   }, [handleDraftHydration]);
 
+  // Persist store whenever roster or world-scoped keys change
   useEffect(() => {
     if (!hasHydratedSetupDraftRef.current) return;
     if (typeof window === "undefined") return;
@@ -355,54 +403,62 @@ export function useCharacterSetupController() {
     const existingStore = readCharactersStore();
     const now = Date.now();
     const currentCharacterKey = confirmedCharacter ? toCharacterKey(confirmedCharacter) : null;
-    const nextCharactersById = characterRoster.reduce<Record<string, ReturnType<typeof createStoredCharacterRecord>>>(
+    // characterRoster is already StoredCharacterRecord[], just sync gender from setup steps
+    // and update meta.updatedAt if the character data changed since last save.
+    const nextCharactersById = characterRoster.reduce<Record<string, StoredCharacterRecord>>(
       (acc, character) => {
         const id = toCharacterKey(character);
         const existingRecord = existingStore.charactersById[id];
         const isCurrentCharacter = currentCharacterKey === id;
-        const gender = normalizeGenderValue(
-          isCurrentCharacter ? setupStepTestByStep.gender : existingRecord?.gender,
-        );
-        const stats = isCurrentCharacter
-          ? existingRecord?.stats ?? createEmptyCharacterStats()
-          : existingRecord?.stats ?? createEmptyCharacterStats();
-        const equipment = existingRecord?.equipment ?? createEmptyCharacterEquipment();
-
-        acc[id] = createStoredCharacterRecord({
-          character,
+        const gender = isCurrentCharacter
+          ? normalizeGenderValue(setupStepTestByStep.gender)
+          : (character.gender ?? existingRecord?.gender ?? null);
+        acc[id] = {
+          ...character,
           gender,
-          stats,
-          equipment,
-          addedAt: existingRecord?.meta.addedAt ?? now,
-          updatedAt:
-            existingRecord && existingRecord.fetchedAt === character.fetchedAt
-              ? existingRecord.meta.updatedAt
-              : now,
-        });
+          meta: {
+            addedAt: character.meta.addedAt,
+            updatedAt:
+              existingRecord && existingRecord.fetchedAt === character.fetchedAt
+                ? character.meta.updatedAt
+                : now,
+          },
+        };
         return acc;
       },
       {},
     );
 
+    // Filter world-scoped keys to only valid characters
+    const nextMainCharacterIdByWorld: Record<string, string> = {};
+    for (const [worldId, key] of Object.entries(mainCharacterKeyByWorld)) {
+      if (nextCharactersById[key]) nextMainCharacterIdByWorld[worldId] = key;
+    }
+    const nextChampionCharacterIdsByWorld: Record<string, string[]> = {};
+    for (const [worldId, keys] of Object.entries(championCharacterKeysByWorld)) {
+      const validKeys = keys.filter((id) => Boolean(nextCharactersById[id]));
+      if (validKeys.length > 0) nextChampionCharacterIdsByWorld[worldId] = validKeys;
+    }
+
     const nextStore = {
       version: existingStore.version,
       order: characterRoster.map((character) => toCharacterKey(character)),
-      mainCharacterId:
-        mainCharacterKey && nextCharactersById[mainCharacterKey] ? mainCharacterKey : null,
-      championCharacterIds: championCharacterKeys.filter((id) => Boolean(nextCharactersById[id])),
+      mainCharacterIdByWorld: nextMainCharacterIdByWorld,
+      championCharacterIdsByWorld: nextChampionCharacterIdsByWorld,
       charactersById: nextCharactersById,
       updatedAt: now,
     };
 
     writeCharactersStore(nextStore);
   }, [
-    championCharacterKeys,
+    championCharacterKeysByWorld,
     characterRoster,
     confirmedCharacter,
-    mainCharacterKey,
+    mainCharacterKeyByWorld,
     setupStepTestByStep,
   ]);
 
+  // Persist draft
   useEffect(() => {
     if (!hasHydratedSetupDraftRef.current) return;
     if (typeof window === "undefined") return;
@@ -430,9 +486,6 @@ export function useCharacterSetupController() {
       completedFlowIds,
       showFlowOverview,
       showCharacterDirectory,
-      characterRoster,
-      mainCharacterKey,
-      championCharacterKeys,
       setupStepIndex: clampFlowStepIndex(activeFlowId, setupStepIndex),
       setupStepDirection,
       setupStepTestByStep,
@@ -451,12 +504,12 @@ export function useCharacterSetupController() {
     return () => clearTimeout(resumeStateTimer);
   }, [
     activeFlowId,
-    championCharacterKeys,
+    championCharacterKeysByWorld,
     characterRoster,
     completedFlowIds,
     confirmedCharacter,
     isResumableDraft,
-    mainCharacterKey,
+    mainCharacterKeyByWorld,
     query,
     requiredFlowId,
     setupFlowStarted,
@@ -646,6 +699,17 @@ export function useCharacterSetupController() {
 
     const existingCharacterDraft = readSetupDraftByCharacter(foundCharacter);
     immediateUiLockRef.current = true;
+
+    // In confirmFoundCharacter, right before beginSetupFlowTransition:
+    readAllSetupDrafts()
+      .filter((d) =>
+        d.characterKey !== toCharacterKey(foundCharacter) &&
+        !d.completedFlowIds.includes(requiredFlowId)
+      )
+      .forEach((d) => {
+        if (d.confirmedCharacter) removeSetupDraftForCharacter(d.confirmedCharacter);
+      });
+
     beginSetupFlowTransition({
       character: foundCharacter,
       source: "found-character",
@@ -685,7 +749,12 @@ export function useCharacterSetupController() {
     transitions.queueTransitionTimer(() => {
       const isQuickSetupFlow = activeFlowId === requiredFlowId;
       if (isQuickSetupFlow && confirmedCharacter) {
-        upsertRosterCharacter(confirmedCharacter);
+        // Convert from NormalizedCharacterData (API response) to StoredCharacterRecord before adding to roster
+        const storedRecord = createStoredCharacterRecord({
+          character: confirmedCharacter,
+          gender: normalizeGenderValue(setupStepTestByStep.gender),
+        });
+        upsertRosterCharacter(storedRecord);
         setHasCompletedRequiredSetupEver(true);
         removeSetupDraftForCharacter(confirmedCharacter);
       }
@@ -712,13 +781,14 @@ export function useCharacterSetupController() {
     completedFlowIds,
     confirmedCharacter,
     requiredFlowId,
+    setupStepTestByStep,
     lookup,
     transitions,
     upsertRosterCharacter,
   ]);
 
   const switchToCharacterProfile = useCallback(
-    (character: NormalizedCharacterData) => {
+    (character: StoredCharacterRecord) => {
       if (immediateUiLockRef.current) return;
       immediateUiLockRef.current = true;
       setIsSwitchingToProfile(true);
@@ -750,19 +820,25 @@ export function useCharacterSetupController() {
   );
 
   const setMainCharacter = useCallback(
-    (character: NormalizedCharacterData) => {
-      setMainCharacterKey(toCharacterKey(character));
+    (character: StoredCharacterRecord) => {
+      setMainCharacterKeyByWorld((prev) =>
+        setMainKeyForWorld(prev, character.worldID, toCharacterKey(character)),
+      );
       switchToCharacterProfile(character);
     },
     [switchToCharacterProfile],
   );
 
-  const toggleChampionCharacter = useCallback((character: NormalizedCharacterData) => {
+  const toggleChampionCharacter = useCallback((character: StoredCharacterRecord) => {
     const key = toCharacterKey(character);
-    setChampionCharacterKeys((prev) => {
-      if (prev.includes(key)) return prev.filter((entry) => entry !== key);
-      if (prev.length >= MAX_CHAMPIONS) return prev;
-      return [...prev, key];
+    const worldId = character.worldID;
+    setChampionCharacterKeysByWorld((prev) => {
+      const current = getChampionKeysForWorld(prev, worldId);
+      if (current.includes(key)) {
+        return setChampionKeysForWorld(prev, worldId, current.filter((k) => k !== key));
+      }
+      if (current.length >= MAX_CHAMPIONS) return prev;
+      return setChampionKeysForWorld(prev, worldId, [...current, key]);
     });
   }, []);
 
@@ -797,12 +873,26 @@ export function useCharacterSetupController() {
 
     const removedCharacter = confirmedCharacter;
     const removedKey = toCharacterKey(removedCharacter);
+    const removedWorldId = removedCharacter.worldID;
     const remainingRoster = characterRoster.filter(
       (entry) => toCharacterKey(entry) !== removedKey,
     );
-    const remainingChampionKeys = championCharacterKeys.filter((key) => key !== removedKey);
-    const nextMainKey =
-      mainCharacterKey && mainCharacterKey !== removedKey ? mainCharacterKey : null;
+
+    // Clean up world-scoped champion keys
+    const nextChampionKeysByWorld = { ...championCharacterKeysByWorld };
+    const worldChampKeys = getChampionKeysForWorld(championCharacterKeysByWorld, removedWorldId);
+    const remainingWorldChampKeys = worldChampKeys.filter((k) => k !== removedKey);
+    if (remainingWorldChampKeys.length > 0) {
+      nextChampionKeysByWorld[String(removedWorldId)] = remainingWorldChampKeys;
+    } else {
+      delete nextChampionKeysByWorld[String(removedWorldId)];
+    }
+
+    // Clean up world-scoped main key if it was the removed character
+    const nextMainKeysByWorld = { ...mainCharacterKeyByWorld };
+    if (nextMainKeysByWorld[String(removedWorldId)] === removedKey) {
+      delete nextMainKeysByWorld[String(removedWorldId)];
+    }
 
     removeSetupDraftForCharacter(removedCharacter);
     setIsDeleteTransitioning(true);
@@ -811,8 +901,8 @@ export function useCharacterSetupController() {
 
     transitions.queueTransitionTimer(() => {
       setCharacterRoster(remainingRoster);
-      setChampionCharacterKeys(remainingChampionKeys);
-      setMainCharacterKey(nextMainKey);
+      setChampionCharacterKeysByWorld(nextChampionKeysByWorld);
+      setMainCharacterKeyByWorld(nextMainKeysByWorld);
       setConfirmedCharacter(null);
       setFoundCharacter(null);
       setQuery("");
@@ -846,10 +936,10 @@ export function useCharacterSetupController() {
       immediateUiLockRef.current = false;
     }, CHARACTERS_TRANSITION_MS.standard + CHARACTERS_TRANSITION_MS.deleteNoticeTotal);
   }, [
-    championCharacterKeys,
+    championCharacterKeysByWorld,
     characterRoster,
     confirmedCharacter,
-    mainCharacterKey,
+    mainCharacterKeyByWorld,
     lookup,
     transitions,
   ]);
@@ -920,9 +1010,6 @@ export function useCharacterSetupController() {
         completedFlowIds,
         showFlowOverview: targetShowFlowOverview,
         showCharacterDirectory: targetShowCharacterDirectory,
-        characterRoster,
-        mainCharacterKey,
-        championCharacterKeys,
         setupStepIndex: targetStepIndex,
         setupStepDirection: targetStepDirection,
         setupStepTestByStep,
@@ -932,11 +1019,8 @@ export function useCharacterSetupController() {
     }
   }, [
     activeFlowId,
-    championCharacterKeys,
-    characterRoster,
     completedFlowIds,
     confirmedCharacter,
-    mainCharacterKey,
     query,
     requiredFlowId,
     setupStepTestByStep,
@@ -983,6 +1067,11 @@ export function useCharacterSetupController() {
     isCurrentChampionCharacter || championCharacterKeys.length < MAX_CHAMPIONS;
   const currentCharacterGender = getCurrentCharacterGender(setupStepTestByStep);
 
+  // Derive sorted world IDs from roster
+  const worldIds = Array.from(
+    new Set(characterRoster.map((c) => c.worldID)),
+  ).sort((a, b) => a - b);
+
   const state = {
     query,
     foundCharacter,
@@ -1005,8 +1094,9 @@ export function useCharacterSetupController() {
     isAddingCharacter,
     fastDirectoryRevealOnce,
     characterRoster,
-    mainCharacterKey,
-    championCharacterKeys,
+    mainCharacterKeyByWorld,
+    championCharacterKeysByWorld,
+    worldIds,
     setupStepIndex,
     setupStepDirection,
     canResumeSetup,

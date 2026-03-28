@@ -1,11 +1,11 @@
-import type { NormalizedCharacterData } from "../model/types";
+import type { StoredCharacterRecord } from "../model/charactersStore";
 import { toCharacterKey } from "../model/characterKeys";
 import { CHARACTERS_TRANSITION_MS } from "./useSetupFlowTransitions";
 
 export type DirectorySortBy = "name" | "level" | "class";
 
 export function sortCharacters(
-  characters: NormalizedCharacterData[],
+  characters: StoredCharacterRecord[],
   sortBy: DirectorySortBy,
 ) {
   const entries = [...characters];
@@ -24,7 +24,7 @@ export function sortCharacters(
 }
 
 export function buildDirectoryGroups(args: {
-  allCharacters: NormalizedCharacterData[];
+  allCharacters: StoredCharacterRecord[];
   sortBy: DirectorySortBy;
   mainCharacterKey: string | null;
   championCharacterKeys: string[];
@@ -48,9 +48,7 @@ export function buildDirectoryGroups(args: {
   );
   const otherCharacters = sortedCharacters.filter((character) => {
     const key = toCharacterKey(character);
-    if (mainCharacterCompositeKey && key === mainCharacterCompositeKey) {
-      return false;
-    }
+    if (mainCharacterCompositeKey && key === mainCharacterCompositeKey) return false;
     return !championSet.has(key);
   });
 
@@ -68,8 +66,7 @@ export function buildDirectoryGroups(args: {
     otherCharacters,
     muleCapacity,
     canAddCharacter: sortedCharacters.length < args.maxCharacters,
-    hasChampionSection:
-      championCharactersForDirectory.length > 0 || isMainAlsoChampion,
+    hasChampionSection: championCharactersForDirectory.length > 0 || isMainAlsoChampion,
     isMainAlsoChampion,
   };
 }
@@ -79,18 +76,9 @@ export function getDirectoryRevealDelays(
   hasChampionSection: boolean,
 ) {
   if (fastDirectoryRevealOnce) {
-    return {
-      mainDelay: 24,
-      championDelay: 56,
-      mulesDelay: hasChampionSection ? 88 : 56,
-    };
+    return { mainDelay: 24, championDelay: 56, mulesDelay: hasChampionSection ? 88 : 56 };
   }
-
-  return {
-    mainDelay: 60,
-    championDelay: 120,
-    mulesDelay: hasChampionSection ? 180 : 120,
-  };
+  return { mainDelay: 60, championDelay: 120, mulesDelay: hasChampionSection ? 180 : 120 };
 }
 
 export function getDirectoryRevealStyle(visible: boolean) {
