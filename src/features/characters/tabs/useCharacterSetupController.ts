@@ -15,6 +15,7 @@ import {
   writeCharactersStore,
 } from "../model/charactersStore";
 import {
+  readAllSetupDrafts,
   makeDraftCharacterKey,
   readLastSetupDraft,
   readSetupDraftByCharacter,
@@ -705,6 +706,17 @@ export function useCharacterSetupController() {
 
     const existingCharacterDraft = readSetupDraftByCharacter(foundCharacter);
     immediateUiLockRef.current = true;
+
+    // In confirmFoundCharacter, right before beginSetupFlowTransition:
+    readAllSetupDrafts()
+      .filter((d) =>
+        d.characterKey !== toCharacterKey(foundCharacter) &&
+        !d.completedFlowIds.includes(requiredFlowId)
+      )
+      .forEach((d) => {
+        if (d.confirmedCharacter) removeSetupDraftForCharacter(d.confirmedCharacter);
+      });
+
     beginSetupFlowTransition({
       character: foundCharacter,
       source: "found-character",
