@@ -5,10 +5,10 @@
   TODO: Add user preferences here (e.g. default world selection — hook into
   mapledoro_pref_default_world to set the default directory world filter).
 */
-import { createPortal } from "react-dom";
 import { useState } from "react";
 import AppShell from "../../components/AppShell";
 import type { AppTheme } from "../../components/themes";
+import ConfirmModal from "../../features/characters/tabs/components/ConfirmModal";
 
 function hardReset() {
   const keys = Object.keys(localStorage).filter((k) => k.startsWith("mapledoro_"));
@@ -72,76 +72,16 @@ function SettingsContent({ theme }: { theme: AppTheme }) {
           </button>
         </div>
 
-        {showResetConfirm && createPortal(
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(15, 23, 42, 0.42)",
-              display: "grid",
-              placeItems: "center",
-              zIndex: 60,
-              padding: "1rem",
-            }}
-          >
-            <div
-              style={{
-                width: "min(420px, 100%)",
-                borderRadius: "14px",
-                border: `1px solid ${theme.border}`,
-                background: theme.panel,
-                color: theme.text,
-                padding: "1rem",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.24)",
-                display: "grid",
-                gap: "0.75rem",
-              }}
-            >
-              <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800 }}>
-                Reset all data?
-              </p>
-              <p style={{ margin: 0, color: theme.muted, fontSize: "0.86rem", fontWeight: 700 }}>
-                This will delete all your characters, world settings, and saved state from this browser. There is no undo.
-              </p>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.55rem" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(false)}
-                  style={{
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: "10px",
-                    background: theme.bg,
-                    color: theme.text,
-                    fontFamily: "inherit",
-                    fontWeight: 800,
-                    fontSize: "0.86rem",
-                    padding: "0.5rem 0.75rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={hardReset}
-                  style={{
-                    border: "1px solid #fca5a5",
-                    borderRadius: "10px",
-                    background: "#ef4444",
-                    color: "#fff",
-                    fontFamily: "inherit",
-                    fontWeight: 800,
-                    fontSize: "0.86rem",
-                    padding: "0.5rem 0.8rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Reset everything
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
+        {showResetConfirm && (
+          <ConfirmModal
+            theme={theme}
+            title="Reset all data?"
+            description="This will delete all your characters, world settings, and saved state from this browser. There is no undo."
+            confirmLabel="Reset everything"
+            confirmDanger
+            onConfirm={hardReset}
+            onCancel={() => setShowResetConfirm(false)}
+          />
         )}
       </div>
     </div>

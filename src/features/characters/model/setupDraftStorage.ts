@@ -5,7 +5,7 @@ import type { SetupStepInputById } from "../setup/types";
 import { clampFlowStepIndex, getRequiredSetupFlowId, type SetupFlowId } from "../setup/flows";
 import type { NormalizedCharacterData } from "./types";
 import { normalizeCharacterKey, normalizeCharacterName } from "./characterKeys";
-import { SETUP_DRAFT_LAST_KEY, SETUP_DRAFT_STORAGE_PREFIX, type SetupMode } from "./constants";
+import { SETUP_DRAFT_STORAGE_PREFIX, type SetupMode } from "./constants";
 
 export interface SetupDraft {
   version: 1;
@@ -103,19 +103,6 @@ export function readAllSetupDrafts(): SetupDraft[] {
 
 export function readLastSetupDraft(): SetupDraft | null {
   if (typeof window === "undefined") return null;
-  const draftKey = window.localStorage.getItem(SETUP_DRAFT_LAST_KEY);
-  if (draftKey) {
-    const normalizedDraftKey = normalizeCharacterKey(draftKey);
-    const raw =
-      window.localStorage.getItem(getSetupDraftStorageKey(normalizedDraftKey)) ??
-      window.localStorage.getItem(getSetupDraftStorageKey(draftKey));
-    if (raw) {
-      const parsed = parseSetupDraft(raw);
-      if (parsed) return parsed;
-    }
-  }
-
-  // Fallback: recover from any valid saved draft if the "last" pointer is stale/missing.
   let newestDraft: SetupDraft | null = null;
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
@@ -127,12 +114,6 @@ export function readLastSetupDraft(): SetupDraft | null {
     if (!newestDraft || parsed.savedAt > newestDraft.savedAt) {
       newestDraft = parsed;
     }
-  }
-
-  if (newestDraft) {
-    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(newestDraft.characterKey));
-  } else {
-    window.localStorage.removeItem(SETUP_DRAFT_LAST_KEY);
   }
   return newestDraft;
 }
@@ -160,64 +141,19 @@ export function writeSetupDraft(draft: SetupDraft) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(getSetupDraftStorageKey(draft.characterKey), JSON.stringify(draft));
-    window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(draft.characterKey));
   } catch {
     // Ignore localStorage write failures.
   }
 }
 
-export function setLastSetupDraftAutoResume(value: boolean) {
-  const draft = readLastSetupDraft();
-  if (!draft) return;
-  writeSetupDraft({
-    ...draft,
-    setupFlowStarted: value ? draft.setupFlowStarted : false,
-    autoResumeOnLoad: value,
-    savedAt: Date.now(),
-  });
-}
 
 export function removeSetupDraftForCharacter(character: NormalizedCharacterData) {
   if (typeof window === "undefined") return;
   try {
     const characterKey = makeDraftCharacterKey(character);
     window.localStorage.removeItem(getSetupDraftStorageKey(characterKey));
-    const lastKey = window.localStorage.getItem(SETUP_DRAFT_LAST_KEY);
-    if (lastKey === characterKey) {
-      // Re-point "last draft" to the newest remaining valid draft if possible.
-      let newestDraft: SetupDraft | null = null;
-      for (let i = 0; i < window.localStorage.length; i += 1) {
-        const key = window.localStorage.key(i);
-        if (!key || !key.startsWith(SETUP_DRAFT_STORAGE_PREFIX)) continue;
-        const raw = window.localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = parseSetupDraft(raw);
-        if (!parsed) continue;
-        if (!newestDraft || parsed.savedAt > newestDraft.savedAt) {
-          newestDraft = parsed;
-        }
-      }
-
-      if (newestDraft) {
-        window.localStorage.setItem(SETUP_DRAFT_LAST_KEY, normalizeCharacterKey(newestDraft.characterKey));
-      } else {
-        window.localStorage.removeItem(SETUP_DRAFT_LAST_KEY);
-      }
-    }
   } catch {
     return null;
   }
 }
 
-export function clearLastSetupDraft() {
-  if (typeof window === "undefined") return;
-  try {
-    const lastKey = window.localStorage.getItem(SETUP_DRAFT_LAST_KEY);
-    if (lastKey) {
-      window.localStorage.removeItem(getSetupDraftStorageKey(lastKey));
-    }
-    window.localStorage.removeItem(SETUP_DRAFT_LAST_KEY);
-  } catch {
-    // Ignore localStorage errors.
-  }
-}

@@ -19,7 +19,6 @@ import {
   readLastSetupDraft,
   readSetupDraftByCharacter,
   removeSetupDraftForCharacter,
-  setLastSetupDraftAutoResume,
   type SetupDraft,
   writeSetupDraft,
 } from "../model/setupDraftStorage";
@@ -563,9 +562,12 @@ export function useCharacterSetupController() {
     if (immediateUiLockRef.current) return;
     immediateUiLockRef.current = true;
     setIsAddingCharacter(false);
+    if (confirmedCharacter) {
+      const draft = readSetupDraftByCharacter(confirmedCharacter);
+      if (draft) writeSetupDraft({ ...draft, autoResumeOnLoad: false, setupFlowStarted: false, savedAt: Date.now() });
+    }
     transitions.runBackToIntroTransition({
-      setLastSetupDraftAutoResume,
-      resetSearchStateMessage: lookup.resetSearchStateMessage,
+          resetSearchStateMessage: lookup.resetSearchStateMessage,
       setSetupMode,
       setFoundCharacter,
       setConfirmedCharacter,
@@ -578,7 +580,7 @@ export function useCharacterSetupController() {
       setSetupStepDirection,
       setSetupStepTestByStep,
     });
-  }, [lookup, transitions]);
+  }, [confirmedCharacter, lookup, transitions]);
 
   const runTransitionToMode = useCallback(
     (nextMode: SetupMode) => {
@@ -606,6 +608,10 @@ export function useCharacterSetupController() {
   const backFromSetupFlowToAddCharacter = useCallback(() => {
     if (immediateUiLockRef.current) return;
     immediateUiLockRef.current = true;
+    if (confirmedCharacter) {
+      const draft = readSetupDraftByCharacter(confirmedCharacter);
+      if (draft) writeSetupDraft({ ...draft, autoResumeOnLoad: false, setupFlowStarted: false, savedAt: Date.now() });
+    }
     transitions.runBackTransition(() => {
       setIsAddingCharacter(true);
       setSetupFlowStarted(false);
@@ -617,9 +623,8 @@ export function useCharacterSetupController() {
       setSetupStepDirection("forward");
       setSetupStepTestByStep({});
       lookup.resetSearchStateMessage();
-      setLastSetupDraftAutoResume(false);
     });
-  }, [lookup, transitions]);
+  }, [confirmedCharacter, lookup, transitions]);
 
   const backToCharactersDirectory = useCallback(() => {
     setIsAddingCharacter(false);

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
+import ConfirmModal from "./ConfirmModal";
 import FirstTimeSetupScreen from "../screens/FirstTimeSetupScreen";
 import ImportModeScreen from "../screens/ImportModeScreen";
 import CharacterProfileActionsScreen from "../screens/CharacterProfileActionsScreen";
 import CharacterProfileScreen from "../screens/CharacterProfileScreen";
 import SearchEntryScreen from "../screens/SearchEntryScreen";
-import { panelCardStyle, secondaryButtonStyle } from "./uiStyles";
+import { panelCardStyle } from "./uiStyles";
 
 interface SearchPaneCardProps {
   model: SearchPaneModel;
@@ -95,69 +95,19 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
         onRequestRemove={() => setShowRemoveConfirm(true)}
       />
 
-      {showRemoveConfirm && profile.confirmedCharacter && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.42)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 60,
-            padding: "1rem",
+      {showRemoveConfirm && profile.confirmedCharacter && (
+        <ConfirmModal
+          theme={theme}
+          title={`Remove ${profile.confirmedCharacter.characterName}?`}
+          description="This removes the character and local setup data for this profile."
+          confirmLabel="Remove"
+          confirmDanger
+          onConfirm={() => {
+            setShowRemoveConfirm(false);
+            actions.removeCurrentCharacter();
           }}
-        >
-          <div
-            style={{
-              width: "min(420px, 100%)",
-              borderRadius: "14px",
-              border: `1px solid ${theme.border}`,
-              background: theme.panel,
-              color: theme.text,
-              padding: "1rem",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.24)",
-              display: "grid",
-              gap: "0.75rem",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800 }}>
-              Remove {profile.confirmedCharacter.characterName}?
-            </p>
-            <p style={{ margin: 0, color: theme.muted, fontSize: "0.86rem", fontWeight: 700 }}>
-              This removes the character and local setup data for this profile.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.55rem" }}>
-              <button
-                type="button"
-                onClick={() => setShowRemoveConfirm(false)}
-                style={secondaryButtonStyle(theme, "0.5rem 0.75rem")}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRemoveConfirm(false);
-                  actions.removeCurrentCharacter();
-                }}
-                style={{
-                  border: "1px solid #fca5a5",
-                  borderRadius: "10px",
-                  background: "#ef4444",
-                  color: "#fff",
-                  fontFamily: "inherit",
-                  fontWeight: 800,
-                  fontSize: "0.86rem",
-                  padding: "0.5rem 0.8rem",
-                  cursor: "pointer",
-                }}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+          onCancel={() => setShowRemoveConfirm(false)}
+        />
       )}
     </>
   );

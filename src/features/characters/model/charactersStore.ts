@@ -1,7 +1,5 @@
 import { toCharacterKey } from "./characterKeys";
-import { getRequiredSetupFlowId } from "../setup/flows";
 import type { NormalizedCharacterData } from "./types";
-import { readAllSetupDrafts } from "./setupDraftStorage";
 
 export const CHARACTERS_STORE_VERSION = 1 as const;
 export const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -349,33 +347,29 @@ function parseStoredCharacterRecord(
   };
 }
 
-// Migrates old flat mainCharacterId/championCharacterIds to per-world shape.
-function migrateToWorldScoped(
+function parseWorldScopedRoles(
   parsed: Record<string, unknown>,
   charactersById: Record<string, StoredCharacterRecord>,
 ): Pick<CharactersStore, "mainCharacterIdByWorld" | "championCharacterIdsByWorld"> {
   const mainCharacterIdByWorld: Record<string, string> = {};
-  const championCharacterIdsByWorld: Record<string, string[]> = {};
-
-  // Migrate old flat mainCharacterId
-  const oldMainId = typeof parsed.mainCharacterId === "string" ? parsed.mainCharacterId : null;
-  if (oldMainId && charactersById[oldMainId]) {
-    const worldId = String(charactersById[oldMainId].worldID);
-    mainCharacterIdByWorld[worldId] = oldMainId;
+  if (isObject(parsed.mainCharacterIdByWorld)) {
+    for (const [worldId, charId] of Object.entries(parsed.mainCharacterIdByWorld)) {
+      if (typeof charId === "string" && charactersById[charId]) {
+        mainCharacterIdByWorld[worldId] = charId;
+      }
+    }
   }
 
-  // Migrate old flat championCharacterIds
-  const oldChampionIds = Array.isArray(parsed.championCharacterIds)
-    ? parsed.championCharacterIds.filter(
-        (entry): entry is string => typeof entry === "string" && Boolean(charactersById[entry]),
-      )
-    : [];
-  for (const id of oldChampionIds) {
-    const worldId = String(charactersById[id].worldID);
-    if (!championCharacterIdsByWorld[worldId]) {
-      championCharacterIdsByWorld[worldId] = [];
+  const championCharacterIdsByWorld: Record<string, string[]> = {};
+  if (isObject(parsed.championCharacterIdsByWorld)) {
+    for (const [worldId, ids] of Object.entries(parsed.championCharacterIdsByWorld)) {
+      if (Array.isArray(ids)) {
+        championCharacterIdsByWorld[worldId] = ids.filter(
+          (entry): entry is string =>
+            typeof entry === "string" && Boolean(charactersById[entry]),
+        );
+      }
     }
-    championCharacterIdsByWorld[worldId].push(id);
   }
 
   return { mainCharacterIdByWorld, championCharacterIdsByWorld };
@@ -405,40 +399,8 @@ function parseCharactersStore(raw: string): CharactersStore | null {
       if (!order.includes(id)) order.push(id);
     }
 
-    // Detect old format (has mainCharacterId or championCharacterIds) and migrate
-    const isOldFormat =
-      "mainCharacterId" in parsed || "championCharacterIds" in parsed;
-
-    let mainCharacterIdByWorld: Record<string, string>;
-    let championCharacterIdsByWorld: Record<string, string[]>;
-
-    if (isOldFormat) {
-      const migrated = migrateToWorldScoped(parsed, charactersById);
-      mainCharacterIdByWorld = migrated.mainCharacterIdByWorld;
-      championCharacterIdsByWorld = migrated.championCharacterIdsByWorld;
-    } else {
-      // Parse new format
-      mainCharacterIdByWorld = {};
-      if (isObject(parsed.mainCharacterIdByWorld)) {
-        for (const [worldId, charId] of Object.entries(parsed.mainCharacterIdByWorld)) {
-          if (typeof charId === "string" && charactersById[charId]) {
-            mainCharacterIdByWorld[worldId] = charId;
-          }
-        }
-      }
-
-      championCharacterIdsByWorld = {};
-      if (isObject(parsed.championCharacterIdsByWorld)) {
-        for (const [worldId, ids] of Object.entries(parsed.championCharacterIdsByWorld)) {
-          if (Array.isArray(ids)) {
-            championCharacterIdsByWorld[worldId] = ids.filter(
-              (entry): entry is string =>
-                typeof entry === "string" && Boolean(charactersById[entry]),
-            );
-          }
-        }
-      }
-    }
+    const { mainCharacterIdByWorld, championCharacterIdsByWorld } =
+          parseWorldScopedRoles(parsed, charactersById);
 
     return {
       version: CHARACTERS_STORE_VERSION,
@@ -451,58 +413,6 @@ function parseCharactersStore(raw: string): CharactersStore | null {
   } catch {
     return null;
   }
-}
-
-function buildLegacyCharactersStore(): CharactersStore {
-  const requiredFlowId = getRequiredSetupFlowId();
-  const drafts = readAllSetupDrafts()
-    .filter((draft) => draft.confirmedCharacter && draft.completedFlowIds.includes(requiredFlowId))
-    .sort((a, b) => a.savedAt - b.savedAt);
-
-  if (!drafts.length) return createEmptyCharactersStore();
-
-  const charactersById: Record<string, StoredCharacterRecord> = {};
-  const order: string[] = [];
-
-  for (const draft of drafts) {
-    if (!draft.confirmedCharacter) continue;
-    const draftId = toCharacterKey(draft.confirmedCharacter);
-    const existing = charactersById[draftId];
-    charactersById[draftId] = createStoredCharacterRecord({
-      character: draft.confirmedCharacter,
-      gender:
-        draft.setupStepTestByStep.gender?.toLowerCase() === "male"
-          ? "male"
-          : draft.setupStepTestByStep.gender?.toLowerCase() === "female"
-            ? "female"
-            : null,
-      stats: createEmptyCharacterStats(),
-      equipment: createEmptyCharacterEquipment(),
-      addedAt: existing?.meta.addedAt ?? draft.savedAt,
-      updatedAt: draft.savedAt,
-    });
-    if (!order.includes(draftId)) order.push(draftId);
-  }
-
-  // Default main to first character per world; champions start empty.
-  // Legacy drafts no longer carry main/champion keys so we can't restore them.
-  const mainCharacterIdByWorld: Record<string, string> = {};
-  const championCharacterIdsByWorld: Record<string, string[]> = {};
-  if (order[0] && charactersById[order[0]]) {
-    const firstChar = charactersById[order[0]];
-    mainCharacterIdByWorld[String(firstChar.worldID)] = order[0];
-  }
-
-  const updatedAt = drafts[drafts.length - 1]?.savedAt ?? Date.now();
-
-  return {
-    version: CHARACTERS_STORE_VERSION,
-    order,
-    mainCharacterIdByWorld,
-    championCharacterIdsByWorld,
-    charactersById,
-    updatedAt,
-  };
 }
 
 export function writeCharactersStore(store: CharactersStore) {
@@ -519,18 +429,9 @@ export function readCharactersStore(): CharactersStore {
   const raw = window.localStorage.getItem(CHARACTERS_STORE_STORAGE_KEY);
   if (raw) {
     const parsed = parseCharactersStore(raw);
-    if (parsed) {
-      // If it was old format, re-save with new shape immediately
-      const isOldFormat =
-        raw.includes('"mainCharacterId"') || raw.includes('"championCharacterIds"');
-      if (isOldFormat) writeCharactersStore(parsed);
-      return parsed;
-    }
+    if (parsed) return parsed;
   }
-
-  const migrated = buildLegacyCharactersStore();
-  if (migrated.order.length > 0) writeCharactersStore(migrated);
-  return migrated;
+  return createEmptyCharactersStore();
 }
 
 export function selectCharactersList(store: CharactersStore): StoredCharacterRecord[] {

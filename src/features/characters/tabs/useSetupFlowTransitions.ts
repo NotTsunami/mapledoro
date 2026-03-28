@@ -139,11 +139,8 @@ export function useSetupFlowTransitions() {
 
   const runBackToIntroTransition = useCallback(
     (
-      callbacks: CommonTransitionCallbacks & {
-        setLastSetupDraftAutoResume: (value: boolean) => void;
-      },
+      callbacks: CommonTransitionCallbacks,
     ) => {
-      callbacks.setLastSetupDraftAutoResume(false);
       runTransitionSequence({
         type: "mode",
         enableSearchFadeIn: true,

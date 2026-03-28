@@ -11,7 +11,6 @@ export const LOOKUP_REQUEST_TIMEOUT_MS = 25000;
 export const LOOKUP_SLOW_NOTICE_MS = 12000;
 export const CHARACTER_CACHE_STORAGE_KEY = `mapledoro_character_cache_${LOOKUP_RESPONSE_SCHEMA_VERSION}`;
 export const SETUP_DRAFT_STORAGE_PREFIX = `mapledoro_character_setup_draft_${LOOKUP_RESPONSE_SCHEMA_VERSION}:`;
-export const SETUP_DRAFT_LAST_KEY = `mapledoro_character_setup_draft_last_${LOOKUP_RESPONSE_SCHEMA_VERSION}`;
 export const MAX_BROWSER_CACHE_ENTRIES = 100;
 
 export const WORLD_NAMES: Record<number, string> = {
