@@ -1,7 +1,7 @@
 import { toCharacterKey } from "./characterKeys";
 import { getRequiredSetupFlowId } from "../setup/flows";
 import type { NormalizedCharacterData } from "./types";
-import { readAllSetupDrafts, readLastSetupDraft } from "./setupDraftStorage";
+import { readAllSetupDrafts } from "./setupDraftStorage";
 
 export const CHARACTERS_STORE_VERSION = 1 as const;
 export const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -484,28 +484,13 @@ function buildLegacyCharactersStore(): CharactersStore {
     if (!order.includes(draftId)) order.push(draftId);
   }
 
-  const lastDraft = readLastSetupDraft();
-
-  // Build world-scoped main
+  // Default main to first character per world; champions start empty.
+  // Legacy drafts no longer carry main/champion keys so we can't restore them.
   const mainCharacterIdByWorld: Record<string, string> = {};
-  const oldMainId = lastDraft?.mainCharacterKey;
-  if (oldMainId && charactersById[oldMainId]) {
-    const worldId = String(charactersById[oldMainId].worldID);
-    mainCharacterIdByWorld[worldId] = oldMainId;
-  } else if (order[0] && charactersById[order[0]]) {
+  const championCharacterIdsByWorld: Record<string, string[]> = {};
+  if (order[0] && charactersById[order[0]]) {
     const firstChar = charactersById[order[0]];
     mainCharacterIdByWorld[String(firstChar.worldID)] = order[0];
-  }
-
-  // Build world-scoped champions
-  const championCharacterIdsByWorld: Record<string, string[]> = {};
-  for (const id of lastDraft?.championCharacterKeys ?? []) {
-    if (!charactersById[id]) continue;
-    const worldId = String(charactersById[id].worldID);
-    if (!championCharacterIdsByWorld[worldId]) {
-      championCharacterIdsByWorld[worldId] = [];
-    }
-    championCharacterIdsByWorld[worldId].push(id);
   }
 
   const updatedAt = drafts[drafts.length - 1]?.savedAt ?? Date.now();

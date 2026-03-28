@@ -11,7 +11,6 @@ import {
   readCharactersStore,
   selectCharacterById,
   selectCharactersList,
-  toNormalizedCharacterData,
   writeCharactersStore,
 } from "../model/charactersStore";
 import {
@@ -476,8 +475,6 @@ export function useCharacterSetupController() {
     }
 
     const characterKey = makeDraftCharacterKey(confirmedCharacter);
-    // Draft stores flat keys for the confirmed character's world for backwards compat
-    const worldId = confirmedCharacter.worldID;
     const draft: SetupDraft = {
       version: 1,
       characterKey,
@@ -489,10 +486,6 @@ export function useCharacterSetupController() {
       completedFlowIds,
       showFlowOverview,
       showCharacterDirectory,
-      // Draft format uses NormalizedCharacterData — convert from StoredCharacterRecord
-      characterRoster: characterRoster.map(toNormalizedCharacterData),
-      mainCharacterKey: getMainKeyForWorld(mainCharacterKeyByWorld, worldId),
-      championCharacterKeys: getChampionKeysForWorld(championCharacterKeysByWorld, worldId),
       setupStepIndex: clampFlowStepIndex(activeFlowId, setupStepIndex),
       setupStepDirection,
       setupStepTestByStep,
@@ -1006,7 +999,6 @@ export function useCharacterSetupController() {
     if (confirmedCharacter && !completedFlowIds.includes(requiredFlowId)) {
       const characterKey = makeDraftCharacterKey(confirmedCharacter);
       const existingDraft = readSetupDraftByCharacter(confirmedCharacter);
-      const worldId = confirmedCharacter.worldID;
       writeSetupDraft({
         version: 1,
         characterKey,
@@ -1018,9 +1010,6 @@ export function useCharacterSetupController() {
         completedFlowIds,
         showFlowOverview: targetShowFlowOverview,
         showCharacterDirectory: targetShowCharacterDirectory,
-        characterRoster,
-        mainCharacterKey: getMainKeyForWorld(mainCharacterKeyByWorld, worldId),
-        championCharacterKeys: getChampionKeysForWorld(championCharacterKeysByWorld, worldId),
         setupStepIndex: targetStepIndex,
         setupStepDirection: targetStepDirection,
         setupStepTestByStep,
@@ -1030,11 +1019,8 @@ export function useCharacterSetupController() {
     }
   }, [
     activeFlowId,
-    championCharacterKeysByWorld,
-    characterRoster,
     completedFlowIds,
     confirmedCharacter,
-    mainCharacterKeyByWorld,
     query,
     requiredFlowId,
     setupStepTestByStep,

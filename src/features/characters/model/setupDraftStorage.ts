@@ -18,9 +18,6 @@ export interface SetupDraft {
   completedFlowIds: SetupFlowId[];
   showFlowOverview: boolean;
   showCharacterDirectory: boolean;
-  characterRoster: NormalizedCharacterData[];
-  mainCharacterKey: string | null;
-  championCharacterKeys: string[];
   setupStepIndex: number;
   setupStepDirection: "forward" | "backward";
   setupStepTestByStep: SetupStepInputById;
@@ -32,15 +29,6 @@ export function makeDraftCharacterKey(character: NormalizedCharacterData) {
   return normalizeCharacterName(character.characterName);
 }
 
-function isNormalizedCharacterDataSummary(value: unknown): value is NormalizedCharacterData {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      typeof (value as Partial<NormalizedCharacterData>).characterName === "string" &&
-      typeof (value as Partial<NormalizedCharacterData>).worldID === "number",
-  );
-}
-
 function parseDraftActiveFlowId(value: unknown): SetupFlowId {
   return typeof value === "string" ? (value as SetupFlowId) : getRequiredSetupFlowId();
 }
@@ -48,18 +36,6 @@ function parseDraftActiveFlowId(value: unknown): SetupFlowId {
 function parseDraftCompletedFlowIds(value: unknown): SetupFlowId[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is SetupFlowId => typeof entry === "string")
-    : [];
-}
-
-function parseDraftCharacterRoster(value: unknown): NormalizedCharacterData[] {
-  return Array.isArray(value)
-    ? value.filter((entry): entry is NormalizedCharacterData => isNormalizedCharacterDataSummary(entry))
-    : [];
-}
-
-function parseDraftChampionCharacterKeys(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
 }
 
@@ -76,9 +52,6 @@ function parseSetupDraft(raw: string): SetupDraft | null {
     if (typeof parsed.characterKey !== "string" || !parsed.characterKey.trim()) return null;
     const activeFlowId = parseDraftActiveFlowId(parsed.activeFlowId);
     const completedFlowIds = parseDraftCompletedFlowIds(parsed.completedFlowIds);
-    const characterRoster = parseDraftCharacterRoster(parsed.characterRoster);
-    const mainCharacterKey = typeof parsed.mainCharacterKey === "string" ? parsed.mainCharacterKey : null;
-    const championCharacterKeys = parseDraftChampionCharacterKeys(parsed.championCharacterKeys);
     return {
       version: 1,
       characterKey: normalizeCharacterKey(parsed.characterKey),
@@ -90,9 +63,6 @@ function parseSetupDraft(raw: string): SetupDraft | null {
       completedFlowIds,
       showFlowOverview: Boolean(parsed.showFlowOverview) && completedFlowIds.length > 0,
       showCharacterDirectory: Boolean(parsed.showCharacterDirectory) && completedFlowIds.length > 0,
-      characterRoster,
-      mainCharacterKey,
-      championCharacterKeys,
       setupStepIndex: clampFlowStepIndex(activeFlowId, Number(parsed.setupStepIndex ?? 0)),
       setupStepDirection: parsed.setupStepDirection === "backward" ? "backward" : "forward",
       setupStepTestByStep: parseDraftStepTestByStep(parsed.setupStepTestByStep),
@@ -129,28 +99,6 @@ export function readAllSetupDrafts(): SetupDraft[] {
     drafts.push(parsed);
   }
   return drafts;
-}
-
-export function readMergedCharacterRoster(): NormalizedCharacterData[] {
-  const drafts = readAllSetupDrafts();
-  const requiredFlowId = getRequiredSetupFlowId();
-  const completedDrafts = drafts.filter((draft) =>
-    draft.completedFlowIds.includes(requiredFlowId),
-  );
-  const existingCharacterKeys = new Set(completedDrafts.map((draft) => draft.characterKey));
-  const map = new Map<string, NormalizedCharacterData>();
-  for (const draft of completedDrafts) {
-    for (const entry of draft.characterRoster ?? []) {
-      const entryKey = makeDraftCharacterKey(entry);
-      // Prevent stale roster snapshots from resurrecting deleted characters.
-      if (!existingCharacterKeys.has(entryKey)) continue;
-      map.set(entryKey, entry);
-    }
-    if (draft.confirmedCharacter) {
-      map.set(makeDraftCharacterKey(draft.confirmedCharacter), draft.confirmedCharacter);
-    }
-  }
-  return Array.from(map.values());
 }
 
 export function readLastSetupDraft(): SetupDraft | null {
