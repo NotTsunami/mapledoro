@@ -179,90 +179,6 @@ function ItemIcon({ src, size = 24 }: { src: string; size?: number }) {
   );
 }
 
-function RecentDropsSection({
-  theme,
-  drops,
-}: {
-  theme: AppTheme;
-  drops: PitchedBossDrop[];
-}) {
-  const recent = drops.slice(0, 5);
-
-  return (
-    <div style={panelStyle(theme)}>
-      <div
-        style={{
-          fontWeight: 700,
-          color: theme.text,
-          marginBottom: "1rem",
-          fontSize: "0.95rem",
-        }}
-      >
-        Recent Drops
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-        {recent.map((drop) => {
-          const item = PITCHED_ITEMS_BY_ID.get(drop.itemId);
-          return (
-            <div
-              key={drop.id}
-              style={{
-                flex: "1 1 150px",
-                background: theme.timerBg,
-                border: `1px solid ${theme.border}`,
-                borderRadius: 10,
-                padding: "0.75rem",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontWeight: 700,
-                  color: theme.text,
-                  fontSize: "0.82rem",
-                }}
-              >
-                {item && <ItemIcon src={item.icon} />}
-                {item?.name ?? drop.itemId}
-              </div>
-              <div
-                style={{
-                  color: theme.muted,
-                  fontSize: "0.75rem",
-                  marginTop: 2,
-                }}
-              >
-                {item?.boss ?? "Unknown boss"}
-              </div>
-              <div
-                style={{
-                  color: theme.muted,
-                  fontSize: "0.75rem",
-                  marginTop: 4,
-                }}
-              >
-                {drop.characterName} &middot; CH {drop.channel}
-              </div>
-              <div
-                style={{
-                  color: theme.accent,
-                  fontSize: "0.72rem",
-                  fontWeight: 600,
-                  marginTop: 4,
-                }}
-              >
-                {drop.date}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function DropCountBarChart({
   theme,
   drops,
@@ -838,18 +754,6 @@ export default function PitchedBossDropsWorkspace({
         {/* ── Analytics ── */}
         {sortedDrops.length > 0 && (
           <>
-            <div
-              style={{
-                fontWeight: 700,
-                color: theme.text,
-                fontSize: "1.1rem",
-                marginBottom: "1rem",
-              }}
-            >
-              Analytics
-            </div>
-
-            <RecentDropsSection theme={theme} drops={sortedDrops} />
             <DropCountBarChart theme={theme} drops={sortedDrops} />
             <MonthlyTimeSeriesChart theme={theme} drops={sortedDrops} />
           </>
