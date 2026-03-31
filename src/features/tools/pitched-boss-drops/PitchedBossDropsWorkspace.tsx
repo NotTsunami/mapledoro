@@ -2,6 +2,18 @@
 
 import { useState, useSyncExternalStore } from "react";
 import type { CSSProperties } from "react";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 import type { AppTheme } from "../../../components/themes";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { WikiAttribution } from "../../../components/WikiAttribution";
@@ -97,21 +109,8 @@ function getLastNMonths(n: number): string[] {
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split("-");
-  const names = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  return `${names[parseInt(m, 10) - 1]} '${y.slice(2)}`;
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${MONTH_NAMES[parseInt(m, 10) - 1]} '${y.slice(2)}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -265,173 +264,47 @@ function MonthlyTimeSeriesChart({
   drops: PitchedBossDrop[];
 }) {
   const months = getLastNMonths(6);
-
+  const labels = months.map(formatMonth);
   const charNames = Array.from(new Set(drops.map((d) => d.characterName)));
 
-  const data = charNames.map((name) => ({
-    name,
-    values: months.map(
-      (month) =>
-        drops.filter((d) => d.characterName === name && d.date.startsWith(month))
-          .length,
+  const datasets = charNames.map((name, i) => ({
+    label: name,
+    data: months.map(
+      (month) => drops.filter((d) => d.characterName === name && d.date.startsWith(month)).length,
     ),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+    tension: 0.25,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    borderWidth: 2.5,
   }));
 
-  const maxVal = Math.max(...data.flatMap((d) => d.values), 1);
+  const chartData = { labels, datasets };
 
-  // SVG layout
-  const W = 600;
-  const H = 280;
-  const PAD = { top: 20, right: 20, bottom: 40, left: 36 };
-  const chartW = W - PAD.left - PAD.right;
-  const chartH = H - PAD.top - PAD.bottom;
-
-  const xStep = chartW / Math.max(months.length - 1, 1);
-  const yScale = chartH / maxVal;
-
-  // Y-axis ticks (keep to a reasonable number)
-  const yTickStep = maxVal <= 8 ? 1 : Math.ceil(maxVal / 6);
-  const yTicks: number[] = [];
-  for (let v = 0; v <= maxVal; v += yTickStep) yTicks.push(v);
+  const options = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { position: "bottom" as const, labels: { color: theme.muted, font: { size: 12, weight: 600 as const } } },
+      tooltip: { mode: "index" as const, intersect: false },
+    },
+    scales: {
+      x: { ticks: { color: theme.muted }, grid: { color: theme.border } },
+      y: {
+        beginAtZero: true,
+        ticks: { color: theme.muted, stepSize: 1 },
+        grid: { color: theme.border },
+      },
+    },
+  };
 
   return (
     <div style={panelStyle(theme)}>
-      <div
-        style={{
-          fontWeight: 700,
-          color: theme.text,
-          marginBottom: "1rem",
-          fontSize: "0.95rem",
-        }}
-      >
+      <div style={{ fontWeight: 700, color: theme.text, marginBottom: "1rem", fontSize: "0.95rem" }}>
         Monthly Drops by Character
       </div>
-
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ width: "100%", height: "auto", display: "block" }}
-      >
-        {/* Grid lines */}
-        {yTicks.map((v) => {
-          const y = PAD.top + chartH - v * yScale;
-          return (
-            <g key={`y-${v}`}>
-              <line
-                x1={PAD.left}
-                y1={y}
-                x2={W - PAD.right}
-                y2={y}
-                stroke={theme.border}
-                strokeWidth={1}
-              />
-              <text
-                x={PAD.left - 8}
-                y={y + 4}
-                textAnchor="end"
-                fill={theme.muted}
-                fontSize={11}
-                fontFamily="inherit"
-              >
-                {v}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* X-axis labels */}
-        {months.map((month, i) => {
-          const x = PAD.left + i * xStep;
-          return (
-            <text
-              key={month}
-              x={x}
-              y={H - 10}
-              textAnchor="middle"
-              fill={theme.muted}
-              fontSize={11}
-              fontFamily="inherit"
-            >
-              {formatMonth(month)}
-            </text>
-          );
-        })}
-
-        {/* Data lines */}
-        {data.map((series, si) => {
-          const color = CHART_COLORS[si % CHART_COLORS.length];
-          const points = series.values
-            .map((v, i) => {
-              const x = PAD.left + i * xStep;
-              const y = PAD.top + chartH - v * yScale;
-              return `${x},${y}`;
-            })
-            .join(" ");
-
-          return (
-            <g key={series.name}>
-              <polyline
-                points={points}
-                fill="none"
-                stroke={color}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {series.values.map((v, i) => {
-                const x = PAD.left + i * xStep;
-                const y = PAD.top + chartH - v * yScale;
-                return (
-                  <circle
-                    key={`${series.name}-${months[i]}`}
-                    cx={x}
-                    cy={y}
-                    r={4}
-                    fill={color}
-                  />
-                );
-              })}
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Legend */}
-      {data.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-            marginTop: "0.75rem",
-          }}
-        >
-          {data.map((series, si) => (
-            <div
-              key={series.name}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 3,
-                  background: CHART_COLORS[si % CHART_COLORS.length],
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "0.78rem",
-                  color: theme.text,
-                  fontWeight: 600,
-                }}
-              >
-                {series.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      <Line data={chartData} options={options} />
     </div>
   );
 }
