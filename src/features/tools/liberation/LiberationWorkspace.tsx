@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import type { AppTheme } from "../../../components/themes";
+import {
+  readCharactersStore,
+  selectCharactersList,
+  type StoredCharacterRecord,
+} from "../../characters/model/charactersStore";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { WikiAttribution } from "../../../components/WikiAttribution";
 import {
@@ -39,9 +44,13 @@ interface SavedState {
 
 const STORAGE_KEY = "liberation-v1";
 
-function loadState(): SavedState | null {
+function storageKeyFor(charName: string | null): string {
+  return charName ? `${STORAGE_KEY}-${charName}` : STORAGE_KEY;
+}
+
+function loadStateFrom(key: string): SavedState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -49,8 +58,8 @@ function loadState(): SavedState | null {
   }
 }
 
-function saveState(state: SavedState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function saveStateTo(key: string, state: SavedState) {
+  localStorage.setItem(key, JSON.stringify(state));
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -390,18 +399,7 @@ interface FormState {
   selections: Record<string, BossSelection>;
 }
 
-function initFormState(): FormState {
-  const saved = loadState();
-  if (saved) {
-    return {
-      type: saved.type,
-      questIdx: saved.currentQuestIdx,
-      currentTraces: saved.currentTraces,
-      genesisPass: saved.genesisPass,
-      startDate: saved.startDate,
-      selections: saved.bosses,
-    };
-  }
+function defaultFormState(): FormState {
   return {
     type: "genesis",
     questIdx: 0,
@@ -412,7 +410,48 @@ function initFormState(): FormState {
   };
 }
 
+function savedToForm(saved: SavedState): FormState {
+  return {
+    type: saved.type,
+    questIdx: saved.currentQuestIdx,
+    currentTraces: saved.currentTraces,
+    genesisPass: saved.genesisPass,
+    startDate: saved.startDate,
+    selections: saved.bosses,
+  };
+}
+
+function formToSaved(form: FormState): SavedState {
+  return {
+    type: form.type,
+    currentQuestIdx: form.questIdx,
+    currentTraces: form.currentTraces,
+    genesisPass: form.genesisPass,
+    startDate: form.startDate,
+    bosses: form.selections,
+  };
+}
+
+function initFormState(): FormState {
+  const saved = loadStateFrom(STORAGE_KEY);
+  if (saved) return savedToForm(saved);
+  return defaultFormState();
+}
+
 export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
+  // Character sync (optional)
+  const characters: StoredCharacterRecord[] = mounted
+    ? selectCharactersList(readCharactersStore())
+    : [];
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
+  const currentStorageKey = storageKeyFor(selectedCharName);
+
   const [form, setForm] = useState<FormState>(initFormState);
 
   const { type, questIdx, currentTraces, genesisPass, startDate, selections } = form;
@@ -423,17 +462,19 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
   const setStartDate = useCallback((v: string) => setForm((f) => ({ ...f, startDate: v })), []);
   const setSelections = useCallback((updater: (prev: Record<string, BossSelection>) => Record<string, BossSelection>) => setForm((f) => ({ ...f, selections: updater(f.selections) })), []);
 
-  // Persist
+  // Persist to current character's storage key
   useEffect(() => {
-    saveState({
-      type,
-      currentQuestIdx: questIdx,
-      currentTraces,
-      genesisPass,
-      startDate,
-      bosses: selections,
-    });
-  }, [type, questIdx, currentTraces, genesisPass, startDate, selections]);
+    saveStateTo(currentStorageKey, formToSaved(form));
+  }, [currentStorageKey, form]);
+
+  const handleCharChange = (charName: string | null) => {
+    // Save current state before switching
+    saveStateTo(currentStorageKey, formToSaved(form));
+    const newKey = storageKeyFor(charName);
+    const saved = loadStateFrom(newKey);
+    setForm(saved ? savedToForm(saved) : defaultFormState());
+    setSelectedCharName(charName);
+  };
 
   const bosses = type === "genesis" ? GENESIS_BOSSES : DESTINY_BOSSES;
   const quests = type === "genesis" ? GENESIS_QUESTS : DESTINY_QUESTS;
@@ -586,6 +627,56 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
             title="Liberation Calculator"
             description="Estimate your Genesis or Destiny liberation completion date."
           />
+
+          {/* Character sync */}
+          {characters.length > 0 && (
+            <div className="fade-in panel-card" style={sectionPanel}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div
+                  className="section-label"
+                  style={{ color: theme.muted, marginBottom: 0 }}
+                >
+                  Character
+                </div>
+                <select
+                  className="tool-input"
+                  value={selectedCharName ?? ""}
+                  onChange={(e) => handleCharChange(e.target.value || null)}
+                  style={{
+                    ...inputStyle,
+                    flex: 1,
+                    maxWidth: "280px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">None (global)</option>
+                  {characters.map((c) => (
+                    <option key={c.characterName} value={c.characterName}>
+                      {c.characterName} (Lv.{c.level} {c.jobName})
+                    </option>
+                  ))}
+                </select>
+                {selectedCharName && (
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      color: theme.accent,
+                    }}
+                  >
+                    Synced to {selectedCharName}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Type toggle */}
           <div className="fade-in panel-card" style={sectionPanel}>
