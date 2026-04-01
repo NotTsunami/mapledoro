@@ -23,6 +23,20 @@ const TOOLS: ToolCard[] = [
     emoji: "💎",
     href: "/tools/boss-crystals",
   },
+  {
+    title: "Liberation Calculator",
+    description:
+      "Track your Genesis and Destiny liberation progress and estimate completion.",
+    emoji: "🗡️",
+    href: "/tools/liberation",
+  },
+  {
+    title: "Symbol Calculator",
+    description:
+      "Track your Arcane and Sacred symbol progress and estimate days to max.",
+    emoji: "🔮",
+    href: "/tools/symbols",
+  },
 ];
 
 function ToolsContent({ theme }: { theme: AppTheme }) {
@@ -32,38 +46,16 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
         .tool-card { transition: background 0.35s ease, border-color 0.35s ease, transform 0.15s ease; }
         .tool-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
         @media (max-width: 860px) {
-          .tools-main { padding: 1rem !important; }
           .tools-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <div
-        className="tools-main"
-        style={{
-          flex: 1,
-          width: "100%",
-          padding: "1.5rem 1.5rem 2rem 2.75rem",
-        }}
-      >
-        <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-          <div
-            style={{
-              fontFamily: "'Fredoka One', cursive",
-              fontSize: "1.5rem",
-              color: theme.text,
-              marginBottom: "0.25rem",
-            }}
-          >
+      <div className="page-content">
+        <div className="page-container">
+          <div className="page-title" style={{ color: theme.text }}>
             Tools
           </div>
-          <div
-            style={{
-              fontSize: "0.85rem",
-              color: theme.muted,
-              fontWeight: 600,
-              marginBottom: "1.5rem",
-            }}
-          >
+          <div className="page-subtitle" style={{ color: theme.muted }}>
             MapleStory calculators and utilities
           </div>
 
@@ -82,11 +74,10 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
                 style={{ textDecoration: "none" }}
               >
                 <div
-                  className="fade-in tool-card"
+                  className="fade-in tool-card panel-card"
                   style={{
                     background: theme.panel,
                     border: `1px solid ${theme.border}`,
-                    borderRadius: "18px",
                     padding: "1.5rem",
                     cursor: "pointer",
                   }}
@@ -95,12 +86,8 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
                     {tool.emoji}
                   </div>
                   <div
-                    style={{
-                      fontFamily: "'Fredoka One', cursive",
-                      fontSize: "1.1rem",
-                      color: theme.text,
-                      marginBottom: "0.5rem",
-                    }}
+                    className="panel-header-title"
+                    style={{ color: theme.text, fontSize: "1.1rem", marginBottom: "0.5rem" }}
                   >
                     {tool.title}
                   </div>

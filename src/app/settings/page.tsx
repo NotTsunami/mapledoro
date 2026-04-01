@@ -2,63 +2,87 @@
 
 /*
   Settings page.
-  Placeholder — will allow users to configure preferences.
+  TODO: Add user preferences here (e.g. default world selection — hook into
+  mapledoro_pref_default_world to set the default directory world filter).
 */
+import { useState } from "react";
 import AppShell from "../../components/AppShell";
 import type { AppTheme } from "../../components/themes";
+import ConfirmModal from "../../components/ConfirmModal";
+
+function hardReset() {
+  const keys = Object.keys(localStorage).filter((k) => k.startsWith("mapledoro_"));
+  keys.forEach((k) => localStorage.removeItem(k));
+  window.location.reload();
+}
 
 function SettingsContent({ theme }: { theme: AppTheme }) {
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   return (
-    <div
-      style={{
-        flex: 1,
-        width: "100%",
-        padding: "1.5rem 1.5rem 2rem 2.75rem",
-      }}
-    >
-      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        <div
-          style={{
-            fontFamily: "'Fredoka One', cursive",
-            fontSize: "1.5rem",
-            color: theme.text,
-            marginBottom: "0.25rem",
-          }}
-        >
+    <div className="page-content">
+      <div className="page-container">
+        <div className="page-title" style={{ color: theme.text }}>
           Settings
         </div>
-        <div
-          style={{
-            fontSize: "0.85rem",
-            color: theme.muted,
-            fontWeight: 600,
-            marginBottom: "1.5rem",
-          }}
-        >
+        <div className="page-subtitle" style={{ color: theme.muted }}>
           Customize your MapleDoro experience
         </div>
 
         <div
-          className="fade-in"
+          className="fade-in panel-card"
           style={{
             background: theme.panel,
             border: `1px solid ${theme.border}`,
-            borderRadius: "18px",
-            padding: "3rem 1.5rem",
-            textAlign: "center",
+            borderRadius: "14px",
+            padding: "1.25rem 1.5rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            flexWrap: "wrap",
+            marginTop: "1rem",
           }}
         >
-          <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚙️</div>
-          <div
+          <div>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: "0.95rem", color: theme.text }}>
+              Reset all data
+            </p>
+            <p style={{ margin: 0, marginTop: "0.2rem", fontSize: "0.82rem", color: theme.muted, fontWeight: 700 }}>
+              Clears all characters, settings, and saved state from this browser.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
             style={{
-              fontSize: "0.9rem",
-              color: theme.muted,
-              fontWeight: 600,
+              border: "1px solid #ef4444",
+              borderRadius: "999px",
+              background: "#fef2f2",
+              color: "#991b1b",
+              fontFamily: "inherit",
+              fontWeight: 800,
+              fontSize: "0.82rem",
+              padding: "0.4rem 0.9rem",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
             }}
           >
-            Settings coming soon.
-          </div>
+            🗑 Reset all data
+          </button>
         </div>
+
+        {showResetConfirm && (
+          <ConfirmModal
+            theme={theme}
+            title="Reset all data?"
+            description="This will delete all your characters, world settings, and saved state from this browser. There is no undo."
+            confirmLabel="Reset everything"
+            confirmDanger
+            onConfirm={hardReset}
+            onCancel={() => setShowResetConfirm(false)}
+          />
+        )}
       </div>
     </div>
   );

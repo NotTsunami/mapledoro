@@ -8,18 +8,17 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import AppTopNav from "./AppTopNav";
 import { NAV_LINKS } from "./nav-links";
-import ThemeSidebar from "./ThemeSidebar";
 import { THEMES, type AppTheme } from "./themes";
 import { useTheme } from "./ThemeContext";
 
 interface AppShellProps {
   currentPath: string;
-  children: (args: { theme: AppTheme; now: Date }) => ReactNode;
+  children: (args: { theme: AppTheme; now: Date | null }) => ReactNode;
 }
 
 export default function AppShell({ currentPath, children }: AppShellProps) {
   const { themeKey, theme, setThemeKey } = useTheme();
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -32,13 +31,12 @@ export default function AppShell({ currentPath, children }: AppShellProps) {
         minHeight: "100dvh",
         background: theme.bg,
         color: theme.text,
-        fontFamily: "'Nunito', sans-serif",
         transition: "all 0.35s ease",
         overflowX: "hidden",
       }}
     >
       <AppTopNav
-        now={now}
+        now={now ?? new Date(0)}
         currentPath={currentPath}
         themeKey={themeKey}
         theme={theme}
@@ -48,12 +46,6 @@ export default function AppShell({ currentPath, children }: AppShellProps) {
       />
 
       <div className="page-shell">
-        <ThemeSidebar
-          theme={theme}
-          themeKey={themeKey}
-          themes={THEMES}
-          onThemeChange={setThemeKey}
-        />
         {children({ theme, now })}
       </div>
 

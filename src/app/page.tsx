@@ -82,8 +82,42 @@ function fmt(ms: number) {
   return [h, m, sc].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-function pct(elapsed: number, total: number) {
-  return `${Math.min(100, Math.max(0, (elapsed / total) * 100)).toFixed(1)}%`;
+
+// -- Ursus 2× meso helpers ----------------------------------------------------
+function getUrsusStatus(now: Date):
+  | { active: true; remaining: number }
+  | { active: false; until: number } {
+  const h = now.getUTCHours();
+  const nowMs = now.getTime();
+
+  const inWindow1 = h >= 1 && h < 5;
+  const inWindow2 = h >= 18 && h < 22;
+
+  if (inWindow1 || inWindow2) {
+    const endHour = inWindow1 ? 5 : 22;
+    const end = new Date(now);
+    end.setUTCHours(endHour, 0, 0, 0);
+    return {
+      active: true as const,
+      remaining: end.getTime() - nowMs,
+    };
+  }
+
+  // Next window start
+  let nextStart: Date;
+  if (h < 1) {
+    nextStart = new Date(now);
+    nextStart.setUTCHours(1, 0, 0, 0);
+  } else if (h >= 5 && h < 18) {
+    nextStart = new Date(now);
+    nextStart.setUTCHours(18, 0, 0, 0);
+  } else {
+    // h >= 22
+    nextStart = new Date(now);
+    nextStart.setUTCDate(nextStart.getUTCDate() + 1);
+    nextStart.setUTCHours(1, 0, 0, 0);
+  }
+  return { active: false as const, until: nextStart.getTime() - nowMs };
 }
 
 function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
@@ -110,23 +144,39 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
       .catch((err) => console.error("Failed to fetch patch notes:", err));
   }, []);
 
-  const daily = getNextReset(now, 0);
-  const weekly = getNextReset(now, 0, 4);
+  const resets = now
+    ? [
+        {
+          label: "Daily Reset",
+          color: theme.accent,
+          countdown: fmt(getNextReset(now, 0).getTime() - now.getTime()),
+        },
+        {
+          label: "Weekly Reset",
+          color: theme.accent,
+          countdown: fmt(getNextReset(now, 0, 4).getTime() - now.getTime()),
+        },
+      ]
+    : [
+        { label: "Daily Reset", color: theme.accent, countdown: PLACEHOLDER_COUNTDOWN },
+        { label: "Weekly Reset", color: theme.accent, countdown: PLACEHOLDER_COUNTDOWN },
+      ];
 
-  const resets = [
-    {
-      label: "Daily Reset",
-      color: theme.accent,
-      countdown: fmt(daily.getTime() - now.getTime()),
-      progress: pct(86400 - (daily.getTime() - now.getTime()) / 1000, 86400),
-    },
-    {
-      label: "Weekly Reset",
-      color: "#f59e0b",
-      countdown: fmt(weekly.getTime() - now.getTime()),
-      progress: pct(604800 - (weekly.getTime() - now.getTime()) / 1000, 604800),
-    },
-  ];
+  const ursus = now ? getUrsusStatus(now) : null;
+  let ursusCountdown: string;
+  if (!ursus) ursusCountdown = PLACEHOLDER_COUNTDOWN;
+  else ursusCountdown = fmt(ursus.active ? ursus.remaining : ursus.until);
+
+  const fmtLocal = (utcHour: number) => {
+    const d = new Date(now ?? 0);
+    d.setUTCHours(utcHour, 0, 0, 0);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+  const tzLabel = now
+    ? (new Intl.DateTimeFormat([], { timeZoneName: "short" })
+        .formatToParts(now)
+        .find((p) => p.type === "timeZoneName")?.value ?? "Local")
+    : "";
 
   const allFilteredPatchNotes =
     patchFilter === "All"
@@ -144,30 +194,18 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
         .panel:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
 
         .row-hover:hover { background: ${theme.accentSoft} !important; }
-        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: blink 2s infinite; }
-        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-        .countdown { font-family: 'Fredoka One', cursive; font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
+        .countdown { font-family: var(--font-heading); font-size: 2rem; line-height: 1; letter-spacing: 0.03em; }
 
         @media (max-width: 860px) {
-          .dashboard-main { padding: 1rem !important; }
           .dashboard-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <div
-        className="dashboard-main"
-        style={{
-          flex: 1,
-          width: "100%",
-          padding: "1.5rem 1.5rem 2rem 2.75rem",
-        }}
-      >
+      <div className="page-content">
         <div
-          className="dashboard-grid"
+          className="page-container dashboard-grid"
           style={{
-            maxWidth: "1100px",
-            margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "1fr 330px",
             gap: "1.25rem",
@@ -175,33 +213,17 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
           }}
         >
           <div
-            className="fade-in panel"
+            className="fade-in panel panel-card"
             style={{
               animationDelay: "0.1s",
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
               minHeight: "400px",
             }}
           >
-            <div
-              style={{
-                padding: "1rem 1.25rem 0.8rem",
-                borderBottom: `1px solid ${theme.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
+            <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
               <span style={{ fontSize: "1.1rem" }}>⭐</span>
-              <span
-                style={{
-                  fontFamily: "'Fredoka One', cursive",
-                  fontSize: "1.15rem",
-                  color: theme.text,
-                }}
-              >
+              <span className="panel-header-title" style={{ color: theme.text }}>
                 Favorite Characters
               </span>
             </div>
@@ -222,53 +244,18 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             <div
-              className="fade-in panel"
+              className="fade-in panel panel-card"
               style={{
                 animationDelay: "0.2s",
                 background: theme.panel,
                 border: `1px solid ${theme.border}`,
-                borderRadius: "18px",
-                overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  padding: "1rem 1.25rem 0.8rem",
-                  borderBottom: `1px solid ${theme.border}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
+              <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
                 <span style={{ fontSize: "1.1rem" }}>⏱</span>
-                <span
-                  style={{
-                    fontFamily: "'Fredoka One', cursive",
-                    fontSize: "1.15rem",
-                    color: theme.text,
-                  }}
-                >
+                <span className="panel-header-title" style={{ color: theme.text }}>
                   Reset Timers
                 </span>
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <div className="live-dot" />
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      color: theme.muted,
-                    }}
-                  >
-                    LIVE
-                  </span>
-                </div>
               </div>
 
               <div style={{ padding: "0.75rem" }}>
@@ -288,51 +275,11 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: "0.7rem",
-                          fontWeight: 800,
-                          color: theme.muted,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                          marginBottom: "6px",
-                        }}
-                      >
+                      <div className="section-label" style={{ color: theme.muted, marginBottom: "6px" }}>
                         {r.label}
                       </div>
                       <div className="countdown" style={{ color: r.color }}>
                         {r.countdown}
-                      </div>
-                    </div>
-                    <div style={{ width: "90px" }}>
-                      <div
-                        style={{
-                          height: "6px",
-                          background: theme.border,
-                          borderRadius: "3px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            background: r.color,
-                            width: r.progress,
-                            borderRadius: "3px",
-                            transition: "width 1s linear",
-                          }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.65rem",
-                          color: theme.muted,
-                          marginTop: "4px",
-                          textAlign: "right",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {r.progress} elapsed
                       </div>
                     </div>
                   </div>
@@ -341,13 +288,80 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
             </div>
 
             <div
-              className="fade-in panel"
+              className="fade-in panel panel-card"
+              style={{
+                animationDelay: "0.25s",
+                background: theme.panel,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <span style={{ fontSize: "1.1rem" }}>🐻</span>
+                <span className="panel-header-title" style={{ color: theme.text }}>
+                  Ursus 2× Meso
+                </span>
+                {ursus?.active && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      color: "#fff",
+                      background: "#10b981",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    ACTIVE
+                  </span>
+                )}
+              </div>
+              <div style={{ padding: "0.75rem" }}>
+                <div
+                  style={{
+                    background: theme.timerBg,
+                    borderRadius: "14px",
+                    padding: "1rem 1.25rem",
+                    border: `1px solid ${theme.border}`,
+                    transition: "background 0.35s, border-color 0.35s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div className="section-label" style={{ color: theme.muted, marginBottom: "6px" }}>
+                      {ursus?.active ? "Ends In" : "Starts In"}
+                    </div>
+                    <div
+                      className="countdown"
+                      style={{ color: theme.accent }}
+                    >
+                      {ursusCountdown}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    fontSize: "0.65rem",
+                    color: theme.muted,
+                    fontWeight: 700,
+                    textAlign: "center",
+                  }}
+                >
+                  {fmtLocal(1)} – {fmtLocal(5)} &amp; {fmtLocal(18)} – {fmtLocal(22)} {tzLabel}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="fade-in panel panel-card"
               style={{
                 animationDelay: "0.3s",
                 background: theme.panel,
                 border: `1px solid ${theme.border}`,
-                borderRadius: "18px",
-                overflow: "hidden",
               }}
             >
               <div
@@ -358,13 +372,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "0.5rem" }}>
                   <span>📋</span>
-                  <span
-                    style={{
-                      fontFamily: "'Fredoka One', cursive",
-                      fontSize: "1.1rem",
-                      color: theme.text,
-                    }}
-                  >
+                  <span className="panel-header-title" style={{ color: theme.text, fontSize: "1.1rem" }}>
                     Patch Notes
                   </span>
                   <a
@@ -410,7 +418,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
                 </div>
               </div>
               {filteredPatchNotes.length === 0 ? (
-                <div style={{ padding: "1.5rem 1.25rem", textAlign: "center", color: theme.muted, fontSize: "0.85rem", fontWeight: 600 }}>
+                <div className="empty-state" style={{ padding: "1.5rem 1.25rem", color: theme.muted, fontWeight: 600 }}>
                   No notes for this filter.
                 </div>
               ) : (

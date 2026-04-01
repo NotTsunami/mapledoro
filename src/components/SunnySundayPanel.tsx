@@ -35,37 +35,26 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
   const upcoming = futureWeeks[0] ?? null;
   const otherWeeks = futureWeeks.slice(1);
 
+  let statusText: string;
+  if (loading) statusText = "Loading...";
+  else if (error) statusText = "Connection error";
+  else if (upcoming) statusText = upcoming.date;
+  else statusText = "No data";
+
   return (
     <div
-      className="fade-in panel"
+      className="fade-in panel panel-card"
       style={{
         animationDelay: "0.4s",
         background: theme.panel,
         border: `1px solid ${theme.border}`,
-        borderRadius: "18px",
-        overflow: "hidden",
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          padding: "0.9rem 1.25rem",
-          borderBottom: `1px solid ${theme.border}`,
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-      >
+      <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
         <span>☀️</span>
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontFamily: "'Fredoka One', cursive",
-              fontSize: "1.1rem",
-              color: theme.text,
-              lineHeight: 1,
-            }}
-          >
+          <div className="panel-header-title" style={{ color: theme.text, lineHeight: 1 }}>
             Sunny Sunday
           </div>
           <div
@@ -76,27 +65,21 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
               marginTop: "2px",
             }}
           >
-            {loading
-              ? "Loading..."
-              : error
-                ? "Connection error"
-                : upcoming
-                  ? upcoming.date
-                  : "No data"}
+            {statusText}
           </div>
         </div>
       </div>
 
       {/* Loading */}
       {loading && (
-        <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: theme.muted, fontSize: "0.85rem" }}>
+        <div className="empty-state" style={{ color: theme.muted }}>
           Loading event data...
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: theme.muted, fontSize: "0.85rem" }}>
+        <div className="empty-state" style={{ color: theme.muted }}>
           <div style={{ marginBottom: "0.5rem" }}>Could not load Sunny Sunday data.</div>
           <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
             Check that your Discord bot is configured.
@@ -212,7 +195,7 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
       )}
 
       {!loading && !error && !upcoming && (
-        <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: theme.muted, fontSize: "0.85rem" }}>
+        <div className="empty-state" style={{ color: theme.muted }}>
           No Sunny Sunday data available.
         </div>
       )}

@@ -9,15 +9,9 @@
   - First visitor after cache expires triggers a Discord fetch; everyone else
     gets the cached response instantly.
 
-  Expected Discord message format (one block per week):
-  ---
-  Saturday, February 28, 2026 4:00 PM (in 5 days)
-  Star force destruction chance reduced by 30% ...
-  30% off Star Force enhancement cost
-
-  Saturday, March 7, 2026 4:00 PM (in 12 days)
-  Treasure Hunter EXP x3
-  ---
+  Supported Discord message formats:
+  1. Discord timestamps:  ### __<t:1774137600:F> (<t:1774137600:R>)__
+  2. Plain-text dates:    Saturday, February 28, 2026 4:00 PM (in 5 days)
 */
 import { fetchDiscordMessages } from "./discord";
 
@@ -56,7 +50,11 @@ export async function fetchSunnySunday(): Promise<SunnySundayPayload | null> {
 
 // -- Parser -----------------------------------------------------------------
 
-const DATE_RE =
+/** Matches a line that is a date header with Discord timestamp <t:UNIX:F> */
+const DISCORD_DATE_LINE_RE = /<t:(\d+):F>/;
+
+/** Plain-text date: Saturday, February 28, 2026 4:00 PM */
+const PLAIN_DATE_RE =
   /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}:\d{2}\s*[AP]M)/i;
 
 const MONTH_MAP: Record<string, number> = {
@@ -79,8 +77,32 @@ function getEventEndUTC(startDate: Date): Date {
   return d;
 }
 
+/** Format a Date as a readable label like "Saturday, March 19, 2026 4:00 PM" */
+function formatDateLabel(d: Date): string {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const hour12 = h % 12 || 12;
+  const ampm = h < 12 ? "AM" : "PM";
+  const minStr = String(m).padStart(2, "0");
+  return `${days[d.getUTCDay()]}, ${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} ${hour12}:${minStr} ${ampm}`;
+}
+
 function parseDateLine(line: string): { label: string; iso: string } | null {
-  const m = line.match(DATE_RE);
+  // Try Discord timestamp format first: <t:UNIX:F>
+  const discordMatch = line.match(DISCORD_DATE_LINE_RE);
+  if (discordMatch) {
+    const unix = parseInt(discordMatch[1], 10);
+    const d = new Date(unix * 1000);
+    return { label: formatDateLabel(d), iso: d.toISOString() };
+  }
+
+  // Fall back to plain-text date format
+  const m = line.match(PLAIN_DATE_RE);
   if (!m) return null;
 
   const [, , monthName, dayStr, yearStr, timePart] = m;
@@ -90,7 +112,6 @@ function parseDateLine(line: string): { label: string; iso: string } | null {
   const day = parseInt(dayStr, 10);
   const year = parseInt(yearStr, 10);
 
-  // Parse 12-hour time
   const tm = timePart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
   let hours = 0;
   let minutes = 0;
@@ -103,9 +124,53 @@ function parseDateLine(line: string): { label: string; iso: string } | null {
   }
 
   const d = new Date(year, month, day, hours, minutes);
-  const label = line.replace(/\s*\(.*?\)\s*$/, "").trim();
+  const parenIdx = line.lastIndexOf("(");
+  let label: string;
+  if (parenIdx >= 0 && line.trimEnd().endsWith(")")) {
+    label = line.slice(0, parenIdx).trim();
+  } else {
+    label = line.trim();
+  }
 
   return { label, iso: d.toISOString() };
+}
+
+/** Strip markdown formatting and Discord timestamp tags from detail lines */
+function cleanDetail(line: string): string {
+  return line
+    .replace(/<t:\d+:[A-Za-z]>/g, "")  // remove Discord timestamps
+    .replace(/\*\*/g, "")               // remove bold **
+    .replace(/^-\s*/, "")               // remove leading "- "
+    .replace(/^\*\s*/, "  • ")          // convert "* " sub-items to indented bullet
+    .trim();
+}
+
+function processMessageLine(
+  line: string,
+  current: SunnySundayWeek | null,
+  weeks: SunnySundayWeek[],
+  now: Date,
+): SunnySundayWeek | null {
+  if (/^##\s/.test(line) && !DISCORD_DATE_LINE_RE.test(line)) return current;
+
+  const parsed = parseDateLine(line);
+  if (parsed) {
+    if (current) weeks.push(current);
+    return {
+      date: parsed.label,
+      dateISO: parsed.iso,
+      details: [],
+      isPast: getEventEndUTC(new Date(parsed.iso)) < now,
+    };
+  }
+
+  if (!line || /^\(.*\)$/.test(line)) return current;
+
+  if (current) {
+    const cleaned = cleanDetail(line);
+    if (cleaned) current.details.push(cleaned);
+  }
+  return current;
 }
 
 export function parseSunnySundayMessage(content: string): SunnySundayWeek[] {
@@ -115,26 +180,7 @@ export function parseSunnySundayMessage(content: string): SunnySundayWeek[] {
   const now = new Date();
 
   for (const raw of lines) {
-    const line = raw.trim();
-
-    const parsed = parseDateLine(line);
-    if (parsed) {
-      if (current) weeks.push(current);
-      current = {
-        date: parsed.label,
-        dateISO: parsed.iso,
-        details: [],
-        isPast: getEventEndUTC(new Date(parsed.iso)) < now,
-      };
-      continue;
-    }
-
-    if (!line) continue;
-    if (/^\(.*\)$/.test(line)) continue;
-
-    if (current) {
-      current.details.push(line);
-    }
+    current = processMessageLine(raw.trim(), current, weeks, now);
   }
 
   if (current) weeks.push(current);

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
 import type { AppTheme } from "../../../components/themes";
+import { ToolHeader } from "../../../components/ToolHeader";
 import {
   BOSSES,
   BOSS_GROUPS,
@@ -103,6 +103,21 @@ function restoreColumns(saved: SavedState): CharacterColumn[] {
   }));
 }
 
+function updateColumnBoss(
+  columns: CharacterColumn[],
+  colIdx: number,
+  bossIdx: number,
+  updater: (b: BossRow) => BossRow,
+): CharacterColumn[] {
+  return columns.map((col, ci) => {
+    if (ci !== colIdx) return col;
+    return {
+      ...col,
+      bosses: col.bosses.map((b, bi) => (bi === bossIdx ? updater(b) : b)),
+    };
+  });
+}
+
 // -- Component ----------------------------------------------------------------
 
 export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
@@ -166,28 +181,14 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
   const toggleBoss = useCallback((colIdx: number, bossIdx: number) => {
     setColumns((prev) =>
-      prev.map((col, ci) => {
-        if (ci !== colIdx) return col;
-        return {
-          ...col,
-          bosses: col.bosses.map((b, bi) =>
-            bi === bossIdx ? { ...b, checked: !b.checked } : b,
-          ),
-        };
-      }),
+      updateColumnBoss(prev, colIdx, bossIdx, (b) => ({ ...b, checked: !b.checked })),
     );
   }, []);
 
   const updatePartySize = useCallback(
     (colIdx: number, bossIdx: number, val: number) => {
       setColumns((prev) =>
-        prev.map((col, ci) => {
-          if (ci !== colIdx) return col;
-          const bosses = col.bosses.map((b, bi) =>
-            bi === bossIdx ? { ...b, partySize: val } : b,
-          );
-          return { ...col, bosses };
-        }),
+        updateColumnBoss(prev, colIdx, bossIdx, (b) => ({ ...b, partySize: val })),
       );
     },
     [],
@@ -297,38 +298,54 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
   const serverMult = server === "heroic" ? 1 : 5;
 
+  // Precompute per-column disabled sets and per-boss striping
+  const disabledSets = columns.map((col) => getDisabledSet(col.bosses));
+  const bossStriped: boolean[] = [];
+  {
+    let groupIdx = 0;
+    let prevGroup = "";
+    for (let bi = 0; bi < BOSSES.length; bi++) {
+      const group = BOSS_GROUPS.find((g) => g.bossIndices.includes(bi));
+      const groupLabel = group ? group.label : BOSSES[bi].name;
+      if (groupLabel !== prevGroup) {
+        if (prevGroup !== "") groupIdx++;
+        prevGroup = groupLabel;
+      }
+      bossStriped.push(groupIdx % 2 !== 0);
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     background: theme.timerBg,
     border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
     padding: "4px 6px",
     color: theme.text,
-    fontFamily: "'Nunito', sans-serif",
     fontSize: "0.78rem",
-    fontWeight: 700,
     width: "42px",
     textAlign: "center",
-    outline: "none",
   };
 
-  const checkboxStyle = (checked: boolean, disabled: boolean): React.CSSProperties => ({
-    width: "18px",
-    height: "18px",
-    borderRadius: "5px",
-    flexShrink: 0,
-    border: `2px solid ${disabled ? theme.border : checked ? theme.accent : theme.border}`,
-    background: disabled
-      ? theme.timerBg
-      : checked
-        ? theme.accent
-        : "transparent",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: disabled ? "not-allowed" : "pointer",
-    transition: "all 0.15s",
-    opacity: disabled ? 0.4 : 1,
-  });
+  const checkboxStyle = (checked: boolean, disabled: boolean): React.CSSProperties => {
+    const borderColor = checked && !disabled ? theme.accent : theme.border;
+    let bg: string;
+    if (disabled) bg = theme.timerBg;
+    else if (checked) bg = theme.accent;
+    else bg = "transparent";
+    return {
+      width: "18px",
+      height: "18px",
+      borderRadius: "5px",
+      flexShrink: 0,
+      border: `2px solid ${borderColor}`,
+      background: bg,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: disabled ? "not-allowed" : "pointer",
+      transition: "all 0.15s",
+      opacity: disabled ? 0.4 : 1,
+    };
+  };
 
   return (
     <>
@@ -354,49 +371,18 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
         }}
       >
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <Link
-              href="/tools"
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 800,
-                color: theme.accent,
-                textDecoration: "none",
-              }}
-            >
-              ← Back to Tools
-            </Link>
-            <div
-              style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: "1.5rem",
-                color: theme.text,
-                marginTop: "0.5rem",
-              }}
-            >
-              Boss Crystal Calculator
-            </div>
-            <div
-              style={{
-                fontSize: "0.8rem",
-                color: theme.muted,
-                fontWeight: 600,
-                marginTop: "0.15rem",
-                lineHeight: 1.5,
-              }}
-            >
-              Select bosses and set party size (1-6). Supports GMS (14 crystals/char).
-            </div>
-          </div>
+          <ToolHeader
+            theme={theme}
+            title="Boss Crystal Calculator"
+            description="Select bosses and set party size (1-6). Supports GMS (14 crystals/char)."
+          />
 
           {/* Controls panel */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
               padding: "1.25rem",
               marginBottom: "1.25rem",
               display: "flex",
@@ -520,7 +506,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
               <span
                 style={{
-                  fontFamily: "'Fredoka One', cursive",
+                  fontFamily: "var(--font-heading)",
                   fontSize: "0.9rem",
                   color: theme.text,
                 }}
@@ -529,7 +515,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
               </span>
               <span
                 style={{
-                  fontFamily: "'Fredoka One', cursive",
+                  fontFamily: "var(--font-heading)",
                   fontSize: "1.1rem",
                   color: theme.accent,
                 }}
@@ -586,12 +572,10 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Boss table */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
               marginBottom: "1.25rem",
             }}
           >
@@ -618,7 +602,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                         background: theme.panel,
                         padding: "0.75rem 1rem",
                         textAlign: "left",
-                        fontFamily: "'Fredoka One', cursive",
+                        fontFamily: "var(--font-heading)",
                         fontSize: "0.85rem",
                         color: theme.text,
                         borderBottom: `1px solid ${theme.border}`,
@@ -631,7 +615,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                       style={{
                         padding: "0.75rem 0.75rem",
                         textAlign: "right",
-                        fontFamily: "'Fredoka One', cursive",
+                        fontFamily: "var(--font-heading)",
                         fontSize: "0.85rem",
                         color: theme.text,
                         borderBottom: `1px solid ${theme.border}`,
@@ -691,7 +675,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                               borderRadius: "8px",
                               padding: "5px 8px",
                               color: theme.text,
-                              fontFamily: "'Nunito', sans-serif",
+                              fontFamily: "var(--font-body)",
                               fontSize: "0.78rem",
                               fontWeight: 700,
                               flex: 1,
@@ -723,22 +707,10 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                  // Compute per-column disabled sets
-                  const disabledSets = columns.map((col) => getDisabledSet(col.bosses));
-
-                  // Compute per-boss-group striping
-                  let groupIdx = 0;
-                  let prevGroup = "";
-                  return BOSSES.map((boss, bi) => {
-                    const group = BOSS_GROUPS.find((g) => g.bossIndices.includes(bi));
-                    const groupLabel = group ? group.label : boss.name;
-                    if (groupLabel !== prevGroup) {
-                      if (prevGroup !== "") groupIdx++;
-                      prevGroup = groupLabel;
-                    }
-                    const striped = groupIdx % 2 !== 0;
+                  {BOSSES.map((boss, bi) => {
+                    const striped = bossStriped[bi];
                     const rowBg = striped ? theme.timerBg : "transparent";
+                    const maxParty = boss.name === "Lotus (Extreme)" ? 2 : 6;
                     return (
                       <tr key={boss.name}>
                         <td
@@ -815,16 +787,15 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                                 <input
                                   type="number"
                                   min={1}
-                                  max={boss.name === "Lotus (Extreme)" ? 2 : 6}
+                                  max={maxParty}
                                   value={row.partySize}
                                   onChange={(e) => {
-                                    const max =
-                                      boss.name === "Lotus (Extreme)" ? 2 : 6;
                                     let v = parseInt(e.target.value) || 1;
                                     if (v < 1) v = 1;
-                                    if (v > max) v = max;
+                                    if (v > maxParty) v = maxParty;
                                     updatePartySize(ci, bi, v);
                                   }}
+                                  className="tool-input"
                                   style={inputStyle}
                                 />
                               </div>
@@ -833,8 +804,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                         })}
                       </tr>
                     );
-                  });
-                })()}
+                  })}
                 </tbody>
               </table>
             </div>
@@ -842,30 +812,14 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
           {/* Results panel */}
           <div
-            className="fade-in"
+            className="fade-in panel-card"
             style={{
               background: theme.panel,
               border: `1px solid ${theme.border}`,
-              borderRadius: "18px",
-              overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "1rem 1.25rem 0.8rem",
-                borderBottom: `1px solid ${theme.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "'Fredoka One', cursive",
-                  fontSize: "1.15rem",
-                  color: theme.text,
-                }}
-              >
+            <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
+              <span className="panel-header-title" style={{ color: theme.text }}>
                 Weekly Income
               </span>
             </div>
@@ -873,14 +827,8 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
             <div style={{ padding: "1rem 1.25rem" }}>
               {/* Per-character income */}
               <div
-                style={{
-                  fontSize: "0.7rem",
-                  fontWeight: 800,
-                  color: theme.muted,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "8px",
-                }}
+                className="section-label"
+                style={{ color: theme.muted }}
               >
                 Bossing
               </div>
@@ -919,7 +867,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
               >
                 <span
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.1rem",
                     color: theme.text,
                   }}
@@ -928,7 +876,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                 </span>
                 <span
                   style={{
-                    fontFamily: "'Fredoka One', cursive",
+                    fontFamily: "var(--font-heading)",
                     fontSize: "1.3rem",
                     color: theme.accent,
                   }}
