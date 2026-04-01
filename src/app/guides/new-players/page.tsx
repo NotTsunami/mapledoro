@@ -192,7 +192,7 @@ function ClassRandomizer({ theme }: { theme: AppTheme }) {
   const [result, setResult] = useState<MapleClass | null>(null);
 
   function roll() {
-    setResult(CLASSES[Math.floor(Math.random() * CLASSES.length)]);
+    setResult(CLASSES[Math.floor(Math.random() * CLASSES.length)]); // eslint-disable-line sonarjs/pseudo-random
   }
 
   return (

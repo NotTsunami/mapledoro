@@ -120,7 +120,9 @@ function getUrsusStatus(now: Date):
   return { active: false as const, until: nextStart.getTime() - nowMs };
 }
 
-function DashboardContent({ theme, now }: { theme: AppTheme; now: Date }) {
+const PLACEHOLDER_COUNTDOWN = "--:--:--";
+
+function DashboardContent({ theme, now }: { theme: AppTheme; now: Date | null }) {
   const [patchNotes, setPatchNotes] = useState<PatchNote[]>(() => readCachedPatchNotes() ?? initialPatchNotes);
   const [patchFilter, setPatchFilter] = useState<PatchFilter>("All");
   const [patchExpanded, setPatchExpanded] = useState(false);
