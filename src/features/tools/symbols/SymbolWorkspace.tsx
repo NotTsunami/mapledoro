@@ -23,6 +23,7 @@ import {
 import { ToolHeader } from "../../../components/ToolHeader";
 import { WikiAttribution } from "../../../components/WikiAttribution";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
+import { SegmentedToggle } from "../../../components/SegmentedToggle";
 import {
   type SymbolType,
   type SymbolArea,
@@ -1196,39 +1197,15 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
             sectionPanel={sectionPanel}
           />
 
-          {/* Type toggle */}
-          <div className="fade-in panel-card" style={sectionPanel}>
-            <div
-              style={{
-                display: "flex",
-                gap: "4px",
-                background: theme.timerBg,
-                borderRadius: "10px",
-                padding: "3px",
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              {(["arcane", "sacred"] as const).map((t) => (
-                <div
-                  key={t}
-                  className="sym-btn"
-                  onClick={() => switchType(t)}
-                  style={{
-                    flex: 1,
-                    padding: "9px 18px",
-                    borderRadius: "8px",
-                    fontSize: "0.88rem",
-                    fontWeight: 800,
-                    textAlign: "center",
-                    color: type === t ? theme.accentText : theme.muted,
-                    background: type === t ? theme.accentSoft : "transparent",
-                  }}
-                >
-                  {t === "arcane" ? "Arcane Symbols" : "Sacred Symbols"}
-                </div>
-              ))}
-            </div>
-          </div>
+          <SegmentedToggle
+            theme={theme}
+            options={["arcane", "sacred"] as const}
+            value={type}
+            labels={{ arcane: "Arcane Symbols", sacred: "Sacred Symbols" }}
+            sectionPanel={sectionPanel}
+            btnClassName="sym-btn"
+            onChange={switchType}
+          />
 
           <OverallProgressPanel theme={theme} sectionPanel={sectionPanel} stats={stats} />
 
