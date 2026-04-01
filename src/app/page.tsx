@@ -122,7 +122,14 @@ function getUrsusStatus(now: Date):
 
 const PLACEHOLDER_COUNTDOWN = "--:--:--";
 
-function DashboardContent({ theme, now }: { theme: AppTheme; now: Date | null }) {
+function DashboardContent({ theme }: { theme: AppTheme }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
   const [patchNotes, setPatchNotes] = useState<PatchNote[]>(() => readCachedPatchNotes() ?? initialPatchNotes);
   const [patchFilter, setPatchFilter] = useState<PatchFilter>("All");
   const [patchExpanded, setPatchExpanded] = useState(false);
@@ -540,7 +547,7 @@ function DashboardContent({ theme, now }: { theme: AppTheme; now: Date | null })
 export default function MapleDoro() {
   return (
     <AppShell currentPath="/">
-      {({ theme, now }) => <DashboardContent theme={theme} now={now} />}
+      {({ theme }) => <DashboardContent theme={theme} />}
     </AppShell>
   );
 }
