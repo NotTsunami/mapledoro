@@ -165,16 +165,26 @@ function panelStyle(theme: AppTheme): CSSProperties {
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
-function ItemIcon({ src, size = 24 }: { src: string; size?: number }) {
+function ItemIcon({ src }: { src: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      style={{ imageRendering: "pixelated", verticalAlign: "middle", flexShrink: 0 }}
-    />
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 38,
+        height: 38,
+        flexShrink: 0,
+        verticalAlign: "middle",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        style={{ imageRendering: "pixelated" }}
+      />
+    </span>
   );
 }
 
@@ -225,7 +235,7 @@ function DropCountBarChart({
             }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: theme.text, fontWeight: 600 }}>
-              <ItemIcon src={item.icon} size={20} />
+              <ItemIcon src={item.icon} />
               {item.name}
             </span>
             <span style={{ color: theme.muted, fontWeight: 700 }}>{count}</span>
@@ -589,7 +599,7 @@ export default function PitchedBossDropsWorkspace({
                         <td style={tdStyle(theme)}>{drop.characterName}</td>
                         <td style={{ ...tdStyle(theme), fontWeight: 600 }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                            {item && <ItemIcon src={item.icon} size={20} />}
+                            {item && <ItemIcon src={item.icon} />}
                             {item?.name ?? drop.itemId}
                           </span>
                         </td>
