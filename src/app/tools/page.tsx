@@ -23,6 +23,13 @@ const CALCULATORS: ToolCard[] = [
     emoji: "💎",
     href: "/tools/boss-crystals",
   },
+  {
+    title: "Star Force Calculator",
+    description:
+      "Estimate the expected meso cost to star force your equipment.",
+    emoji: "⭐",
+    href: "/tools/star-force",
+  },
 ];
 
 const TRACKERS: ToolCard[] = [
