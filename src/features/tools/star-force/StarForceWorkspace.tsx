@@ -112,7 +112,7 @@ function PillGroup<T extends string>({
             borderRadius: "8px",
             fontSize: "0.75rem",
             fontWeight: 700,
-            color: value === o.value ? theme.accentText : theme.muted,
+            color: value === o.value ? "#fff" : theme.muted,
             background: value === o.value ? theme.accent : "transparent",
             userSelect: "none",
           }}
