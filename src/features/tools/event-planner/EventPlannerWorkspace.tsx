@@ -23,6 +23,7 @@ import {
   type StarForceOpts,
   type MvpTier,
 } from "../star-force/star-force-data";
+import { Toggle, PillGroup } from "../shared-ui";
 import {
   EVENT_ITEMS,
   EVENT_ITEMS_BY_ID,
@@ -111,83 +112,6 @@ function computeEntryCost(entry: PlannerEntry, settings: SavedState): EntryCost 
 }
 
 // ── Shared sub-components ────────────────────────────────────────────────────
-
-function Toggle({
-  theme,
-  label,
-  checked,
-  onChange,
-}: {
-  theme: AppTheme;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div
-      className="ep-btn"
-      onClick={() => onChange(!checked)}
-      style={{
-        padding: "8px 16px",
-        borderRadius: "10px",
-        fontSize: "0.8rem",
-        fontWeight: 700,
-        cursor: "pointer",
-        color: checked ? theme.accentText : theme.muted,
-        background: checked ? theme.accentSoft : theme.timerBg,
-        border: `1px solid ${checked ? theme.accent : theme.border}`,
-        userSelect: "none",
-      }}
-    >
-      {checked ? "\u2713 " : ""}
-      {label}
-    </div>
-  );
-}
-
-function PillGroup<T extends string>({
-  theme,
-  options,
-  value,
-  onChange,
-}: {
-  theme: AppTheme;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: "4px",
-        background: theme.timerBg,
-        borderRadius: "10px",
-        padding: "3px",
-        border: `1px solid ${theme.border}`,
-      }}
-    >
-      {options.map((o) => (
-        <div
-          key={o.value}
-          className="ep-btn"
-          onClick={() => onChange(o.value)}
-          style={{
-            padding: "5px 12px",
-            borderRadius: "8px",
-            fontSize: "0.75rem",
-            fontWeight: 700,
-            color: value === o.value ? "#fff" : theme.muted,
-            background: value === o.value ? theme.accent : "transparent",
-            userSelect: "none",
-          }}
-        >
-          {o.label}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function ItemIcon({
   item,
@@ -412,7 +336,7 @@ function ItemSelector({
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    className="ep-btn ep-dropdown-item"
+                    className="tool-btn tool-dropdown-item"
                     onClick={() => {
                       onChange(item.id);
                       setOpen(false);
@@ -626,8 +550,8 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
   return (
     <div style={{ flex: 1, width: "100%", padding: "1.5rem 1.5rem 2rem 2.75rem" }}>
       <style>{`
-        .ep-btn { transition: background 0.15s, border-color 0.15s; cursor: pointer; }
-        .ep-dropdown-item:hover { background: ${theme.timerBg}; }
+        .tool-btn { transition: background 0.15s, border-color 0.15s; cursor: pointer; }
+        .tool-dropdown-item:hover { background: ${theme.timerBg}; }
         @media (max-width: 860px) {
           .ep-form-grid { grid-template-columns: 1fr !important; }
         }
@@ -857,7 +781,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
                   onChange={setFormSafeguard}
                 />
                 <div
-                  className="ep-btn"
+                  className="tool-btn"
                   onClick={handleAdd}
                   style={{
                     padding: "7px 20px",
@@ -994,7 +918,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
                 </div>
               </div>
               <div
-                className="ep-btn"
+                className="tool-btn"
                 onClick={clearEntries}
                 style={{
                   padding: "6px 14px",
@@ -1135,7 +1059,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
                             </div>
                           </div>
                           <div
-                            className="ep-btn"
+                            className="tool-btn"
                             onClick={() => toggleSafeguard(entry.id)}
                             title={entry.safeguard ? "Safeguard ON (15-17)" : "Safeguard OFF"}
                             style={{
@@ -1154,7 +1078,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
                             Safeguard
                           </div>
                           <div
-                            className="ep-btn"
+                            className="tool-btn"
                             onClick={() => removeEntry(entry.id)}
                             style={{
                               width: 24,
