@@ -5,10 +5,18 @@
   Edit this file for dashboard-only content/widgets.
   Shared chrome (top nav/sidebar/themes) lives in src/components/AppShell.tsx.
 */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
+import Link from "next/link";
 import AppShell from "../components/AppShell";
 import SunnySundayPanel from "../components/SunnySundayPanel";
 import type { AppTheme } from "../components/themes";
+import {
+  readCharactersStore,
+  selectCharactersList,
+} from "../features/characters/model/charactersStore";
+import type { StoredCharacterRecord } from "../features/characters/model/charactersStore";
+import { WORLD_NAMES } from "../features/characters/model/constants";
+import CharacterAvatar from "../features/characters/tabs/components/CharacterAvatar";
 
 // -- Patch Notes constants ----------------------------------------------------
 const PATCH_CACHE_KEY = "mapledoro_patch_notes_v1";
@@ -122,7 +130,14 @@ function getUrsusStatus(now: Date):
 
 const PLACEHOLDER_COUNTDOWN = "--:--:--";
 
+const subscribeFn = () => () => undefined;
+
 function DashboardContent({ theme }: { theme: AppTheme }) {
+  const mounted = useSyncExternalStore(subscribeFn, () => true, () => false);
+  const characters: StoredCharacterRecord[] = mounted
+    ? selectCharactersList(readCharactersStore())
+    : [];
+
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -233,22 +248,175 @@ function DashboardContent({ theme }: { theme: AppTheme }) {
             <div className="panel-header" style={{ borderBottom: `1px solid ${theme.border}` }}>
               <span style={{ fontSize: "1.1rem" }}>⭐</span>
               <span className="panel-header-title" style={{ color: theme.text }}>
-                Favorite Characters
+                My Characters
               </span>
+              {characters.length > 0 && (
+                <Link
+                  href="/characters"
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: "0.78rem",
+                    color: theme.accent,
+                    textDecoration: "none",
+                    fontWeight: 800,
+                  }}
+                >
+                  Manage →
+                </Link>
+              )}
             </div>
-            <div
-              style={{
-                padding: "3rem 2rem",
-                textAlign: "center",
-                color: theme.muted,
-              }}
-            >
-              <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>✨</div>
-              <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>No favorites yet</div>
-              <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", opacity: 0.8 }}>
-                Search for characters to add them here!
+
+            {characters.length === 0 ? (
+              <div
+                style={{
+                  padding: "3rem 2rem",
+                  textAlign: "center",
+                  color: theme.muted,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                }}
+              >
+                <div style={{ fontSize: "2rem" }}>✨</div>
+                <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>No characters yet</div>
+                <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>
+                  Add your first character to get started!
+                </div>
+                <Link
+                  href="/characters"
+                  style={{
+                    marginTop: "0.5rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "0.55rem 1.25rem",
+                    borderRadius: "10px",
+                    background: theme.accent,
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: "0.85rem",
+                    textDecoration: "none",
+                    transition: "opacity 0.15s",
+                  }}
+                >
+                  + Add Character
+                </Link>
               </div>
-            </div>
+            ) : (
+              <div style={{ padding: "0.5rem" }}>
+                {characters.map((char) => (
+                  <Link
+                    key={char.characterName.toLowerCase()}
+                    href="/characters"
+                    style={{ textDecoration: "none", display: "block" }}
+                  >
+                    <div
+                      className="row-hover"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        padding: "0.6rem 0.75rem",
+                        borderRadius: "12px",
+                        cursor: "pointer",
+                        transition: "background 0.15s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: "12px",
+                          overflow: "hidden",
+                          background: theme.timerBg,
+                          border: `1px solid ${theme.border}`,
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <CharacterAvatar
+                          src={char.characterImgURL}
+                          alt={char.characterName}
+                          width={48}
+                          height={48}
+                          style={{ objectFit: "contain" }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontSize: "0.9rem",
+                            color: theme.text,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {char.characterName}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "0.75rem",
+                            color: theme.muted,
+                            fontWeight: 600,
+                            marginTop: "1px",
+                          }}
+                        >
+                          Lv. {char.level} {char.jobName}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          fontWeight: 700,
+                          color: theme.accentText,
+                          background: theme.accentSoft,
+                          padding: "2px 8px",
+                          borderRadius: "6px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {WORLD_NAMES[char.worldID] ?? `World ${char.worldID}`}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                <Link
+                  href="/characters"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    margin: "0.25rem 0.75rem 0.5rem",
+                    padding: "0.55rem 0",
+                    borderRadius: "10px",
+                    border: `2px dashed ${theme.border}`,
+                    background: "transparent",
+                    color: theme.muted,
+                    fontWeight: 800,
+                    fontSize: "0.8rem",
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "border-color 0.15s, color 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = theme.accent;
+                    e.currentTarget.style.color = theme.accent;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = theme.border;
+                    e.currentTarget.style.color = theme.muted;
+                  }}
+                >
+                  + Add Character
+                </Link>
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
