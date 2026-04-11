@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { ToolHeader } from "../../../components/ToolHeader";
 import {
@@ -20,6 +20,12 @@ function CharacterCard({
   char,
   income,
   serverMult,
+  isDragging,
+  isDropTarget,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
   onEdit,
   onDelete,
 }: {
@@ -27,6 +33,12 @@ function CharacterCard({
   char: CharacterEntry;
   income: { meso: number; crystals: number };
   serverMult: number;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -37,12 +49,19 @@ function CharacterCard({
   return (
     <div
       className="fade-in bc-card panel-card"
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       style={{
         background: theme.panel,
-        border: `1px solid ${theme.border}`,
+        border: `1px solid ${isDropTarget ? theme.accent : theme.border}`,
         borderRadius: "14px",
         padding: "1.25rem",
         position: "relative",
+        opacity: isDragging ? 0.4 : 1,
+        cursor: "grab",
       }}
     >
       {/* Top-right actions */}
@@ -820,17 +839,47 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
     nameMode, setNameMode, typedName, setTypedName,
     selectedStoreChar, setSelectedStoreChar, availableStoreChars,
     openAdd, proceedToBosses, confirmAdd, openEdit, confirmEdit,
-    deleteCharacter, toggleDialogBoss, setDialogParty, applyPreset,
+    deleteCharacter, reorderCharacters, toggleDialogBoss, setDialogParty, applyPreset,
     clearData, closeDialog, goBackToAddName, exportXlsx,
   } = useBossCrystalsState(mounted);
+
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+    setTimeout(() => setDragIndex(idx), 0);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overIndex !== idx) setOverIndex(idx);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    e.preventDefault();
+    if (dragIndex !== null && dragIndex !== idx) {
+      reorderCharacters(dragIndex, idx);
+    }
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setOverIndex(null);
+  };
 
   // -- Render -----------------------------------------------------------------
 
   return (
     <>
       <style>{`
-        .bc-card { transition: box-shadow 0.15s, transform 0.15s; }
+        .bc-card { transition: box-shadow 0.15s, transform 0.15s, opacity 0.15s, border-color 0.15s; }
         .bc-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+        .bc-card:active { cursor: grabbing; }
         .bc-btn { transition: background 0.15s, transform 0.1s; cursor: pointer; user-select: none; }
         .bc-btn:hover { transform: translateY(-1px); }
         .bc-btn:active { transform: translateY(0); }
@@ -1003,6 +1052,12 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
                 char={char}
                 income={charIncomes[ci]}
                 serverMult={serverMult}
+                isDragging={dragIndex === ci}
+                isDropTarget={overIndex === ci && dragIndex !== null && dragIndex !== ci}
+                onDragStart={(e) => handleDragStart(e, ci)}
+                onDragOver={(e) => handleDragOver(e, ci)}
+                onDrop={(e) => handleDrop(e, ci)}
+                onDragEnd={handleDragEnd}
                 onEdit={() => openEdit(ci)}
                 onDelete={() => deleteCharacter(ci)}
               />
