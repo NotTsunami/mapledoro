@@ -487,10 +487,7 @@ function PatchNotesPanel({ theme }: { theme: AppTheme }) {
       .then(() => {
         if (cancelled) return;
         const cached = readCachedPatchNotes();
-        if (cached) {
-          setPatchNotes(cached);
-          return;
-        }
+        if (cached) setPatchNotes(cached);
         return fetch("/api/patch-notes")
           .then((res) => res.json())
           .then((data) => {
