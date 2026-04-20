@@ -178,7 +178,6 @@ function ItemIcon({ src }: { src: string }) {
         verticalAlign: "middle",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""

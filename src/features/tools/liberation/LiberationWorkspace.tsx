@@ -66,7 +66,6 @@ function BossCard({
           marginBottom: "0.6rem",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={boss.icon}
           alt={boss.name}

@@ -125,7 +125,6 @@ function CharacterCard({
         }}
       >
         {char.imageURL ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={char.imageURL}
             alt={char.name}
@@ -209,7 +208,6 @@ function CharacterCard({
                 padding: "1.5px 0",
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={b.boss.icon}
                 alt=""
@@ -397,7 +395,6 @@ function AddNameDialog({
                       }}
                     >
                       {c.characterImgURL ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={c.characterImgURL}
                           alt={c.characterName}
@@ -677,7 +674,6 @@ function BossSelectionDialog({
                         </span>
                       )}
                     </div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={boss.icon}
                       alt=""

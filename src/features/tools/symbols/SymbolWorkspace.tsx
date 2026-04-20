@@ -226,7 +226,6 @@ function SymbolCardHeader({
         marginBottom: "0.75rem",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={area.icon}
         alt={area.name}
