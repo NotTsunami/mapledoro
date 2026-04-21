@@ -106,11 +106,6 @@ interface TrackerLink {
 
 const TRACKER_LINKS: TrackerLink[] = [
   {
-    emoji: "📋",
-    label: "Daily Tracker",
-    href: (c) => `/tools/dailies?character=${encodeURIComponent(c)}`,
-  },
-  {
     emoji: "🗡️",
     label: "Liberation Tracker",
     href: (c) => `/tools/liberation?character=${encodeURIComponent(c)}`,
