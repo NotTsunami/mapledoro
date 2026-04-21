@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { AppTheme } from "../../../components/themes";
 import { ToolHeader } from "../../../components/ToolHeader";
-import CharacterAvatar from "../../characters/tabs/components/CharacterAvatar";
+import CharacterChip from "../../../components/CharacterChip";
 import { WORLD_NAMES } from "../../characters/model/constants";
 import type { StoredCharacterRecord } from "../../characters/model/charactersStore";
 import {
@@ -253,6 +253,7 @@ function CardHeader({
 }) {
   const pct = progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
   const complete = progress.done >= progress.total && progress.total > 0;
+  const worldName = WORLD_NAMES[char.worldID] ?? `World ${char.worldID}`;
 
   return (
     <>
@@ -264,52 +265,15 @@ function CardHeader({
           marginBottom: "0.75rem",
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "12px",
-            overflow: "hidden",
-            background: theme.timerBg,
-            border: `1px solid ${theme.border}`,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CharacterAvatar
-            src={char.characterImgURL}
-            alt={char.characterName}
-            width={48}
-            height={48}
-            style={{ objectFit: "contain" }}
-          />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: "0.95rem",
-              color: theme.text,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {char.characterName}
-          </div>
-          <div
-            style={{
-              fontSize: "0.72rem",
-              color: theme.muted,
-              fontWeight: 700,
-              marginTop: 1,
-            }}
-          >
-            Lv.{char.level} {char.jobName} · {WORLD_NAMES[char.worldID] ?? `World ${char.worldID}`}
-          </div>
-        </div>
+        <CharacterChip
+          theme={theme}
+          characterImgURL={char.characterImgURL}
+          characterName={char.characterName}
+          subtitle={`Lv.${char.level} ${char.jobName} · ${worldName}`}
+          nameFontSize="0.95rem"
+          subtitleFontSize="0.72rem"
+          subtitleFontWeight={700}
+        />
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
           <button
             type="button"

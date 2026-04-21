@@ -53,7 +53,7 @@ export function loadRemindersState(): RemindersState {
     if (!raw) return defaultRemindersState();
     const parsed = JSON.parse(raw) as Partial<RemindersState>;
     return {
-      enabled: { ...defaultRemindersState().enabled, ...(parsed.enabled ?? {}) },
+      enabled: { ...defaultRemindersState().enabled, ...parsed.enabled },
       dismissed: parsed.dismissed ?? {},
     };
   } catch {

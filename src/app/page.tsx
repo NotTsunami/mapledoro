@@ -17,7 +17,7 @@ import {
 } from "../features/characters/model/charactersStore";
 import type { StoredCharacterRecord } from "../features/characters/model/charactersStore";
 import { WORLD_NAMES } from "../features/characters/model/constants";
-import CharacterAvatar from "../features/characters/tabs/components/CharacterAvatar";
+import CharacterChip from "../components/CharacterChip";
 import { getUrsusStatus } from "../lib/ursus";
 
 // -- Patch Notes constants ----------------------------------------------------
@@ -196,52 +196,12 @@ function CharacterRow({
           color: "inherit",
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "12px",
-            overflow: "hidden",
-            background: theme.timerBg,
-            border: `1px solid ${theme.border}`,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CharacterAvatar
-            src={char.characterImgURL}
-            alt={char.characterName}
-            width={48}
-            height={48}
-            style={{ objectFit: "contain" }}
-          />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: "0.9rem",
-              color: theme.text,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {char.characterName}
-          </div>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: theme.muted,
-              fontWeight: 600,
-              marginTop: "1px",
-            }}
-          >
-            Lv. {char.level} {char.jobName}
-          </div>
-        </div>
+        <CharacterChip
+          theme={theme}
+          characterImgURL={char.characterImgURL}
+          characterName={char.characterName}
+          subtitle={`Lv. ${char.level} ${char.jobName}`}
+        />
       </Link>
       <TrackerIcons theme={theme} char={char} />
       <div
