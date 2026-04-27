@@ -1167,6 +1167,8 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
     marginBottom: "1.25rem",
   };
 
+  if (!mounted) return null;
+
   return (
     <>
       <style>{`

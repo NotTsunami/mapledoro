@@ -870,6 +870,8 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
 
   // -- Render -----------------------------------------------------------------
 
+  if (!mounted) return null;
+
   return (
     <>
       <style>{`
