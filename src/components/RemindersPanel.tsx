@@ -40,7 +40,13 @@ function ReminderCard({
         flex: "1 1 240px",
       }}
     >
-      <div style={{ fontSize: "1.4rem", flexShrink: 0 }}>{def.icon}</div>
+      <div style={{ fontSize: "1.4rem", flexShrink: 0, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {def.icon.startsWith("http") ? (
+          <img src={def.icon} alt="" width={24} height={24} style={{ display: "block" }} />
+        ) : (
+          def.icon
+        )}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{

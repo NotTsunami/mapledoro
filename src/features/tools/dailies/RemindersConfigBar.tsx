@@ -81,7 +81,13 @@ function ReminderToggleRow({
         minWidth: 240,
       }}
     >
-      <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>{def.icon}</span>
+      <span style={{ fontSize: "1.2rem", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+        {def.icon.startsWith("http") ? (
+          <img src={def.icon} alt="" width={20} height={20} style={{ display: "block" }} />
+        ) : (
+          def.icon
+        )}
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{

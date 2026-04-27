@@ -375,7 +375,6 @@ function iconBtn(theme: AppTheme, color: string): React.CSSProperties {
 
 function CardBody({
   theme,
-  charName,
   cs,
   worldTotalFor,
   onToggle,
@@ -383,7 +382,6 @@ function CardBody({
   onEdit,
 }: {
   theme: AppTheme;
-  charName: string;
   cs: CharDailyState;
   worldTotalFor: (counterId: string) => number;
   onToggle: (section: TaskSection, id: string) => void;
@@ -496,9 +494,6 @@ function CardBody({
           )}
         </>
       )}
-      <div style={{ fontSize: "0.65rem", color: theme.muted, marginTop: "0.6rem" }}>
-        Resets at 00:00 UTC · {charName}
-      </div>
     </>
   );
 }
@@ -810,7 +805,6 @@ function CharacterCard({
       {!collapsed && (
         <CardBody
           theme={theme}
-          charName={char.characterName}
           cs={cs}
           worldTotalFor={worldTotalFor}
           onToggle={onToggle}

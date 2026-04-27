@@ -165,8 +165,8 @@ function countCounterSection(
   let total = 0;
   for (const t of tasks) {
     if (!sel.has(t.id)) continue;
-    total += t.max;
-    done += Math.min(t.max, counters[t.id] ?? 0);
+    total += 1;
+    if ((counters[t.id] ?? 0) > 0) done += 1;
   }
   return { done, total };
 }

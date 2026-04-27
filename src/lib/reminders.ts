@@ -26,7 +26,7 @@ export const REMINDER_DEFS: ReminderDef[] = [
   },
   {
     id: "solErda",
-    icon: "🔷",
+    icon: "https://media.maplestorywiki.net/yetidb/Etc_Sol_Erda_Fragment_%28Full_Size%29.png",
     title: "Sol Erda Booster",
     description: "Claim daily Sol Erda Booster rewards.",
   },
