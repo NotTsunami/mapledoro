@@ -11,13 +11,20 @@ It is **advisory**, not a gate. The build gate is still `npm run build` + `npm r
 
 ## How to run
 
+**Default (the development cycle): diff-scoped only.** After a chunk of UI/component work, scan just what you changed:
+
 ```sh
-npm run doctor              # scoped to changes (== react-doctor . --verbose --scope changed)
-npx react-doctor@latest . --verbose          # full-repo audit
-npx react-doctor@latest . --score            # just the number
+npm run doctor              # == react-doctor . --verbose --scope changed
 ```
 
-Prefer `--scope changed` after a chunk of work so you only see what you introduced. Full audits are for deliberate health checks.
+This is the only mode that runs as part of normal development. Never trigger a full-repo scan on your own during the dev cycle — it surfaces dozens of pre-existing findings unrelated to the change and is noise.
+
+**Optional full scan — only on explicit request** (a deliberate health check or audit, when the user asks):
+
+```sh
+npx react-doctor@latest . --verbose          # full-repo audit
+npx react-doctor@latest . --score            # just the score number
+```
 
 ## Triage (critical — the tool is generic, this project is not)
 
