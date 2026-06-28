@@ -24,13 +24,13 @@ Specialized subagents live in `.claude/agents/`. You are the orchestrator: deleg
 | Agent | Use it for |
 | --- | --- |
 | **manifest-finder** | Resolving a game-object name → numeric ID (items, bosses, skills, mobs, familiars) from the manifests. |
-| **wiki-researcher** | Looking up in-game facts from maplestorywiki.net (mechanics, stats, drops). |
+| **game-researcher** | Researching in-game facts and systems — maplestorywiki.net for authoritative mechanics/stats/drops, community resources for insight into how systems work. |
 | **frontend-designer** | Building or polishing UI — applies the `mapledoro-ui` + `frontend-design` skills. |
 | **code-reviewer** | Reviewing recent changes for correctness, simplicity, and convention adherence (read-only). |
 | **build-lint-verifier** | Running `npm run build` + `npm run lint`, fixing failures, confirming green. |
 | **changelog-writer** | Recording a user-facing change in `src/app/changelog/page.tsx`. |
 
-**Delegation playbook:** need an ID → manifest-finder; need a game fact → wiki-researcher; doing UI work → frontend-designer; user-facing change → changelog-writer; after a change → code-reviewer, then build-lint-verifier before declaring done. For small, isolated edits it's fine to act directly.
+**Delegation playbook:** need an ID → manifest-finder; need a game fact or to understand a system → game-researcher; doing UI work → frontend-designer; user-facing change → changelog-writer; after a change → code-reviewer, then build-lint-verifier before declaring done. For small, isolated edits it's fine to act directly.
 
 ## Skills
 
