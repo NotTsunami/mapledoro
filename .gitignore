@@ -14,4 +14,3 @@ next-env.d.ts
 public/cache/
 .cache/
 .claude/settings.local.json
-/.claude/skills/react-doctor

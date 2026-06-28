@@ -15,66 +15,50 @@ MapleDoro — free, open-source MapleStory community web app (character tracking
 
 ## Behavioral Guidelines
 
-**Think first.** State assumptions. Present multiple interpretations rather than silently picking one; flag simpler approaches and push back when warranted.
+**Think first, simplest viable, surgical.** State assumptions and flag simpler approaches; present interpretations rather than silently picking one, and push back when warranted. Write the minimum code that solves the problem — no speculative features, single-use abstractions, or handling for impossible cases. Touch only what was asked, and match existing style.
 
-**Simplicity first.** Minimum code that solves the problem — no speculative features, single-use abstractions, or handling for impossible cases.
+## Agent Council
 
-**Surgical changes.** Touch only what was asked; match existing style.
+Specialized subagents live in `.claude/agents/`. You are the orchestrator: delegate high-token or specialized work to them and keep their verbose output out of this context.
+
+| Agent | Use it for |
+| --- | --- |
+| **manifest-finder** | Resolving a game-object name → numeric ID (items, bosses, skills, mobs, familiars) from the manifests. |
+| **wiki-researcher** | Looking up in-game facts from maplestorywiki.net (mechanics, stats, drops). |
+| **frontend-designer** | Building or polishing UI — applies the `mapledoro-ui` + `frontend-design` skills. |
+| **code-reviewer** | Reviewing recent changes for correctness, simplicity, and convention adherence (read-only). |
+| **build-lint-verifier** | Running `npm run build` + `npm run lint`, fixing failures, confirming green. |
+| **changelog-writer** | Recording a user-facing change in `src/app/changelog/page.tsx`. |
+
+**Delegation playbook:** need an ID → manifest-finder; need a game fact → wiki-researcher; doing UI work → frontend-designer; user-facing change → changelog-writer; after a change → code-reviewer, then build-lint-verifier before declaring done. For small, isolated edits it's fine to act directly.
+
+## Skills
+
+Skills are the shared knowledge/procedure layer (in `.claude/skills/`), loaded on demand by agents and the main thread — the single source of truth so rules aren't duplicated across agents.
+
+| Skill | Use it for |
+| --- | --- |
+| **`mapledoro-ui`** | Project UI conventions: theming system, layout, React-Doctor rules, image policy. Invoke before any component work or review. |
+| **`react-doctor`** | Running the react-doctor scanner (`npm run doctor`) and triaging its findings. Advisory, after UI work. |
+| **`frontend-design`** | Generic aesthetic direction and frontend technique (applied within `mapledoro-ui` constraints). |
 
 ## Changelog
 
-Whenever a change makes a user-facing difference (bug fix, new feature, or behavior change), add a matching entry to the `CHANGELOG` array in `src/app/changelog/page.tsx` as part of the same work. Skip purely internal changes (refactors, tests, tooling, docs) that users would never notice.
-
-- Add changes to the entry for today's date, creating a new entry at the top of the array if one does not exist (newest first).
-- Pick the right `type`: `added` for new tools or capabilities, `changed` for tweaks to existing behavior, `fixed` for bug fixes.
-- Match the tone and structure of existing entries: one short, plain sentence per change, written for players, naming the tool affected (for example "Fixed the Liberation Tracker wiping saved progress in some cases.").
-- Do not use em dashes in entry text.
+User-facing changes (bug fix, feature, behavior change) need a matching entry in the `CHANGELOG` array (`src/app/changelog/page.tsx`); purely internal changes (refactors, tests, tooling, docs) don't. Delegate the entry to the **changelog-writer** agent, which owns the format, tone, type, and date rules.
 
 ## Build & Lint
 
-Both must pass before any implementation is considered complete:
+`npm run build` and `npm run lint` must both pass before any work is complete. Delegate verification to the **build-lint-verifier** agent, which fixes failures and reports only the summary. While writing, avoid the two recurring lint traps: no bare `setState()` in `useEffect` (`react-hooks/set-state-in-effect`), and keep functions under the `sonarjs/cognitive-complexity` cap of 15 (extract cohesive sub-steps; don't micro-shuffle).
 
-```sh
-npm run build
-npm run lint
-```
+## UI Conventions
 
-### Lint Gotchas
-
-- **`react-hooks/set-state-in-effect`** — No bare `setState()` in `useEffect`. Use lazy `useState` initializers, `useSyncExternalStore`, or `useRef` + DOM mutation.
-- **`sonarjs/cognitive-complexity`** — Cap 15. Extract cohesive sub-steps (parser, validator, renderer) or `eslint-disable` if any split would be artificial. Don't micro-shuffle branches.
-
-## React-Doctor Rules
-
-- **Clickable elements:** Prefer a real `<button>` (reset appearance via CSS: `background: none; border: none; padding: 0; font: inherit; text-align: inherit`) — native semantics, focus, and keyboard handling for free. Only fall back to `<div>`/`<span>` with `role="button"`, `tabIndex={0}`, and an `onKeyDown` Enter/Space handler when `<button>` can't work (e.g. nested interactive content).
-- **Minimum font size:** 0.75rem (12px). No sub-12px text anywhere.
-- **Image error fallbacks:** Use dual-render with refs (`display:none` on fallback, swap via `onError`), not `useState` to toggle. Avoids a re-render on error.
-- **No `autoFocus` attribute.** Use a ref callback with a guard: `ref={(el) => { if (el && document.activeElement !== el) el.focus(); }}`.
-- **localStorage writes:** Write synchronously inside state updaters, not in a `useEffect` watching state. Keeps the write atomic with the state change.
-- **Internal links → `next/link`; images → `next/image`** (never raw `<a>`/`<img>` for these).
-- **No unused type exports** — don't `export` types used only in the same file (Knip flags them).
-- **Extract large inline `style={{…}}` objects** into named `CSSProperties` vars outside JSX.
+All project UI rules — styling/theming system, layout conventions, React-Doctor rules, and the game-art image policy — live in the **`mapledoro-ui`** skill. Invoke it before writing or reviewing any component (the **frontend-designer** and **code-reviewer** agents do this automatically). For automated enforcement run the **`react-doctor`** skill (`npm run doctor`); it's advisory — `npm run build` + `npm run lint` remain the gate. To resolve a name→ID for new art, delegate to the **manifest-finder** agent.
 
 ## Key Patterns
 
-**Route pages** (`src/app/tools/<name>/page.tsx`) are thin `"use client"` shells wrapping a workspace in `AppShell`.
-
-**Workspace layout:** outer padding `1.5rem 1.5rem 2rem 2.75rem`, inner `maxWidth: 900, margin: "0 auto"`. `<ToolHeader>` first, then panel sections.
-
-**SSR/client gate:** `useMounted()` (`src/lib/useMounted.ts`) for localStorage reads — false during SSR/hydration, true after mount.
-
-**Shared tool controls:** Form controls split static settings (in global CSS) from dynamic theme colors (inline). Use `className="tool-input"` (text/number/date), `"tool-select"` (dropdowns), `"tool-field-label"` (uppercase field labels), and `"tool-dialog-btn"` (modal action buttons) for shape; pair with `toolStyles(theme)` (`tool-styles.ts`) which returns **colors only** (`background`/`borderColor`/`color`). Context sizing (widths, compact paddings) stays inline. `Field` (uppercase label + control) lives in `shared-ui.tsx` alongside `Toggle`/`PillGroup`. Don't re-add radius/padding/font to per-tool style helpers — extend the class instead.
+**UI structure & styling:** route page shells, workspace layout, the `useMounted()` SSR gate, the theming system, and `shared-ui.tsx` components — see the **`mapledoro-ui`** skill.
 
 **Per-character tool storage:** Per-character tool data (symbols, liberation, hexa skills) is stored in each character's `tools` field within the character store (`mapledoro_characters_store_v1`). Read/write via `characterToolStorage.ts` helpers. Global tool data (dailies, event planner, boss crystals, pitched boss drops, trace restoration) lives in a single `mapledoro_tools_v1` key via `globalToolsStore.ts`.
-
-## Image Policy
-
-Game art comes from the self-hosted **MapleResource API** (`haku.network`), via pure id→URL components in `src/components/ResourceImage.tsx` (`src/lib/mapleResource.ts`): `<ItemIcon>`, `<MobSprite>`, `<SkillIcon>`, `<HexaSkillIcon>`, `<FamiliarSprite>`. Host = `NEXT_PUBLIC_RESOURCE_BASE`; new hosts go in `next.config.mjs` `remotePatterns`.
-
-- **Item icons** default to shadowless `iconRaw.png`; pass `shadow` for framed `icon.png` (inventory only).
-- **Boss icons** have no component — use `bossIconUrl(id)` (`ui/boss` URL); stored as `icon` strings in boss data (`bosses.ts`, `liberation-data.ts`, `astra-data.ts`, `trace-restoration-data.ts`).
-- **Familiars:** `<FamiliarSprite>` is direct-sprite only; mob/card-backed ones use `<MobSprite>`/`<ItemIcon>` per manifest `spriteFrom`.
-- **Finding IDs:** search committed `manifests/v<version>/<type>.json` by `name`, hardcode the id with a name comment. No name→ID map; manifests are dev-only, never bundled (`item.json` ~17 MB).
 
 ## Feature Docs
 

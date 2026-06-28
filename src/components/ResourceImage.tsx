@@ -4,7 +4,7 @@ import { resourceImageUrl } from "../lib/mapleResource";
 
 // Reusable templates for game art served by the MapleResource API (haku.network).
 // One pure id->URL builder per resource type. IDs come from the committed manifests
-// in `manifests/v<version>/`; see CLAUDE.md "Image Policy".
+// in `manifests/v<version>/`; see the image policy in the `mapledoro-ui` skill.
 
 interface ResourceIconProps {
   id: string;

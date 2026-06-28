@@ -1,6 +1,6 @@
 // Builds image URLs served by the self-hosted MapleResource API (haku.network).
 // IDs are looked up by hand from the committed manifests in `manifests/v<version>/`;
-// see CLAUDE.md "Image Policy". Override the host with NEXT_PUBLIC_RESOURCE_BASE.
+// see the image policy in the `mapledoro-ui` skill. Override the host with NEXT_PUBLIC_RESOURCE_BASE.
 
 export type ResourceType = "erda-skill" | "familiar" | "hexa-skill" | "item" | "mob" | "skill";
 
