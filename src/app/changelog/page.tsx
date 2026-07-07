@@ -75,6 +75,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-13",
     changes: [
+      { type: "added", text: "Added the Stat Optimizer, a bossing-focused tool that recommends your optimal Hyper Stat allocation and HEXA Stat core line setup based on your tracked character's stats." },
       { type: "added", text: "The EXP Calculator Daily / Weekly Calculator now takes Luxe Sauna / MVP Resort hours, with the sauna's EXP table in the Resources tab." },
     ],
   },

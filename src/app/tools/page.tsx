@@ -46,6 +46,13 @@ const CALCULATORS: ToolCard[] = [
     iconType: "item",
     href: "/tools/exp-calculator",
   },
+  {
+    title: "Stat Optimizer",
+    description:
+      "Find the optimal Hyper Stat and HEXA Stat allocation for bossing, using your tracked character's stats.",
+    icon: "🎯",
+    href: "/tools/stat-optimizer",
+  },
 ];
 
 const PLANNERS: ToolCard[] = [
