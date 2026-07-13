@@ -52,6 +52,9 @@ the % and ×21 flat buckets). If the greedy scores below the current allocation,
 the current one is kept and reported as `alreadyOptimal`. Points budget seeds
 from `availableHyperPoints(level)` (scouter's closed form, 1699 at 300) minus
 points the stored preset spends on untracked lines (HP, Arcane Power, ...).
+There is no separate budget input: the workspace's level field (disabled while
+a stored character is selected) recomputes the budget from the closed form on
+edit, so the untracked-line deduction survives only for stored characters.
 
 ## HEXA Stat (scouter's per-line greedy, `hexa-stat-engine.ts`)
 Levels are fixed (RNG-rolled in-game); only the stat TYPE per line is assigned.

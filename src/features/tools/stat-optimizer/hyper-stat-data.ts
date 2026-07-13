@@ -47,7 +47,7 @@ export const HYPER_LINES: HyperLineDef[] = [
   { id: "damage", label: "Damage", unit: "percent", values: linear(3) },
   { id: "critDamage", label: "Critical Damage", unit: "percent", values: linear(1) },
   { id: "critRate", label: "Critical Rate", unit: "percent", values: [1, 2, 3, 4, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25] },
-  { id: "ignoreDefense", label: "Ignore Enemy DEF", unit: "percent", values: linear(3) },
+  { id: "ignoreDefense", label: "Ignore Defense", unit: "percent", values: linear(3) },
 ];
 
 export const HYPER_VALUES: Record<HyperLineId, number[]> = Object.fromEntries(

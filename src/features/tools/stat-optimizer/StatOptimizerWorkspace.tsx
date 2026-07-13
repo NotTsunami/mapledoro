@@ -1,13 +1,14 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
 import { HexaSkillIcon } from "../../../components/ResourceImage";
+import { SegmentedToggle } from "../../../components/SegmentedToggle";
 import type { AppTheme } from "../../../components/themes";
-import { PillGroup } from "../shared-ui";
-import { toolStyles } from "../tool-styles";
+import { ToolNumberInput } from "../shared-ui";
+import { toolStyles, type ToolStyles } from "../tool-styles";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import {
   getMainStatLabel,
@@ -39,7 +40,6 @@ const STAT_NAME: Record<MainStatId, string> = { str: "STR", dex: "DEX", int: "IN
 const statName = (id: MainStatId | null): string => (id ? STAT_NAME[id] : "");
 
 const SCALAR_FIELDS: { key: ScalarInputKey; label: string }[] = [
-  { key: "level", label: "Character Level" },
   { key: "damagePct", label: "Damage %" },
   { key: "bossDamagePct", label: "Boss Damage %" },
   { key: "critRatePct", label: "Critical Rate %" },
@@ -68,10 +68,14 @@ const CORE_GRID_CSS = `
 
 // ── Small shared pieces ───────────────────────────────────────────────────────
 
-function PanelTitle({ theme, title, subtitle }: { theme: AppTheme; title: string; subtitle?: string }) {
+function PanelTitle({ theme, title, subtitle, aside }: { theme: AppTheme; title: string; subtitle?: string; aside?: ReactNode }) {
   return (
     <div style={{ marginBottom: "1rem" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", color: theme.text }}>{title}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
+        {/* fontWeight pinned so the heading keeps the weight the <div> version inherited */}
+        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", fontWeight: 400, color: theme.text, margin: 0 }}>{title}</h2>
+        {aside}
+      </div>
       {subtitle && (
         <div style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 600, marginTop: "0.3rem", lineHeight: 1.4 }}>
           {subtitle}
@@ -95,9 +99,9 @@ function GainBanner({
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
       {alreadyOptimal ? (
-        <span style={{ fontSize: "1.5rem", fontWeight: 800, color: theme.accent }}>Already optimized</span>
+        <span style={{ fontSize: "1.5rem", fontWeight: 800, color: theme.accentText }}>Already optimized</span>
       ) : (
-        <span style={{ fontSize: "2rem", fontWeight: 800, color: theme.accent }}>
+        <span style={{ fontSize: "2rem", fontWeight: 800, color: theme.accentText }}>
           {gainPct >= 0 ? "+" : ""}{gainPct.toFixed(2)}%
         </span>
       )}
@@ -116,17 +120,35 @@ function WarnNote({ theme, text }: { theme: AppTheme; text: string }) {
   );
 }
 
-function NumberInput({ theme, value, onChange, max, width }: { theme: AppTheme; value: number; onChange: (v: number) => void; max: number; width?: number | string }) {
+function NumberInput({
+  theme,
+  value,
+  onChange,
+  max,
+  width,
+  ariaLabel,
+  disabled,
+}: {
+  theme: AppTheme;
+  value: number;
+  onChange: (v: number) => void;
+  max: number;
+  width?: number | string;
+  ariaLabel: string;
+  disabled?: boolean;
+}) {
   const styles = toolStyles(theme);
   return (
-    <input
-      className="tool-input"
-      type="number"
-      style={{ ...styles.inputStyle, width: width ?? "100%", textAlign: "center" }}
-      value={String(value)}
-      onFocus={(e) => e.currentTarget.select()}
+    <ToolNumberInput
+      value={value}
+      min={0}
+      max={max}
+      integer
+      aria-label={ariaLabel}
+      disabled={disabled}
       onKeyDown={replaceZeroOnDigit}
-      onChange={(e) => onChange(Math.max(0, Math.min(max, Number(e.target.value) || 0)))}
+      onCommit={onChange}
+      style={{ ...styles.inputStyle, width: width ?? "100%", textAlign: "center", opacity: disabled ? 0.55 : 1 }}
     />
   );
 }
@@ -158,14 +180,13 @@ function TripleFieldRow({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.5rem" }}>
         {TRIPLE_PARTS.map(({ part, label: partLabel }) => (
           <div key={part}>
-            <input
-              className="tool-input"
-              type="number"
+            <ToolNumberInput
+              min={0}
+              value={value[part]}
+              aria-label={`${label} ${partLabel}`}
               style={{ ...styles.inputStyle, width: "100%" }}
-              value={String(value[part])}
-              onFocus={(e) => e.currentTarget.select()}
               onKeyDown={replaceZeroOnDigit}
-              onChange={(e) => onChange(part, Number(e.target.value) || 0)}
+              onCommit={(v) => onChange(part, v)}
             />
             <div style={{ fontSize: "0.75rem", fontWeight: 600, color: theme.muted, marginTop: "0.15rem" }}>{partLabel}</div>
           </div>
@@ -216,15 +237,14 @@ function StatsPanel({
       <div style={gridTwo}>
         {SCALAR_FIELDS.map((f) => (
           <div key={f.key}>
-            <div className="tool-field-label" style={styles.labelStyle}>{f.label}</div>
-            <input
-              className="tool-input"
-              type="number"
+            <label className="tool-field-label" htmlFor={`stat-opt-${f.key}`} style={styles.labelStyle}>{f.label}</label>
+            <ToolNumberInput
+              id={`stat-opt-${f.key}`}
+              min={0}
+              value={inputs[f.key]}
               style={{ ...styles.inputStyle, width: "100%" }}
-              value={String(inputs[f.key])}
-              onFocus={(e) => e.currentTarget.select()}
               onKeyDown={replaceZeroOnDigit}
-              onChange={(e) => onScalarChange(f.key, Number(e.target.value) || 0)}
+              onCommit={(v) => onScalarChange(f.key, v)}
             />
           </div>
         ))}
@@ -249,6 +269,20 @@ function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile): string {
 // Shared columns so the header and every row align without magic widths.
 const HYPER_GRID = "minmax(0, 1fr) 58px 64px";
 
+// In-game hyper stat window order. Display only: HYPER_LINES keeps scouter's
+// greedy iteration order, which the engine's tie-breaking depends on.
+const HYPER_DISPLAY_ORDER: HyperLineId[] = [
+  "mainStat",
+  "subStat",
+  "subStat2",
+  "critRate",
+  "critDamage",
+  "ignoreDefense",
+  "damage",
+  "bossDamage",
+  "attack",
+];
+
 function HyperLineRow({
   theme,
   label,
@@ -266,8 +300,8 @@ function HyperLineRow({
   return (
     <div style={{ display: "grid", gridTemplateColumns: HYPER_GRID, alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.7rem", background: theme.timerBg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
       <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text, minWidth: 0 }}>{label}</span>
-      <NumberInput theme={theme} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} />
-      <span style={{ textAlign: "right", fontSize: "0.85rem", fontWeight: 800, color: changed ? theme.accent : theme.muted }}>
+      <NumberInput theme={theme} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} ariaLabel={`${label} current level`} />
+      <span style={{ textAlign: "right", fontSize: "0.85rem", fontWeight: 800, color: changed ? theme.accentText : theme.muted }}>
         {changed ? `→ ${recommended}` : recommended}
       </span>
     </div>
@@ -279,8 +313,6 @@ function HyperPanel({
   profile,
   result,
   alloc,
-  availablePoints,
-  onAvailablePointsChange,
   onLevelChange,
   tracked,
 }: {
@@ -288,16 +320,23 @@ function HyperPanel({
   profile: ClassDamageProfile;
   result: HyperResult;
   alloc: HyperAllocation;
-  availablePoints: number;
-  onAvailablePointsChange: (value: number) => void;
   onLevelChange: (id: HyperLineId, level: number) => void;
   tracked: boolean;
 }) {
   const styles = toolStyles(theme);
-  const rows = HYPER_LINES.filter((line) => line.id !== "subStat2" || profile.subStat2 !== null);
+  const rows = HYPER_DISPLAY_ORDER.filter((id) => id !== "subStat2" || profile.subStat2 !== null);
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
-      <PanelTitle theme={theme} title="Hyper Stat" />
+      {/* The budget itself comes from the level input in the controls row. */}
+      <PanelTitle
+        theme={theme}
+        title="Hyper Stat"
+        aside={
+          <span style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
+            {result.pointsUsed} / {result.pointsAvailable} points used
+          </span>
+        }
+      />
       <GainBanner
         theme={theme}
         gainPct={result.gainPct}
@@ -310,29 +349,20 @@ function HyperPanel({
           text="No Hyper Stat allocation is tracked for this character. Your stats above already include your in-game hyper stats, so enter your current levels below (or set them in character setup) to keep the gain accurate."
         />
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.85rem", flexWrap: "wrap" }}>
-        <div>
-          <div className="tool-field-label" style={styles.labelStyle}>Available hyper points</div>
-          <NumberInput theme={theme} value={availablePoints} onChange={onAvailablePointsChange} max={9999} width={120} />
-        </div>
-        <div style={{ textAlign: "right", fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
-          {result.pointsUsed} / {result.pointsAvailable} points used
-        </div>
-      </div>
       <div style={{ display: "grid", gridTemplateColumns: HYPER_GRID, gap: "0.6rem", padding: "0 0.7rem", marginBottom: "0.4rem" }}>
         <span className="tool-field-label" style={styles.labelStyle}>Stat</span>
         <span className="tool-field-label" style={{ ...styles.labelStyle, textAlign: "center" }}>Now</span>
         <span className="tool-field-label" style={{ ...styles.labelStyle, textAlign: "right" }}>Best</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-        {rows.map((line) => (
+        {rows.map((id) => (
           <HyperLineRow
-            key={line.id}
+            key={id}
             theme={theme}
-            label={hyperLineLabel(line.id, profile)}
-            current={alloc[line.id]}
-            recommended={result.allocation[line.id]}
-            onChange={(v) => onLevelChange(line.id, v)}
+            label={hyperLineLabel(id, profile)}
+            current={alloc[id]}
+            recommended={result.allocation[id]}
+            onChange={(v) => onLevelChange(id, v)}
           />
         ))}
       </div>
@@ -359,6 +389,7 @@ function LineLevelBar({ theme, level }: { theme: AppTheme; level: number }) {
 function HexaLineRow({
   theme,
   profile,
+  coreLabel,
   role,
   type,
   level,
@@ -368,6 +399,7 @@ function HexaLineRow({
 }: {
   theme: AppTheme;
   profile: ClassDamageProfile;
+  coreLabel: string;
   role: CoreLineKey;
   type: HexaStatType | "";
   level: number;
@@ -382,18 +414,26 @@ function HexaLineRow({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isPrimary ? theme.accent : theme.muted }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isPrimary ? theme.accentText : theme.muted }}>
           {HEXA_LINE_LABELS[role]}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: theme.muted }}>Lv</span>
-          <NumberInput theme={theme} value={level} onChange={onLevelChange} max={HEXA_MAX_LINE_LEVEL} width={46} />
+          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>Lv</span>
+          <NumberInput
+            theme={theme}
+            value={level}
+            onChange={onLevelChange}
+            max={HEXA_MAX_LINE_LEVEL}
+            width={46}
+            ariaLabel={`${coreLabel} ${HEXA_LINE_LABELS[role]} level`}
+          />
         </div>
       </div>
       <select
         className="tool-select"
         style={{ ...styles.selectStyle, width: "100%" }}
         value={type}
+        aria-label={`${coreLabel} ${HEXA_LINE_LABELS[role]} stat`}
         onChange={(e) => onTypeChange(e.target.value as HexaStatType | "")}
       >
         <option value="">Select…</option>
@@ -403,7 +443,7 @@ function HexaLineRow({
       </select>
       <LineLevelBar theme={theme} level={level} />
       {rec && (
-        <div style={{ fontSize: "0.76rem", fontWeight: 700, color: theme.accent }}>
+        <div style={{ fontSize: "0.76rem", fontWeight: 700, color: theme.accentText }}>
           ★ Best: {hexaTypeLabel(rec, profile)}{recBonus ? ` (${recBonus})` : ""}
         </div>
       )}
@@ -449,12 +489,17 @@ function CoreCard({
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           {core.unlocked && (
-            <span className="tool-badge" style={{ color: maxed ? "#fff" : theme.accent, background: maxed ? theme.accent : theme.accentSoft }}>
+            <span className="tool-badge" style={{ color: maxed ? theme.accentOn : theme.accentText, background: maxed ? theme.accent : theme.accentSoft }}>
               {total}/{HEXA_CORE_TOTAL}
             </span>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.76rem", color: theme.muted, fontWeight: 700, cursor: "pointer" }}>
-            <input type="checkbox" checked={core.unlocked} onChange={(e) => onUnlockedChange(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={core.unlocked}
+              style={{ accentColor: theme.accent }}
+              onChange={(e) => onUnlockedChange(e.target.checked)}
+            />
             Unlocked
           </label>
         </div>
@@ -469,6 +514,7 @@ function CoreCard({
               <HexaLineRow
                 theme={theme}
                 profile={profile}
+                coreLabel={CORE_LABELS[index]}
                 role={role}
                 type={line.type}
                 level={line.level}
@@ -545,10 +591,8 @@ function HexaPanel({
 
 // ── Workspace ─────────────────────────────────────────────────────────────────
 
-const MODE_OPTIONS: { value: OptimizerMode; label: string }[] = [
-  { value: "hyper", label: "Hyper Stat" },
-  { value: "hexa", label: "HEXA Stat" },
-];
+const MODE_OPTIONS = ["hyper", "hexa"] as const;
+const MODE_LABELS: Record<OptimizerMode, string> = { hyper: "Hyper Stat", hexa: "HEXA Stat" };
 
 type StatOptimizerState = ReturnType<typeof useStatOptimizer>;
 
@@ -577,15 +621,29 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
         ) : (
           <div style={{ flex: "1 1 320px", fontSize: "0.82rem", color: theme.muted, fontWeight: 600, lineHeight: 1.5 }}>
             Enter your stats below, or add a character in{" "}
-            <Link href="/characters" style={{ color: theme.accent }}>Characters</Link> to autopopulate.
+            <Link href="/characters" style={{ color: theme.accentText }}>Characters</Link> to autopopulate.
           </div>
         )}
         <div style={{ display: "flex", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
           <div>
-            <div className="tool-field-label" style={styles.labelStyle}>Boss DEF %</div>
-            <NumberInput theme={theme} value={opt.bossPdrPct} onChange={opt.setBossPdr} max={999} width={96} />
+            <div className="tool-field-label" style={styles.labelStyle}>Level</div>
+            {/* A stored character's level (and hyper-point budget, which deducts
+                untracked-line spending) comes from the store; only standalone
+                entry edits it, recomputing the budget from the closed form. */}
+            <NumberInput
+              theme={theme}
+              value={opt.state.inputs.level}
+              onChange={opt.setLevel}
+              max={300}
+              width={72}
+              ariaLabel="Character level"
+              disabled={opt.selectedCharName !== null}
+            />
           </div>
-          <PillGroup theme={theme} options={MODE_OPTIONS} value={opt.mode} onChange={opt.setMode} />
+          <div>
+            <div className="tool-field-label" style={styles.labelStyle}>Boss DEF %</div>
+            <NumberInput theme={theme} value={opt.bossPdrPct} onChange={opt.setBossPdr} max={999} width={96} ariaLabel="Boss DEF %" />
+          </div>
         </div>
       </div>
     </div>
@@ -614,8 +672,6 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
           profile={state.profile}
           result={opt.hyperResult}
           alloc={state.hyperAlloc}
-          availablePoints={state.availablePoints}
-          onAvailablePointsChange={opt.setAvailablePoints}
           onLevelChange={opt.setHyperLevel}
           tracked={hyperTracked(state.hyperAlloc)}
         />
@@ -634,8 +690,21 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
   );
 }
 
+/** Empty panels shaped like the mounted layout, so the page doesn't pop or
+ *  jump while waiting for the localStorage-backed content. */
+function LoadingPlaceholder({ styles }: { styles: ToolStyles }) {
+  return (
+    <>
+      <div className="panel-card" style={{ ...styles.sectionPanel, height: 92 }} />
+      <div className="panel-card" style={{ ...styles.sectionPanel, height: 560 }} />
+      <div className="panel-card" style={{ ...styles.sectionPanel, height: 520 }} />
+    </>
+  );
+}
+
 export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
   const opt = useStatOptimizer();
+  const styles = toolStyles(theme);
 
   return (
     <div className="page-content">
@@ -647,7 +716,17 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
           description="Find the best Hyper Stat and HEXA Stat allocation for bossing, valued against the boss defense you set."
         />
 
-        {opt.mounted ? <StatOptimizerContent theme={theme} opt={opt} /> : null}
+        <SegmentedToggle
+          theme={theme}
+          options={MODE_OPTIONS}
+          labels={MODE_LABELS}
+          value={opt.mode}
+          ariaLabel="Optimizer"
+          onChange={opt.setMode}
+          sectionPanel={styles.sectionPanel}
+        />
+
+        {opt.mounted ? <StatOptimizerContent theme={theme} opt={opt} /> : <LoadingPlaceholder styles={styles} />}
       </div>
     </div>
   );

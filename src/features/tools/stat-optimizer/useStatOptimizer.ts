@@ -16,14 +16,14 @@ import {
   type TripleStat,
 } from "./damage-formula";
 import { optimizeHyper, type HyperAllocation, type HyperResult } from "./hyper-stat-engine";
-import type { HyperLineId } from "./hyper-stat-data";
+import { availableHyperPoints, type HyperLineId } from "./hyper-stat-data";
 import { optimizeHexa, type HexaCore, type HexaLine, type HexaResult } from "./hexa-stat-engine";
 import { emptyCharacterSeed, seedFromCharacter, type CharacterSeed } from "./stat-optimizer-character";
 
 export type OptimizerMode = "hyper" | "hexa";
-/** Editable single-number stat inputs (the triples are edited via setTriplePart). */
+/** Editable single-number stat inputs (the triples are edited via setTriplePart;
+ *  level has its own setter because it also drives the hyper-point budget). */
 export type ScalarInputKey =
-  | "level"
   | "damagePct"
   | "bossDamagePct"
   | "critRatePct"
@@ -89,8 +89,15 @@ export function useStatOptimizer() {
     }));
   }, []);
 
-  const setAvailablePoints = useCallback((value: number) => {
-    setState((prev) => ({ ...prev, availablePoints: value }));
+  // Only reachable in standalone mode (the level input is disabled while a
+  // stored character is selected), so resetting the budget to the closed form
+  // never stomps a seeded budget that deducts untracked-line spending.
+  const setLevel = useCallback((level: number) => {
+    setState((prev) => ({
+      ...prev,
+      inputs: { ...prev.inputs, level },
+      availablePoints: availableHyperPoints(level),
+    }));
   }, []);
 
   const setHyperLevel = useCallback((id: HyperLineId, level: number) => {
@@ -124,7 +131,7 @@ export function useStatOptimizer() {
         availablePoints: state.availablePoints,
         bossPdrPct,
       }),
-    [state, bossPdrPct],
+    [state.profile, state.inputs, state.hyperAlloc, state.availablePoints, bossPdrPct],
   );
 
   const hexaResult: HexaResult = useMemo(
@@ -135,7 +142,7 @@ export function useStatOptimizer() {
         cores: state.cores,
         bossPdrPct,
       }),
-    [state, bossPdrPct],
+    [state.profile, state.inputs, state.cores, bossPdrPct],
   );
 
   return {
@@ -150,7 +157,7 @@ export function useStatOptimizer() {
     setBossPdr,
     setScalarInput,
     setTriplePart,
-    setAvailablePoints,
+    setLevel,
     setHyperLevel,
     setCoreUnlocked,
     setCoreLine,
