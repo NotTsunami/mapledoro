@@ -8,7 +8,7 @@ import type { CSSProperties } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import AppShell from "../../components/AppShell";
-import { ItemIcon } from "../../components/ResourceImage";
+import { ItemIcon, SkillIcon } from "../../components/ResourceImage";
 import type { AppTheme } from "../../components/themes";
 
 type ToolCard = {
@@ -16,7 +16,11 @@ type ToolCard = {
   description: string;
   href: Route;
   comingSoon?: boolean;
-} & ({ iconType?: "emoji"; icon: string } | { iconType: "item"; itemId: string });
+} & (
+  | { iconType?: "emoji"; icon: string }
+  | { iconType: "item"; itemId: string }
+  | { iconType: "skill"; skillId: string }
+);
 
 const CALCULATORS: ToolCard[] = [
   {
@@ -50,7 +54,8 @@ const CALCULATORS: ToolCard[] = [
     title: "Stat Optimizer",
     description:
       "Find the optimal Hyper Stat and HEXA Stat allocation for bossing, using your tracked character's stats.",
-    icon: "🎯",
+    skillId: "500071000", // HEXA Stats
+    iconType: "skill",
     href: "/tools/stat-optimizer",
   },
 ];
@@ -173,12 +178,16 @@ const rowArrowBase: CSSProperties = {
   fontSize: "0.9rem",
 };
 
+function toolIcon(tool: ToolCard) {
+  if (tool.iconType === "item") return <ItemIcon id={tool.itemId} size={26} />;
+  if (tool.iconType === "skill") return <SkillIcon id={tool.skillId} size={26} />;
+  return tool.icon;
+}
+
 function ToolRow({ tool, theme }: { tool: ToolCard; theme: AppTheme }) {
   const inner = (
     <>
-      <div style={{ ...iconTileBase, background: theme.bg }}>
-        {tool.iconType === "item" ? <ItemIcon id={tool.itemId} size={26} /> : tool.icon}
-      </div>
+      <div style={{ ...iconTileBase, background: theme.bg }}>{toolIcon(tool)}</div>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <span style={{ fontWeight: 700, fontSize: "0.92rem", color: theme.text }}>
