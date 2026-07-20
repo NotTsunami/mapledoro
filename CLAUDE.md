@@ -73,21 +73,7 @@ Same spirit for reads: large data modules (`hexa-classes.ts`, `exp-monsters.ts`,
 
 ## Color & Contrast
 
-Themes live in `src/components/themes.ts`: a `ColorModeBase` (light/dark neutrals) merged with one of 12 `ACCENT_THEMES` by `composeTheme()`. **The palette is tuned to WCAG AA (4.5:1) and must stay there.** Odd-looking hex values are OKLCH contrast fits; don't round them. Full rationale (luminance windows, dead zone) lives in the `themes.ts` comments.
-
-Three accent tokens, each with one job:
-
-| Token | Role | Rule |
-|---|---|---|
-| `accent` | Fills and borders | **Never a text color** (one hex can't be readable ink in both modes). `color: theme.accent` is always a bug; use `accentText`. |
-| `accentText` | Accent-colored *text* | Per color mode; clears 4.5:1 on every surface. |
-| `accentOn` | Ink *on top of* an `accent` fill | Derived by `composeTheme`. `color: "#fff"` on an accent fill is a bug; bright accents take dark ink. |
-
-When adding or changing an accent theme, check the new color against every surface in both modes before committing (see the dead-zone note in `themes.ts`).
-
-**Status colors:** `src/components/statusColors.ts` applies the same split to success / danger / info / warning; never hardcode `#10b981`, `#ef4444`, and friends. `STATUS[kind].fill` + `.on` for filled pills/badges; `statusText(theme, kind)` for status-colored *text* on a neutral surface.
-
-Known gaps: `DIFFICULTY_COLORS` / `RESOURCE_TYPE_COLORS` in the character guides still hardcode categorical text colors that fail contrast (they need the `statusText` treatment), and `accent` as a 1px state border misses WCAG 1.4.11's 3:1 in 16 of 24 theme/mode combos (fix: route state borders through `accentText`, a separate ~38-site pass).
+Themes live in `src/components/themes.ts` (12 accent themes x light/dark, composed by `composeTheme()`). **The palette is tuned to WCAG AA (4.5:1) and must stay there.** Odd-looking hex values are OKLCH contrast fits; don't round them.
 
 ## Image Policy
 
