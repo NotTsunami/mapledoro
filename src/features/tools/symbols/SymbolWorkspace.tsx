@@ -29,7 +29,8 @@ import {
 
 // -- Constants ----------------------------------------------------------------
 
-const DAILY_EVENT_BONUS = 6;
+const ARCANE_DAILY_EVENT_BONUS = 14;
+const SACRED_DAILY_EVENT_BONUS = 9;
 
 // Grand Sacred Symbols take the accent's own soft surface rather than a fixed
 // violet, which read as a foreign color on the themes that aren't blue-purple.
@@ -387,7 +388,7 @@ function SymbolCard({
   const areaPct = totalForOneArea > 0 ? (consumed / totalForOneArea) * 100 : 0;
   const isSacred = type === "sacred";
   const isGrand = isSacred && isGrandSacredArea(area);
-  const dailyMax = area.daily + DAILY_EVENT_BONUS;
+  const dailyMax = area.daily + (isSacred ? SACRED_DAILY_EVENT_BONUS : ARCANE_DAILY_EVENT_BONUS);
   const isLocked = !isUnlocked;
 
   let cardBorderColor: string;
