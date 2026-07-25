@@ -474,7 +474,7 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="EXP Calculator"
-          description="Buff stacking, monster EXP, and event resource values on the current GMS 200-300 table."
+          description="Calculate hourly farming rates, weekly EXP gained, and view resources."
         />
 
         <SegmentedToggle

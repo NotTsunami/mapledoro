@@ -21,31 +21,27 @@ type ToolCard = {
 const CALCULATORS: ToolCard[] = [
   {
     title: "Star Force Calculator",
-    description:
-      "Expected meso and booms before you commit to a star force run.",
+    description: "Expected meso and booms before a star force run.",
     icon: "⭐",
     href: "/tools/star-force",
   },
   {
     title: "Cubing Calculator",
-    description:
-      "Expected cubes and meso for the potential lines you want.",
+    description: "Expected cubes and meso for the lines you want.",
     itemId: "05062028", // Glowing Cube
     iconType: "item",
     href: "/tools/cubing",
   },
   {
     title: "Flaming Calculator",
-    description:
-      "Expected flames to land the bonus stats you need.",
+    description: "Expected flames to land the bonus stats you need.",
     itemId: "02048752", // Powerful Rebirth Flame
     iconType: "item",
     href: "/tools/flaming",
   },
   {
     title: "EXP Calculator",
-    description:
-      "Buff stacking, monster EXP, and what your event coupons are worth from 200 to 300.",
+    description: "Hourly farming rates, weekly EXP, and level resources.",
     itemId: "02637353", // EXP Voucher
     iconType: "item",
     href: "/tools/exp-calculator",
@@ -55,15 +51,13 @@ const CALCULATORS: ToolCard[] = [
 const PLANNERS: ToolCard[] = [
   {
     title: "Event Planner",
-    description:
-      "Total meso and spare items for everything you plan to star force this event.",
+    description: "Total meso and spare items for your event star forcing.",
     icon: "📅",
     href: "/tools/event-planner",
   },
   {
     title: "Mystic Frontier Solver",
-    description:
-      "Whether your roll clears the target, and which reroll would.",
+    description: "Whether your roll clears the target, and which would.",
     itemId: "03802172", // Blessed Orange Dice
     iconType: "item",
     href: "/tools/mystic-frontier",
@@ -73,56 +67,49 @@ const PLANNERS: ToolCard[] = [
 const TRACKERS: ToolCard[] = [
   {
     title: "Boss Crystal Tracker",
-    description:
-      "Weekly crystal income across your whole roster.",
+    description: "Weekly crystal income across your whole roster.",
     itemId: "04001928", // Intense Power Crystal (Weekly)
     iconType: "item",
     href: "/tools/boss-crystals",
   },
   {
     title: "Daily Tracker",
-    description:
-      "One checklist for every daily you run, on every character.",
+    description: "One checklist for every daily, on every character.",
     itemId: "04001886", // Intense Power Crystal (Daily)
     iconType: "item",
     href: "/tools/dailies",
   },
   {
     title: "Liberation Tracker",
-    description:
-      "Genesis, Destiny, and Astra progress with a projected finish date.",
+    description: "Genesis, Destiny, and Astra progress with a finish date.",
     itemId: "01332289", // Genesis Dagger
     iconType: "item",
     href: "/tools/liberation",
   },
   {
     title: "Symbol Tracker",
-    description:
-      "Days to max for every Arcane and Sacred symbol you own.",
+    description: "Days to max for every Arcane and Sacred symbol.",
     itemId: "01713000", // Sacred Symbol: Cernium
     iconType: "item",
     href: "/tools/symbols",
   },
   {
     title: "HEXA Skill Tracker",
-    description:
-      "Sol Erda and Fragment cost to max your HEXA skills.",
+    description: "Sol Erda and Fragment cost to max your HEXA skills.",
     itemId: "04009613", // Sol Erda Fragment
     iconType: "item",
     href: "/tools/hexa-skills",
   },
   {
     title: "Drop Tracker",
-    description:
-      "A running history of your rare boss drops, charted by item and month.",
+    description: "Your rare boss drop history, charted by item and month.",
     itemId: "02539004", // Grindstone of Faith
     iconType: "item",
     href: "/tools/pitched-boss-drops",
   },
   {
     title: "Trace Restoration Tracker",
-    description:
-      "Whisper crystal and mission progress toward the item you want.",
+    description: "Whisper crystal and mission progress toward your item.",
     itemId: "04001956", // Pitched Whisper Crystal
     iconType: "item",
     href: "/tools/trace-restoration",
@@ -239,10 +226,10 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
         /* Equal-height rows where two columns render; mobile wraps naturally. */
         @media (min-width: 861px) {
           .tool-row-desc {
-            min-height: calc(0.78rem * 1.45 * 2);
+            min-height: calc(0.78rem * 1.45);
             display: -webkit-box;
             -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             overflow: hidden;
           }
         }
