@@ -40,8 +40,8 @@ Run the full unscoped `npm run lint` when the change touches shared config or a 
 
 Tool output stays in the conversation for every later request, so one careless command inflates the whole session. Cost is dominated by the tail, not the average.
 
-- **Never Read whole:** `potentialsData.ts` (~53k tokens), `hexa-fd-data.generated.ts` (~47k), `cubing-data.ts` (~15k), `hexa-classes.ts` (~11k), `exp-monsters.ts`, `puzzle-data.generated.ts`, or anything in `manifests/` (`item.json` is 29.5 MB). Grep for the entries you need.
-- **Anchor greps to a specific name.** Bash truncates at 30k chars *silently*, so a wide pattern returns a confidently incomplete answer rather than an error. Searching `manifests/v270/item.json` for `"name": ".*Cube.*"` with context yields ~195k chars; the exact name yields ~500.
+- **Never Read whole** — grep for the entries you need: mystic-frontier `*Data.ts` and `familiarTraits.ts`, `hexa-fd-data.generated.ts`, `hexa-classes.ts`, `cubing-data.ts`, `exp-calculator-data.ts`, `exp-monsters.ts`, `puzzle-data.generated.ts`, and anything under `manifests/`. Each runs from thousands of lines to tens of MB.
+- **Anchor greps to a specific name**, never a family. Bash truncates long output *silently*, so a wide pattern returns a confidently incomplete answer rather than an error.
 - Prefer targeted `offset`/`limit` Reads over whole files once you know where you're going.
 
 ### Lint Gotchas
@@ -87,7 +87,7 @@ Game art comes from the self-hosted **MapleResource API** (`haku.network`), via 
 - **Item icons** default to shadowless `iconRaw.png`; pass `shadow` for framed `icon.png` (inventory only).
 - **Boss icons** have no component — use `bossIconUrl(id)` (`ui/boss` URL); stored as `icon` strings in boss data (`bosses.ts`, `liberation-data.ts`, `astra-data.ts`, `trace-restoration-data.ts`).
 - **Familiars:** `<FamiliarSprite>` is direct-sprite only; mob/card-backed ones use `<MobSprite>`/`<ItemIcon>` per manifest `spriteFrom`.
-- **Finding IDs:** grep `manifests/v270/<type>.json` for the exact `name` (see Context Discipline above), then hardcode the id with a name comment. There is no name→ID map; manifests are dev-only and never bundled. Current game version is **v270**. Older features whose generated data was built from an earlier manifest (and says so) are correct as-is.
+- **Finding IDs:** grep `manifests/v270/<type>.json` for the exact `name` (see Context Discipline), then hardcode the id with a name comment. There is no name→ID map; manifests are dev-only and never bundled. Current game version is **v270**. Older features whose generated data was built from an earlier manifest (and says so) are correct as-is.
 
 ## Feature Docs
 
