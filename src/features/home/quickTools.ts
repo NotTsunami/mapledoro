@@ -79,7 +79,7 @@ export const ALL_QUICK_TOOLS: QuickLink[] = [
     desc: "Rare boss drops",
     itemId: "02539004", // Grindstone of Faith
     iconType: "item",
-    href: "/tools/pitched-boss-drops",
+    href: "/tools/drop-tracker",
   },
   {
     title: "Trace Restoration",

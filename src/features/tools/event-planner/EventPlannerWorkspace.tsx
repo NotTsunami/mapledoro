@@ -210,7 +210,7 @@ const SORT_COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] =
 ];
 
 // Read-only per-entry option columns (not sortable).
-const STATUS_COLUMNS = ["Star Catch", "Safeguard", "Boom Red."];
+const STATUS_COLUMNS = ["Safeguard", "Boom Red."];
 
 function sortValue(row: PlanRow, key: SortKey): string | number {
   switch (key) {
@@ -242,6 +242,17 @@ function sortRows(rows: PlanRow[], sort: SortState | null): PlanRow[] {
     return cmp * sort.dir;
   });
 }
+
+// Matches the drop tracker's row delete button.
+const REMOVE_BUTTON_STYLE: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  padding: 0,
+  display: "grid",
+  placeItems: "center",
+  border: "none",
+  fontSize: "0.9rem",
+};
 
 /** Read-only ✓/— cell for a per-entry option. */
 function StatusCell({
@@ -275,22 +286,6 @@ function PlanRowCells({
   tdStyle: React.CSSProperties;
   removeEntry: (id: string) => void;
 }) {
-  const removeStyle: React.CSSProperties = {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "0.82rem",
-    fontWeight: 700,
-    color: theme.muted,
-    background: theme.timerBg,
-    border: `1px solid ${theme.border}`,
-    userSelect: "none",
-    flexShrink: 0,
-  };
-
   return (
     <>
       <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "normal" }}>
@@ -312,7 +307,6 @@ function PlanRowCells({
       <td style={{ ...tdStyle, color: cost.booms > 0 ? statusText(theme, "danger") : theme.muted }}>
         {cost.booms === 0 ? "0" : cost.booms.toFixed(1)}
       </td>
-      <StatusCell tdStyle={tdStyle} theme={theme} on={entry.starCatch} />
       {/* Tier > 1 overrides safeguard, so show the effective status. */}
       <StatusCell tdStyle={tdStyle} theme={theme} on={entry.safeguard && entry.boomTier <= 1} />
       <td style={{ ...tdStyle, textAlign: "center", color: entry.boomTier > 1 ? theme.text : theme.muted }}>
@@ -320,16 +314,16 @@ function PlanRowCells({
       </td>
       <td style={tdStyle}>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="tool-btn"
-            onClick={() => removeEntry(entry.id)}
-            aria-label={`Remove ${item.name}`}
-            title="Remove item"
-            style={removeStyle}
-          >
-            {"×"}
-          </button>
+          <ConfirmButton
+            theme={theme}
+            label="✕"
+            ariaLabel={`Remove ${item.name}`}
+            title="Remove this item?"
+            message={`This removes ${item.name} from the plan. This can't be undone.`}
+            confirmLabel="Remove"
+            onConfirm={() => removeEntry(entry.id)}
+            style={REMOVE_BUTTON_STYLE}
+          />
         </div>
       </td>
     </>
@@ -360,7 +354,7 @@ function CharacterPlanPanel({
   const subtotal = rows.reduce((s, r) => s + r.cost.cost, 0);
 
   const thStyle: React.CSSProperties = {
-    padding: "6px 12px",
+    padding: "10px 14px",
     borderBottom: `2px solid ${theme.border}`,
   };
   const thButtonStyle: React.CSSProperties = {
@@ -376,6 +370,7 @@ function CharacterPlanPanel({
   };
   const tdStyle: React.CSSProperties = {
     ...dataTableTd(theme),
+    padding: "12px 14px",
     textAlign: "right",
     whiteSpace: "nowrap",
   };
@@ -384,10 +379,12 @@ function CharacterPlanPanel({
     <div className="fade-in panel-card" style={{ ...panelStyle, padding: 0 }}>
       <div
         style={{
-          padding: "0.6rem 1.25rem",
+          // Tighter underneath: the header reads as a label for the table, so it
+          // sits closer to it than to the panel's top edge.
+          padding: "1rem 1.25rem 0.55rem",
           display: "flex",
           alignItems: "center",
-          gap: "0.6rem",
+          gap: "0.7rem",
         }}
       >
         <CharacterAvatarBox theme={theme} record={record} size={42} />
@@ -679,6 +676,12 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
         /* Keeps the columns readable rather than crushed. The wrapper's
            overflow-x: auto scrolls it on a narrow screen. */
         .ep-plan-table { min-width: 760px; }
+        /* Line the outer columns up with the panel header's 1.25rem inset
+           instead of stopping short of it. */
+        .ep-plan-table th:first-child,
+        .ep-plan-table td:first-child { padding-left: 1.25rem; }
+        .ep-plan-table th:last-child,
+        .ep-plan-table td:last-child { padding-right: 1.25rem; }
         /* A flex item's automatic minimum size is its min-content width, and a
            select's min-content is its widest option, so a long character name
            would push the row wider than the screen instead of shrinking it. */
@@ -690,6 +693,12 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
           .ep-setting-row > .section-label { flex-basis: 100%; }
           .ep-setting-row > .tool-btn { flex: 1; justify-content: center; }
           .ep-setting-row > .tool-select { flex: 1; }
+        }
+        @media (max-width: 560px) {
+          /* Two pills sharing a phone-width row leaves each too narrow for its
+             label ("30% Boom Reduction", "Safeguard (15-17)"), which then wraps
+             mid-phrase. One per row instead. */
+          .ep-setting-row > .tool-btn { flex-basis: 100%; }
         }
       `}</style>
 

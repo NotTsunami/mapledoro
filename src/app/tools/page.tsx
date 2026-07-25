@@ -105,7 +105,7 @@ const TRACKERS: ToolCard[] = [
     description: "Your rare boss drop history, charted by item and month.",
     itemId: "02539004", // Grindstone of Faith
     iconType: "item",
-    href: "/tools/pitched-boss-drops",
+    href: "/tools/drop-tracker",
   },
   {
     title: "Trace Restoration Tracker",

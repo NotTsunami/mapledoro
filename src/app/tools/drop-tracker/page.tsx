@@ -1,8 +1,9 @@
 "use client";
 
 /*
-  Drop Tracker route shell. Route/folder stay `pitched-boss-drops` to preserve
-  existing bookmarks and the `pitchedBossDrops` localStorage key.
+  Drop Tracker route shell. The feature folder stays `pitched-boss-drops` and so
+  does the `pitchedBossDrops` localStorage key, which holds live user data; only
+  the URL follows the display name.
 */
 import AppShell from "../../../components/AppShell";
 import PitchedBossDropsWorkspace from "../../../features/tools/pitched-boss-drops/PitchedBossDropsWorkspace";
