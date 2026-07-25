@@ -1,7 +1,7 @@
 // Patch notes external store — fetched once per page load (with a
 // localStorage cache as fallback), consumed via useSyncExternalStore.
 
-export type PatchNote = { version: string; date: string; title: string; tags: string[]; url: string };
+import { FALLBACK_PATCH_NOTES, type PatchNote } from "./patchNotesFallback";
 
 const PATCH_CACHE_KEY = "mapledoro_patch_notes_v1";
 const PATCH_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -18,32 +18,7 @@ function readCachedPatchNotes(): PatchNote[] | null {
   return null;
 }
 
-// Static fallback shown until the live fetch resolves (also the SSR snapshot).
-export const initialPatchNotes: PatchNote[] = [
-  {
-    version: "v266",
-    date: "Feb 18",
-    title: "V.266 KNOWN ISSUES",
-    tags: ["MAINTENANCE"],
-    url: "https://www.nexon.com/maplestory/news/maintenance/36146/v-266-known-issues",
-  },
-  {
-    version: "",
-    date: "Feb 17",
-    title: "[UPDATE FEB 21] CASH SHOP UPDATE FOR FEBRUARY 18",
-    tags: ["SALE"],
-    url: "https://www.nexon.com/maplestory/news/sale/35891/update-feb-21-cash-shop-update-for-february-18",
-  },
-  {
-    version: "",
-    date: "Feb 17",
-    title: "ETHEREAL ATELIER: KEYS TO LOVE",
-    tags: ["SALE"],
-    url: "https://www.nexon.com/maplestory/news/sale/36387/ethereal-atelier-keys-to-love",
-  },
-];
-
-let patchNotesData: PatchNote[] = initialPatchNotes;
+let patchNotesData: PatchNote[] = FALLBACK_PATCH_NOTES;
 const patchListeners = new Set<() => void>();
 let patchFetched = false;
 
