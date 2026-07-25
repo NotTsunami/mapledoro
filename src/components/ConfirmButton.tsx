@@ -26,6 +26,7 @@ function dangerPillStyle(theme: AppTheme): CSSProperties {
 export function ConfirmButton({
   theme,
   label,
+  ariaLabel,
   title,
   message,
   confirmLabel,
@@ -35,6 +36,8 @@ export function ConfirmButton({
 }: {
   theme: AppTheme;
   label: string;
+  /** Accessible name, for triggers whose visible label is a glyph ("✕"). */
+  ariaLabel?: string;
   title: string;
   message: string;
   confirmLabel?: string;
@@ -49,6 +52,7 @@ export function ConfirmButton({
       <button
         type="button"
         className={triggerClass}
+        aria-label={ariaLabel}
         onClick={() => setConfirming(true)}
         style={{ ...dangerPillStyle(theme), ...style }}
       >

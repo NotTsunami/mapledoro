@@ -265,6 +265,13 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* Searchable select: the ring belongs on the bordered trigger, not the
+   borderless input sitting inside it. */
+.searchable-select-trigger:focus-within {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+
 /* Appearance reset for <button> elements styled as custom clickables.
    Declared before the shape classes below so they win the cascade. */
 .btn-reset {

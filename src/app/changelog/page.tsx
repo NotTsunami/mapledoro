@@ -16,6 +16,9 @@ const CHANGELOG: ChangelogEntry[] = [
     changes: [
       { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, and Eternal Armor of Radiance Box." },
       { type: "added", text: "The Event Planner now has Original Sin of Pride and Blissful Nightmare as items to tap." },
+      { type: "added", text: "The Drop Tracker now opens with a summary of your total drops, drops this month, days since your last one, and your most dropped item." },
+      { type: "changed", text: "Deleting a drop in the Drop Tracker now asks for confirmation first." },
+      { type: "changed", text: "The Drop Tracker item search now takes arrow keys to move through results, Enter to pick one, and Escape to close." },
       { type: "fixed", text: "Fixed the Event Planner emptying the star dropdowns and disabling Add when you picked a lower level item like Wings of Fate." },
       { type: "changed", text: "The Event Planner item search now takes arrow keys to move through results, Enter to pick one, and Escape to close." },
       { type: "fixed", text: "Fixed the EXP Calculator Daily / Weekly Calculator losing a day of EXP from plans that span a daylight saving time change." },
