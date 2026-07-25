@@ -1,5 +1,6 @@
 import { toCharacterKey } from "./characterKeys";
 import type { NormalizedCharacterData } from "./types";
+import { checkForWipe } from "./wipeTripwire";
 
 const CHARACTERS_STORE_VERSION = 1 as const;
 const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -953,6 +954,9 @@ export function writeLegionArtifactForWorld(worldId: number, value: StoredLegion
 export function writeCharactersStore(store: CharactersStore) {
   if (typeof window === "undefined") return;
   try {
+    if (process.env.NODE_ENV !== "production") {
+      checkForWipe(window.localStorage.getItem(CHARACTERS_STORE_STORAGE_KEY), store);
+    }
     window.localStorage.setItem(CHARACTERS_STORE_STORAGE_KEY, JSON.stringify(store));
   } catch {
     // Ignore localStorage write failures.
