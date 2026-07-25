@@ -6,6 +6,10 @@ export type ResourceType = "erda-skill" | "familiar" | "hexa-skill" | "item" | "
 
 const RESOURCE_BASE = process.env.NEXT_PUBLIC_RESOURCE_BASE ?? "https://haku.network";
 
+// Bare origin of the above, for the root layout's <link rel="preconnect">.
+// Derived rather than hardcoded so an overridden host still preconnects.
+export const RESOURCE_ORIGIN = new URL(RESOURCE_BASE).origin;
+
 export function resourceImageUrl(type: ResourceType, id: string, asset: string): string {
   return `${RESOURCE_BASE}/api/img/${type}/${id}/${asset}`;
 }
