@@ -25,11 +25,16 @@ export function formatLongDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
-/** A date or timestamp as a short display date ("Mar 7, 2026"). */
-export function formatShortDate(value: Date | number): string {
+/**
+ * A date or timestamp as a short display date ("Mar 7, 2026"). Pass `utc` for
+ * values that represent a UTC calendar date (game reset projections), so the
+ * day doesn't shift for a viewer behind GMT.
+ */
+export function formatShortDate(value: Date | number, utc = false): string {
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
+    ...(utc ? { timeZone: "UTC" } : {}),
   });
 }

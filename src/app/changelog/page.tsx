@@ -14,6 +14,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-25",
     changes: [
+      { type: "fixed", text: "Fixed the Trace Restoration Tracker projecting completion dates a day off for players outside UTC." },
       { type: "fixed", text: "Fixed the Flaming calculator wiping the decimal point as you typed values like 0.5." },
       { type: "fixed", text: "Trace Restoration now shows dates in your own region's format instead of always using the US one." },
       { type: "fixed", text: "The home page no longer falls back to months-old patch notes when the news feed is slow or unavailable." },
