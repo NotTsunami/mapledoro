@@ -25,6 +25,10 @@ import CharacterAvatar, { FALLBACK_SRC } from "../components/CharacterAvatar";
 
 type LegionSection = "artifact" | "linkSkills";
 
+// Module-level so useSyncExternalStore gets a stable reference: an inline arrow would be a
+// new function every render and make it resubscribe each time.
+const emptySubscribe = () => () => undefined;
+
 // Lets the header's Save button (see LegionPanel) trigger whichever *EditPanel is
 // currently mounted, without lifting its local draft state up out of the component
 // that owns it.
@@ -443,7 +447,7 @@ function HoverTooltip({ theme, label, sublabel, ariaLabel, wrapSublabel, wrapper
   // a plain useState would seed the server's `false` and never reconcile it against the
   // client's real value, causing a hydration mismatch on hover-capable devices.
   const supportsHover = useSyncExternalStore(
-    () => () => undefined,
+    emptySubscribe,
     () => typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches,
     () => false,
   );
