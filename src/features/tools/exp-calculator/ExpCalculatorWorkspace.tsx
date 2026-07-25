@@ -470,7 +470,7 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
           .segmented-toggle-track { flex-wrap: wrap; }
         }
       `}</style>
-      <div className="tool-container" style={{ maxWidth: 1000 }}>
+      <div className="tool-container">
         <ToolHeader
           theme={theme}
           title="EXP Calculator"
@@ -1064,24 +1064,6 @@ function ExpOverviewPanel({
           Import Into Daily/Weekly Calculator →
         </button>
       )}
-      {/* Booster and clockwork proc panels are intentionally hidden while the EXP source modeling is refined.
-      <div className="exp-results" style={{ marginTop: 14 }}>
-        <VisualMetric
-          theme={theme}
-          icon={<MobSprite id="9834331" size={38} alt="Booster Flame" />}
-          label="VIP / HEXA Booster"
-          value={formatExpCompact(result.vipBoosterExp)}
-          detail={`${formatPercent(percentOfLevel(monster.playerLevel, result.vipBoosterExp))}% EXP gained per proc`}
-        />
-        <VisualMetric
-          theme={theme}
-          icon={<ItemIcon id="02639929" size={34} alt="Gilded Clockwork" />}
-          label="Gilded Clockwork"
-          value={formatExpCompact(result.goldClockworkExp)}
-          detail={`${formatPercent(percentOfLevel(monster.playerLevel, result.goldClockworkExp))}% EXP gained per proc`}
-        />
-      </div>
-      */}
     </div>
   );
 }
@@ -1378,7 +1360,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             {/* Milestone levels strictly increase within a simulation, so level is a unique key. */}
             {result.milestones.slice(0, 24).map((milestone) => (
               <span key={milestone.level} style={milestoneChipStyle(theme)}>
-                Lv. {milestone.level} · {formatShortDate(milestone.date)}
+                Lv. {milestone.level} · {formatShortDate(milestone.date, true)}
               </span>
             ))}
           </div>

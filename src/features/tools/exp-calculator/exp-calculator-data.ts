@@ -60,8 +60,6 @@ export interface MonsterExpResult {
   monsterLevelBonus: number;
   buffMultiplier: number;
   normalExp: number;
-  vipBoosterExp: number;
-  goldClockworkExp: number;
   hourlyExp: number;
   hoursToTarget: number;
 }
@@ -733,8 +731,6 @@ export function calculateMonsterExp(input: MonsterExpInput, buffs: BuffState): M
     monsterLevelBonus: levelBonus,
     buffMultiplier,
     normalExp,
-    vipBoosterExp: normalExp * 10,
-    goldClockworkExp: normalExp * 200,
     hourlyExp,
     hoursToTarget: hourlyExp > 0 ? remainingExp / hourlyExp : 0,
   };
@@ -814,7 +810,7 @@ function applyEndingEventResources(state: SimulationState, input: AllInOneInput,
 
 function applyDailyWeeklyContent(state: SimulationState, input: AllInOneInput, date: number): SimulationState {
   let next = applySimulationExp(state, dailyExpForState(state, input, date), date);
-  if (new Date(date).getDay() === THURSDAY) {
+  if (new Date(date).getUTCDay() === THURSDAY) {
     next = applySimulationExp(next, weeklyExpForState(next, input), date);
   }
   return next;
@@ -864,7 +860,7 @@ function dailyBonusPercent(daily: ExpContentOption, input: AllInOneInput): numbe
 function monsterParkExpForLevel(level: number, input: AllInOneInput, date: number): number {
   const base = resolveMonsterPark(level, input.monsterParkId)?.exp ?? 0;
   const bonusPercent = Math.max(0, input.monsterParkBonus);
-  const sundayMultiplier = new Date(date).getDay() === 0 ? 1.5 : 1;
+  const sundayMultiplier = new Date(date).getUTCDay() === 0 ? 1.5 : 1;
   return (
     (Math.ceil(base * sundayMultiplier) + Math.ceil(base * bonusPercent / 100)) * Math.max(0, input.monsterParkRuns)
   );
@@ -970,17 +966,25 @@ function resourceExpWithFallback(tableId: string, level: number): number {
   return rows.find((row) => row.level === level)?.exp ?? rows[rows.length - 1]?.exp ?? 0;
 }
 
+/**
+ * The plan window as UTC midnight timestamps. Parsing as UTC rather than local is what
+ * keeps `date += DAY_MS` on an exact day boundary: stepping a fixed 86,400,000ms from a
+ * *local* midnight drifts by an hour across a DST transition, which silently dropped a
+ * whole day of EXP from any window spanning one. It also puts the weekday checks on the
+ * same clock as the game's Thursday 00:00 UTC reset.
+ */
 function normalizedDateRange(startDate: string, endDate: string): { start: number; end: number } {
-  const today = Date.parse(new Date().toDateString());
-  const start = Date.parse(`${startDate}T00:00:00`) || today;
-  const end = Date.parse(`${endDate}T00:00:00`) || start;
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const start = Date.parse(`${startDate}T00:00:00Z`) || today;
+  const end = Date.parse(`${endDate}T00:00:00Z`) || start;
   return start <= end ? { start, end } : { start: end, end: start };
 }
 
 function countThursdays(start: number, end: number): number {
   let count = 0;
   for (let date = start; date <= end; date += DAY_MS) {
-    if (new Date(date).getDay() === THURSDAY) count += 1;
+    if (new Date(date).getUTCDay() === THURSDAY) count += 1;
   }
   return count;
 }

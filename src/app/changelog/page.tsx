@@ -14,6 +14,8 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-25",
     changes: [
+      { type: "fixed", text: "Fixed the EXP Calculator Daily / Weekly Calculator losing a day of EXP from plans that span a daylight saving time change." },
+      { type: "fixed", text: "The EXP Calculator Daily / Weekly Calculator now credits weekly content on the game's Thursday reset instead of your local Thursday." },
       { type: "fixed", text: "Fixed the Trace Restoration Tracker projecting completion dates a day off for players outside UTC." },
       { type: "fixed", text: "Fixed the Flaming calculator wiping the decimal point as you typed values like 0.5." },
       { type: "fixed", text: "Trace Restoration now shows dates in your own region's format instead of always using the US one." },
