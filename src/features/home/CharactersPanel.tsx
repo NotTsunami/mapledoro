@@ -20,7 +20,7 @@ interface TrackerLink {
 const TRACKER_LINKS: TrackerLink[] = [
   {
     label: "Liberation Tracker",
-    itemId: "01332289", // Genesis Dagger
+    itemId: "01332303", // Destiny Dagger
     href: (c) => `/tools/liberation?character=${encodeURIComponent(c)}`,
   },
   {

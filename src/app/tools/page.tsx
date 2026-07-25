@@ -82,7 +82,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Liberation Tracker",
     description: "Genesis, Destiny, and Astra progress with a finish date.",
-    itemId: "01332289", // Genesis Dagger
+    itemId: "01332303", // Destiny Dagger
     iconType: "item",
     href: "/tools/liberation",
   },

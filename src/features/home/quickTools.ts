@@ -49,7 +49,7 @@ export const ALL_QUICK_TOOLS: QuickLink[] = [
   {
     title: "Liberation",
     desc: "Liberation planning",
-    itemId: "01332289", // Genesis Dagger
+    itemId: "01332303", // Destiny Dagger
     iconType: "item",
     href: "/tools/liberation",
   },
