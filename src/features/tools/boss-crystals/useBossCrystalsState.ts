@@ -6,6 +6,7 @@ import {
   selectCharactersList,
 } from "../../characters/model/charactersStore";
 import type { StoredCharacterRecord } from "../../characters/model/charactersStore";
+import { moveInArray } from "../useCardReorder";
 import {
   type BossRow,
   type CharacterEntry,
@@ -240,14 +241,7 @@ export function useBossCrystalsState(mounted: boolean) {
   }, []);
 
   const reorderCharacters = useCallback((from: number, to: number) => {
-    if (from === to) return;
-    setCharacters((prev) => {
-      if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+    setCharacters((prev) => moveInArray(prev, from, to));
   }, []);
 
   const toggleDialogBoss = useCallback((bi: number) => {

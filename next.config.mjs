@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  typedRoutes: true,
   async headers() {
     return [
       {
@@ -24,9 +25,6 @@ const nextConfig = {
     // IP here, since it's specific to whoever's machine is running `next dev`.
     ...(process.env.DEV_LAN_ORIGIN ? [process.env.DEV_LAN_ORIGIN] : []),
   ],
-  experimental: {
-    optimizePackageImports: ["chart.js", "react-chartjs-2"],
-  },
   images: {
     minimumCacheTTL: 2678400,
     remotePatterns: [

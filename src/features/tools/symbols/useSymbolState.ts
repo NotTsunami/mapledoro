@@ -1,12 +1,6 @@
-import { useState, useCallback, useMemo } from "react";
-import { useMounted } from "../../../lib/useMounted";
-import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
-import {
-  readCharactersStore,
-  selectCharactersList,
-  type StoredCharacterRecord,
-} from "../../characters/model/charactersStore";
-import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { useCallback } from "react";
+import { type StoredCharacterRecord } from "../../characters/model/charactersStore";
+import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import {
   type SymbolType,
   type SymbolArea,
@@ -154,66 +148,40 @@ interface FormState {
   symbols: Record<string, SymbolState>;
 }
 
-function defaultFormState(): FormState {
-  return { type: "arcane", symbols: {} };
+function parseSymbols(
+  saved: SavedState | null,
+  char: StoredCharacterRecord | undefined,
+): FormState {
+  if (saved) return { type: saved.type, symbols: saved.symbols };
+  // A character already in Grandis lands on the Sacred tab; everyone else starts
+  // on Arcane. With no character there is no level to check, so Arcane it is.
+  const inGrandis = char !== undefined && char.level >= SACRED_AREAS[0].requiredLevel;
+  return { type: inGrandis ? "sacred" : "arcane", symbols: {} };
+}
+
+function serializeSymbols(form: FormState): SavedState {
+  return { type: form.type, symbols: form.symbols };
 }
 
 export function useSymbolState() {
-  const mounted = useMounted();
+  const {
+    mounted,
+    characters,
+    selectedCharName,
+    handleCharChange,
+    state: form,
+    update: updateForm,
+  } = usePerCharacterToolState({
+    toolKey: "symbols",
+    parse: parseSymbols,
+    serialize: serializeSymbols,
+  });
 
-  const characters: StoredCharacterRecord[] = useMemo(
-    () => (mounted ? selectCharactersList(readCharactersStore()) : []),
-    [mounted],
-  );
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-
-  const [form, setForm] = useState<FormState>(defaultFormState);
   const { type, symbols } = form;
 
   const areas = type === "arcane" ? ARCANE_AREAS : ALL_SACRED_AREAS;
   const growth = type === "arcane" ? ARCANE_GROWTH : SACRED_GROWTH;
   const maxLevel = type === "arcane" ? ARCANE_MAX_LEVEL : SACRED_MAX_LEVEL;
-
-  const updateForm = useCallback(
-    (updater: (prev: FormState) => FormState) => {
-      setForm((prev) => {
-        const next = updater(prev);
-        if (selectedCharName) {
-          writeCharacterToolData(selectedCharName, "symbols", { type: next.type, symbols: next.symbols });
-        }
-        return next;
-      });
-    },
-    [selectedCharName],
-  );
-
-  const handleCharChange = useCallback(
-    (charName: string | null) => {
-      if (selectedCharName) {
-        writeCharacterToolData(selectedCharName, "symbols", { type, symbols });
-      }
-
-      if (charName) {
-        const saved = readCharacterToolData<SavedState>(charName, "symbols");
-        if (saved) {
-          setForm({ type: saved.type, symbols: saved.symbols });
-        } else {
-          // A character already in Grandis lands on the Sacred tab; everyone
-          // else starts on Arcane.
-          const char = characters.find((c) => c.characterName === charName);
-          const inGrandis = char !== undefined && char.level >= SACRED_AREAS[0].requiredLevel;
-          setForm({ type: inGrandis ? "sacred" : "arcane", symbols: {} });
-        }
-      } else {
-        setForm(defaultFormState);
-      }
-
-      setSelectedCharName(charName);
-    },
-    [selectedCharName, type, symbols, characters],
-  );
-
-  useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
 
   const switchType = useCallback((t: SymbolType) => {
     updateForm((f) => ({ ...f, type: t }));

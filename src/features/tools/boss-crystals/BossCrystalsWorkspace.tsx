@@ -861,7 +861,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
           <ToolHeader
             theme={theme}
             title="Boss Crystal Tracker"
-            description="Select your server type, add characters, and check off the bosses you clear each week to track your meso income."
+            description="Weekly crystal income, per character and in total."
           />
 
           <BossCrystalsControls

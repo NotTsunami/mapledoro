@@ -6,7 +6,7 @@
   with a search bar to filter classes.
 */
 
-import React, { type CSSProperties, useState } from "react";
+import { type CSSProperties, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AppShell from "../../../components/AppShell";

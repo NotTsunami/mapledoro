@@ -1,11 +1,12 @@
 "use client";
 
-import { useReducer, useMemo, useState, useEffect, useRef, type ComponentType } from "react";
+import { useReducer, useMemo, useState, useEffect, useRef } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import type { ChartOptions, ChartData, TooltipItem } from "chart.js";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { ToolHeader } from "../../../components/ToolHeader";
+import { useLazyChart } from "../useLazyChart";
 import {
   attemptCost,
   computeExpectedCosts,
@@ -180,7 +181,6 @@ function SimulationPanel({
 // -- Histogram panel ----------------------------------------------------------
 
 type HistMetric = "cost" | "booms";
-type BarChartComponent = ComponentType<{ data: unknown; options: unknown }>;
 
 const METRIC_OPTIONS: { value: HistMetric; label: string }[] = [
   { value: "cost", label: "Meso Cost" },
@@ -275,29 +275,14 @@ function HistogramTable({ bins, total, metric }: { bins: Bins; total: number; me
 }
 
 function HistogramPanel({ theme, sim }: { theme: AppTheme; sim: SimulationResult }) {
-  const [Bar, setBar] = useState<BarChartComponent | null>(null);
   const [metric, setMetric] = useState<HistMetric>("cost");
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadChart() {
-      const [chartModule, barModule] = await Promise.all([
-        import("chart.js"),
-        import("react-chartjs-2"),
-      ]);
-      chartModule.Chart.register(
-        chartModule.CategoryScale,
-        chartModule.LinearScale,
-        chartModule.BarElement,
-        chartModule.Tooltip,
-      );
-      if (mounted) setBar(() => barModule.Bar as BarChartComponent);
-    }
-    loadChart();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const charts = useLazyChart(["Bar"], (c) => [
+    c.CategoryScale,
+    c.LinearScale,
+    c.BarElement,
+    c.Tooltip,
+  ]);
+  const Bar = charts?.Bar ?? null;
 
   const bins = useMemo(
     () => (metric === "cost" ? buildRangeBins(sim.costs, formatMeso) : buildBoomBins(sim.booms)),
@@ -936,7 +921,7 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="Star Force Calculator"
-          description="Enter your item level, current star, and target star, then run the simulation to see expected meso costs."
+          description="Expected meso and booms for a single star force run, from a full simulation."
         />
 
         <StarForceForm

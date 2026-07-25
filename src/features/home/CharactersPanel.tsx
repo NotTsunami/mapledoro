@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import CharacterChip from "../../components/CharacterChip";
 import Panel from "../../components/Panel";
@@ -13,13 +14,13 @@ import { WORLD_NAMES } from "../characters/model/constants";
 interface TrackerLink {
   itemId: string;
   label: string;
-  href: (characterName: string) => string;
+  href: (characterName: string) => Route;
 }
 
 const TRACKER_LINKS: TrackerLink[] = [
   {
     label: "Liberation Tracker",
-    itemId: "01332289", // Genesis Dagger
+    itemId: "01332303", // Destiny Dagger
     href: (c) => `/tools/liberation?character=${encodeURIComponent(c)}`,
   },
   {

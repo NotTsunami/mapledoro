@@ -1,10 +1,11 @@
+import type { Route } from "next";
 import { readGlobalTool } from "../tools/globalToolsStore";
 
 // A dashboard-launchable link card (tool or guide).
 export type QuickLink = {
   title: string;
   desc: string;
-  href: string;
+  href: Route;
 } & ({ iconType: "emoji"; icon: string } | { iconType: "item"; itemId: string });
 
 // Full catalog of dashboard-launchable tools. `href` doubles as the stable id
@@ -48,7 +49,7 @@ export const ALL_QUICK_TOOLS: QuickLink[] = [
   {
     title: "Liberation",
     desc: "Liberation planning",
-    itemId: "01332289", // Genesis Dagger
+    itemId: "01332303", // Destiny Dagger
     iconType: "item",
     href: "/tools/liberation",
   },

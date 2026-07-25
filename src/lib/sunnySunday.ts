@@ -67,8 +67,10 @@ export async function fetchSunnySunday(): Promise<SunnySundayPayload | null> {
 
 // -- Parser -----------------------------------------------------------------
 
-/** Matches a line that is a date header with Discord timestamp <t:UNIX:F> */
-const DISCORD_DATE_LINE_RE = /<t:(\d+):F>/;
+/** Matches a line that is a date header with a Discord timestamp tag, <t:UNIX:F> or
+ *  <t:UNIX:f> -- the announcement's posted style has changed between updates (long-with-
+ *  weekday vs. short), so both must match or a format switch silently empties the schedule. */
+const DISCORD_DATE_LINE_RE = /<t:(\d+):[Ff]>/;
 
 /** Plain-text date: Saturday, February 28, 2026 4:00 PM */
 const PLAIN_DATE_RE =
@@ -160,10 +162,11 @@ function parseDateLine(line: string): { label: string; iso: string } | null {
   return { label, iso: d.toISOString() };
 }
 
-/** Strip markdown formatting and Discord timestamp tags from detail lines */
+/** Strip markdown formatting, Discord timestamp tags, and custom emoji tags from detail lines */
 function cleanDetail(line: string): string {
   return line
-    .replace(/<t:\d+:[A-Za-z]>/g, "")  // remove Discord timestamps
+    .replace(/<t:\d+:[A-Za-z]>/g, "")   // remove Discord timestamps
+    .replace(/<a?:\w+:\d+>/g, "")       // remove custom emoji tags, e.g. <a:animated_sparkle:123>
     .replace(/^-\s*/, "")               // remove leading "- "
     .replace(/^\*\s*/, "  • ")          // convert "* " sub-items to indented bullet
     .replace(/\*/g, "")                 // remove remaining bold/italic markers

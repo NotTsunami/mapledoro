@@ -514,7 +514,7 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
         <ToolHeader
           theme={theme}
           title="Mystic Frontier Solver"
-          description="Set your active lineup, dice, and target, then see whether your roll passes and which rerolls would get you there."
+          description="Whether your current roll passes, and the rerolls that would."
         />
 
         {/* Character, wave, and target — the per-wave setup controls */}

@@ -5,6 +5,7 @@
   Groups tools into one panel per category, each tool a compact linked row.
 */
 import type { CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import AppShell from "../../components/AppShell";
 import { ItemIcon } from "../../components/ResourceImage";
@@ -13,56 +14,50 @@ import type { AppTheme } from "../../components/themes";
 type ToolCard = {
   title: string;
   description: string;
-  href: string;
+  href: Route;
   comingSoon?: boolean;
 } & ({ iconType?: "emoji"; icon: string } | { iconType: "item"; itemId: string });
 
 const CALCULATORS: ToolCard[] = [
   {
     title: "Star Force Calculator",
-    description:
-      "Estimate the expected meso cost to star force your equipment.",
+    description: "Expected meso and booms before a star force run.",
     icon: "⭐",
     href: "/tools/star-force",
   },
   {
     title: "Cubing Calculator",
-    description:
-      "Calculate the expected cost and number of cubes to achieve your desired potential.",
+    description: "Expected cubes and meso for the lines you want.",
     itemId: "05062028", // Glowing Cube
     iconType: "item",
     href: "/tools/cubing",
   },
   {
     title: "Flaming Calculator",
-    description:
-      "Calculate the expected number of flames to achieve your desired bonus stats.",
+    description: "Expected flames to land the bonus stats you need.",
     itemId: "02048752", // Powerful Rebirth Flame
     iconType: "item",
     href: "/tools/flaming",
   },
   {
     title: "EXP Calculator",
-    description:
-      "Calculate EXP buffs, monster EXP, event resources, and level progress from 200 to 300.",
+    description: "Hourly farming rates, weekly EXP, and level resources.",
     itemId: "02637353", // EXP Voucher
     iconType: "item",
     href: "/tools/exp-calculator",
   },
 ];
 
-const OTHER_TOOLS: ToolCard[] = [
+const PLANNERS: ToolCard[] = [
   {
     title: "Event Planner",
-    description:
-      "Plan star force spending for the next event, estimating meso cost and spare items needed.",
+    description: "Total meso and spare items for your event star forcing.",
     icon: "📅",
     href: "/tools/event-planner",
   },
   {
     title: "Mystic Frontier Solver",
-    description:
-      "Set your familiars, dice, and target score to see if your roll passes and calculate rerolls.",
+    description: "Whether your roll clears the target, and which would.",
     itemId: "03802172", // Blessed Orange Dice
     iconType: "item",
     href: "/tools/mystic-frontier",
@@ -72,56 +67,49 @@ const OTHER_TOOLS: ToolCard[] = [
 const TRACKERS: ToolCard[] = [
   {
     title: "Boss Crystal Tracker",
-    description:
-      "Track your weekly boss crystal income across all characters.",
+    description: "Weekly crystal income across your whole roster.",
     itemId: "04001928", // Intense Power Crystal (Weekly)
     iconType: "item",
     href: "/tools/boss-crystals",
   },
   {
     title: "Daily Tracker",
-    description:
-      "Track symbol dailies, daily bosses, and daily content across all your characters.",
+    description: "One checklist for every daily, on every character.",
     itemId: "04001886", // Intense Power Crystal (Daily)
     iconType: "item",
     href: "/tools/dailies",
   },
   {
     title: "Liberation Tracker",
-    description:
-      "Track your Genesis and Destiny liberation progress and estimate completion.",
-    itemId: "01332289", // Genesis Dagger
+    description: "Genesis, Destiny, and Astra progress with a finish date.",
+    itemId: "01332303", // Destiny Dagger
     iconType: "item",
     href: "/tools/liberation",
   },
   {
     title: "Symbol Tracker",
-    description:
-      "Track your Arcane and Sacred symbol progress and estimate days to max.",
+    description: "Days to max for every Arcane and Sacred symbol.",
     itemId: "01713000", // Sacred Symbol: Cernium
     iconType: "item",
     href: "/tools/symbols",
   },
   {
     title: "HEXA Skill Tracker",
-    description:
-      "Track Sol Erda and Fragment costs to max your HEXA skills per character.",
+    description: "Sol Erda and Fragment cost to max your HEXA skills.",
     itemId: "04009613", // Sol Erda Fragment
     iconType: "item",
     href: "/tools/hexa-skills",
   },
   {
     title: "Drop Tracker",
-    description:
-      "Track and analyze rare boss drops across all characters.",
+    description: "Your rare boss drop history, charted by item and month.",
     itemId: "02539004", // Grindstone of Faith
     iconType: "item",
     href: "/tools/pitched-boss-drops",
   },
   {
     title: "Trace Restoration Tracker",
-    description:
-      "Track whisper crystal progress and trace restoration missions toward your target items.",
+    description: "Whisper crystal and mission progress toward your item.",
     itemId: "04001956", // Pitched Whisper Crystal
     iconType: "item",
     href: "/tools/trace-restoration",
@@ -131,7 +119,7 @@ const TRACKERS: ToolCard[] = [
 const SECTIONS: { label: string; tools: ToolCard[] }[] = [
   { label: "Calculators", tools: CALCULATORS },
   { label: "Trackers", tools: TRACKERS },
-  { label: "Other Tools", tools: OTHER_TOOLS },
+  { label: "Planners & Solvers", tools: PLANNERS },
 ];
 
 // Uppercase category label inside each panel; color (theme.muted) inline.
@@ -238,10 +226,10 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
         /* Equal-height rows where two columns render; mobile wraps naturally. */
         @media (min-width: 861px) {
           .tool-row-desc {
-            min-height: calc(0.78rem * 1.45 * 2);
+            min-height: calc(0.78rem * 1.45);
             display: -webkit-box;
             -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             overflow: hidden;
           }
         }
@@ -253,7 +241,7 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
             Tools
           </div>
           <div className="page-subtitle" style={{ color: theme.muted }}>
-            MapleStory calculators, trackers, and utilities
+            MapleStory calculators, trackers, and planners
           </div>
 
           <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>

@@ -12,6 +12,35 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-07-25",
+    changes: [
+      { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, and Eternal Armor of Radiance Box." },
+      { type: "added", text: "The Event Planner now has Original Sin of Pride and Blissful Nightmare as items to tap." },
+      { type: "fixed", text: "Fixed the Event Planner emptying the star dropdowns and disabling Add when you picked a lower level item like Wings of Fate." },
+      { type: "changed", text: "The Event Planner item search now takes arrow keys to move through results, Enter to pick one, and Escape to close." },
+      { type: "fixed", text: "Fixed the EXP Calculator Daily / Weekly Calculator losing a day of EXP from plans that span a daylight saving time change." },
+      { type: "fixed", text: "The EXP Calculator Daily / Weekly Calculator now credits weekly content on the game's Thursday reset instead of your local Thursday." },
+      { type: "fixed", text: "Fixed the Trace Restoration Tracker projecting completion dates a day off for players outside UTC." },
+      { type: "fixed", text: "Fixed the Flaming calculator wiping the decimal point as you typed values like 0.5." },
+      { type: "fixed", text: "Trace Restoration now shows dates in your own region's format instead of always using the US one." },
+      { type: "fixed", text: "The home page no longer falls back to months-old patch notes when the news feed is slow or unavailable." },
+    ],
+  },
+  {
+    date: "2026-07-23",
+    changes: [
+      { type: "added", text: "The EXP Calculator Daily / Weekly Calculator now takes Express Boosters." },
+      { type: "added", text: "The EXP Calculator Resources tab now has EXP tables for Express Booster and Haste Fever Time." },
+      { type: "fixed", text: "The EXP Calculator Import Into Daily/Weekly Calculator link now imports to the character selected in the Farming tab instead of your main, and the imported rate is saved to that character." },
+    ],
+  },
+  {
+    date: "2026-07-19",
+    changes: [
+      { type: "added", text: "Added a back to top button that appears in the corner once you scroll down a page." },
+    ],
+  },
+  {
     date: "2026-07-17",
     changes: [
       { type: "changed", text: "The HEXA Skill Tracker Guide tab now combines back to back levels of the same skill into one step, so leveling a skill from 8 to 10 shows as a single 8 to 10 step." },
@@ -56,6 +85,9 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-10",
     changes: [
+      { type: "added", text: "Added a compact strip with the daily, weekly, and Ursus timers to the home screen on phones and small windows." },
+      { type: "changed", text: "The Miracle Time panel now appears right below the timers on the phone home screen instead of near the bottom." },
+      { type: "changed", text: "The home screen banner is now smaller on phones so tools and timers show up sooner." },
       { type: "changed", text: "The Daily Tracker now works like the Boss Crystal Tracker: add characters yourself with the Add character card, pick each one from your imports or type a name, and drag the cards to reorder them." },
       { type: "added", text: "Added the Geardock Sacred Symbol daily to the Daily Tracker." },
       { type: "changed", text: "The Daily Tracker now allows up to 14 Monster Park runs per world, so two characters can each do their 7." },

@@ -1,14 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useMounted } from "../../../lib/useMounted";
-import {
-  readCharactersStore,
-  selectCharactersList,
-  type StoredCharacterRecord,
-} from "../../characters/model/charactersStore";
-import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
-import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { useCallback } from "react";
+import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import { utcDateStr } from "../date";
 import {
   type LiberationType,
@@ -83,14 +76,6 @@ export function getSelection(
 }
 
 
-export function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  return d.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 // -- Calculation --------------------------------------------------------------
 
@@ -397,32 +382,26 @@ function formToSaved(form: FormState): SavedState {
 
 // -- Hook ---------------------------------------------------------------------
 
+function parseLiberation(saved: SavedState | null): FormState {
+  return saved ? savedToForm(saved) : defaultFormState();
+}
+
 export function useLiberationState() {
-  const mounted = useMounted();
-
-  // Character sync
-  const characters: StoredCharacterRecord[] = mounted
-    ? selectCharactersList(readCharactersStore())
-    : [];
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-
-  const [form, setForm] = useState<FormState>(defaultFormState);
+  const {
+    mounted,
+    characters,
+    selectedCharName,
+    handleCharChange,
+    state: form,
+    update: updateForm,
+  } = usePerCharacterToolState({
+    toolKey: "liberation",
+    parse: parseLiberation,
+    serialize: formToSaved,
+  });
 
   const { type, progress, genesisPass, startDate, selections } = form;
   const { questIdx, currentTraces } = progress[type];
-
-  const updateForm = useCallback(
-    (updater: (prev: FormState) => FormState) => {
-      setForm((prev) => {
-        const next = updater(prev);
-        if (selectedCharName) {
-          writeCharacterToolData(selectedCharName, "liberation", formToSaved(next));
-        }
-        return next;
-      });
-    },
-    [selectedCharName],
-  );
 
   const setQuestIdx = useCallback((v: number) => updateForm((f) => ({
     ...f,
@@ -435,26 +414,6 @@ export function useLiberationState() {
   const setGenesisPass = useCallback((updater: (prev: boolean) => boolean) => updateForm((f) => ({ ...f, genesisPass: updater(f.genesisPass) })), [updateForm]);
   const setStartDate = useCallback((v: string) => updateForm((f) => ({ ...f, startDate: v })), [updateForm]);
   const setSelections = useCallback((updater: (prev: Record<string, BossSelection>) => Record<string, BossSelection>) => updateForm((f) => ({ ...f, selections: updater(f.selections) })), [updateForm]);
-
-  const handleCharChange = useCallback(
-    (charName: string | null) => {
-      if (selectedCharName) {
-        writeCharacterToolData(selectedCharName, "liberation", formToSaved(form));
-      }
-
-      if (charName) {
-        const saved = readCharacterToolData<SavedState>(charName, "liberation");
-        setForm(saved ? savedToForm(saved) : defaultFormState());
-      } else {
-        setForm(defaultFormState());
-      }
-
-      setSelectedCharName(charName);
-    },
-    [selectedCharName, form],
-  );
-
-  useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
 
   const bosses = type === "genesis" ? GENESIS_BOSSES : DESTINY_BOSSES;
 

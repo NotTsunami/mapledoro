@@ -18,8 +18,8 @@ import {
   useAstraState,
   type AstraCalcResult,
   getAstraSelection,
-  formatDate,
 } from "./useAstraState";
+import { formatLongDate } from "../date";
 import { toolStyles } from "../tool-styles";
 import { PanelDivider, ToolNumberInput } from "../shared-ui";
 import { ConfirmButton } from "../../../components/ConfirmButton";
@@ -99,7 +99,7 @@ function AstraConfigSection({
 
   return (
     <section className="fade-in panel-card" style={sectionPanel}>
-      <h2 className="tool-panel-title" style={{ color: theme.text }}>Configuration</h2>
+      <h2 className="tool-panel-title" style={{ color: theme.text }}>Starting Point</h2>
       <div className="tool-control-row">
         <div style={{ flex: "1 1 180px" }}>
           <label className="tool-field-label" htmlFor={`${uid}-mission`} style={fieldLabel}>Current Mission</label>
@@ -138,19 +138,13 @@ function AstraConfigSection({
 
         <div style={{ flex: "0 1 165px" }}>
           <label className="tool-field-label" htmlFor={`${uid}-frags`} style={fieldLabel}>Current Fragments</label>
-          <input
+          <ToolNumberInput
             id={`${uid}-frags`}
-            className="tool-input"
-            type="number"
             min={0}
+            integer
             value={currentFragments}
-            onFocus={(e) => e.currentTarget.select()}
             onKeyDown={replaceZeroOnDigit}
-            onChange={(e) => {
-              let v = parseInt(e.target.value) || 0;
-              if (v < 0) v = 0;
-              onCurrentFragmentsChange(v);
-            }}
+            onCommit={onCurrentFragmentsChange}
             style={{ ...inputStyle, width: "100%" }}
           />
         </div>
@@ -337,7 +331,7 @@ function AstraResultsSection({
   const milestones: ResultRow[] = result.missionResults.map((m) => ({
     key: m.mission.label,
     label: m.mission.label,
-    value: formatDate(m.completionDate),
+    value: formatLongDate(m.completionDate),
     valueNote: `(${m.weeksFromStart}w)`,
   }));
   const breakdown: ResultRow[] = result.breakdown
@@ -354,7 +348,7 @@ function AstraResultsSection({
       theme={theme}
       sectionPanel={sectionPanel}
       metrics={[
-        { label: "Completion Date", value: never ? "Never" : formatDate(result.completionDate), danger: never },
+        { label: "Completion Date", value: never ? "Never" : formatLongDate(result.completionDate), danger: never },
         {
           label: "Weeks Remaining",
           value: result.weeksToComplete === Infinity ? "--" : String(result.weeksToComplete),

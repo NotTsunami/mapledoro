@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
+import { useMounted } from "./useMounted";
 
 export type ReminderId = "ursus" | "autoHarvest" | "solErda";
 
@@ -66,11 +67,7 @@ function saveRemindersState(state: RemindersState) {
 }
 
 export function useRemindersState() {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
+  const mounted = useMounted();
   const [state, setState] = useState<RemindersState>(loadRemindersState);
 
   const today = utcDateStr();

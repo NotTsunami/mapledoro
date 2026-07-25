@@ -3,7 +3,8 @@
 import { useState, useSyncExternalStore, type CSSProperties } from "react";
 import Panel from "../../components/Panel";
 import type { AppTheme } from "../../components/themes";
-import { getPatchNotesSnapshot, initialPatchNotes, subscribePatchNotes } from "./patchNotesStore";
+import { FALLBACK_PATCH_NOTES } from "./patchNotesFallback";
+import { getPatchNotesSnapshot, subscribePatchNotes } from "./patchNotesStore";
 
 const PATCH_DISPLAY_LIMIT = 3;
 const PATCH_FILTERS = ["All", "MAINTENANCE", "SALE", "UPDATE", "EVENTS", "COMMUNITY"] as const;
@@ -21,7 +22,7 @@ const filterBtnBase: CSSProperties = {
 };
 
 export default function PatchNotesPanel({ theme }: { theme: AppTheme }) {
-  const patchNotes = useSyncExternalStore(subscribePatchNotes, getPatchNotesSnapshot, () => initialPatchNotes);
+  const patchNotes = useSyncExternalStore(subscribePatchNotes, getPatchNotesSnapshot, () => FALLBACK_PATCH_NOTES);
   const [patchFilter, setPatchFilter] = useState<PatchFilter>("All");
   const [patchExpanded, setPatchExpanded] = useState(false);
 

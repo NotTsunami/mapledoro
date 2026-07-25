@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useId } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
@@ -12,11 +12,11 @@ import {
 } from "../../../components/CharacterSyncPanel";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { formatMeso, formatMesoFull } from "../format";
-import { Toggle, PanelDivider, ActionButton } from "../shared-ui";
+import { Toggle, PanelDivider, ActionButton, ToolNumberInput } from "../shared-ui";
 import { MVP_OPTIONS } from "../shared-data";
 import { BOOM_TIER_COUNT, type MvpTier } from "../star-force/star-force-data";
 import { toolStyles } from "../tool-styles";
-import { controlHeightStyle, dataTableTd, statValueStyle, toggleControlStyle } from "../shared-styles";
+import { controlHeightStyle, dataTableTd, dropdownShadow, statValueStyle, toggleControlStyle } from "../shared-styles";
 import {
   EVENT_ITEMS,
   EVENT_ITEMS_BY_ID,
@@ -52,9 +52,13 @@ function ItemSelector({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   useEffect(() => {
+    if (!open) return;
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
@@ -62,7 +66,7 @@ function ItemSelector({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  }, [open]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -75,17 +79,65 @@ function ItemSelector({
     );
   }, [search]);
 
-  const grouped = useMemo(() => {
+  /** Categories in display order, each carrying the offset of its first row in the
+   *  flattened list, so arrow keys can walk the menu exactly as it reads. */
+  const sections = useMemo(() => {
     const groups = new Map<string, EventItem[]>();
     for (const item of filtered) {
       const arr = groups.get(item.category) ?? [];
       arr.push(item);
       groups.set(item.category, arr);
     }
-    return groups;
+    const out: { id: string; label: string; items: EventItem[]; offset: number }[] = [];
+    let offset = 0;
+    for (const cat of ITEM_CATEGORIES) {
+      const items = groups.get(cat.id);
+      if (!items || items.length === 0) continue;
+      out.push({ id: cat.id, label: cat.label, items, offset });
+      offset += items.length;
+    }
+    return out;
   }, [filtered]);
 
+  const orderedItems = useMemo(() => sections.flatMap((section) => section.items), [sections]);
   const selectedItem = value ? EVENT_ITEMS_BY_ID.get(value) ?? null : null;
+
+  // Keeps the arrow-key highlight inside the scroll viewport. No state, so no re-render.
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [open, activeIndex]);
+
+  const choose = (item: EventItem) => {
+    onChange(item.id);
+    setOpen(false);
+    setSearch("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) {
+        setActiveIndex(0);
+        setOpen(true);
+        return;
+      }
+      if (orderedItems.length === 0) return;
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex((index) => (index + delta + orderedItems.length) % orderedItems.length);
+      return;
+    }
+    if (e.key === "Enter" && open && orderedItems[activeIndex]) {
+      e.preventDefault();
+      choose(orderedItems[activeIndex]);
+      return;
+    }
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (e.key === "Tab") setOpen(false);
+  };
 
   const searchInputStyle: React.CSSProperties = {
     border: "none",
@@ -112,7 +164,7 @@ function ItemSelector({
     borderRadius: "8px",
     zIndex: 10,
     marginTop: 4,
-    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+    boxShadow: dropdownShadow(theme),
   };
 
   const dropdownItemStyle: React.CSSProperties = {
@@ -128,13 +180,9 @@ function ItemSelector({
 
   return (
     <div ref={ref} style={{ position: "relative", flex: 1, minWidth: 200 }}>
+      {/* The focus ring belongs on the bordered trigger, not the borderless input inside it. */}
       <div
-        className="tool-input"
-        role="combobox"
-        tabIndex={0}
-        aria-label="Item"
-        aria-expanded={open}
-        aria-controls="event-item-listbox"
+        className="tool-input ep-item-trigger"
         style={{
           ...inputStyle,
           display: "flex",
@@ -145,35 +193,36 @@ function ItemSelector({
           cursor: "pointer",
           height: ITEM_TRIGGER_HEIGHT,
         }}
-        onClick={() => {
-          if (!open) setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            if (!open) setOpen(true);
-          }
-        }}
       >
         {selectedItem && !open && (
           <ItemIcon item={selectedItem} size={18} />
         )}
         <input
           type="text"
+          role="combobox"
+          aria-label="Item"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={open && orderedItems[activeIndex] ? `${listId}-${activeIndex}` : undefined}
           value={open ? search : (selectedItem?.name ?? "")}
           onChange={(e) => {
             setSearch(e.target.value);
+            setActiveIndex(0);
             if (value) onChange(null);
             if (!open) setOpen(true);
           }}
           onFocus={() => {
             setSearch("");
+            setActiveIndex(0);
             setOpen(true);
           }}
+          onKeyDown={handleKeyDown}
           placeholder="Search items..."
           style={searchInputStyle}
         />
         <span
+          aria-hidden="true"
           style={{
             marginLeft: "auto",
             fontSize: "0.75rem",
@@ -186,12 +235,8 @@ function ItemSelector({
         </span>
       </div>
       {open && (
-        <div
-          id="event-item-listbox"
-          role="listbox"
-          style={dropdownMenuStyle}
-        >
-          {filtered.length === 0 && (
+        <div ref={menuRef} id={listId} role="listbox" aria-label="Items" style={dropdownMenuStyle}>
+          {orderedItems.length === 0 && (
             <div
               style={{
                 padding: "12px",
@@ -203,50 +248,50 @@ function ItemSelector({
               No items found
             </div>
           )}
-          {ITEM_CATEGORIES.map((cat) => {
-            const items = grouped.get(cat.id);
-            if (!items || items.length === 0) return null;
-            return (
-              <div key={cat.id}>
-                <div
-                  style={{
-                    padding: "8px 12px 4px",
-                    fontSize: "0.75rem",
-                    fontWeight: 800,
-                    color: theme.muted,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  {cat.label}
-                </div>
-                {items.map((item) => (
-                  <div
+          {sections.map((section) => (
+            <div key={section.id}>
+              <div
+                style={{
+                  padding: "8px 12px 4px",
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                  color: theme.muted,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {section.label}
+              </div>
+              {section.items.map((item, indexInSection) => {
+                const index = section.offset + indexInSection;
+                const active = index === activeIndex;
+                return (
+                  <button
                     key={item.id}
-                    className="tool-btn tool-dropdown-item"
+                    type="button"
                     role="option"
-                    tabIndex={0}
-                    aria-selected={value === item.id}
-                    onClick={() => {
-                      onChange(item.id);
-                      setOpen(false);
-                      setSearch("");
+                    id={`${listId}-${index}`}
+                    aria-selected={active}
+                    data-active={active}
+                    tabIndex={-1}
+                    // Keeps focus (and the combobox's activedescendant) on the input through the click.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(item)}
+                    style={{
+                      ...dropdownItemStyle,
+                      width: "100%",
+                      border: "none",
+                      textAlign: "left",
+                      background: active ? theme.accentSoft : "transparent",
+                      color: active ? theme.accentText : theme.text,
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onChange(item.id);
-                        setOpen(false);
-                        setSearch("");
-                      }
-                    }}
-                    style={dropdownItemStyle}
                   >
                     <ItemIcon item={item} size={22} />
                     <span>{item.name}</span>
                     <span
                       style={{
-                        color: theme.muted,
+                        color: active ? theme.accentText : theme.muted,
                         fontSize: "0.75rem",
                         marginLeft: "auto",
                         whiteSpace: "nowrap",
@@ -254,11 +299,11 @@ function ItemSelector({
                     >
                       Lv.{item.level} &middot; {item.slot}
                     </span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -319,6 +364,22 @@ function PlanSummary({
           onConfirm={clearEntries}
           style={{ ...clearAllButtonStyle, marginLeft: "auto" }}
         />
+      </div>
+    </div>
+  );
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyPlanState({ theme, panelStyle }: { theme: AppTheme; panelStyle: React.CSSProperties }) {
+  return (
+    <div className="fade-in panel-card" style={{ ...panelStyle, textAlign: "center" }}>
+      <div style={{ fontSize: "0.9rem", fontWeight: 800, color: theme.text }}>
+        No items in the plan yet
+      </div>
+      <div style={{ marginTop: 6, fontSize: "0.82rem", fontWeight: 600, color: theme.muted, lineHeight: 1.5 }}>
+        Pick an item above with its current and target stars, then add it. Each item you add is
+        grouped under its character with the expected meso cost and spares for the whole plan.
       </div>
     </div>
   );
@@ -557,6 +618,7 @@ function CharacterPlanPanel({
                 return (
                   <th
                     key={col.key}
+                    scope="col"
                     aria-sort={ariaSort}
                     style={{ ...thStyle, textAlign: col.align }}
                   >
@@ -573,11 +635,13 @@ function CharacterPlanPanel({
                 );
               })}
               {STATUS_COLUMNS.map((label) => (
-                <th key={label} style={{ ...thStyle, textAlign: "center" }}>
+                <th key={label} scope="col" style={{ ...thStyle, textAlign: "center" }}>
                   <span style={thButtonStyle}>{label}</span>
                 </th>
               ))}
-              <th style={thStyle} />
+              <th scope="col" style={thStyle}>
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -683,7 +747,7 @@ function EventSettingsSection({
 // ── Add item form ─────────────────────────────────────────────────────────────
 
 function AddItemForm({
-  theme, form, dispatchForm, characters, itemMaxStar, canAdd, handleAdd, styles,
+  theme, form, dispatchForm, characters, itemMaxStar, canAdd, addHint, handleAdd, styles,
 }: {
   theme: AppTheme;
   form: FormState;
@@ -691,6 +755,7 @@ function AddItemForm({
   characters: StoredCharacterRecord[];
   itemMaxStar: number;
   canAdd: boolean;
+  addHint: string | null;
   handleAdd: () => void;
   styles: ReturnType<typeof toolStyles>;
 }) {
@@ -733,9 +798,14 @@ function AddItemForm({
       <div>
         <div className="section-label" style={{ color: theme.muted, marginBottom: 4, fontSize: "0.75rem" }}>Replace Cost</div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input className="tool-input" type="number" min={0} value={form.replaceCost} onFocus={(e) => e.currentTarget.select()} onKeyDown={replaceZeroOnDigit} onChange={(e) => dispatchForm({ type: "setReplaceCost", value: Math.max(0, Number(e.target.value) || 0) })} placeholder="0" style={{ ...styles.inputStyle, ...controlHeightStyle, width: 120 }} />
+          <ToolNumberInput min={0} value={form.replaceCost} onKeyDown={replaceZeroOnDigit} onCommit={(value) => dispatchForm({ type: "setReplaceCost", value })} placeholder="0" style={{ ...styles.inputStyle, ...controlHeightStyle, width: 120 }} />
           <ActionButton theme={theme} label="+ Add" disabled={!canAdd} onClick={handleAdd} style={{ marginLeft: "auto", ...controlHeightStyle, padding: "0 22px" }} />
         </div>
+        {addHint && (
+          <div role="status" style={{ marginTop: 6, fontSize: "0.75rem", fontWeight: 600, color: statusText(theme, "danger") }}>
+            {addHint}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -762,7 +832,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
 
   // ── Add-item form state ──
 
-  const { form, dispatchForm, itemMaxStar, canAdd, handleAdd } =
+  const { form, dispatchForm, itemMaxStar, canAdd, addHint, handleAdd } =
     useEventPlannerForm(addEntry);
 
   // ── Group entries by character ──
@@ -798,8 +868,11 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
   return (
     <div className="page-content">
       <style>{`
-        .tool-dropdown-item:hover { background: ${theme.timerBg}; }
-        .ep-plan-table tbody tr:last-child td { border-bottom: none; }
+        /* The ring belongs on the bordered trigger, not the borderless input inside it. */
+        .ep-item-trigger:focus-within { outline: 2px solid; outline-offset: 2px; }
+        /* !important beats the inline borderBottom from dataTableTd, so the last
+           row's line doesn't double up against the panel's own bottom border. */
+        .ep-plan-table tbody tr:last-child td { border-bottom: none !important; }
         @media (max-width: 860px) {
           .ep-form-grid { grid-template-columns: 1fr !important; }
           /* Stack each settings row: label on its own line, controls filling
@@ -814,7 +887,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="Event Planner"
-          description="Toggle your active events and options, then add items with their current and target stars to plan your total spending."
+          description="Star force spending for the whole event, item by item."
         />
 
         {/* Settings + add form share one panel to keep the header area short. */}
@@ -843,10 +916,13 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
             characters={characters}
             itemMaxStar={itemMaxStar}
             canAdd={canAdd}
+            addHint={addHint}
             handleAdd={handleAdd}
             styles={styles}
           />
         </div>
+
+        {state.entries.length === 0 && <EmptyPlanState theme={theme} panelStyle={panelStyle} />}
 
         {state.entries.length > 0 && (
           <PlanSummary

@@ -1,7 +1,9 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import type { Route } from "next";
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useMounted } from "../../../../lib/useMounted";
 import type { SetupFlowId } from "../../setup/flows";
 import type { SetupStepId } from "../../setup/steps";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
@@ -424,7 +426,7 @@ function OverviewToolLinkIcon() {
 // Shared by every Overview section header that also links out to a standalone calculator
 // tool -- the tools read the character back via their existing `?character=` convention
 // (useApplyCharacterQueryParam), so this just needs to build a matching URL.
-function overviewToolHref(base: string, charName: string | undefined): string | undefined {
+function overviewToolHref(base: Route, charName: string | undefined): Route | undefined {
   return charName ? `${base}?character=${encodeURIComponent(charName)}` : undefined;
 }
 
@@ -441,7 +443,7 @@ function overviewToolHref(base: string, charName: string | undefined): string | 
 // name (per its /tools listing card, e.g. "HEXA Skill Tracker") rather than the section
 // label, since they don't always match either.
 function OverviewGroupHeader({ label, theme, onNavigate, bookmarkLabel, toolHref, toolLabel }: {
-  label: string; theme: Theme; onNavigate: () => void; bookmarkLabel: string; toolHref?: string; toolLabel?: string;
+  label: string; theme: Theme; onNavigate: () => void; bookmarkLabel: string; toolHref?: Route; toolLabel?: string;
 }) {
   return (
     <div style={overviewGroupHeaderRowStyle(theme)}>
@@ -1078,7 +1080,7 @@ function OverviewBookmark({ model, onNavigateToBookmark, onNavigateToGearSlot, o
   const classData = classId ? CLASS_SKILL_DATA.find((c) => c.id === classId) : undefined;
   const hexaClassDef = resolveHexaClassDef(classId);
 
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
   const charName = character?.characterName;
   const [customizing, setCustomizing] = useState(false);
   const hexaLevels = useMemo(() => {
@@ -1955,7 +1957,7 @@ function EquipmentBookmark({
   const activeGrid: SlotMap = preset ? storedPresetToDraft(preset) : {};
 
   const charName = character?.characterName;
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
   const symbolLevels = useMemo(() => {
     if (!mounted) return null;
     const fromState = (character?.tools?.symbols as { symbols?: Record<string, SymbolState> } | undefined)?.symbols;
@@ -2454,7 +2456,7 @@ function HexaMatrixBookmark({ theme, character, view, onViewChange, onSetActiveP
   theme: Theme; character: StoredCharacterRecord | null; view: HexaBookmarkView; onViewChange: (v: HexaBookmarkView) => void;
   onSetActivePreset: (nodeIndex: number, presetIndex: number) => void;
 }) {
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
   const charName = character?.characterName;
   const hexaLevels = useMemo(() => {
     if (!mounted) return null;
@@ -3263,7 +3265,7 @@ export default function CharacterProfileOverviewScreen({
 }: CharacterProfileOverviewScreenProps) {
   const { theme, profile } = model;
   const character = profile.confirmedCharacter;
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
 
   const bookmarks = ALL_BOOKMARKS;
   // Restores whichever bookmark was active before an optional flow was started from

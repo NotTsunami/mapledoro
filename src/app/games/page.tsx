@@ -5,6 +5,7 @@
   Displays games as compact linked rows inside a category panel.
 */
 import type { CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import AppShell from "../../components/AppShell";
 import type { AppTheme } from "../../components/themes";
@@ -13,14 +14,13 @@ interface GameCard {
   title: string;
   description: string;
   icon: string;
-  href: string;
+  href: Route;
 }
 
 const GAMES: GameCard[] = [
   {
     title: "Mapledle",
-    description:
-      "Guess which class learns the daily skill icon in 5 tries. A new puzzle arrives every day at 00:00 UTC.",
+    description: "Guess which class learns the daily skill icon in 5 tries.",
     icon: "🎯",
     href: "/games/skill-guesser",
   },
@@ -108,10 +108,10 @@ function GamesContent({ theme }: { theme: AppTheme }) {
         .game-row:hover .game-row-arrow, .game-row:focus-visible .game-row-arrow { opacity: 1; }
         @media (min-width: 861px) {
           .game-row-desc {
-            min-height: calc(0.78rem * 1.45 * 2);
+            min-height: calc(0.78rem * 1.45);
             display: -webkit-box;
             -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             overflow: hidden;
           }
         }

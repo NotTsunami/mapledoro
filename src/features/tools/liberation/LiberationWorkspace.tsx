@@ -17,8 +17,8 @@ import {
   useLiberationState,
   type CalcResult,
   getSelection,
-  formatDate,
 } from "./useLiberationState";
+import { formatLongDate } from "../date";
 import { toolStyles } from "../tool-styles";
 import { PanelDivider, Toggle, ToolNumberInput } from "../shared-ui";
 import { ConfirmButton } from "../../../components/ConfirmButton";
@@ -70,7 +70,7 @@ function LiberationConfigSection({
 
   return (
     <section className="fade-in panel-card" style={sectionPanel}>
-      <h2 className="tool-panel-title" style={{ color: theme.text }}>Configuration</h2>
+      <h2 className="tool-panel-title" style={{ color: theme.text }}>Starting Point</h2>
       <div className="tool-control-row">
         <div style={{ flex: "1 1 220px" }}>
           <label className="tool-field-label" htmlFor={questId} style={fieldLabel}>Current Quest</label>
@@ -222,7 +222,7 @@ function LiberationResultsSection({
     key: String(m.questIdx),
     label: m.questLabel,
     note: i === result.milestones.length - 1 ? "liberation" : "bar full",
-    value: formatDate(m.completionDate),
+    value: formatLongDate(m.completionDate),
     valueNote: `(${m.weeksFromStart}w)`,
   }));
   const breakdown: ResultRow[] = result.breakdown.map((b) => ({
@@ -237,7 +237,7 @@ function LiberationResultsSection({
       theme={theme}
       sectionPanel={sectionPanel}
       metrics={[
-        { label: "Completion Date", value: never ? "Never" : formatDate(result.completionDate), danger: never },
+        { label: "Completion Date", value: never ? "Never" : formatLongDate(result.completionDate), danger: never },
         {
           label: "Weeks Remaining",
           value: result.weeksToComplete === Infinity ? "--" : String(result.weeksToComplete),
@@ -310,7 +310,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           <ToolHeader
             theme={theme}
             title="Liberation Tracker"
-            description="Track your Genesis, Destiny, or Astra Secondary progress and view estimated completion dates."
+            description="Genesis, Destiny, and Astra Secondary progress with estimated completion dates."
           />
 
           <div className="fade-in" style={{ marginBottom: "1.25rem" }}>

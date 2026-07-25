@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type Ref } from "react";
 import Image from "next/image";
+import { useMounted } from "../../../../lib/useMounted";
 import { WORLD_NAMES } from "../../model/constants";
 import {
   readCharactersStore, linkSkillsDraftToStored, linkSkillsStoredToDraftString,
@@ -280,7 +281,7 @@ function LegionArtifactEditPanel({ theme, worldId, worldLegionArtifact, onSave, 
 function LegionArtifactSection({ theme, worldId, editing, onEditDone, editorRef }: {
   theme: AppTheme; worldId: number; editing: boolean; onEditDone: () => void; editorRef: Ref<EditorHandle>;
 }) {
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
   const legion = mounted ? readCharactersStore().legionArtifactByWorld[String(worldId)] : undefined;
   const artifactLevel = legion?.artifactLevel;
 
@@ -650,7 +651,7 @@ function LinkSkillsEditPanel({ theme, worldId, worldCharacters, worldLinkSkills,
 function LinkSkillsSection({ theme, worldId, worldCharacters, editing, onEditDone, editorRef }: {
   theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[]; editing: boolean; onEditDone: () => void; editorRef: Ref<EditorHandle>;
 }) {
-  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const mounted = useMounted();
   const stored = mounted ? readCharactersStore().linkSkillsByWorld[String(worldId)] : undefined;
   const levels = mounted ? reconcileLinkSkills(stored, worldCharacters, worldId) : undefined;
   // Only the per-class winner (highest level) actually contributes to the account-wide
