@@ -870,7 +870,9 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
       <style>{`
         /* The ring belongs on the bordered trigger, not the borderless input inside it. */
         .ep-item-trigger:focus-within { outline: 2px solid; outline-offset: 2px; }
-        .ep-plan-table tbody tr:last-child td { border-bottom: none; }
+        /* !important beats the inline borderBottom from dataTableTd, so the last
+           row's line doesn't double up against the panel's own bottom border. */
+        .ep-plan-table tbody tr:last-child td { border-bottom: none !important; }
         @media (max-width: 860px) {
           .ep-form-grid { grid-template-columns: 1fr !important; }
           /* Stack each settings row: label on its own line, controls filling
