@@ -168,6 +168,7 @@ export function SearchableSelect<T>({
         {!open && leading}
         <input
           type="text"
+          className="searchable-select-input"
           role="combobox"
           aria-label={ariaLabel}
           aria-expanded={open}
@@ -193,9 +194,7 @@ export function SearchableSelect<T>({
             color: theme.text,
             outline: "none",
             width: "100%",
-            fontFamily: "var(--font-body)",
-            fontSize: "inherit",
-            fontWeight: "inherit",
+            minWidth: 0,
             padding: 0,
             cursor: "inherit",
           }}
