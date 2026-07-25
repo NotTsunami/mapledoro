@@ -414,7 +414,7 @@ function CharacterPlanPanel({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table className="ep-plan-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+        <table className="ep-plan-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               {SORT_COLUMNS.map((col) => {
@@ -503,7 +503,7 @@ function EventSettingsSection({
   // Left-column labels (Events, MVP) hug their controls more tightly.
   const narrowLabelStyle: React.CSSProperties = { ...labelStyle, minWidth: 60 };
   return (
-    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "0.75rem" }}>
       <div className="ep-setting-row" style={rowStyle}>
         <span className="section-label" style={narrowLabelStyle}>Events</span>
         <Toggle theme={theme} label="30% Off Cost" checked={costDiscount} style={toggleControlStyle} onChange={setCostDiscount} />
@@ -564,7 +564,7 @@ function AddItemForm({
   styles: ReturnType<typeof toolStyles>;
 }) {
   return (
-    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "end" }}>
+    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "0.75rem", alignItems: "end" }}>
       <div>
         <div className="section-label" style={{ color: theme.muted, marginBottom: 4, fontSize: "0.75rem" }}>Character</div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -675,8 +675,16 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
         /* !important beats the inline borderBottom from dataTableTd, so the last
            row's line doesn't double up against the panel's own bottom border. */
         .ep-plan-table tbody tr:last-child td { border-bottom: none !important; }
+
+        /* Keeps the columns readable rather than crushed. The wrapper's
+           overflow-x: auto scrolls it on a narrow screen. */
+        .ep-plan-table { min-width: 760px; }
+        /* A flex item's automatic minimum size is its min-content width, and a
+           select's min-content is its widest option, so a long character name
+           would push the row wider than the screen instead of shrinking it. */
+        .ep-setting-row > * { min-width: 0; }
         @media (max-width: 860px) {
-          .ep-form-grid { grid-template-columns: 1fr !important; }
+          .ep-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
           /* Stack each settings row: label on its own line, controls filling
              the full width below (the boom slider + value wrap to a new line). */
           .ep-setting-row > .section-label { flex-basis: 100%; }

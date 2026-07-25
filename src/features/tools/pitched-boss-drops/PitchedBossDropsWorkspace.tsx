@@ -532,7 +532,7 @@ function DropLogTable({
     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
       <table
         className="pbd-table"
-        style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 720 }}
+        style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}
       >
         <thead>
           <tr>
@@ -659,11 +659,13 @@ function LogPanelHeader({
             </option>
           ))}
         </select>
+        {/* Same height token as the selects. A bare `height` would be content-box
+            against actionBtnBase's 1px border and render 2px taller than they do. */}
         <ActionButton
           theme={theme}
           label="+ Log a Drop"
           onClick={onLog}
-          style={{ height: 34, padding: "0 1rem", whiteSpace: "nowrap" }}
+          style={{ ...controlHeightStyle, padding: "0 1rem", whiteSpace: "nowrap" }}
         />
       </div>
     </div>
@@ -872,6 +874,10 @@ export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }
         .pbd-note:hover, .pbd-note:focus-visible { background: ${theme.timerBg}; }
         .pbd-table tbody tr:last-child td { border-bottom: none; }
 
+        /* Keeps the columns readable rather than crushed. The wrapper's
+           overflow-x: auto scrolls it on a narrow screen. */
+        .pbd-table { min-width: 720px; }
+
         .pbd-stat-strip {
           display: flex;
           flex-wrap: wrap;
@@ -888,6 +894,10 @@ export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }
         }
         .pbd-log-title { margin-right: auto; }
         .pbd-log-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        /* A flex item's automatic minimum size is its min-content width, and a
+           select's min-content is its widest option, so a long character name
+           would push the row wider than the screen instead of shrinking it. */
+        .pbd-log-controls > * { min-width: 0; }
 
         /* Four stats ragged-wrap into an uneven second line well before they run out
            of room, so hand them an even grid instead of letting flex break them up. */
@@ -900,11 +910,16 @@ export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }
         }
 
         /* Title above the controls, controls still side by side: stacking all three
-           full-width this early wastes most of the row. */
+           full-width this early wastes most of the row. The upper bound matters:
+           once the row becomes a column below 560px, a flex-basis is read as the
+           item's *height*, which stretched every select to 140px tall. */
+        @media (max-width: 860px) and (min-width: 561px) {
+          .pbd-log-controls > .tool-select { flex: 1 1 140px; }
+        }
+
         @media (max-width: 860px) {
           .pbd-log-header { flex-direction: column; align-items: stretch; }
           .pbd-log-title { margin-right: 0; }
-          .pbd-log-controls > .tool-select { flex: 1 1 140px; }
         }
 
         @media (max-width: 560px) {
