@@ -14,7 +14,7 @@ import { formatShortDate } from "../date";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { Field, Toggle, ToolNumberInput } from "../shared-ui";
 import { toolStyles } from "../tool-styles";
-import { dataTableTh } from "../shared-styles";
+import { dataTableTh, dropdownShadow } from "../shared-styles";
 import {
   CHECK_BUFF_GROUPS,
   DAILY_EXP_CONTENT,
@@ -988,11 +988,6 @@ function MonsterSelector({
       {menu}
     </div>
   );
-}
-
-/** A black drop shadow does nothing on a near-black panel, so deepen it in dark mode. */
-function dropdownShadow(theme: AppTheme): string {
-  return theme.colorMode === "dark" ? "0 12px 28px rgba(0,0,0,0.55)" : "0 8px 24px rgba(0,0,0,0.18)";
 }
 
 function DropdownMessage({ theme, text }: { theme: AppTheme; text: string }) {

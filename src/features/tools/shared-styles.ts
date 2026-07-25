@@ -78,6 +78,12 @@ export const toggleControlStyle: CSSProperties = {
   alignItems: "center",
 };
 
+/** Drop shadow for a dropdown menu floating over the page. A black shadow does
+ *  nothing on a near-black panel, so dark mode gets a deeper, larger one. */
+export function dropdownShadow(theme: AppTheme): string {
+  return theme.colorMode === "dark" ? "0 12px 28px rgba(0,0,0,0.55)" : "0 8px 24px rgba(0,0,0,0.18)";
+}
+
 /** Header cell for data tables (per-star breakdown, EXP table, drop log).
  *  Alignment is per-column, so callers set textAlign. */
 export function dataTableTh(theme: AppTheme): CSSProperties {

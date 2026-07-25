@@ -14,6 +14,8 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-25",
     changes: [
+      { type: "fixed", text: "Fixed the Event Planner emptying the star dropdowns and disabling Add when you picked a lower level item like Wings of Fate." },
+      { type: "changed", text: "The Event Planner item search now takes arrow keys to move through results, Enter to pick one, and Escape to close." },
       { type: "fixed", text: "Fixed the EXP Calculator Daily / Weekly Calculator losing a day of EXP from plans that span a daylight saving time change." },
       { type: "fixed", text: "The EXP Calculator Daily / Weekly Calculator now credits weekly content on the game's Thursday reset instead of your local Thursday." },
       { type: "fixed", text: "Fixed the Trace Restoration Tracker projecting completion dates a day off for players outside UTC." },

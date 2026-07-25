@@ -26,11 +26,25 @@ export type FormAction =
   | { type: "setBoomTier"; value: number }
   | { type: "clearItem" };
 
+/** Star force caps by item level, so the target can offer 1..max and the current 0..max-1.
+ *  Clamps both into range while keeping current below target. */
+function clampStars(state: FormState): FormState {
+  const item = state.item ? EVENT_ITEMS_BY_ID.get(state.item) ?? null : null;
+  if (!item) return state;
+  const max = maxStarForLevel(item.level);
+  const targetStar = Math.max(1, Math.min(state.targetStar, max));
+  const currentStar = Math.max(0, Math.min(state.currentStar, targetStar - 1, max - 1));
+  return { ...state, currentStar, targetStar };
+}
+
 function formReducer(state: FormState, action: FormAction): FormState {
   switch (action.type) {
     case "setChar": return { ...state, char: action.value };
     case "setCharCustom": return { ...state, charCustom: action.value };
-    case "setItem": return { ...state, item: action.value };
+    // Star options are derived from the item's max, so a lower-max item has to pull the
+    // stars down with it. Without this the selects hold a value they no longer offer,
+    // render blank, and leave Add disabled with nothing on screen explaining why.
+    case "setItem": return clampStars({ ...state, item: action.value });
     case "setCurrentStar": return { ...state, currentStar: action.value };
     case "setTargetStar": return { ...state, targetStar: action.value };
     case "setReplaceCost": return { ...state, replaceCost: action.value };
@@ -59,6 +73,10 @@ export function useEventPlannerForm(addEntry: (entry: Omit<PlannerEntry, "id">) 
   const selectedItem = form.item ? EVENT_ITEMS_BY_ID.get(form.item) ?? null : null;
   const itemMaxStar = selectedItem ? maxStarForLevel(selectedItem.level) : 25;
   const canAdd = selectedItem !== null && form.currentStar < form.targetStar && form.targetStar <= itemMaxStar;
+  /** Why Add is unavailable, once an item is chosen. No item selected needs no explaining. */
+  const addHint = selectedItem !== null && form.currentStar >= form.targetStar
+    ? "Target star must be above the current star."
+    : null;
 
   const handleAdd = useCallback(() => {
     if (!form.item || !canAdd) return;
@@ -76,5 +94,5 @@ export function useEventPlannerForm(addEntry: (entry: Omit<PlannerEntry, "id">) 
     dispatchForm({ type: "clearItem" });
   }, [form, canAdd, addEntry]);
 
-  return { form, dispatchForm, itemMaxStar, canAdd, handleAdd };
+  return { form, dispatchForm, itemMaxStar, canAdd, addHint, handleAdd };
 }
