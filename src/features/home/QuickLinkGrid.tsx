@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import type { AppTheme } from "../../components/themes";
 import { useMounted } from "../../lib/useMounted";
@@ -39,7 +40,7 @@ export function QuickLinkGrid({
 }: {
   theme: AppTheme;
   title: string;
-  allHref: string;
+  allHref: Route;
   allLabel: string;
   items: QuickLink[];
   gridClassName: string;

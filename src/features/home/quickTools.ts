@@ -1,10 +1,11 @@
+import type { Route } from "next";
 import { readGlobalTool } from "../tools/globalToolsStore";
 
 // A dashboard-launchable link card (tool or guide).
 export type QuickLink = {
   title: string;
   desc: string;
-  href: string;
+  href: Route;
 } & ({ iconType: "emoji"; icon: string } | { iconType: "item"; itemId: string });
 
 // Full catalog of dashboard-launchable tools. `href` doubles as the stable id

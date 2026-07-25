@@ -5,6 +5,7 @@
   Groups tools into one panel per category, each tool a compact linked row.
 */
 import type { CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import AppShell from "../../components/AppShell";
 import { ItemIcon } from "../../components/ResourceImage";
@@ -13,7 +14,7 @@ import type { AppTheme } from "../../components/themes";
 type ToolCard = {
   title: string;
   description: string;
-  href: string;
+  href: Route;
   comingSoon?: boolean;
 } & ({ iconType?: "emoji"; icon: string } | { iconType: "item"; itemId: string });
 

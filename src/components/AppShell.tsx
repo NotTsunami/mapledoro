@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import AppTopNav from "./AppTopNav";
 import { NAV_LINKS } from "./nav-links";
@@ -8,7 +9,7 @@ import ScrollToTopButton from "./ScrollToTopButton";
 import type { AppTheme } from "./themes";
 import { useTheme } from "./ThemeContext";
 
-const FOOTER_LINKS: { label: string; href: string }[] = [
+const FOOTER_LINKS: { label: string; href: Route }[] = [
   { label: "About", href: "/about" },
   { label: "Terms of Service", href: "/terms" },
   { label: "Privacy Policy", href: "/privacy" },
