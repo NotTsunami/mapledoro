@@ -921,7 +921,7 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="Star Force Calculator"
-          description="Enter your item level, current star, and target star, then run the simulation to see expected meso costs."
+          description="Expected meso and booms for a single star force run, from a full simulation."
         />
 
         <StarForceForm

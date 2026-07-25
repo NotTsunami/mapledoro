@@ -815,7 +815,7 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
           <ToolHeader
             theme={theme}
             title="Daily Tracker"
-            description="Add characters, tap the edit icon to choose which dailies to track, then check them off as you go. Resets at 00:00 UTC."
+            description="Your daily checklist across every character. Resets at 00:00 UTC."
           />
 
           <RemindersConfigBar theme={theme} />

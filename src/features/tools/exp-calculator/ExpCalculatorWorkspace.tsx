@@ -14,7 +14,7 @@ import { formatShortDate } from "../date";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { Field, Toggle, ToolNumberInput } from "../shared-ui";
 import { toolStyles } from "../tool-styles";
-import { dataTableTh } from "../shared-styles";
+import { dataTableTh, dropdownShadow } from "../shared-styles";
 import {
   CHECK_BUFF_GROUPS,
   DAILY_EXP_CONTENT,
@@ -470,11 +470,11 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
           .segmented-toggle-track { flex-wrap: wrap; }
         }
       `}</style>
-      <div className="tool-container" style={{ maxWidth: 1000 }}>
+      <div className="tool-container">
         <ToolHeader
           theme={theme}
           title="EXP Calculator"
-          description="Calculate GMS EXP buffs, monster EXP, level progress, and event resource values using the current level 200-300 EXP table."
+          description="Calculate hourly farming rates, weekly EXP gained, and view resources."
         />
 
         <SegmentedToggle
@@ -990,11 +990,6 @@ function MonsterSelector({
   );
 }
 
-/** A black drop shadow does nothing on a near-black panel, so deepen it in dark mode. */
-function dropdownShadow(theme: AppTheme): string {
-  return theme.colorMode === "dark" ? "0 12px 28px rgba(0,0,0,0.55)" : "0 8px 24px rgba(0,0,0,0.18)";
-}
-
 function DropdownMessage({ theme, text }: { theme: AppTheme; text: string }) {
   return <div style={{ padding: "9px 10px", color: theme.muted, fontSize: "0.82rem", fontWeight: 700 }}>{text}</div>;
 }
@@ -1064,24 +1059,6 @@ function ExpOverviewPanel({
           Import Into Daily/Weekly Calculator →
         </button>
       )}
-      {/* Booster and clockwork proc panels are intentionally hidden while the EXP source modeling is refined.
-      <div className="exp-results" style={{ marginTop: 14 }}>
-        <VisualMetric
-          theme={theme}
-          icon={<MobSprite id="9834331" size={38} alt="Booster Flame" />}
-          label="VIP / HEXA Booster"
-          value={formatExpCompact(result.vipBoosterExp)}
-          detail={`${formatPercent(percentOfLevel(monster.playerLevel, result.vipBoosterExp))}% EXP gained per proc`}
-        />
-        <VisualMetric
-          theme={theme}
-          icon={<ItemIcon id="02639929" size={34} alt="Gilded Clockwork" />}
-          label="Gilded Clockwork"
-          value={formatExpCompact(result.goldClockworkExp)}
-          detail={`${formatPercent(percentOfLevel(monster.playerLevel, result.goldClockworkExp))}% EXP gained per proc`}
-        />
-      </div>
-      */}
     </div>
   );
 }
@@ -1378,7 +1355,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             {/* Milestone levels strictly increase within a simulation, so level is a unique key. */}
             {result.milestones.slice(0, 24).map((milestone) => (
               <span key={milestone.level} style={milestoneChipStyle(theme)}>
-                Lv. {milestone.level} · {formatShortDate(milestone.date)}
+                Lv. {milestone.level} · {formatShortDate(milestone.date, true)}
               </span>
             ))}
           </div>

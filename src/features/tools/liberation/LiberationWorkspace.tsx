@@ -70,7 +70,7 @@ function LiberationConfigSection({
 
   return (
     <section className="fade-in panel-card" style={sectionPanel}>
-      <h2 className="tool-panel-title" style={{ color: theme.text }}>Configuration</h2>
+      <h2 className="tool-panel-title" style={{ color: theme.text }}>Starting Point</h2>
       <div className="tool-control-row">
         <div style={{ flex: "1 1 220px" }}>
           <label className="tool-field-label" htmlFor={questId} style={fieldLabel}>Current Quest</label>
@@ -310,7 +310,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
           <ToolHeader
             theme={theme}
             title="Liberation Tracker"
-            description="Track your Genesis, Destiny, or Astra Secondary progress and view estimated completion dates."
+            description="Genesis, Destiny, and Astra Secondary progress with estimated completion dates."
           />
 
           <div className="fade-in" style={{ marginBottom: "1.25rem" }}>

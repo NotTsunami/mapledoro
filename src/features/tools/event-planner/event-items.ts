@@ -187,6 +187,8 @@ export const EVENT_ITEMS: readonly EventItem[] = [
   // ── Brilliant Boss ────────────────────────────────────────────────────────
   { id: "brilliant-oath", name: "Oath of Death", slot: "Pendant", level: 250, category: "brilliant", itemId: "01122447" },
   { id: "brilliant-whisper", name: "Whisper of the Source", slot: "Ring", level: 250, category: "brilliant", itemId: "01113341" },
+  { id: "brilliant-original-sin", name: "Original Sin of Pride", slot: "Face", level: 250, category: "brilliant", itemId: "01012911" },
+  { id: "brilliant-blissful-nightmare", name: "Blissful Nightmare", slot: "Ring", level: 250, category: "brilliant", itemId: "01113360" },
 
   // ── Gollux ─────────────────────────────────────────────────────────────────
   { id: "gollux-sup-ring", name: "Superior Gollux Ring", slot: "Ring", level: 150, category: "gollux", itemId: "01113075" },

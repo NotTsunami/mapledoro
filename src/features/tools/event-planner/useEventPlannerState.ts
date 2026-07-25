@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useMounted } from "../../../lib/useMounted";
 import {
   readCharactersStore,
@@ -121,45 +121,52 @@ export function useEventPlannerState() {
     };
   });
 
-  useEffect(() => {
-    writeGlobalTool("eventPlanner", state);
-  }, [state]);
+  /** Persists as part of the state update, so the write can't drift from the state it
+   *  describes. A `useEffect` watching `state` would also fire on mount and write a
+   *  record for someone who has only ever looked at the page. */
+  const update = useCallback((updater: (s: SavedState) => SavedState) => {
+    setState((s) => {
+      const next = updater(s);
+      writeGlobalTool("eventPlanner", next);
+      return next;
+    });
+  }, []);
 
   // Settings callbacks
   const setCostDiscount = useCallback(
-    (v: boolean) => setState((s) => ({ ...s, costDiscount: v })),
-    [],
+    (v: boolean) => update((s) => ({ ...s, costDiscount: v })),
+    [update],
   );
   const setBoomReduction = useCallback(
-    (v: boolean) => setState((s) => ({ ...s, boomReduction: v })),
-    [],
+    (v: boolean) => update((s) => ({ ...s, boomReduction: v })),
+    [update],
   );
   const setMvp = useCallback(
-    (v: MvpTier) => setState((s) => ({ ...s, mvp: v })),
-    [],
+    (v: MvpTier) => update((s) => ({ ...s, mvp: v })),
+    [update],
   );
 
   // Entry management
   const addEntry = useCallback(
     (entry: Omit<PlannerEntry, "id">) => {
-      setState((s) => ({
+      update((s) => ({
         ...s,
         entries: [...s.entries, { ...entry, id: crypto.randomUUID() }],
       }));
     },
-    [],
+    [update],
   );
 
-  const removeEntry = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      entries: s.entries.filter((e) => e.id !== id),
-    }));
-  }, []);
+  const removeEntry = useCallback(
+    (id: string) => {
+      update((s) => ({ ...s, entries: s.entries.filter((e) => e.id !== id) }));
+    },
+    [update],
+  );
 
   const clearEntries = useCallback(() => {
-    setState((s) => ({ ...s, entries: [] }));
-  }, []);
+    update((s) => ({ ...s, entries: [] }));
+  }, [update]);
 
   // Cost computation
   const entryCosts = useMemo(

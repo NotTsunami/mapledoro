@@ -20,15 +20,13 @@ interface GuideCard {
 const GUIDES: GuideCard[] = [
   {
     title: "New Players Guide",
-    description:
-      "Everything you need to know to get started in MapleStory.",
+    description: "Everything you need to get started in MapleStory.",
     emoji: "🌱",
     href: "/guides/new-players",
   },
   {
     title: "Character Guides",
-    description:
-      "Browse all MapleStory classes with overviews, link skills, and legion bonuses.",
+    description: "Every class with link skills and legion bonuses.",
     emoji: "⚔️",
     href: "/guides/character-guides",
   },
@@ -116,10 +114,10 @@ function GuidesContent({ theme }: { theme: AppTheme }) {
         .guide-row:hover .guide-row-arrow, .guide-row:focus-visible .guide-row-arrow { opacity: 1; }
         @media (min-width: 861px) {
           .guide-row-desc {
-            min-height: calc(0.78rem * 1.45 * 2);
+            min-height: calc(0.78rem * 1.45);
             display: -webkit-box;
             -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             overflow: hidden;
           }
         }

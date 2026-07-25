@@ -14,6 +14,13 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-25",
     changes: [
+      { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, and Eternal Armor of Radiance Box." },
+      { type: "added", text: "The Event Planner now has Original Sin of Pride and Blissful Nightmare as items to tap." },
+      { type: "fixed", text: "Fixed the Event Planner emptying the star dropdowns and disabling Add when you picked a lower level item like Wings of Fate." },
+      { type: "changed", text: "The Event Planner item search now takes arrow keys to move through results, Enter to pick one, and Escape to close." },
+      { type: "fixed", text: "Fixed the EXP Calculator Daily / Weekly Calculator losing a day of EXP from plans that span a daylight saving time change." },
+      { type: "fixed", text: "The EXP Calculator Daily / Weekly Calculator now credits weekly content on the game's Thursday reset instead of your local Thursday." },
+      { type: "fixed", text: "Fixed the Trace Restoration Tracker projecting completion dates a day off for players outside UTC." },
       { type: "fixed", text: "Fixed the Flaming calculator wiping the decimal point as you typed values like 0.5." },
       { type: "fixed", text: "Trace Restoration now shows dates in your own region's format instead of always using the US one." },
       { type: "fixed", text: "The home page no longer falls back to months-old patch notes when the news feed is slow or unavailable." },

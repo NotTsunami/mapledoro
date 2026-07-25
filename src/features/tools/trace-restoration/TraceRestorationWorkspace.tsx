@@ -94,14 +94,16 @@ function computeEstimate(
 
   let accumulated = current;
   const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  now.setUTCHours(0, 0, 0, 0);
 
-  // Next weekly reset (Thursday)
+  // Next weekly reset (Thursday 00:00 UTC), matching the liberation and astra
+  // trackers. Local-time weekday math would land a day off for viewers whose
+  // local Thursday and the UTC reset fall on different calendar dates.
   const nextThurs = new Date(now);
-  nextThurs.setDate(nextThurs.getDate() + ((4 - nextThurs.getDay() + 7) % 7 || 7));
+  nextThurs.setUTCDate(nextThurs.getUTCDate() + ((4 - nextThurs.getUTCDay() + 7) % 7 || 7));
 
-  // Next monthly reset (1st of next month)
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  // Next monthly reset (1st of next month, 00:00 UTC)
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   const weekDate = new Date(nextThurs);
   const monthDate = new Date(nextMonth);
@@ -112,11 +114,11 @@ function computeEstimate(
     if (useWeekly) {
       accumulated += weeklyGain;
       if (accumulated >= target) return { date: new Date(weekDate) };
-      weekDate.setDate(weekDate.getDate() + 7);
+      weekDate.setUTCDate(weekDate.getUTCDate() + 7);
     } else {
       accumulated += monthlyGain;
       if (accumulated >= target) return { date: new Date(monthDate) };
-      monthDate.setMonth(monthDate.getMonth() + 1);
+      monthDate.setUTCMonth(monthDate.getUTCMonth() + 1);
     }
   }
 
@@ -154,7 +156,7 @@ function EstimateResult({
 }) {
   if (result) {
     const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    now.setUTCHours(0, 0, 0, 0);
     const diffDays = Math.round((result.date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays <= 0) {
       return (
@@ -175,7 +177,7 @@ function EstimateResult({
     return (
       <span style={{ fontSize: "0.82rem", color: theme.text }}>
         <span style={{ fontWeight: 700 }}>Expected: </span>
-        {formatShortDate(result.date)} ({timeLabel})
+        {formatShortDate(result.date, true)} ({timeLabel})
       </span>
     );
   }
@@ -308,6 +310,46 @@ function presetBtnStyle(theme: AppTheme, primary: boolean): CSSProperties {
   };
 }
 
+/** One labelled row of boss toggle chips. Renders nothing for an empty list. */
+function BossChipGroup({
+  theme,
+  label,
+  labelStyle,
+  bosses,
+  selectedBosses,
+  onBossToggle,
+}: {
+  theme: AppTheme;
+  label: string;
+  labelStyle: CSSProperties;
+  bosses: WhisperBoss[];
+  selectedBosses: string[];
+  onBossToggle: (id: string) => void;
+}) {
+  if (bosses.length === 0) return null;
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      <div className="tool-field-label" style={labelStyle}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {bosses.map((boss) => {
+          const active = selectedBosses.includes(boss.id);
+          return (
+            <button
+              key={boss.id}
+              type="button"
+              className="tool-btn"
+              onClick={() => onBossToggle(boss.id)}
+              style={bossChipStyle(theme, active)}
+            >
+              <span aria-hidden="true" style={active ? checkSlotStyle : hiddenCheckSlotStyle}>✓</span>{boss.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CrystalSection({
   theme,
   title,
@@ -409,48 +451,23 @@ function CrystalSection({
       />
 
       {/* Boss selection */}
-      {weeklyBosses.length > 0 && (
-        <div style={{ marginBottom: "1rem" }}>
-          <div className="tool-field-label" style={styles.labelStyle}>Bosses Cleared Weekly</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {weeklyBosses.map((boss) => {
-              const active = selectedBosses.includes(boss.id);
-              return (
-                <button
-                  key={boss.id}
-                  type="button"
-                  className="tool-btn"
-                  onClick={() => onBossToggle(boss.id)}
-                  style={bossChipStyle(theme, active)}
-                >
-                  <span aria-hidden="true" style={active ? checkSlotStyle : hiddenCheckSlotStyle}>✓</span>{boss.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {monthlyBosses.length > 0 && (
-        <div style={{ marginBottom: "1rem" }}>
-          <div className="tool-field-label" style={styles.labelStyle}>Bosses Cleared Monthly</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {monthlyBosses.map((boss) => {
-              const active = selectedBosses.includes(boss.id);
-              return (
-                <button
-                  key={boss.id}
-                  type="button"
-                  className="tool-btn"
-                  onClick={() => onBossToggle(boss.id)}
-                  style={bossChipStyle(theme, active)}
-                >
-                  <span aria-hidden="true" style={active ? checkSlotStyle : hiddenCheckSlotStyle}>✓</span>{boss.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <BossChipGroup
+        theme={theme}
+        label="Bosses Cleared Weekly"
+        labelStyle={styles.labelStyle}
+        bosses={weeklyBosses}
+        selectedBosses={selectedBosses}
+        onBossToggle={onBossToggle}
+      />
+      <BossChipGroup
+        theme={theme}
+        label="Bosses Cleared Monthly"
+        labelStyle={styles.labelStyle}
+        bosses={monthlyBosses}
+        selectedBosses={selectedBosses}
+        onBossToggle={onBossToggle}
+      />
+
 
       {/* Expected date */}
       <div
@@ -813,7 +830,7 @@ export default function TraceRestorationWorkspace({ theme }: { theme: AppTheme }
           <ToolHeader
             theme={theme}
             title="Trace Restoration Tracker"
-            description="Track your Star Force Research whisper crystals and Trace Restoration mission progress."
+            description="Whisper crystal totals and Trace Restoration mission progress."
           />
 
           <SegmentedToggle
