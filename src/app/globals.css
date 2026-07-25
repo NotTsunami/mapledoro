@@ -49,6 +49,15 @@ html {
 /* Content for assistive technology only: live-region status text, table captions. */
 .sr-only {
   position: absolute;
+  /* Pinned horizontally rather than left at its static position. Absolute
+     positioning resolves against the nearest *positioned* ancestor, and these
+     usually have none, so the containing block is the initial containing block
+     and no `overflow` wrapper in between can clip them. Left unpinned inside a
+     horizontally scrolling table, the span sits at the table's far right, pushes
+     the document's scrollable width out to meet it, and the layout viewport
+     expands: enough to stretch the fixed top nav until its menu button and clock
+     sit off screen on a phone. */
+  left: 0;
   width: 1px;
   height: 1px;
   padding: 0;
@@ -97,6 +106,12 @@ html.scroll-locked body {
 
 .page-content {
   flex: 1;
+  /* A flex item defaults to `min-width: auto`, so it refuses to shrink below its
+     min-content width. Without this, a wide table inside an `overflow-x: auto`
+     wrapper widens the whole page instead of scrolling inside it, and the fixed
+     top nav stretches with the document until the mobile menu and clock sit off
+     screen. */
+  min-width: 0;
   width: 100%;
   padding: 1.5rem 1.5rem 2rem 2.75rem;
 }
@@ -261,6 +276,13 @@ html.scroll-locked body {
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+
+/* Searchable select: the ring belongs on the bordered trigger, not the
+   borderless input sitting inside it. */
+.searchable-select-trigger:focus-within {
   outline: 2px solid;
   outline-offset: 2px;
 }
