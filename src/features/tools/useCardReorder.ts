@@ -2,6 +2,19 @@
 
 import { useState } from "react";
 
+/**
+ * Moves one entry within a list, returning a new array. Out-of-range indices
+ * return the original array so a stale drop can't corrupt the order.
+ */
+export function moveInArray<T>(list: T[], from: number, to: number): T[] {
+  if (from === to) return list;
+  if (from < 0 || from >= list.length || to < 0 || to >= list.length) return list;
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 export interface CardDragProps {
   draggable: true;
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;

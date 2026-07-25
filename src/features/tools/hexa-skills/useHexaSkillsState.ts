@@ -1,14 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { useMounted } from "../../../lib/useMounted";
-import {
-  readCharactersStore,
-  selectCharactersList,
-  type StoredCharacterRecord,
-} from "../../characters/model/charactersStore";
-import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
-import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { useCallback } from "react";
+import { type StoredCharacterRecord } from "../../characters/model/charactersStore";
+import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import {
   ORIGIN_COSTS,
   ENHANCEMENT_COSTS,
@@ -76,10 +70,6 @@ function defaultDesiredLevels(): SkillLevels {
     common: COMMON_SKILLS.map(() => 30),
     ascent: 30,
   };
-}
-
-function defaultState(): SavedState {
-  return { className: null, levels: defaultLevels(), desiredLevels: defaultDesiredLevels() };
 }
 
 function clampLevel(v: number): number {
@@ -175,63 +165,37 @@ function calcTotalCosts(levels: SkillLevels, desired: SkillLevels, classDef: Hex
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+function parseHexaSkills(
+  saved: SavedState | null,
+  char: StoredCharacterRecord | undefined,
+): SavedState {
+  if (saved) return saved;
+  // Seed the class from the character's job when we recognise it.
+  const autoClass = char && findClassByName(char.jobName) ? char.jobName : null;
+  return { className: autoClass, levels: defaultLevels(), desiredLevels: defaultDesiredLevels() };
+}
+
+function serializeHexaSkills(state: SavedState): SavedState {
+  return state;
+}
+
 export function useHexaSkillsState() {
-  const mounted = useMounted();
-
-  const characters: StoredCharacterRecord[] = useMemo(
-    () => (mounted ? selectCharactersList(readCharactersStore()) : []),
-    [mounted],
-  );
-
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-
-  const [state, setState] = useState<SavedState>(defaultState);
+  const {
+    mounted,
+    characters,
+    selectedCharName,
+    handleCharChange,
+    state,
+    update: updateState,
+  } = usePerCharacterToolState({
+    toolKey: "hexaSkills",
+    parse: parseHexaSkills,
+    serialize: serializeHexaSkills,
+  });
 
   const classDef = state.className ? findClassByName(state.className) : null;
   const levels = normalizeLevels(state.levels, classDef);
   const desiredLevels = normalizeLevels(state.desiredLevels ?? defaultDesiredLevels(), classDef, 30);
-
-  const updateState = useCallback(
-    (updater: (prev: SavedState) => SavedState) => {
-      setState((prev) => {
-        const next = updater(prev);
-        if (selectedCharName) {
-          writeCharacterToolData(selectedCharName, "hexaSkills", next);
-        }
-        return next;
-      });
-    },
-    [selectedCharName],
-  );
-
-  const handleCharChange = useCallback(
-    (charName: string | null) => {
-      if (selectedCharName) {
-        writeCharacterToolData(selectedCharName, "hexaSkills", state);
-      }
-
-      if (charName) {
-        const saved = readCharacterToolData<SavedState>(charName, "hexaSkills");
-        if (saved) {
-          setState(saved);
-        } else {
-          const char = characters.find((c) => c.characterName === charName);
-          let autoClass: string | null = null;
-          if (char && findClassByName(char.jobName)) {
-            autoClass = char.jobName;
-          }
-          setState({ className: autoClass, levels: defaultLevels(), desiredLevels: defaultDesiredLevels() });
-        }
-      } else {
-        setState(defaultState());
-      }
-
-      setSelectedCharName(charName);
-    },
-    [selectedCharName, state, characters],
-  );
-
-  useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
 
   // Class switching
   const setClassName = useCallback((name: string | null) => {

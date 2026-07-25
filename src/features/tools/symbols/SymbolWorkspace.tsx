@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type ComponentType } from "react";
+import { useId, useMemo } from "react";
 import type { ChartOptions } from "chart.js";
 import { alpha, type AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
@@ -14,6 +14,7 @@ import { toolStyles } from "../tool-styles";
 import { PanelDivider, ToolNumberInput } from "../shared-ui";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { utcDateStr } from "../date";
+import { useLazyChart } from "../useLazyChart";
 import {
   type SymbolType,
   type SymbolArea,
@@ -730,8 +731,6 @@ function computeLevelDays(
   return points;
 }
 
-type LineChartComponent = ComponentType<{ data: unknown; options: unknown }>;
-
 function CompletionTimelineChart({
   theme,
   sectionPanel,
@@ -747,33 +746,15 @@ function CompletionTimelineChart({
   maxLevel: number;
   type: SymbolType;
 }) {
-  // chart.js and react-chartjs-2 are ~180 KB and this panel is often absent
-  // (nothing tracked, or nothing with income). Load them only once it renders,
-  // matching StarForceWorkspace's HistogramPanel and PitchedBossCharts.
-  const [Line, setLine] = useState<LineChartComponent | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadChart() {
-      const [chartModule, lineModule] = await Promise.all([
-        import("chart.js"),
-        import("react-chartjs-2"),
-      ]);
-      chartModule.Chart.register(
-        chartModule.CategoryScale,
-        chartModule.LinearScale,
-        chartModule.PointElement,
-        chartModule.LineElement,
-        chartModule.Tooltip,
-        chartModule.Legend,
-      );
-      if (alive) setLine(() => lineModule.Line as LineChartComponent);
-    }
-    loadChart();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const charts = useLazyChart(["Line"], (c) => [
+    c.CategoryScale,
+    c.LinearScale,
+    c.PointElement,
+    c.LineElement,
+    c.Tooltip,
+    c.Legend,
+  ]);
+  const Line = charts?.Line ?? null;
 
   const series: { name: string; points: ReturnType<typeof computeLevelDays> }[] = [];
   for (const p of stats.unlocked) {

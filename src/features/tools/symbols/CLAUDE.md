@@ -10,4 +10,4 @@ Arcane and Sacred share one tool slot (`tools.symbols`) per character — switch
 
 **Colors** (beyond the global rules in the root doc): translucent state borders use `alpha(theme.accent, n)` from `themes.ts`, not string-appended hex like `theme.accent + "44"`. Grand Sacred cards take `theme.accentSoft`, not a fixed violet. `TIMELINE_COLORS` is a per-color-mode categorical palette (each series color clears 3:1 on its mode's panel); index it with `theme.colorMode`.
 
-**Chart:** the completion timeline lazy-loads chart.js in a `useEffect` (as StarForce and Pitched do), so the ~200 KB library stays out of the page's eager bundle. The panel often renders nothing (no tracked symbol with income), which is why the cost isn't paid up front.
+**Chart:** the completion timeline pulls chart.js through `useLazyChart` (`../useLazyChart.ts`, shared with StarForce and Pitched), so the ~200 KB library stays out of the page's eager bundle. The panel often renders nothing (no tracked symbol with income), which is why the cost isn't paid up front.

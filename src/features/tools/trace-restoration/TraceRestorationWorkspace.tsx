@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import Image from "next/image";
 import type { AppTheme } from "../../../components/themes";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
+import { formatShortDate } from "../date";
 import { ToolNumberInput } from "../shared-ui";
 import { ItemIcon } from "../../../components/ResourceImage";
 import { ToolHeader } from "../../../components/ToolHeader";
@@ -142,10 +143,6 @@ function computeWeeklyPointGain(selectedMissions: string[], bosses: TraceBoss[])
   return { weekly, monthly };
 }
 
-function formatDateShort(date: Date): string {
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 function EstimateResult({
   theme,
   result,
@@ -178,7 +175,7 @@ function EstimateResult({
     return (
       <span style={{ fontSize: "0.82rem", color: theme.text }}>
         <span style={{ fontWeight: 700 }}>Expected: </span>
-        {formatDateShort(result.date)} ({timeLabel})
+        {formatShortDate(result.date)} ({timeLabel})
       </span>
     );
   }
@@ -359,15 +356,13 @@ function CrystalSection({
       <div className="tool-control-row" style={{ marginBottom: "1.25rem" }}>
         <div>
           <div className="tool-field-label" style={styles.labelStyle}>Current Count</div>
-          <input
-            className="tool-input"
-            type="number"
+          <ToolNumberInput
             min={0}
+            integer
             aria-label={`${title} current count`}
             value={count}
-            onFocus={(e) => e.currentTarget.select()}
             onKeyDown={replaceZeroOnDigit}
-            onChange={(e) => onCountChange(Math.max(0, parseInt(e.target.value, 10) || 0))}
+            onCommit={onCountChange}
             style={{ ...styles.inputStyle, width: 100 }}
           />
         </div>

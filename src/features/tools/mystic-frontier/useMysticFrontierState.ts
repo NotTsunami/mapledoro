@@ -1,14 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useMounted } from "../../../lib/useMounted";
-import {
-  readCharactersStore,
-  selectCharactersList,
-  type StoredCharacterRecord,
-} from "../../characters/model/charactersStore";
-import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
-import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { useMemo } from "react";
+import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import { getMfFamiliar } from "./familiars";
 import { getBonusItem, type MfBonusColor, type MfBonusFamily, type MfBonusItem } from "./bonusItemsData";
 import {
@@ -124,42 +117,17 @@ function editActiveSlot(prev: SavedState, index: number, fn: (s: SlotState) => S
   }));
 }
 
+function serializeMysticFrontier(state: SavedState): SavedState {
+  return state;
+}
+
 export function useMysticFrontierState() {
-  const mounted = useMounted();
-
-  const characters: StoredCharacterRecord[] = useMemo(
-    () => (mounted ? selectCharactersList(readCharactersStore()) : []),
-    [mounted],
-  );
-
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-  const [state, setState] = useState<SavedState>(defaultState);
-  // Mirror of selectedCharName for use inside state updaters, so persistence always
-  // targets the right character regardless of closure timing.
-  const selectedCharRef = useRef<string | null>(null);
-
-  // The lineup is stored per character (in that character's `tools` field). Writes
-  // happen synchronously inside the updater so the persisted value stays atomic with
-  // the state change.
-  const update = useCallback((fn: (prev: SavedState) => SavedState): void => {
-    setState((prev) => {
-      const next = fn(prev);
-      if (selectedCharRef.current) writeCharacterToolData(selectedCharRef.current, STORAGE_KEY, next);
-      return next;
+  const { mounted, characters, selectedCharName, handleCharChange, state, update } =
+    usePerCharacterToolState({
+      toolKey: STORAGE_KEY,
+      parse: parseState,
+      serialize: serializeMysticFrontier,
     });
-  }, []);
-
-  const handleCharChange = useCallback((charName: string | null): void => {
-    const outgoing = selectedCharRef.current;
-    setState((current) => {
-      if (outgoing) writeCharacterToolData(outgoing, STORAGE_KEY, current);
-      return charName ? parseState(readCharacterToolData<SavedState>(charName, STORAGE_KEY)) : defaultState();
-    });
-    selectedCharRef.current = charName;
-    setSelectedCharName(charName);
-  }, []);
-
-  useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
 
   // ── setters (all scoped to the active wave) ────────────────────────────────
   const patchSlot = (index: number, patch: Partial<SlotState>) =>
