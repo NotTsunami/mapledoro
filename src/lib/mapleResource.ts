@@ -4,7 +4,11 @@
 
 export type ResourceType = "erda-skill" | "familiar" | "hexa-skill" | "item" | "mob" | "skill";
 
-const RESOURCE_BASE = process.env.NEXT_PUBLIC_RESOURCE_BASE ?? "https://haku.network";
+// Exported for the root layout's <link rel="preconnect">, which needs only the
+// origin: the browser derives that from the href itself, so this is passed
+// through as-is rather than parsed (a malformed override should keep degrading
+// to broken images, not throw at module load and take the app down).
+export const RESOURCE_BASE = process.env.NEXT_PUBLIC_RESOURCE_BASE ?? "https://haku.network";
 
 export function resourceImageUrl(type: ResourceType, id: string, asset: string): string {
   return `${RESOURCE_BASE}/api/img/${type}/${id}/${asset}`;

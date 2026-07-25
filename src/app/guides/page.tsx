@@ -5,6 +5,7 @@
   Displays guides as compact linked rows inside a category panel.
 */
 import type { CSSProperties } from "react";
+import type { Route } from "next";
 import Link from "next/link";
 import AppShell from "../../components/AppShell";
 import type { AppTheme } from "../../components/themes";
@@ -13,7 +14,7 @@ interface GuideCard {
   title: string;
   description: string;
   emoji: string;
-  href: string;
+  href: Route;
 }
 
 const GUIDES: GuideCard[] = [

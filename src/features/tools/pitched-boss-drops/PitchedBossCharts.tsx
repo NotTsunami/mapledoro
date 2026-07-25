@@ -1,12 +1,10 @@
 "use client";
 
 import { toolStyles } from "../tool-styles";
-import { useEffect, useState, type ComponentType } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { chartSeriesColor } from "../../../components/chartColors";
+import { useLazyChart } from "../useLazyChart";
 import { DROP_ITEMS_BY_ID } from "./pitched-items";
-
-type ChartComponent = ComponentType<{ data: unknown; options: unknown }>;
 
 interface PitchedBossDrop {
   id: string;
@@ -140,36 +138,15 @@ export default function PitchedBossCharts({
   theme: AppTheme;
   drops: PitchedBossDrop[];
 }) {
-  const [charts, setCharts] = useState<{ Bar: ChartComponent; Line: ChartComponent } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      const [chartModule, reactChart] = await Promise.all([
-        import("chart.js"),
-        import("react-chartjs-2"),
-      ]);
-      chartModule.Chart.register(
-        chartModule.CategoryScale,
-        chartModule.LinearScale,
-        chartModule.BarElement,
-        chartModule.PointElement,
-        chartModule.LineElement,
-        chartModule.Tooltip,
-        chartModule.Legend,
-      );
-      if (active) {
-        setCharts({
-          Bar: reactChart.Bar as ChartComponent,
-          Line: reactChart.Line as ChartComponent,
-        });
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const charts = useLazyChart(["Bar", "Line"], (c) => [
+    c.CategoryScale,
+    c.LinearScale,
+    c.BarElement,
+    c.PointElement,
+    c.LineElement,
+    c.Tooltip,
+    c.Legend,
+  ]);
 
   if (!charts) return null;
   const { Bar, Line } = charts;

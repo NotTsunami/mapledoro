@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  typedRoutes: true,
   async headers() {
     return [
       {
@@ -19,9 +20,6 @@ const nextConfig = {
     "http://localhost:3000",
     "http://127.0.0.1:3000",
   ],
-  experimental: {
-    optimizePackageImports: ["chart.js", "react-chartjs-2"],
-  },
   images: {
     minimumCacheTTL: 2678400,
     remotePatterns: [

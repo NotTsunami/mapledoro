@@ -328563,6 +328563,1873 @@
     "01832000": {
       "cash": true
     },
+    "01902000": {
+      "islot": "Tm",
+      "reqLevel": 60
+    },
+    "01902001": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01902002": {
+      "islot": "Tm",
+      "reqLevel": 200
+    },
+    "01902004": {
+      "islot": "Tm",
+      "reqLevel": 30
+    },
+    "01902005": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01902006": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01902007": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01902008": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902009": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902010": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902011": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902012": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902013": {
+      "islot": "Tm",
+      "reqLevel": 70,
+      "cash": true
+    },
+    "01902014": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902015": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01902016": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01902017": {
+      "islot": "Tm",
+      "reqLevel": 150
+    },
+    "01902018": {
+      "islot": "Tm",
+      "reqLevel": 200
+    },
+    "01902019": {
+      "islot": "Tm",
+      "reqLevel": 30
+    },
+    "01902020": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902021": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902022": {
+      "islot": "Tm",
+      "reqLevel": 70,
+      "cash": true
+    },
+    "01902023": {
+      "islot": "Tm",
+      "reqLevel": 70,
+      "cash": true
+    },
+    "01902024": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902025": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902026": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902032": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902035": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902036": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902038": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902039": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902040": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01902041": {
+      "islot": "Tm",
+      "reqLevel": 80
+    },
+    "01902042": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01902045": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902046": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902047": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902048": {
+      "islot": "Tm",
+      "reqLevel": 75
+    },
+    "01902049": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902050": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902051": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902059": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902060": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01902061": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01912003": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912004": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912006": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912007": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912008": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912009": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912010": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912013": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912014": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912015": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912016": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912017": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912018": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912019": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912025": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912028": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912029": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912031": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912032": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912038": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912039": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912040": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912041": {
+      "islot": "Sd",
+      "reqLevel": 75
+    },
+    "01912042": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912043": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912044": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912052": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912053": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01912054": {
+      "islot": "Sd",
+      "cash": true
+    },
+    "01932000": {
+      "islot": "Tm",
+      "reqLevel": 70
+    },
+    "01932001": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932002": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932003": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932004": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932005": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932006": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932007": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932008": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932009": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932010": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932011": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932012": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932013": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932014": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932016": {
+      "islot": "Tm",
+      "reqLevel": 70
+    },
+    "01932017": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932018": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932019": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932020": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932021": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932034": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932035": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932037": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932043": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932044": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932045": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932046": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932047": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932048": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932049": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932050": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932052": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932086": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932087": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932095": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932096": {
+      "islot": "Tm",
+      "reqLevel": 10
+    },
+    "01932102": {
+      "islot": "Tm",
+      "reqLevel": 70
+    },
+    "01932103": {
+      "islot": "Tm",
+      "reqJob": 5
+    },
+    "01932104": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932108": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932142": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932151": {
+      "islot": "Tm",
+      "reqLevel": 70
+    },
+    "01932179": {
+      "islot": "Tm",
+      "reqLevel": 60
+    },
+    "01932180": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01932181": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01932182": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01932183": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01932184": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01932187": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01932188": {
+      "islot": "Tm",
+      "reqLevel": 100
+    },
+    "01932189": {
+      "islot": "Tm",
+      "reqLevel": 150
+    },
+    "01932190": {
+      "islot": "Tm",
+      "reqLevel": 200
+    },
+    "01932191": {
+      "islot": "Tm",
+      "reqLevel": 50
+    },
+    "01932192": {
+      "islot": "Tm",
+      "reqLevel": 80
+    },
+    "01932193": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01932223": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932225": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932226": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932227": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932230": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932232": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932233": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932244": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932245": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932251": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932258": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932259": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932262": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932263": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932264": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932265": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932266": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932267": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932268": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932269": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932270": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932271": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932272": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932273": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932274": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932275": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932276": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932306": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932307": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932310": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932311": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932314": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932319": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932320": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932321": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932322": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932323": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932324": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932325": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932333": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932336": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932337": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932341": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932342": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932350": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932351": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932352": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932362": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932363": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932365": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932366": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932368": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932370": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932374": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932376": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932377": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932378": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932379": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932380": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932383": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932384": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932388": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932389": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932390": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932391": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932392": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932396": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932397": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932400": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932402": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932404": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932405": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932406": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932413": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932414": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932415": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932416": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932417": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932418": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932419": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932420": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932421": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932422": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932425": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932426": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932430": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932431": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932433": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932435": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932436": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932437": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932438": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932441": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932442": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932443": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932444": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932445": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932446": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932447": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932448": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932449": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932451": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932454": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932455": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932456": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932457": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932459": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932464": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932465": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932466": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932467": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932469": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932470": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932471": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932474": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932475": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932476": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932477": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932478": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932480": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932481": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932483": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932484": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932488": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932489": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932490": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932491": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932492": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932493": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932494": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932495": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932496": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932498": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932499": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932500": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932501": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932507": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932508": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932510": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932511": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932513": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932514": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932515": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932516": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932517": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932518": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932521": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932524": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932526": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932537": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932538": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932542": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932543": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932544": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932550": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932551": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932557": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932560": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932561": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932563": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932573": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932574": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932575": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932576": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932577": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932581": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932584": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932587": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932588": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932589": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932595": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932597": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932598": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932614": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932615": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932616": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932617": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932618": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932622": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932623": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932624": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932632": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932633": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932644": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932663": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932670": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932674": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932675": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932676": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932677": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932683": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932691": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932692": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932693": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932695": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932697": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932705": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932708": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932724": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932725": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932726": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932740": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932753": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932755": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932756": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932757": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932758": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932760": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932764": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932765": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932768": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932769": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932772": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932776": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932781": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932782": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932787": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932793": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932794": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932795": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932796": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932797": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932800": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932801": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932802": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932804": {
+      "islot": "Tm",
+      "cash": true
+    },
+    "01932805": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932806": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932807": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932813": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932815": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932822": {
+      "islot": "Tm",
+      "reqLevel": 10
+    },
+    "01932824": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932827": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932829": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932831": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932833": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932835": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932838": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932840": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932845": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932846": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932853": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932854": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932856": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932876": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932877": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932881": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932884": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932885": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932886": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932887": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932888": {
+      "islot": "Tm",
+      "collabo": true
+    },
+    "01932889": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01932890": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01932893": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932894": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932895": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01932902": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932904": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932910": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01932911": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932912": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932917": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932918": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932923": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932924": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932928": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932929": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932930": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932931": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932937": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932938": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932941": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932944": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932947": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932950": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932951": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932952": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932953": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932954": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932961": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 2
+    },
+    "01932964": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932965": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01932966": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932972": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932973": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932974": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932984": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01932994": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932995": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01932996": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933000": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01933001": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01933002": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01933003": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01933004": {
+      "islot": "Tm",
+      "reqJob": 1,
+      "collabo": true
+    },
+    "01933005": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933006": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933008": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933009": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933014": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933015": {
+      "islot": "Tm",
+      "reqJob": 1
+    },
+    "01933016": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933017": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933020": {
+      "islot": "Tm",
+      "reqLevel": 13
+    },
+    "01933021": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933022": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933023": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933025": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933026": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933027": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933030": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933036": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933041": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01933042": {
+      "islot": "Tm",
+      "reqLevel": 13,
+      "reqJob": 1
+    },
+    "01939007": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01939016": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01939018": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01939019": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01939020": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
     "01942000": {
       "islot": "Tm",
       "reqLevel": 20,
@@ -328743,6 +330610,71 @@
       "incMDD": 60,
       "incJump": 10,
       "tuc": 5
+    },
+    "01982000": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01982002": {
+      "islot": "Tm",
+      "reqLevel": 1
+    },
+    "01983711": {
+      "collabo": true
+    },
+    "01983934": {
+      "collabo": true
+    },
+    "01983935": {
+      "collabo": true
+    },
+    "01983936": {
+      "collabo": true
+    },
+    "01983937": {
+      "collabo": true
+    },
+    "01983938": {
+      "collabo": true
+    },
+    "01983958": {
+      "collabo": true
+    },
+    "01984100": {
+      "collabo": true
+    },
+    "01984101": {
+      "collabo": true
+    },
+    "01984285": {
+      "collabo": true
+    },
+    "01984286": {
+      "collabo": true
+    },
+    "01984287": {
+      "collabo": true
+    },
+    "01984289": {
+      "collabo": true
+    },
+    "01984290": {
+      "collabo": true
+    },
+    "01984293": {
+      "collabo": true
+    },
+    "01992000": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01992001": {
+      "islot": "Tm",
+      "reqLevel": 120
+    },
+    "01992012": {
+      "islot": "Tm",
+      "reqLevel": 120
     },
     "02002036": {
       "collabo": true
@@ -343283,6 +345215,243 @@
       "collabo": true
     },
     "03996227": {
+      "collabo": true
+    },
+    "04000209": {
+      "collabo": true
+    },
+    "04000210": {
+      "collabo": true
+    },
+    "04000211": {
+      "collabo": true
+    },
+    "04000212": {
+      "collabo": true
+    },
+    "04000213": {
+      "collabo": true
+    },
+    "04000214": {
+      "collabo": true
+    },
+    "04000216": {
+      "collabo": true
+    },
+    "04000217": {
+      "collabo": true
+    },
+    "04000218": {
+      "collabo": true
+    },
+    "04000219": {
+      "collabo": true
+    },
+    "04000220": {
+      "collabo": true
+    },
+    "04000221": {
+      "collabo": true
+    },
+    "04009486": {
+      "collabo": true
+    },
+    "04031322": {
+      "collabo": true
+    },
+    "04031323": {
+      "collabo": true
+    },
+    "04031324": {
+      "collabo": true
+    },
+    "04031325": {
+      "collabo": true
+    },
+    "04036508": {
+      "collabo": true
+    },
+    "04036509": {
+      "collabo": true
+    },
+    "04036510": {
+      "collabo": true
+    },
+    "04036511": {
+      "collabo": true
+    },
+    "04036512": {
+      "collabo": true
+    },
+    "04036513": {
+      "collabo": true
+    },
+    "04036514": {
+      "collabo": true
+    },
+    "04036515": {
+      "collabo": true
+    },
+    "04036516": {
+      "collabo": true
+    },
+    "04036517": {
+      "collabo": true
+    },
+    "04036518": {
+      "collabo": true
+    },
+    "04036519": {
+      "collabo": true
+    },
+    "04036520": {
+      "collabo": true
+    },
+    "04036521": {
+      "collabo": true
+    },
+    "04036522": {
+      "collabo": true
+    },
+    "04036532": {
+      "collabo": true
+    },
+    "04036602": {
+      "collabo": true
+    },
+    "04036603": {
+      "collabo": true
+    },
+    "04036722": {
+      "collabo": true
+    },
+    "04036723": {
+      "collabo": true
+    },
+    "04037334": {
+      "collabo": true
+    },
+    "04037346": {
+      "collabo": true
+    },
+    "04170066": {
+      "collabo": true
+    },
+    "04170074": {
+      "collabo": true
+    },
+    "04170075": {
+      "collabo": true
+    },
+    "04250000": {
+      "incPAD": 1
+    },
+    "04250001": {
+      "incPAD": 2
+    },
+    "04250002": {
+      "incPAD": 3
+    },
+    "04250100": {
+      "incMAD": 1
+    },
+    "04250101": {
+      "incMAD": 2
+    },
+    "04250102": {
+      "incMAD": 3
+    },
+    "04250200": {
+      "incACC": 2
+    },
+    "04250201": {
+      "incACC": 3
+    },
+    "04250202": {
+      "incACC": 5
+    },
+    "04250300": {
+      "incEVA": 2
+    },
+    "04250301": {
+      "incEVA": 3
+    },
+    "04250302": {
+      "incEVA": 5
+    },
+    "04250400": {
+      "incSpeed": 2
+    },
+    "04250401": {
+      "incSpeed": 3
+    },
+    "04250402": {
+      "incSpeed": 5
+    },
+    "04250500": {
+      "incJump": 1
+    },
+    "04250501": {
+      "incJump": 2
+    },
+    "04250502": {
+      "incJump": 3
+    },
+    "04250800": {
+      "incSTR": 2
+    },
+    "04250801": {
+      "incSTR": 3
+    },
+    "04250802": {
+      "incSTR": 5
+    },
+    "04250900": {
+      "incINT": 2
+    },
+    "04250901": {
+      "incINT": 3
+    },
+    "04250902": {
+      "incINT": 5
+    },
+    "04251000": {
+      "incLUK": 2
+    },
+    "04251001": {
+      "incLUK": 3
+    },
+    "04251002": {
+      "incLUK": 5
+    },
+    "04251100": {
+      "incDEX": 2
+    },
+    "04251101": {
+      "incDEX": 3
+    },
+    "04251102": {
+      "incDEX": 5
+    },
+    "04310144": {
+      "collabo": true
+    },
+    "04310267": {
+      "collabo": true
+    },
+    "04310357": {
+      "collabo": true
+    },
+    "04310432": {
+      "collabo": true
+    },
+    "04310433": {
+      "collabo": true
+    },
+    "04310434": {
+      "collabo": true
+    },
+    "04310437": {
       "collabo": true
     },
     "05010000": {
@@ -358582,177 +360751,6 @@
       "cash": true
     },
     "05990000": {
-      "cash": true
-    },
-    "1220002": {
-      "cash": true
-    },
-    "1220003": {
-      "cash": true
-    },
-    "1220005": {
-      "cash": true
-    },
-    "1230001": {
-      "cash": true
-    },
-    "1230004": {
-      "cash": true
-    },
-    "1230006": {
-      "cash": true
-    },
-    "1230007": {
-      "cash": true
-    },
-    "1230008": {
-      "cash": true
-    },
-    "1240009": {
-      "cash": true
-    },
-    "1240010": {
-      "cash": true
-    },
-    "1240011": {
-      "cash": true
-    },
-    "1240012": {
-      "cash": true
-    },
-    "1240013": {
-      "cash": true
-    },
-    "1240014": {
-      "cash": true
-    },
-    "1240015": {
-      "cash": true
-    },
-    "1240016": {
-      "cash": true
-    },
-    "1240017": {
-      "cash": true
-    },
-    "1240018": {
-      "cash": true
-    },
-    "1240019": {
-      "cash": true
-    },
-    "1240020": {
-      "cash": true
-    },
-    "1240021": {
-      "cash": true
-    },
-    "1240022": {
-      "cash": true
-    },
-    "1240023": {
-      "cash": true
-    },
-    "2210001": {
-      "cash": true
-    },
-    "2210002": {
-      "cash": true
-    },
-    "2210003": {
-      "cash": true
-    },
-    "2210004": {
-      "cash": true
-    },
-    "2210005": {
-      "cash": true
-    },
-    "2210006": {
-      "cash": true
-    },
-    "2210007": {
-      "cash": true
-    },
-    "2210008": {
-      "cash": true
-    },
-    "2210009": {
-      "cash": true
-    },
-    "2210010": {
-      "cash": true
-    },
-    "2210011": {
-      "cash": true
-    },
-    "2210012": {
-      "cash": true
-    },
-    "2210013": {
-      "cash": true
-    },
-    "2210014": {
-      "cash": true
-    },
-    "2210015": {
-      "cash": true
-    },
-    "2210016": {
-      "cash": true
-    },
-    "2210017": {
-      "cash": true
-    },
-    "2210018": {
-      "cash": true
-    },
-    "2210019": {
-      "cash": true
-    },
-    "2210020": {
-      "cash": true
-    },
-    "2210021": {
-      "cash": true
-    },
-    "3009999": {
-      "cash": true
-    },
-    "3200000": {
-      "cash": true
-    },
-    "3200001": {
-      "cash": true
-    },
-    "3200002": {
-      "cash": true
-    },
-    "3200003": {
-      "cash": true
-    },
-    "3200004": {
-      "cash": true
-    },
-    "3200005": {
-      "cash": true
-    },
-    "3200006": {
-      "cash": true
-    },
-    "3200007": {
-      "cash": true
-    },
-    "4250002": {
-      "cash": true
-    },
-    "4350002": {
-      "cash": true
-    },
-    "4450001": {
-      "cash": true
-    },
-    "4550001": {
       "cash": true
     },
     "5000000": {

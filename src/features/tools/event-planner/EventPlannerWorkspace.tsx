@@ -12,7 +12,7 @@ import {
 } from "../../../components/CharacterSyncPanel";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { formatMeso, formatMesoFull } from "../format";
-import { Toggle, PanelDivider, ActionButton } from "../shared-ui";
+import { Toggle, PanelDivider, ActionButton, ToolNumberInput } from "../shared-ui";
 import { MVP_OPTIONS } from "../shared-data";
 import { BOOM_TIER_COUNT, type MvpTier } from "../star-force/star-force-data";
 import { toolStyles } from "../tool-styles";
@@ -733,7 +733,7 @@ function AddItemForm({
       <div>
         <div className="section-label" style={{ color: theme.muted, marginBottom: 4, fontSize: "0.75rem" }}>Replace Cost</div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input className="tool-input" type="number" min={0} value={form.replaceCost} onFocus={(e) => e.currentTarget.select()} onKeyDown={replaceZeroOnDigit} onChange={(e) => dispatchForm({ type: "setReplaceCost", value: Math.max(0, Number(e.target.value) || 0) })} placeholder="0" style={{ ...styles.inputStyle, ...controlHeightStyle, width: 120 }} />
+          <ToolNumberInput min={0} value={form.replaceCost} onKeyDown={replaceZeroOnDigit} onCommit={(value) => dispatchForm({ type: "setReplaceCost", value })} placeholder="0" style={{ ...styles.inputStyle, ...controlHeightStyle, width: 120 }} />
           <ActionButton theme={theme} label="+ Add" disabled={!canAdd} onClick={handleAdd} style={{ marginLeft: "auto", ...controlHeightStyle, padding: "0 22px" }} />
         </div>
       </div>

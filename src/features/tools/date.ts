@@ -13,3 +13,23 @@ export function localDateStr(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/**
+ * A `YYYY-MM-DD` string as a long display date ("March 7, 2026"). Read as UTC,
+ * so a stored calendar date never shifts a day for a viewer behind GMT. Pinned
+ * to en-US, matching the projection dates the liberation trackers have always
+ * shown.
+ */
+export function formatLongDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
+/** A date or timestamp as a short display date ("Mar 7, 2026"). */
+export function formatShortDate(value: Date | number): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

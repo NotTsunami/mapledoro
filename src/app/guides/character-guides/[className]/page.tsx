@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type CSSProperties, use, useState } from "react";
+import { type CSSProperties, use, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AppShell from "../../../../components/AppShell";

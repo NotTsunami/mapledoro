@@ -17,8 +17,8 @@ import {
   useLiberationState,
   type CalcResult,
   getSelection,
-  formatDate,
 } from "./useLiberationState";
+import { formatLongDate } from "../date";
 import { toolStyles } from "../tool-styles";
 import { PanelDivider, Toggle, ToolNumberInput } from "../shared-ui";
 import { ConfirmButton } from "../../../components/ConfirmButton";
@@ -222,7 +222,7 @@ function LiberationResultsSection({
     key: String(m.questIdx),
     label: m.questLabel,
     note: i === result.milestones.length - 1 ? "liberation" : "bar full",
-    value: formatDate(m.completionDate),
+    value: formatLongDate(m.completionDate),
     valueNote: `(${m.weeksFromStart}w)`,
   }));
   const breakdown: ResultRow[] = result.breakdown.map((b) => ({
@@ -237,7 +237,7 @@ function LiberationResultsSection({
       theme={theme}
       sectionPanel={sectionPanel}
       metrics={[
-        { label: "Completion Date", value: never ? "Never" : formatDate(result.completionDate), danger: never },
+        { label: "Completion Date", value: never ? "Never" : formatLongDate(result.completionDate), danger: never },
         {
           label: "Weeks Remaining",
           value: result.weeksToComplete === Infinity ? "--" : String(result.weeksToComplete),

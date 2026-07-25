@@ -8,6 +8,7 @@ import {
   type StoredCharacterRecord,
 } from "../../characters/model/charactersStore";
 import { readGlobalTool, writeGlobalTool } from "../globalToolsStore";
+import { moveInArray } from "../useCardReorder";
 import { utcDateStr } from "../date";
 import {
   ARCANE_SYMBOL_QUESTS,
@@ -433,14 +434,9 @@ export function useDailiesState() {
 
   const reorderCharacters = useCallback(
     (from: number, to: number) => {
+      // Guard before `commit`, which persists unconditionally.
       if (from === to) return;
-      commit((prev) => {
-        if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev;
-        const next = [...prev];
-        const [moved] = next.splice(from, 1);
-        next.splice(to, 0, moved);
-        return next;
-      });
+      commit((prev) => moveInArray(prev, from, to));
     },
     [commit],
   );

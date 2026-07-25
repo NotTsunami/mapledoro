@@ -27,12 +27,6 @@
     "eslint-plugin-sonarjs": "^4.2.0",
     "typescript": "^5.9.3"
   },
-  "browserslist": [
-    "chrome >= 92",
-    "edge >= 92",
-    "firefox >= 90",
-    "safari >= 15"
-  ],
   "overrides": {
     "js-yaml": "4.3.0",
     "postcss": "8.5.22",

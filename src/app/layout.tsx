@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "../components/ThemeContext";
 import { ACCENT_THEMES, composeTheme, type ColorMode } from "../components/themes";
 import CookieConsentBanner from "../components/CookieConsentBanner";
+import { RESOURCE_BASE } from "../lib/mapleResource";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -61,6 +62,14 @@ export default async function RootLayout({
       className={`${nunito.variable} ${fredoka.variable}`}
       style={{ background: initialBg, colorScheme: initialColorMode }}
     >
+      <head>
+        {/* Nearly every page renders game art from the MapleResource host, but the
+            browser only discovers it once React paints the first image, so DNS and
+            TLS land on the critical path. Opening the connection up front removes
+            that handshake. Deliberately no crossOrigin: these are plain no-CORS
+            image loads, and a CORS preconnect opens a socket they never reuse. */}
+        <link rel="preconnect" href={RESOURCE_BASE} />
+      </head>
       <body>
         <ThemeProvider initialThemeKey={initialThemeKey} initialColorMode={initialColorMode}>
           {children}

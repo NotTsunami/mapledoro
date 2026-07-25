@@ -1,14 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useMounted } from "../../../lib/useMounted";
-import {
-  readCharactersStore,
-  selectCharactersList,
-  type StoredCharacterRecord,
-} from "../../characters/model/charactersStore";
-import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
-import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { useCallback } from "react";
+import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import { utcDateStr } from "../date";
 import {
   type AstraBoss,
@@ -42,11 +35,6 @@ interface AstraSavedState {
 
 // -- Helpers ------------------------------------------------------------------
 
-
-export function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-}
 
 export function getAstraSelection(
   selections: Record<string, AstraBossSelection>,
@@ -337,32 +325,28 @@ function formToSaved(form: AstraFormState): AstraSavedState {
 
 // -- Hook ---------------------------------------------------------------------
 
-export function useAstraState() {
-  const mounted = useMounted();
+function parseAstra(saved: AstraSavedState | null): AstraFormState {
+  return saved ? savedToForm(saved) : defaultAstraForm();
+}
 
-  const characters: StoredCharacterRecord[] = mounted
-    ? selectCharactersList(readCharactersStore())
-    : [];
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-  const [form, setForm] = useState<AstraFormState>(defaultAstraForm);
+export function useAstraState() {
+  const {
+    mounted,
+    characters,
+    selectedCharName,
+    handleCharChange,
+    state: form,
+    update: updateForm,
+  } = usePerCharacterToolState({
+    toolKey: "astra",
+    parse: parseAstra,
+    serialize: formToSaved,
+  });
 
   const {
     missionIdx, currentTraces, currentFragments, startDate,
     dailyQuestId, daysPerWeek, futureQuestDate, futureQuestId, selections,
   } = form;
-
-  const updateForm = useCallback(
-    (updater: (prev: AstraFormState) => AstraFormState) => {
-      setForm((prev) => {
-        const next = updater(prev);
-        if (selectedCharName) {
-          writeCharacterToolData(selectedCharName, "astra", formToSaved(next));
-        }
-        return next;
-      });
-    },
-    [selectedCharName],
-  );
 
   const setMissionIdx = useCallback((v: number) => updateForm((f) => ({ ...f, missionIdx: v })), [updateForm]);
   const setCurrentTraces = useCallback((v: number) => updateForm((f) => ({ ...f, currentTraces: Math.min(v, MAX_TRACES_CAPACITY) })), [updateForm]);
@@ -372,24 +356,6 @@ export function useAstraState() {
   const setDaysPerWeek = useCallback((v: number) => updateForm((f) => ({ ...f, daysPerWeek: v })), [updateForm]);
   const setFutureQuestDate = useCallback((v: string) => updateForm((f) => ({ ...f, futureQuestDate: v })), [updateForm]);
   const setFutureQuestId = useCallback((v: string) => updateForm((f) => ({ ...f, futureQuestId: v })), [updateForm]);
-
-  const handleCharChange = useCallback(
-    (charName: string | null) => {
-      if (selectedCharName) {
-        writeCharacterToolData(selectedCharName, "astra", formToSaved(form));
-      }
-      if (charName) {
-        const saved = readCharacterToolData<AstraSavedState>(charName, "astra");
-        setForm(saved ? savedToForm(saved) : defaultAstraForm());
-      } else {
-        setForm(defaultAstraForm());
-      }
-      setSelectedCharName(charName);
-    },
-    [selectedCharName, form],
-  );
-
-  useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
 
   const setDifficulty = useCallback(
     (bossName: string, diffIdx: number | null) => {

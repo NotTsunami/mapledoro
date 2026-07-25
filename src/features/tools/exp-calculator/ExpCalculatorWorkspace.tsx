@@ -10,6 +10,7 @@ import type { AppTheme } from "../../../components/themes";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { useMounted } from "../../../lib/useMounted";
 import { formatExpCompact, formatMesoFull } from "../format";
+import { formatShortDate } from "../date";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { Field, Toggle, ToolNumberInput } from "../shared-ui";
 import { toolStyles } from "../tool-styles";
@@ -1377,7 +1378,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             {/* Milestone levels strictly increase within a simulation, so level is a unique key. */}
             {result.milestones.slice(0, 24).map((milestone) => (
               <span key={milestone.level} style={milestoneChipStyle(theme)}>
-                Lv. {milestone.level} · {formatDate(milestone.date)}
+                Lv. {milestone.level} · {formatShortDate(milestone.date)}
               </span>
             ))}
           </div>
@@ -1831,10 +1832,6 @@ function formatProjectedDays(days: number | null): string {
   if (days === null) return "N/A";
   if (days === 0) return "Reached";
   return `${days.toLocaleString()} day${days === 1 ? "" : "s"}`;
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function localDateInputValue(date: Date): string {

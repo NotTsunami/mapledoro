@@ -6,7 +6,7 @@ import type { CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { ToolHeader } from "../../../components/ToolHeader";
-import { Field, Toggle } from "../shared-ui";
+import { Field, Toggle, ToolNumberInput } from "../shared-ui";
 import { formatMesoFull, formatPct } from "../format";
 import { toolStyles } from "../tool-styles";
 import { controlHeightStyle, resultsMessageStyle, resultsTableStyles, summaryRowStyle as summaryRowBase } from "../shared-styles";
@@ -116,10 +116,6 @@ function reducer(state: CalcState, action: CalcAction): CalcState {
 }
 
 /** Bonus stats are never negative, and a negative equivalence inverts the maths. */
-function toPositive(raw: string): number {
-  return Math.max(0, Number(raw) || 0);
-}
-
 // -- Sub-components -----------------------------------------------------------
 
 function EquivRow({
@@ -144,16 +140,13 @@ function EquivRow({
       {/* The affixes read as one sentence around the input, so they're hidden
           from assistive tech and restated as the input's own label. */}
       <span aria-hidden="true" style={{ ...affixStyle, justifySelf: "end" }}>{prefix}</span>
-      <input
-        className="tool-input"
-        type="number"
+      <ToolNumberInput
         step={0.1}
         min={0}
         aria-label={`${prefix} ${suffix}`}
         value={value}
-        onFocus={(e) => e.currentTarget.select()}
         onKeyDown={replaceZeroOnDigit}
-        onChange={(e) => onChange(toPositive(e.target.value))}
+        onCommit={onChange}
         style={{ ...inputStyle, width: 70, textAlign: "center" }}
       />
       <span aria-hidden="true" style={affixStyle}>{suffix}</span>
@@ -263,15 +256,12 @@ function FlameSettingsPanel({
 
         {state.itemType === "weapon" && (
           <Field label="Base Attack" htmlFor={`${uid}-base-attack`} style={labelStyle}>
-            <input
+            <ToolNumberInput
               id={`${uid}-base-attack`}
-              className="tool-input"
-              type="number"
               min={0}
               value={state.baseAttack}
-              onFocus={(e) => e.currentTarget.select()}
               onKeyDown={replaceZeroOnDigit}
-              onChange={(e) => dispatch({ type: "setBaseAttack", value: toPositive(e.target.value) })}
+              onCommit={(value) => dispatch({ type: "setBaseAttack", value })}
               style={{ ...inputStyle, ...controlHeightStyle, width: "100%", padding: "8px 10px" }}
             />
           </Field>
@@ -372,15 +362,12 @@ function TargetPanel({
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-        <input
+        <ToolNumberInput
           id={`${uid}-desired`}
-          className="tool-input"
-          type="number"
           min={0}
           value={state.desiredStat}
-          onFocus={(e) => e.currentTarget.select()}
           onKeyDown={replaceZeroOnDigit}
-          onChange={(e) => dispatch({ type: "setDesiredStat", value: toPositive(e.target.value) })}
+          onCommit={(value) => dispatch({ type: "setDesiredStat", value })}
           style={{ ...inputStyle, width: 110, textAlign: "center" }}
         />
         <label htmlFor={`${uid}-desired`} style={{ fontSize: "0.82rem", fontWeight: 700, color: theme.muted }}>
@@ -535,15 +522,12 @@ function FlameScorePanel({
     const id = `${uid}-${field}`;
     return (
       <Field label={label} htmlFor={id} style={labelStyle} containerStyle={flexItem}>
-        <input
+        <ToolNumberInput
           id={id}
-          className="tool-input"
-          type="number"
           min={0}
           value={state.flameScore[field]}
-          onFocus={(e) => e.currentTarget.select()}
           onKeyDown={replaceZeroOnDigit}
-          onChange={(e) => setField(field, toPositive(e.target.value))}
+          onCommit={(value) => setField(field, value)}
           style={fieldInputStyle}
         />
       </Field>
