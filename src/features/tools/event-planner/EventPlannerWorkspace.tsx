@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useId } from "react";
+import { useState, useMemo } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
@@ -16,7 +16,8 @@ import { Toggle, PanelDivider, ActionButton, ToolNumberInput } from "../shared-u
 import { MVP_OPTIONS } from "../shared-data";
 import { BOOM_TIER_COUNT, type MvpTier } from "../star-force/star-force-data";
 import { toolStyles } from "../tool-styles";
-import { controlHeightStyle, dataTableTd, dropdownShadow, statValueStyle, toggleControlStyle } from "../shared-styles";
+import { controlHeightStyle, dataTableTd, statValueStyle, toggleControlStyle } from "../shared-styles";
+import { SearchableSelect } from "../SearchableSelect";
 import {
   EVENT_ITEMS,
   EVENT_ITEMS_BY_ID,
@@ -50,262 +51,65 @@ function ItemSelector({
   onChange: (itemId: string | null) => void;
   inputStyle: React.CSSProperties;
 }) {
-  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
 
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    if (!q) return EVENT_ITEMS;
-    return EVENT_ITEMS.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.slot.toLowerCase().includes(q) ||
-        categoryLabel(item.category).toLowerCase().includes(q),
-    );
-  }, [search]);
-
-  /** Categories in display order, each carrying the offset of its first row in the
-   *  flattened list, so arrow keys can walk the menu exactly as it reads. */
   const sections = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const matches = q
+      ? EVENT_ITEMS.filter(
+          (item) =>
+            item.name.toLowerCase().includes(q) ||
+            item.slot.toLowerCase().includes(q) ||
+            categoryLabel(item.category).toLowerCase().includes(q),
+        )
+      : EVENT_ITEMS;
     const groups = new Map<string, EventItem[]>();
-    for (const item of filtered) {
+    for (const item of matches) {
       const arr = groups.get(item.category) ?? [];
       arr.push(item);
       groups.set(item.category, arr);
     }
-    const out: { id: string; label: string; items: EventItem[]; offset: number }[] = [];
-    let offset = 0;
-    for (const cat of ITEM_CATEGORIES) {
+    return ITEM_CATEGORIES.flatMap((cat) => {
       const items = groups.get(cat.id);
-      if (!items || items.length === 0) continue;
-      out.push({ id: cat.id, label: cat.label, items, offset });
-      offset += items.length;
-    }
-    return out;
-  }, [filtered]);
+      return items && items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
+    });
+  }, [search]);
 
-  const orderedItems = useMemo(() => sections.flatMap((section) => section.items), [sections]);
   const selectedItem = value ? EVENT_ITEMS_BY_ID.get(value) ?? null : null;
 
-  // Keeps the arrow-key highlight inside the scroll viewport. No state, so no re-render.
-  useEffect(() => {
-    if (!open) return;
-    menuRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
-  }, [open, activeIndex]);
-
-  const choose = (item: EventItem) => {
-    onChange(item.id);
-    setOpen(false);
-    setSearch("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!open) {
-        setActiveIndex(0);
-        setOpen(true);
-        return;
-      }
-      if (orderedItems.length === 0) return;
-      const delta = e.key === "ArrowDown" ? 1 : -1;
-      setActiveIndex((index) => (index + delta + orderedItems.length) % orderedItems.length);
-      return;
-    }
-    if (e.key === "Enter" && open && orderedItems[activeIndex]) {
-      e.preventDefault();
-      choose(orderedItems[activeIndex]);
-      return;
-    }
-    if (e.key === "Escape") {
-      setOpen(false);
-      return;
-    }
-    if (e.key === "Tab") setOpen(false);
-  };
-
-  const searchInputStyle: React.CSSProperties = {
-    border: "none",
-    background: "transparent",
-    color: theme.text,
-    outline: "none",
-    width: "100%",
-    fontFamily: "var(--font-body)",
-    fontSize: "inherit",
-    fontWeight: "inherit",
-    padding: 0,
-    cursor: "inherit",
-  };
-
-  const dropdownMenuStyle: React.CSSProperties = {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    maxHeight: 320,
-    overflowY: "auto",
-    background: theme.panel,
-    border: `1px solid ${theme.border}`,
-    borderRadius: "8px",
-    zIndex: 10,
-    marginTop: 4,
-    boxShadow: dropdownShadow(theme),
-  };
-
-  const dropdownItemStyle: React.CSSProperties = {
-    padding: "7px 12px",
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    cursor: "pointer",
-    fontSize: "0.82rem",
-    fontWeight: 600,
-    color: theme.text,
-  };
-
   return (
-    <div ref={ref} style={{ position: "relative", flex: 1, minWidth: 200 }}>
-      {/* The focus ring belongs on the bordered trigger, not the borderless input inside it. */}
-      <div
-        className="tool-input ep-item-trigger"
-        style={{
-          ...inputStyle,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          width: "100%",
-          boxSizing: "border-box",
-          cursor: "pointer",
-          height: ITEM_TRIGGER_HEIGHT,
-        }}
-      >
-        {selectedItem && !open && (
-          <ItemIcon item={selectedItem} size={18} />
-        )}
-        <input
-          type="text"
-          role="combobox"
-          aria-label="Item"
-          aria-expanded={open}
-          aria-controls={open ? listId : undefined}
-          aria-autocomplete="list"
-          aria-activedescendant={open && orderedItems[activeIndex] ? `${listId}-${activeIndex}` : undefined}
-          value={open ? search : (selectedItem?.name ?? "")}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setActiveIndex(0);
-            if (value) onChange(null);
-            if (!open) setOpen(true);
-          }}
-          onFocus={() => {
-            setSearch("");
-            setActiveIndex(0);
-            setOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Search items..."
-          style={searchInputStyle}
-        />
-        <span
-          aria-hidden="true"
-          style={{
-            marginLeft: "auto",
-            fontSize: "0.75rem",
-            color: theme.muted,
-            flexShrink: 0,
-            pointerEvents: "none",
-          }}
-        >
-          ▼
-        </span>
-      </div>
-      {open && (
-        <div ref={menuRef} id={listId} role="listbox" aria-label="Items" style={dropdownMenuStyle}>
-          {orderedItems.length === 0 && (
-            <div
+    <div style={{ flex: 1, minWidth: 200 }}>
+      <SearchableSelect
+        theme={theme}
+        sections={sections}
+        selectedLabel={selectedItem?.name ?? null}
+        getKey={(item) => item.id}
+        onSelect={(item) => onChange(item.id)}
+        ariaLabel="Item"
+        placeholder="Search items..."
+        inputStyle={inputStyle}
+        triggerHeight={ITEM_TRIGGER_HEIGHT}
+        emptyLabel="No items found"
+        search={search}
+        onSearchChange={setSearch}
+        leading={selectedItem ? <ItemIcon item={selectedItem} size={18} /> : null}
+        renderRow={(item, active) => (
+          <>
+            <ItemIcon item={item} size={22} />
+            <span>{item.name}</span>
+            <span
               style={{
-                padding: "12px",
-                fontSize: "0.82rem",
-                color: theme.muted,
-                textAlign: "center",
+                color: active ? theme.accentText : theme.muted,
+                fontSize: "0.75rem",
+                marginLeft: "auto",
+                whiteSpace: "nowrap",
               }}
             >
-              No items found
-            </div>
-          )}
-          {sections.map((section) => (
-            <div key={section.id}>
-              <div
-                style={{
-                  padding: "8px 12px 4px",
-                  fontSize: "0.75rem",
-                  fontWeight: 800,
-                  color: theme.muted,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {section.label}
-              </div>
-              {section.items.map((item, indexInSection) => {
-                const index = section.offset + indexInSection;
-                const active = index === activeIndex;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="option"
-                    id={`${listId}-${index}`}
-                    aria-selected={active}
-                    data-active={active}
-                    tabIndex={-1}
-                    // Keeps focus (and the combobox's activedescendant) on the input through the click.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => choose(item)}
-                    style={{
-                      ...dropdownItemStyle,
-                      width: "100%",
-                      border: "none",
-                      textAlign: "left",
-                      background: active ? theme.accentSoft : "transparent",
-                      color: active ? theme.accentText : theme.text,
-                    }}
-                  >
-                    <ItemIcon item={item} size={22} />
-                    <span>{item.name}</span>
-                    <span
-                      style={{
-                        color: active ? theme.accentText : theme.muted,
-                        fontSize: "0.75rem",
-                        marginLeft: "auto",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Lv.{item.level} &middot; {item.slot}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
+              Lv.{item.level} &middot; {item.slot}
+            </span>
+          </>
+        )}
+      />
     </div>
   );
 }
@@ -406,7 +210,7 @@ const SORT_COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] =
 ];
 
 // Read-only per-entry option columns (not sortable).
-const STATUS_COLUMNS = ["Star Catch", "Safeguard", "Boom Red."];
+const STATUS_COLUMNS = ["Safeguard", "Boom Red."];
 
 function sortValue(row: PlanRow, key: SortKey): string | number {
   switch (key) {
@@ -438,6 +242,17 @@ function sortRows(rows: PlanRow[], sort: SortState | null): PlanRow[] {
     return cmp * sort.dir;
   });
 }
+
+// Matches the drop tracker's row delete button.
+const REMOVE_BUTTON_STYLE: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  padding: 0,
+  display: "grid",
+  placeItems: "center",
+  border: "none",
+  fontSize: "0.9rem",
+};
 
 /** Read-only ✓/— cell for a per-entry option. */
 function StatusCell({
@@ -471,22 +286,6 @@ function PlanRowCells({
   tdStyle: React.CSSProperties;
   removeEntry: (id: string) => void;
 }) {
-  const removeStyle: React.CSSProperties = {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "0.82rem",
-    fontWeight: 700,
-    color: theme.muted,
-    background: theme.timerBg,
-    border: `1px solid ${theme.border}`,
-    userSelect: "none",
-    flexShrink: 0,
-  };
-
   return (
     <>
       <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "normal" }}>
@@ -508,7 +307,6 @@ function PlanRowCells({
       <td style={{ ...tdStyle, color: cost.booms > 0 ? statusText(theme, "danger") : theme.muted }}>
         {cost.booms === 0 ? "0" : cost.booms.toFixed(1)}
       </td>
-      <StatusCell tdStyle={tdStyle} theme={theme} on={entry.starCatch} />
       {/* Tier > 1 overrides safeguard, so show the effective status. */}
       <StatusCell tdStyle={tdStyle} theme={theme} on={entry.safeguard && entry.boomTier <= 1} />
       <td style={{ ...tdStyle, textAlign: "center", color: entry.boomTier > 1 ? theme.text : theme.muted }}>
@@ -516,16 +314,16 @@ function PlanRowCells({
       </td>
       <td style={tdStyle}>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="tool-btn"
-            onClick={() => removeEntry(entry.id)}
-            aria-label={`Remove ${item.name}`}
-            title="Remove item"
-            style={removeStyle}
-          >
-            {"×"}
-          </button>
+          <ConfirmButton
+            theme={theme}
+            label="✕"
+            ariaLabel={`Remove ${item.name}`}
+            title="Remove this item?"
+            message={`This removes ${item.name} from the plan. This can't be undone.`}
+            confirmLabel="Remove"
+            onConfirm={() => removeEntry(entry.id)}
+            style={REMOVE_BUTTON_STYLE}
+          />
         </div>
       </td>
     </>
@@ -556,7 +354,7 @@ function CharacterPlanPanel({
   const subtotal = rows.reduce((s, r) => s + r.cost.cost, 0);
 
   const thStyle: React.CSSProperties = {
-    padding: "6px 12px",
+    padding: "10px 14px",
     borderBottom: `2px solid ${theme.border}`,
   };
   const thButtonStyle: React.CSSProperties = {
@@ -572,6 +370,7 @@ function CharacterPlanPanel({
   };
   const tdStyle: React.CSSProperties = {
     ...dataTableTd(theme),
+    padding: "12px 14px",
     textAlign: "right",
     whiteSpace: "nowrap",
   };
@@ -580,10 +379,12 @@ function CharacterPlanPanel({
     <div className="fade-in panel-card" style={{ ...panelStyle, padding: 0 }}>
       <div
         style={{
-          padding: "0.6rem 1.25rem",
+          // Tighter underneath: the header reads as a label for the table, so it
+          // sits closer to it than to the panel's top edge.
+          padding: "1rem 1.25rem 0.55rem",
           display: "flex",
           alignItems: "center",
-          gap: "0.6rem",
+          gap: "0.7rem",
         }}
       >
         <CharacterAvatarBox theme={theme} record={record} size={42} />
@@ -610,7 +411,7 @@ function CharacterPlanPanel({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table className="ep-plan-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+        <table className="ep-plan-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               {SORT_COLUMNS.map((col) => {
@@ -699,7 +500,7 @@ function EventSettingsSection({
   // Left-column labels (Events, MVP) hug their controls more tightly.
   const narrowLabelStyle: React.CSSProperties = { ...labelStyle, minWidth: 60 };
   return (
-    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "0.75rem" }}>
       <div className="ep-setting-row" style={rowStyle}>
         <span className="section-label" style={narrowLabelStyle}>Events</span>
         <Toggle theme={theme} label="30% Off Cost" checked={costDiscount} style={toggleControlStyle} onChange={setCostDiscount} />
@@ -760,7 +561,7 @@ function AddItemForm({
   styles: ReturnType<typeof toolStyles>;
 }) {
   return (
-    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "end" }}>
+    <div className="ep-form-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "0.75rem", alignItems: "end" }}>
       <div>
         <div className="section-label" style={{ color: theme.muted, marginBottom: 4, fontSize: "0.75rem" }}>Character</div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -868,18 +669,36 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
   return (
     <div className="page-content">
       <style>{`
-        /* The ring belongs on the bordered trigger, not the borderless input inside it. */
-        .ep-item-trigger:focus-within { outline: 2px solid; outline-offset: 2px; }
         /* !important beats the inline borderBottom from dataTableTd, so the last
            row's line doesn't double up against the panel's own bottom border. */
         .ep-plan-table tbody tr:last-child td { border-bottom: none !important; }
+
+        /* Keeps the columns readable rather than crushed. The wrapper's
+           overflow-x: auto scrolls it on a narrow screen. */
+        .ep-plan-table { min-width: 760px; }
+        /* Line the outer columns up with the panel header's 1.25rem inset
+           instead of stopping short of it. */
+        .ep-plan-table th:first-child,
+        .ep-plan-table td:first-child { padding-left: 1.25rem; }
+        .ep-plan-table th:last-child,
+        .ep-plan-table td:last-child { padding-right: 1.25rem; }
+        /* A flex item's automatic minimum size is its min-content width, and a
+           select's min-content is its widest option, so a long character name
+           would push the row wider than the screen instead of shrinking it. */
+        .ep-setting-row > * { min-width: 0; }
         @media (max-width: 860px) {
-          .ep-form-grid { grid-template-columns: 1fr !important; }
+          .ep-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
           /* Stack each settings row: label on its own line, controls filling
              the full width below (the boom slider + value wrap to a new line). */
           .ep-setting-row > .section-label { flex-basis: 100%; }
           .ep-setting-row > .tool-btn { flex: 1; justify-content: center; }
           .ep-setting-row > .tool-select { flex: 1; }
+        }
+        @media (max-width: 560px) {
+          /* Two pills sharing a phone-width row leaves each too narrow for its
+             label ("30% Boom Reduction", "Safeguard (15-17)"), which then wraps
+             mid-phrase. One per row instead. */
+          .ep-setting-row > .tool-btn { flex-basis: 100%; }
         }
       `}</style>
 
