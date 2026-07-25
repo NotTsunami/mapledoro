@@ -1,26 +1,47 @@
 # Mystic Frontier Solver
 
-Calculator for the Mystic Frontier dice event: a single calculator (no roster / optimizer / OCR scanner).
+Calculator for the Mystic Frontier dice event: one calculator, no roster / optimizer / OCR scanner.
 
-**Waves:** a character has 3 waves (lineup presets), selected via a dropdown next to the character picker. Each wave holds its own 3 slots and its own target score (up to 9 familiars saved per character); the active wave drives all scoring/reroll output. Bonus items are equipped on the character and shared across all waves.
+**Waves:** a character has 3 waves (lineup presets) picked from a dropdown, each with its own 3 slots
+and target score (up to 9 familiars per character). The active wave drives all scoring and reroll
+output. Bonus items are per character and shared across waves.
 
-**Lineup:** each slot = a familiar (`familiarId`), a chosen **rarity**, **one** Mystic Frontier potential line, and a rolled **die** value. The MF potential is separate from the two regular potential lines in the character setup flow. Rarity is independent of the familiar (it's the familiar's grade in your inventory) and sets the die size: Common d3, Rare d4, Epic d5, Unique/Legendary d6 (`MF_RARITY_DICE`).
+**Lineup:** each slot is a familiar (`familiarId`), a **rarity**, **one** Mystic Frontier potential
+line, and a rolled **die**. The MF potential is separate from the two regular potential lines in the
+character setup flow. Rarity is the familiar's inventory grade, independent of the familiar, and sets
+die size: Common d3, Rare d4, Epic d5, Unique/Legendary d6 (`MF_RARITY_DICE`). The potential pool is
+rarity-specific, so changing rarity clears the slot's line.
 
-**Type & element auto-populate** from the picked familiar — never stored, always derived via `FAMILIAR_TRAITS[familiarId]` (`familiarTraits.ts`, re-exported through `familiars.ts`).
+**Type & element are never stored** — always derived from `FAMILIAR_TRAITS[familiarId]`
+(`familiarTraits.ts`, re-exported through `familiars.ts`).
 
-**Bonus items** (`bonusItemsData.ts`): one color per family at most; all selected items apply to every roll.
+**Bonus items** (`bonusItemsData.ts`): one color per family at most; all selected items apply to
+every roll.
 
-**Scoring (`calc.ts`):** `finalResult = floor((diceSum + totalFlat) × totalMult)` where **`totalMult` is the SUM of all active multiplier components** (e.g. `+1.2x` and `+1.4x` → ×2.6 — additive, not chained). No active multiplier component = implicit ×1.
+**Scoring (`calc.ts`):** `finalResult = floor((diceSum + totalFlat) x totalMult)` where **`totalMult`
+is the SUM of all active multiplier components** (`+1.2x` and `+1.4x` give x2.6, additive not
+chained). No active multiplier means an implicit x1.
 
-**Potentials (`potentialsData.ts` + `potentialEngine.ts`):**
+**Potentials (`potentialsData.ts` + `potentialEngine.ts`):** a potential's effect is fully determined
+by its `params` (`add`/`sub` to flat dice total, `mul` to an additive Final Multiplier component).
+The **condition** is the leading clause of the template, up to the first comma, matched by a flat
+matcher table. Two special cases:
+- **"+x% chance to roll ..." lines are informational** — they change roll odds, not the score of a
+  fixed roll, so they contribute 0/0 and never show as active. Still selectable.
+- **"Prevents dice from rolling over N"** always applies its multiplier and caps every die at N. The
+  cap is computed in the hook and clamps both stored die values and the reroll search range
+  (`globalDiceCap` / `effectiveMaxDie`).
 
-- A potential's **effect is fully determined by its `params`**: `add`/`sub` → flat dice total, `mul` → an additive Final Multiplier component. The **condition** is the leading clause of the template (everything before the first comma), matched to a predicate by a flat matcher table.
-- **"+x% chance to roll …" lines are informational** — they change roll *odds*, not the score of a fixed roll, so they contribute 0/0 and never appear as active. They're still selectable.
-- **"Prevents dice from rolling over N"** always applies its multiplier and caps every die at N. The cap is computed in the hook and clamps both the stored die values and the reroll search range (`globalDiceCap` / `effectiveMaxDie`).
-- The potential pool is **rarity-specific**; changing a slot's rarity clears its line.
+**Generated data:** `familiarsData.ts`, `familiarTraits.ts`, `potentialsData.ts`, and
+`bonusItemsData.ts` come from `manifests/v269/{familiar,familiar-potentials,item}.json`. Re-derive
+with a script if the manifest version changes; never hand-edit the entry lists. `MfPotentialDef`
+deliberately widens `rarity` to `string` and `params` to an index signature (see that file's header
+for why); consumers narrow `rarity` back to `MfRarity`. Manifest familiar types are normalized to MF
+wording at generation time: `Fish → Aquatic`, `Nymph → Fairy`, `Machine → Mechanical`, matching the
+potential condition text. Elements are unchanged.
 
-**Type-label normalization:** manifest familiar types are normalized to Mystic Frontier wording at generation time: `Fish → Aquatic`, `Nymph → Fairy`, `Machine → Mechanical` (the potential condition text uses the latter). Elements are unchanged.
-
-**Generated data:** `familiarsData.ts`, `familiarTraits.ts`, `potentialsData.ts`, and `bonusItemsData.ts` are generated from `manifests/v269/{familiar,familiar-potentials,item}.json` (potential ids 110001–153303; bonus dice item ids 03802169–03802188). Re-derive with a script if the manifest version changes; do not hand-edit the entry lists. `MfPotentialDef.rarity` is intentionally typed `string` (not `MfRarity`) and `params` is an index signature: a literal-union / optional-keys field makes TypeScript keep each of the ~1.4k array elements as a distinct type and overflow ("union type too complex"). Consumers narrow `rarity` back to `MfRarity`.
-
-**Persistence (per-character**, like symbols/liberation/hexa): the full solver state — `waves[]` (each with its slots and target), shared `bonus` selections, and `activeWave` — is stored under the `mysticFrontier` key in each character's `tools` field via `usePerCharacterToolState` (`../usePerCharacterToolState.ts`), which owns the character list, the load/save wiring, and the `?character=` / world-Main seed. The workspace has a `CharacterSyncPanel`; switching characters saves the outgoing one and loads the incoming one. With no character selected, edits are ephemeral. Legacy pre-wave saves (`{slots, target}`) are migrated into wave 1 by `parseState`. Derived type/element is never stored.
+**Persistence (per-character):** the full solver state (`waves[]`, shared `bonus`, `activeWave`) is
+stored under the `mysticFrontier` key via `usePerCharacterToolState` (`../usePerCharacterToolState.ts`),
+which owns the character list, the load/save wiring, and the `?character=` / world-Main seed. The
+workspace exposes it through a `CharacterSyncPanel`. With no character selected, edits are ephemeral. Legacy pre-wave saves (`{slots, target}`) migrate into
+wave 1 via `parseState`.
