@@ -633,7 +633,7 @@ export default function FlamingWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="Flaming Calculator"
-          description="Calculate the expected number of flames to achieve your desired bonus stats."
+          description="Expected flames to hit your bonus stat target."
         />
 
         <FlameSettingsPanel theme={theme} state={state} dispatch={dispatch} selectStyle={selectStyle} inputStyle={inputStyle} labelStyle={labelStyle} panelStyle={panelStyle} />

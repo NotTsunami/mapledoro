@@ -814,7 +814,7 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="Event Planner"
-          description="Toggle your active events and options, then add items with their current and target stars to plan your total spending."
+          description="Star force spending for the whole event, item by item."
         />
 
         {/* Settings + add form share one panel to keep the header area short. */}

@@ -474,7 +474,7 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
         <ToolHeader
           theme={theme}
           title="EXP Calculator"
-          description="Calculate GMS EXP buffs, monster EXP, level progress, and event resource values using the current level 200-300 EXP table."
+          description="Buff stacking, monster EXP, and event resource values on the current GMS 200-300 table."
         />
 
         <SegmentedToggle

@@ -22,14 +22,14 @@ const CALCULATORS: ToolCard[] = [
   {
     title: "Star Force Calculator",
     description:
-      "Estimate the expected meso cost to star force your equipment.",
+      "Expected meso and booms before you commit to a star force run.",
     icon: "⭐",
     href: "/tools/star-force",
   },
   {
     title: "Cubing Calculator",
     description:
-      "Calculate the expected cost and number of cubes to achieve your desired potential.",
+      "Expected cubes and meso for the potential lines you want.",
     itemId: "05062028", // Glowing Cube
     iconType: "item",
     href: "/tools/cubing",
@@ -37,7 +37,7 @@ const CALCULATORS: ToolCard[] = [
   {
     title: "Flaming Calculator",
     description:
-      "Calculate the expected number of flames to achieve your desired bonus stats.",
+      "Expected flames to land the bonus stats you need.",
     itemId: "02048752", // Powerful Rebirth Flame
     iconType: "item",
     href: "/tools/flaming",
@@ -45,25 +45,25 @@ const CALCULATORS: ToolCard[] = [
   {
     title: "EXP Calculator",
     description:
-      "Calculate EXP buffs, monster EXP, event resources, and level progress from 200 to 300.",
+      "Buff stacking, monster EXP, and what your event coupons are worth from 200 to 300.",
     itemId: "02637353", // EXP Voucher
     iconType: "item",
     href: "/tools/exp-calculator",
   },
 ];
 
-const OTHER_TOOLS: ToolCard[] = [
+const PLANNERS: ToolCard[] = [
   {
     title: "Event Planner",
     description:
-      "Plan star force spending for the next event, estimating meso cost and spare items needed.",
+      "Total meso and spare items for everything you plan to star force this event.",
     icon: "📅",
     href: "/tools/event-planner",
   },
   {
     title: "Mystic Frontier Solver",
     description:
-      "Set your familiars, dice, and target score to see if your roll passes and calculate rerolls.",
+      "Whether your roll clears the target, and which reroll would.",
     itemId: "03802172", // Blessed Orange Dice
     iconType: "item",
     href: "/tools/mystic-frontier",
@@ -74,7 +74,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Boss Crystal Tracker",
     description:
-      "Track your weekly boss crystal income across all characters.",
+      "Weekly crystal income across your whole roster.",
     itemId: "04001928", // Intense Power Crystal (Weekly)
     iconType: "item",
     href: "/tools/boss-crystals",
@@ -82,7 +82,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Daily Tracker",
     description:
-      "Track symbol dailies, daily bosses, and daily content across all your characters.",
+      "One checklist for every daily you run, on every character.",
     itemId: "04001886", // Intense Power Crystal (Daily)
     iconType: "item",
     href: "/tools/dailies",
@@ -90,7 +90,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Liberation Tracker",
     description:
-      "Track your Genesis and Destiny liberation progress and estimate completion.",
+      "Genesis, Destiny, and Astra progress with a projected finish date.",
     itemId: "01332289", // Genesis Dagger
     iconType: "item",
     href: "/tools/liberation",
@@ -98,7 +98,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Symbol Tracker",
     description:
-      "Track your Arcane and Sacred symbol progress and estimate days to max.",
+      "Days to max for every Arcane and Sacred symbol you own.",
     itemId: "01713000", // Sacred Symbol: Cernium
     iconType: "item",
     href: "/tools/symbols",
@@ -106,7 +106,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "HEXA Skill Tracker",
     description:
-      "Track Sol Erda and Fragment costs to max your HEXA skills per character.",
+      "Sol Erda and Fragment cost to max your HEXA skills.",
     itemId: "04009613", // Sol Erda Fragment
     iconType: "item",
     href: "/tools/hexa-skills",
@@ -114,7 +114,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Drop Tracker",
     description:
-      "Track and analyze rare boss drops across all characters.",
+      "A running history of your rare boss drops, charted by item and month.",
     itemId: "02539004", // Grindstone of Faith
     iconType: "item",
     href: "/tools/pitched-boss-drops",
@@ -122,7 +122,7 @@ const TRACKERS: ToolCard[] = [
   {
     title: "Trace Restoration Tracker",
     description:
-      "Track whisper crystal progress and trace restoration missions toward your target items.",
+      "Whisper crystal and mission progress toward the item you want.",
     itemId: "04001956", // Pitched Whisper Crystal
     iconType: "item",
     href: "/tools/trace-restoration",
@@ -132,7 +132,7 @@ const TRACKERS: ToolCard[] = [
 const SECTIONS: { label: string; tools: ToolCard[] }[] = [
   { label: "Calculators", tools: CALCULATORS },
   { label: "Trackers", tools: TRACKERS },
-  { label: "Other Tools", tools: OTHER_TOOLS },
+  { label: "Planners & Solvers", tools: PLANNERS },
 ];
 
 // Uppercase category label inside each panel; color (theme.muted) inline.
@@ -254,7 +254,7 @@ function ToolsContent({ theme }: { theme: AppTheme }) {
             Tools
           </div>
           <div className="page-subtitle" style={{ color: theme.muted }}>
-            MapleStory calculators, trackers, and utilities
+            MapleStory calculators, trackers, and planners
           </div>
 
           <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>

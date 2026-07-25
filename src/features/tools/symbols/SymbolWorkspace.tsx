@@ -881,7 +881,7 @@ export default function SymbolWorkspace({ theme }: { theme: AppTheme }) {
           <ToolHeader
             theme={theme}
             title="Symbol Tracker"
-            description="Switch between Arcane and Sacred, enter each symbol's level and count, and view your estimated days to max."
+            description="Arcane and Sacred progress, with a daily projection to max."
           />
 
           {/* Character + type toggle + overall progress share one panel to keep

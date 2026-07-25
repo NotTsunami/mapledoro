@@ -566,7 +566,7 @@ export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }
         <ToolHeader
           theme={theme}
           title="Drop Tracker"
-          description="Log rare boss drops as they happen — pitched items, armor boxes, grindstones, and more — to build your drop history and analytics."
+          description="Your rare boss drop history, charted by item and by month."
         />
 
         {!hasCharacters ? (

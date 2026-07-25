@@ -813,7 +813,7 @@ export default function TraceRestorationWorkspace({ theme }: { theme: AppTheme }
           <ToolHeader
             theme={theme}
             title="Trace Restoration Tracker"
-            description="Track your Star Force Research whisper crystals and Trace Restoration mission progress."
+            description="Whisper crystal totals and Trace Restoration mission progress."
           />
 
           <SegmentedToggle

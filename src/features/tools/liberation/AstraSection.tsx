@@ -99,7 +99,7 @@ function AstraConfigSection({
 
   return (
     <section className="fade-in panel-card" style={sectionPanel}>
-      <h2 className="tool-panel-title" style={{ color: theme.text }}>Configuration</h2>
+      <h2 className="tool-panel-title" style={{ color: theme.text }}>Starting Point</h2>
       <div className="tool-control-row">
         <div style={{ flex: "1 1 180px" }}>
           <label className="tool-field-label" htmlFor={`${uid}-mission`} style={fieldLabel}>Current Mission</label>
