@@ -18,7 +18,6 @@ import type { HexaStatEntry, HexaStatSlot, HexaStatNode } from "../data/hexaStat
 import { HEXA_STAT_OPTIONS, HEXA_STAT_NODE_MAX_LEVEL, getHexaStatBonus, getMainStatLabel, getAttackLabel, hexaStatSlotLevelSum } from "../data/hexaStatData";
 import { readSavedHexaValue } from "../data/hexaMatrixDraft";
 import SetupStepFrame from "./SetupStepFrame";
-import { HexaSkillIcon } from "../../../../components/ResourceImage";
 import { CopyFromPreset } from "./CopyFromPreset";
 import { LeveledIconTile } from "./LeveledIconTile";
 
@@ -67,6 +66,37 @@ const HEXA_STAT_DEFS: HexaSkillDef[] = [
   { iconId: "50000001", name: "HEXA Stat II" },
   { iconId: "50000002", name: "HEXA Stat III" },
 ];
+
+// A missing/failed icon falls back to the 1-based slot number rather than the shared
+// "HEXA Stat" name's initial (all 3 nodes share that prefix, so a letter wouldn't
+// distinguish them) or a bare broken-image glyph.
+export function HexaStatNodeIcon({ id, slot, theme, size = 28, disabled = false }: {
+  id: string; slot: number; theme: AppTheme; size?: number; disabled?: boolean;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  const src = resourceImageUrl("hexa-skill", id, disabled ? "iconDisabled.png" : "icon.png");
+  return (
+    <>
+      <div ref={wrapperRef} style={{ flexShrink: 0 }}>
+        <Image src={src} alt={`HEXA Stat ${slot}`} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ borderRadius: "6px", display: "block" }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {slot}
+      </div>
+    </>
+  );
+}
 
 // Padding + matching negative margin grows the actual clickable box toward a 44px
 // touch target without shifting surrounding layout — the button still occupies its
@@ -940,7 +970,7 @@ function HexaStatSubstep({
                   style={tabStyle}
                   aria-label={def.name}
                 >
-                  <HexaSkillIcon id={def.iconId} size={36} disabled={iconDisabled} />
+                  <HexaStatNodeIcon id={def.iconId} slot={i + 1} theme={theme} size={36} disabled={iconDisabled} />
                 </button>
               );
             })}

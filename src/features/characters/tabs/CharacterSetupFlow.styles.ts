@@ -576,7 +576,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           }
 
           .confirmed-summary-card p:first-of-type {
-            font-size: 0.9rem !important;
+            font-size: 0.95rem !important;
           }
 
           .confirmed-summary-card p:nth-of-type(2),
@@ -803,9 +803,10 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         @media (max-width: 860px) {
           .profile-binder {
             flex-direction: column;
-            /* The spine stacks above the page here instead of beside it, so a shorter page
-               never shifts the spine's position — the desktop-only min-height would just
-               waste screen space on a phone. */
+            /* No reserved height here (unlike the desktop min-height above) -- V Matrix is
+               such an outlier in mobile height (measured 1123.90625px vs a fraction of that
+               for shorter bookmarks like Bio) that pinning to it would waste huge amounts
+               of screen space on every other bookmark. */
             min-height: auto;
           }
 
@@ -814,6 +815,12 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             width: 100%;
             overflow-x: auto;
             padding: 8px;
+            /* .profile-binder-page renders BEFORE this in the JSX
+               (CharacterProfileOverviewScreen.tsx), which puts the spine below a bookmark's
+               content on this column layout instead of above it. order:-1 flips it to
+               render first visually, so a resize expands downward from the spine instead
+               of moving it. */
+            order: -1;
           }
 
           .profile-bookmark-tab {

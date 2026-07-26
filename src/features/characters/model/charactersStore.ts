@@ -276,13 +276,18 @@ export interface ExpHistoryEntry {
 const EXP_HISTORY_MAX_DAYS = 90;
 export const EXP_HISTORY_DAY_MS = 24 * 60 * 60 * 1000;
 
-// Nexon's own character/ranking data only actually refreshes once per real-world day,
-// typically somewhere in the ~16:00-19:00 UTC range (occasionally later) -- not at UTC
-// midnight. A refresh taken before that update lands still returns the PREVIOUS day's frozen
-// snapshot, so which day a snapshot belongs to needs to be anchored to Nexon's own update
-// cadence, not literal UTC midnight-to-midnight. Padded a few hours past the typical window
-// so an occasionally-delayed update doesn't get misread as having already landed for the day.
-export const NEXON_DAILY_UPDATE_CUTOFF_HOUR_UTC = 21;
+// Nexon's own character/ranking data only actually refreshes once per real-world day, via a
+// batch job observed kicking off at 16:00 UTC and almost always finishing by 17:00 UTC --
+// rare outliers run to ~17:30 UTC, never later than that so far. Not at UTC midnight. A
+// refresh taken before that update lands still returns the PREVIOUS day's frozen snapshot, so
+// which day a snapshot belongs to needs to be anchored to Nexon's own update cadence, not
+// literal UTC midnight-to-midnight. Padded ~30min past the observed worst case so an
+// occasionally-delayed update doesn't get misread as having already landed for the day --
+// tightened from a much wider, less-informed 3hr pad after a real refresh landed in the old
+// dead zone and got folded into the previous day's entry instead of creating its own (two
+// real days' gains merged into one inflated delta). Revisit the margin if a delayed update is
+// ever observed running later than ~17:30 UTC.
+export const NEXON_DAILY_UPDATE_CUTOFF_HOUR_UTC = 18;
 
 /** Which "Nexon day" a timestamp falls into -- an integer that's equal for any two
  *  timestamps between one NEXON_DAILY_UPDATE_CUTOFF_HOUR_UTC and the next. Shared with the

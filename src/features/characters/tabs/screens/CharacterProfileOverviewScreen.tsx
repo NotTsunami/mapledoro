@@ -2,6 +2,9 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { Route } from "next";
 import Link from "next/link";
+import Image from "next/image";
+import { classPortraitUrl } from "../../../../lib/classPortraits";
+import { worldIconUrl } from "../../../../lib/mapleResource";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useMounted } from "../../../../lib/useMounted";
 import type { SetupFlowId } from "../../setup/flows";
@@ -11,10 +14,11 @@ import { primaryButtonStyle, secondaryButtonStyle, successButtonStyle } from "..
 import { findClassById, COMMON_SKILLS, type HexaSkillDef, type HexaSkillLevels, type HexaMasteryNode } from "../../../tools/hexa-skills/hexa-classes";
 import { SkillIcon as HexaSkillTileIcon } from "../../../tools/hexa-skills/hexa-ui";
 import { readCharacterToolData } from "../../../tools/characterToolStorage";
-import { resolveClassId, getClassSetupOverrides } from "../../setup/data/nexonJobMapping";
+import { resolveClassId, getClassSetupOverrides, resolveDisplayJobName } from "../../setup/data/nexonJobMapping";
 import { CLASS_SKILL_DATA, getClassDataByNexonJobName, isLegacyClass, type ClassSkillData } from "../../setup/data/classSkillData";
 import { HEXA_STAT_OPTIONS, getHexaStatBonus, getMainStatLabel, getAttackLabel, type HexaStatNode, type HexaStatEntry, type HexaStatSlot } from "../../setup/data/hexaStatData";
 import { EXP_HISTORY_DAY_MS, nexonDayIndex, NEXON_DAILY_UPDATE_CUTOFF_HOUR_UTC, readCharactersStore, selectCharacterByIgn } from "../../model/charactersStore";
+import { WORLD_NAMES } from "../../model/constants";
 import type { StoredCharacterEquipment, StoredCharacterRecord, StoredCharacterStats, StoredEquipmentItem, StoredHyperStat, StoredInnerAbility, StoredIATier, StoredTripleStatField, StoredFamiliarSlot, ExpHistoryEntry, OverviewSectionId } from "../../model/charactersStore";
 import CustomizeOverviewDialog, { type OverviewAnchorDef } from "./CustomizeOverviewDialog";
 import { isExpTrackingAvailable, resolveExpDelta, characterExpPercent, netExpGained } from "../../model/expProgress";
@@ -33,12 +37,13 @@ import { resolveComboOrdersTier, type ComboOrdersTier } from "../../setup/data/c
 import { isRebootWorld, rebootFinalDamageBonusPercent } from "../../setup/data/rebootData";
 import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAMILIARS, familiarStatBonuses, type FamiliarStatBonus, type FamiliarTier } from "../../setup/data/familiarsData";
 import { statusText } from "../../../../components/statusColors";
-import { HexaSkillIcon, ItemIcon } from "../../../../components/ResourceImage";
+import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
 import { VMatrixNodeIcon, useVMatrixCatalog, type VMatrixNode } from "../../setup/components/VMatrixSetupStep";
+import { HexaStatNodeIcon } from "../../setup/components/HexaMatrixSetupStep";
 import { ReadOnlyFamiliarSlotCard, ReadOnlyBadgeSlot, FamiliarCardSprite, PRESET_COUNT as FAMILIAR_PRESET_COUNT, BADGE_SIZE as FAMILIAR_BADGE_SIZE, BADGE_BORDER as FAMILIAR_BADGE_BORDER } from "../../setup/components/FamiliarsSetupStep";
 import {
   storedPresetToDraft, toDraftItem, type SlotMap, type SlotKey,
@@ -172,7 +177,7 @@ function EmptyBookmarkState({ theme, label, onSetup, disabled }: { theme: Theme;
 
 function GenderPlaceholderIcon() {
   return (
-    <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+    <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
       <circle cx="12" cy="12" r="9" />
       <path d="M9.3 9.2a2.7 2.7 0 1 1 3.9 2.4c-.8.4-1.2 1-1.2 1.9v.4" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="12" cy="16.6" r="0.6" fill="currentColor" stroke="none" />
@@ -182,23 +187,96 @@ function GenderPlaceholderIcon() {
 
 function PartnerPlaceholderIcon() {
   return (
-    <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+    <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
       <circle cx="12" cy="8.5" r="3.4" />
       <path d="M5.5 19c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" strokeLinecap="round" />
     </svg>
   );
 }
 
-// Stretches to fill the bookmark panel (rather than a fixed portrait aspect-ratio) so the
-// "Partner" block has more room to later swap in an actual character avatar once marriage
-// data links to a tracked character. Each block is its own real button: tapping it jumps
-// straight into that one setup step (gender or marriage) instead of a single combined
-// "Set up" action.
+// The manifest's world/server ids are just the lowercased WORLD_NAMES display name
+// (Bera -> "bera", Hyperion -> "hyperion", ...), so no separate id map is needed. A world
+// name that doesn't resolve (unknown worldID) still 404s gracefully into the hand-drawn
+// globe fallback below.
+function WorldIcon({ worldName, size = 56 }: { worldName: string; size?: number }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<SVGSVGElement>(null);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ width: size, height: size, flexShrink: 0 }}>
+        <Image
+          src={worldIconUrl(worldName.toLowerCase())}
+          alt={worldName}
+          width={size}
+          height={size}
+          unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ width: size, height: size, objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <svg
+        ref={fallbackRef}
+        style={{ display: "none" }}
+        width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18M12 3c2.5 2.5 4 5.7 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.7-4-9s1.5-6.5 4-9z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </>
+  );
+}
+
+function TrackedSinceIcon({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Simple "leaderboard" bars, for the server rank fun fact.
+function RankIcon({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+      <path d="M5 19V13M12 19V8M19 19V4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// classPortraitUrl falls back to "" for a class name it doesn't have official Nexon
+// artwork for (e.g. a resolveDisplayJobName output that doesn't exactly match the map's
+// keys) -- shows the class's initial instead of a broken image in that case, same
+// fallback shape the character-guides page itself uses for the same lookup.
+function ClassPortrait({ className, theme, size = 72 }: { className: string; theme: Theme; size?: number }) {
+  const url = classPortraitUrl(className);
+  if (!url) {
+    return <span style={{ fontSize: size * 0.4, fontWeight: 800, color: theme.accentText }}>{className.charAt(0)}</span>;
+  }
+  return (
+    <Image src={url} alt={className} width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} />
+  );
+}
+
+// Two rows of two cards each, centered vertically in the panel.
+const biographyRowWrapperStyle: CSSProperties = {
+  display: "flex", flexDirection: "column", gap: 14, flex: 1, alignItems: "center", justifyContent: "center",
+};
+
+// Bigger than the original tiny buttons — minHeight ensures they fill the vertical
+// space when centered, and the larger icon + padding make them feel like proper cards.
+const biographyBlockMinHeight = 200;
+
 function biographyBlockStyle(theme: Theme, filled: boolean): CSSProperties {
   return {
-    flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
+    flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
     borderRadius: 14, background: theme.bg, cursor: "pointer", fontFamily: "inherit", textAlign: "center",
     border: filled ? `1px solid ${theme.border}` : `1px dashed ${theme.border}`,
+    minHeight: biographyBlockMinHeight,
+    padding: "1rem 0.5rem",
   };
 }
 
@@ -214,9 +292,47 @@ function BiographyBlock({ theme, icon, label, caption, filled, onClick, disabled
       style={biographyBlockStyle(theme, filled)}
     >
       <div style={{ color: filled ? theme.accentText : theme.muted }}>{icon}</div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: theme.text }}>{label}</div>
-      <div style={{ fontSize: 12, color: theme.muted }}>{caption}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}>{label}</div>
+      <div style={{ fontSize: 13, color: theme.muted }}>{caption}</div>
     </button>
+  );
+}
+
+// Fades the class portrait toward transparent on every edge (heaviest at the bottom,
+// where the trait row sits) so it blends into the panel's own background rather than
+// needing to know that background's color -- an ellipse mask just reveals whatever is
+// actually behind it. -webkit- duplicate is required for Safari/iOS.
+const classPortraitFadeStyle: CSSProperties = {
+  maskImage: "radial-gradient(ellipse 70% 62% at 50% 36%, black 42%, transparent 92%)",
+  WebkitMaskImage: "radial-gradient(ellipse 70% 62% at 50% 36%, black 42%, transparent 92%)",
+};
+
+// 5 columns (3 stats + 2 hairline dividers), 3 rows (icon/label/value) -- CSS Grid gives
+// every column in a row the same height as that row's tallest cell for free, so whichever
+// label wraps to two lines (varies by column width -- not knowable up front, differs per
+// label length) pushes every column's value down together instead of just its own. No
+// breakpoint to tune, and it stays correct at any width.
+function bioTraitGridStyle(): CSSProperties {
+  return { display: "grid", gridTemplateColumns: "auto 1px auto 1px auto", columnGap: 20, rowGap: 6, justifyContent: "center", alignItems: "center" };
+}
+
+function bioTraitDividerStyle(theme: Theme, column: number): CSSProperties {
+  return { gridColumn: column, gridRow: "1 / span 3", width: 1, background: theme.border };
+}
+
+// Sits under the faded portrait, reading as a continuation of it rather than a separate
+// card -- no background/border of its own, just icon + label + value per trait. Renders as
+// 3 separate grid children (one per row) rather than a wrapping div, so its row heights are
+// shared with its sibling columns -- see bioTraitGridStyle.
+function BioTraitStat({ theme, icon, label, value, column }: {
+  theme: Theme; icon: ReactNode; label: string; value: string; column: number;
+}) {
+  return (
+    <>
+      <div style={{ gridColumn: column, gridRow: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 30, color: theme.accentText }}>{icon}</div>
+      <div style={{ gridColumn: column, gridRow: 2, fontSize: 11, fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", lineHeight: 1.3 }}>{label}</div>
+      <div style={{ gridColumn: column, gridRow: 3, fontSize: 15, fontWeight: 800, color: theme.text, textAlign: "center", whiteSpace: "nowrap" }}>{value}</div>
+    </>
   );
 }
 
@@ -248,27 +364,48 @@ function BiographyPanel({ theme, character, onEditStep, disabled }: {
 
   const genderCaption = resolveGenderCaption(overrides?.gender, gender, genderLocked);
   const marriageCaption = marriageLocked ? "Not available for this class" : resolveMarriageCaption(marriage);
+  const className = character ? resolveDisplayJobName(character.jobName) : "—";
+  const worldName = character ? WORLD_NAMES[character.worldID] ?? `World ${character.worldID}` : "—";
+  const rankLabel = character?.overallRank ? `#${character.overallRank.toLocaleString("en-US")}` : "Unranked";
+  const trackedSinceLabel = character
+    ? new Date(character.meta.addedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "—";
 
   return (
-    <div style={{ display: "flex", gap: 14, flex: 1 }}>
-      <BiographyBlock
-        theme={theme}
-        filled={Boolean(gender) || overrides?.gender === "none"}
-        icon={gender ? <GenderIcon gender={gender} /> : <GenderPlaceholderIcon />}
-        label="Gender"
-        caption={genderCaption}
-        onClick={() => onEditStep("gender_flow")}
-        disabled={disabled || genderLocked}
-      />
-      <BiographyBlock
-        theme={theme}
-        filled={hasMarriage}
-        icon={hasMarriage && marriage ? <MarriageIcon married={Boolean(marriage.isMarried)} /> : <PartnerPlaceholderIcon />}
-        label="Partner"
-        caption={marriageCaption}
-        onClick={() => onEditStep("marriage_flow")}
-        disabled={disabled || marriageLocked}
-      />
+    <div style={biographyRowWrapperStyle}>
+      <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 520 }}>
+        <BiographyBlock
+          theme={theme}
+          filled={Boolean(gender) || overrides?.gender === "none"}
+          icon={gender ? <GenderIcon gender={gender} /> : <GenderPlaceholderIcon />}
+          label="Gender"
+          caption={genderCaption}
+          onClick={() => onEditStep("gender_flow")}
+          disabled={disabled || genderLocked}
+        />
+        <BiographyBlock
+          theme={theme}
+          filled={hasMarriage}
+          icon={hasMarriage && marriage ? <MarriageIcon married={Boolean(marriage.isMarried)} /> : <PartnerPlaceholderIcon />}
+          label="Partner"
+          caption={marriageCaption}
+          onClick={() => onEditStep("marriage_flow")}
+          disabled={disabled || marriageLocked}
+        />
+      </div>
+      <div style={{ borderTop: `1px solid ${theme.border}`, width: "100%", maxWidth: 520 }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 520 }}>
+        <div style={classPortraitFadeStyle}>
+          <ClassPortrait className={className} theme={theme} size={240} />
+        </div>
+        <div style={{ ...bioTraitGridStyle(), marginTop: -8 }}>
+          <BioTraitStat theme={theme} icon={<WorldIcon worldName={worldName} size={30} />} label="World" value={worldName} column={1} />
+          <div style={bioTraitDividerStyle(theme, 2)} />
+          <BioTraitStat theme={theme} icon={<RankIcon size={30} />} label="Server Rank" value={rankLabel} column={3} />
+          <div style={bioTraitDividerStyle(theme, 4)} />
+          <BioTraitStat theme={theme} icon={<TrackedSinceIcon size={30} />} label="Tracked Since" value={trackedSinceLabel} column={5} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -550,7 +687,7 @@ function OverviewHexaStatSection({ theme, character, classData, hexaStatNodes, o
         {HEXA_STAT_NODE_LABELS.map((label, i) => unlocked[i] && (
           <button key={label} type="button" className="tap-target-44" onClick={() => setActiveSlot(i)}
             aria-label={label} aria-pressed={activeSlot === i} style={hexaStatNodeTabStyle(theme, activeSlot === i)}>
-            <HexaSkillIcon id={HEXA_STAT_NODE_ICON_IDS[i]} size={36} disabled={isHexaStatNodeEmpty(nodes[i])} />
+            <HexaStatNodeIcon id={HEXA_STAT_NODE_ICON_IDS[i]} slot={i + 1} theme={theme} size={36} disabled={isHexaStatNodeEmpty(nodes[i])} />
           </button>
         ))}
       </div>
@@ -631,7 +768,7 @@ function OverviewHexaTileGroup({ label, skills, levels, theme }: {
 function OverviewVMatrixTile({ id, name, level, theme }: { id: string; name: string; level: number; theme: Theme }) {
   return (
     <OverviewLevelTile
-      icon={<VMatrixNodeIcon id={id} name={name} size={OVERVIEW_TILE_SIZE - 10} />}
+      icon={<VMatrixNodeIcon id={id} name={name} theme={theme} size={OVERVIEW_TILE_SIZE - 10} />}
       name={name}
       level={level}
       theme={theme}
@@ -1183,14 +1320,14 @@ function OverviewBookmark({ model, onNavigateToBookmark, onNavigateToGearSlot, o
 function GenderIcon({ gender }: { gender: "male" | "female" }) {
   if (gender === "male") {
     return (
-      <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <circle cx="9" cy="15" r="6" />
         <path d="M13.5 10.5L20 4M14 4h6v6" />
       </svg>
     );
   }
   return (
-    <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="9" r="6" />
       <path d="M12 15v6M9 18h6" />
     </svg>
@@ -1199,7 +1336,7 @@ function GenderIcon({ gender }: { gender: "male" | "female" }) {
 
 function MarriageIcon({ married }: { married: boolean }) {
   return (
-    <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <circle cx="9" cy="14" r="5" opacity={married ? 1 : 0.4} />
       <circle cx="15" cy="14" r="5" opacity={married ? 1 : 0.4} />
     </svg>
@@ -2109,7 +2246,7 @@ function VMatrixNodeSection({ label, nodes, levels, theme }: {
     <StatBlock label={label} theme={theme}>
       <div className="vmatrix-grid" style={{ display: "grid", gap: "0.4rem" }}>
         {nodes.map(([id, name, max]) => (
-          <ReadOnlyLeveledIconTile key={name} icon={<VMatrixNodeIcon id={id} name={name} size={32} />} name={name} level={levels[name] ?? 0} max={max} theme={theme} />
+          <ReadOnlyLeveledIconTile key={name} icon={<VMatrixNodeIcon id={id} name={name} theme={theme} size={32} />} name={name} level={levels[name] ?? 0} max={max} theme={theme} />
         ))}
       </div>
     </StatBlock>
@@ -2357,7 +2494,7 @@ function HexaStatBookmarkView({ theme, character, classData, hexaStatNodes, onSe
           {HEXA_STAT_NODE_LABELS.map((label, i) => unlocked[i] && (
             <button key={label} type="button" className="tap-target-44" onClick={() => selectNode(i)}
               aria-label={label} aria-pressed={activeSlot === i} style={hexaStatNodeTabStyle(theme, activeSlot === i)}>
-              <HexaSkillIcon id={HEXA_STAT_NODE_ICON_IDS[i]} size={36} disabled={isHexaStatNodeEmpty(nodes[i])} />
+              <HexaStatNodeIcon id={HEXA_STAT_NODE_ICON_IDS[i]} slot={i + 1} theme={theme} size={36} disabled={isHexaStatNodeEmpty(nodes[i])} />
             </button>
           ))}
         </div>
@@ -2527,6 +2664,11 @@ const EXP_OVER_TIME_INFO: TooltipContent = {
       The very first tracked day for a character won&apos;t show a bar on Daily EXP, since
       there&apos;s nothing earlier yet to measure a gain against. It&apos;ll start filling in
       from the next update onward.
+      <br />
+      <br />
+      Refreshing right as that daily update is finishing (roughly 17:00-18:00 UTC) can
+      occasionally merge that day&apos;s gain into the previous day&apos;s bar instead of
+      getting its own.
     </>
   ),
 };

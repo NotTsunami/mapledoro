@@ -96,7 +96,7 @@ function clampLevelInput(raw: string, max: number): string {
 
 // Namespaced to the v-matrix manifest (no shared component for it in ResourceImage.tsx per the
 // Image Policy's one-off convention) — exported for reuse by the profile V Matrix bookmark.
-export function VMatrixNodeIcon({ id, name, size = 28 }: { id: string; name: string; size?: number }) {
+export function VMatrixNodeIcon({ id, name, theme, size = 28 }: { id: string; name: string; theme: AppTheme; size?: number }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   const src = resourceImageUrl("v-matrix", id, "icon.png");
@@ -106,12 +106,18 @@ export function VMatrixNodeIcon({ id, name, size = 28 }: { id: string; name: str
         <Image src={src} alt={name} width={size} height={size} unoptimized
           onError={() => {
             if (wrapperRef.current) wrapperRef.current.style.display = "none";
-            if (fallbackRef.current) fallbackRef.current.style.display = "block";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
           }}
           style={{ borderRadius: "6px", display: "block" }}
         />
       </div>
-      <div ref={fallbackRef} style={{ display: "none", width: size, height: size, borderRadius: "6px", flexShrink: 0, background: "rgba(127,127,127,0.18)" }} />
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
     </>
   );
 }
@@ -157,7 +163,7 @@ function NodeSection({ label, nodes, levels, theme, onSet, onSetMany }: {
         onClear={() => onSetMany(Object.fromEntries(nodes.map(([, name]) => [name, ""])))} />
       <div className="vmatrix-grid" style={{ display: "grid", gap: "0.4rem" }}>
         {nodes.map(([id, name, max]) => (
-          <LeveledIconTile key={name} icon={<VMatrixNodeIcon id={id} name={name} size={32} />} name={name}
+          <LeveledIconTile key={name} icon={<VMatrixNodeIcon id={id} name={name} theme={theme} size={32} />} name={name}
             level={levels[name] ?? ""} max={max} theme={theme}
             onLevel={(v) => onSet(name, clampLevelInput(v, max))} />
         ))}

@@ -32,6 +32,12 @@ export function familiarBadgeUrl(id: number): string {
   return `${RESOURCE_BASE}/api/img/ui/familiar/${id}/icon.png`;
 }
 
+// World/server icon (haku.network `misc` namespace, no `ui/` prefix). IDs are looked
+// up by hand from `manifests/v<version>/misc.json` and hardcoded at the call site.
+export function worldIconUrl(id: string): string {
+  return `${RESOURCE_BASE}/api/img/misc/${id}/icon.png`;
+}
+
 // Legion Artifact crystal icon (haku.network `legion-artifact` namespace, no `ui/`
 // prefix). `id` = crystal index, matching LEGION_CRYSTALS order in legionArtifactData.ts
 // (0=Orange Mushroom … 8=Papulatus). `grade` = crystal level - 1 (0-4 for level 1-5).
