@@ -14,7 +14,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-25",
     changes: [
-      { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, and Eternal Armor of Radiance Box." },
+      { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, Eternal Armor of Radiance Box, Arcane Umbra Armor Box, and AbsoLab Armor Box." },
       { type: "added", text: "The Event Planner now has Original Sin of Pride and Blissful Nightmare as items to tap." },
       { type: "added", text: "The Drop Tracker now opens with a summary of your total drops, drops this month, days since your last one, and your most dropped item." },
       { type: "changed", text: "Deleting a drop in the Drop Tracker now asks for confirmation first." },
