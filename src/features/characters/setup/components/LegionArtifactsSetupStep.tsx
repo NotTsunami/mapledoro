@@ -93,7 +93,36 @@ const crystalGridStyle: CSSProperties = {
   display: "grid", gap: "0.6rem",
 };
 
-const crystalIconImgStyle: CSSProperties = { width: "68%", height: "68%", borderRadius: 8, objectFit: "contain" };
+const crystalIconImgStyle: CSSProperties = { width: "100%", height: "100%", borderRadius: 8, objectFit: "contain", display: "block" };
+
+// A missing/failed crystal icon falls back to the crystal's name-initial (mirrors
+// VMatrixNodeIcon's treatment) instead of a stray broken-image glyph. The parent tile is
+// already a centered flex column, so this only needs to match the image's own 68% sizing.
+// Exported for reuse by LegionPanel's read-only crystal tile.
+export function CrystalIcon({ src, name, theme }: { src: string; name: string; theme: AppTheme }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ width: "68%", height: "68%" }}>
+        <Image src={src} alt="" width={CRYSTAL_ICON_SIZE} height={CRYSTAL_ICON_SIZE} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={crystalIconImgStyle}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: "68%", height: "68%",
+        borderRadius: 8, fontWeight: 800, fontSize: CRYSTAL_ICON_SIZE * 0.68 * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
+    </>
+  );
+}
 
 function crystalTileStyle(theme: AppTheme, unlocked: boolean, isOpen: boolean): CSSProperties {
   return {
@@ -407,7 +436,7 @@ function CrystalTile({
   if (!unlocked) {
     return (
       <div className="legion-crystal-tile" style={crystalTileStyle(theme, false, false)} title={`${def.name} — Lv ${def.requiredArtifactLevel}+ required`}>
-        <Image src={iconSrc} alt="" width={CRYSTAL_ICON_SIZE} height={CRYSTAL_ICON_SIZE} unoptimized style={crystalIconImgStyle} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
         <span style={crystalLockedBadgeStyle(theme)}>Lv {def.requiredArtifactLevel}+</span>
       </div>
     );
@@ -425,7 +454,7 @@ function CrystalTile({
         style={crystalTileStyle(theme, true, isCardOpen)}
       >
         <LevelPipsStatic level={level} theme={theme} />
-        <Image src={iconSrc} alt="" width={CRYSTAL_ICON_SIZE} height={CRYSTAL_ICON_SIZE} unoptimized style={crystalIconImgStyle} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
       </button>
       {isCardOpen && typeof document !== "undefined" && createPortal(
         <div

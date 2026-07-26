@@ -286,14 +286,24 @@ export function ChecklistGroup({ question, options, value, onToggle, theme, tool
 }) {
   return (
     <div style={{ marginTop: "0.6rem", marginBottom: "0.9rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.3rem" }}>
-        <p style={{ margin: 0, fontSize: "0.88rem", fontWeight: 800, color: theme.muted }}>
-          {question}
-          {required && <RequiredMark theme={theme} />}
-        </p>
-        {tooltip && <InfoTooltip content={tooltip} theme={theme} />}
+      <div style={{ margin: 0, marginBottom: "0.3rem", fontSize: "0.88rem", fontWeight: 800, color: theme.muted }}>
+        {question}
+        {required && <RequiredMark theme={theme} />}
+        {tooltip && (
+          <>
+            {" "}
+            <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+              <InfoTooltip content={tooltip} theme={theme} />
+            </span>
+          </>
+        )}
         {disabled && lockTooltip && (
-          <InfoTooltip content={lockTooltip} theme={theme} icon={<LockGlyph />} label="Why this is locked" bordered={false} />
+          <>
+            {" "}
+            <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+              <InfoTooltip content={lockTooltip} theme={theme} icon={<LockGlyph />} label="Why this is locked" bordered={false} />
+            </span>
+          </>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap" }}>
@@ -350,21 +360,29 @@ export function LegionFinalAttackField({ value, onUpdate, theme, required, locke
   const label = "Final Attack Skill Damage";
   return (
     <div style={{ marginTop: "0.6rem", marginBottom: "0.9rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.4rem" }}>
+      <div style={{ marginBottom: "0.4rem" }}>
         <span style={{ fontSize: "0.88rem", fontWeight: 800, color: theme.muted }}>
           {label}
           {required && <RequiredMark theme={theme} />}
+          {" "}
+          <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+            <InfoTooltip
+              content={{
+                title: label,
+                description: <>Found in your Legion window, in the Artifacts tab. Assigning the <strong>Increases Damage of Final Attack Skill</strong> stat to a crystal grants <strong>Final Attack Skill Damage</strong>, listed under Artifact Bonuses. Enter the total for this stat (up to {LEGION_ARTIFACT_FINAL_ATK_LIMIT}%).</>,
+              }}
+              theme={theme}
+            />
+          </span>
+          {locked && lockTooltip && (
+            <>
+              {" "}
+              <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
+                <InfoTooltip content={lockTooltip} theme={theme} icon={<LockGlyph />} label="Why this is locked" bordered={false} />
+              </span>
+            </>
+          )}
         </span>
-        <InfoTooltip
-          content={{
-            title: label,
-            description: <>Found in your Legion window, in the Artifacts tab. Assigning the <strong>Increases Damage of Final Attack Skill</strong> stat to a crystal grants <strong>Final Attack Skill Damage</strong>, listed under Artifact Bonuses. Enter the total for this stat (up to {LEGION_ARTIFACT_FINAL_ATK_LIMIT}%).</>,
-          }}
-          theme={theme}
-        />
-        {locked && lockTooltip && (
-          <InfoTooltip content={lockTooltip} theme={theme} icon={<LockGlyph />} label="Why this is locked" bordered={false} />
-        )}
       </div>
       <div style={{ position: "relative", width: "5rem" }}>
         <input

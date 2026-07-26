@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { numericKeyDown, sanitizeDigitsInput } from "../../../../lib/inputUtils";
 import Image from "next/image";
@@ -82,7 +82,8 @@ function parseDraft(raw: string): LinkSkillsDraft {
   return {};
 }
 
-function LinkSkillIcon({ iconId, name }: { iconId: string; name: string }) {
+// Exported for reuse by LegionPanel's Link Skills cards/chips.
+export function LinkSkillIcon({ iconId, name, theme, size = 32 }: { iconId: string; name: string; theme: AppTheme; size?: number }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   return (
@@ -91,17 +92,23 @@ function LinkSkillIcon({ iconId, name }: { iconId: string; name: string }) {
         <Image
           src={resourceImageUrl("skill", iconId, "icon.png")}
           alt={name}
-          width={32}
-          height={32}
+          width={size}
+          height={size}
           unoptimized
           onError={() => {
             if (wrapperRef.current) wrapperRef.current.style.display = "none";
-            if (fallbackRef.current) fallbackRef.current.style.display = "block";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
           }}
           style={{ borderRadius: "6px", display: "block" }}
         />
       </div>
-      <div ref={fallbackRef} style={{ display: "none", width: 32, height: 32, borderRadius: "6px", flexShrink: 0 }} />
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
     </>
   );
 }
@@ -175,7 +182,7 @@ function LinkSkillRow({
       background: theme.bg,
       ...(fullWidth ? { gridColumn: "1 / -1" } : {}),
     }}>
-      <LinkSkillIcon iconId={skill.iconId} name={skill.name} />
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: theme.text, lineHeight: 1.2 }}>
           {skill.name}
@@ -232,6 +239,13 @@ export function LinkSkillsEditor({
 }: LinkSkillsEditorProps) {
   const draft = parseDraft(value);
   const initialValueRef = useRef(value);
+  const [filled, setFilled] = useState(false);
+
+  useEffect(() => {
+    if (!filled) return;
+    const t = setTimeout(() => setFilled(false), 2000);
+    return () => clearTimeout(t);
+  }, [filled]);
 
   const { values: autofillValues, sources } = confirmedWorldId !== undefined
     ? computeLinkSkillsFromRoster(characterRoster, confirmedWorldId)
@@ -268,6 +282,7 @@ export function LinkSkillsEditor({
       Object.entries(autofillValues).map(([id, level]) => [id, String(level)]),
     );
     onChange(JSON.stringify({ ...draft, ...stringified }));
+    setFilled(true);
   }
 
   const confirmedSkillId = CLASS_TO_SKILL[jobName];
@@ -308,7 +323,7 @@ export function LinkSkillsEditor({
               onClick={handleAutofill}
               style={autofillButtonStyle(theme)}
             >
-              Autofill from roster
+              {filled ? "Filled!" : "Autofill from roster"}
             </button>
           </div>
         )}

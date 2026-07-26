@@ -1,5 +1,4 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type Ref } from "react";
-import Image from "next/image";
 import { useMounted } from "../../../../lib/useMounted";
 import { WORLD_NAMES } from "../../model/constants";
 import {
@@ -15,11 +14,10 @@ import {
   type LegionCrystalDraft, type LegionCrystalDef,
 } from "../../setup/data/legionArtifactData";
 import { LINK_SKILLS, computeLinkSkillsFromRoster, reconcileLinkSkills } from "../../setup/data/linkSkillsData";
-import { LinkSkillsEditor } from "../../setup/components/LinkSkillsSetupStep";
-import { LegionArtifactsEditor } from "../../setup/components/LegionArtifactsSetupStep";
+import { LinkSkillsEditor, LinkSkillIcon } from "../../setup/components/LinkSkillsSetupStep";
+import { LegionArtifactsEditor, CrystalIcon } from "../../setup/components/LegionArtifactsSetupStep";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
-import { SkillIcon } from "../../../../components/ResourceImage";
 import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
 import CharacterAvatar, { FALLBACK_SRC } from "../components/CharacterAvatar";
 
@@ -163,8 +161,6 @@ function CrystalPips({ level, theme }: { level: number; theme: AppTheme }) {
   );
 }
 
-const crystalTileIconStyle: CSSProperties = { width: "68%", height: "68%", borderRadius: 8, objectFit: "contain" };
-
 function crystalTileStyle(theme: AppTheme, unlocked: boolean): CSSProperties {
   return {
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
@@ -191,7 +187,7 @@ function CrystalTile({ theme, index, def, crystal, unlocked }: {
   if (!unlocked) {
     return (
       <div className="legion-crystal-tile" style={crystalTileStyle(theme, false)} title={`${def.name}, Lv ${def.requiredArtifactLevel}+ required`}>
-        <Image src={iconSrc} alt="" width={80} height={80} unoptimized style={crystalTileIconStyle} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
         <span style={{ fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.03em" }}>
           Lv {def.requiredArtifactLevel}+
         </span>
@@ -207,7 +203,7 @@ function CrystalTile({ theme, index, def, crystal, unlocked }: {
     <HoverTooltip theme={theme} label={def.name} sublabel={statNames.join(" · ")} wrapperStyle={{ width: "100%" }}>
       <div className="legion-crystal-tile" style={crystalTileStyle(theme, true)}>
         <CrystalPips level={level} theme={theme} />
-        <Image src={iconSrc} alt={def.name} width={80} height={80} unoptimized style={crystalTileIconStyle} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
       </div>
     </HoverTooltip>
   );
@@ -593,7 +589,7 @@ function LinkSkillCard({ theme, skill, eligible, level, spriteSize, dormant = fa
       padding: "0.85rem 1rem", borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.bg,
       opacity: dormant ? 0.6 : 1,
     }}>
-      <SkillIcon id={skill.iconId} size={44} alt={skill.name} />
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={44} />
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: "0.85rem", fontWeight: 800, color: theme.text, lineHeight: 1.25 }}>
           {skill.name}
@@ -621,7 +617,7 @@ function DormantSkillChip({ theme, skill }: { theme: AppTheme; skill: (typeof LI
         border: `1px solid ${theme.border}`, background: theme.bg, opacity: 0.6,
       }}
     >
-      <SkillIcon id={skill.iconId} size={18} alt={skill.name} />
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={18} />
       <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>{skill.name}</span>
     </div>
   );

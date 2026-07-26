@@ -252,7 +252,7 @@ const presetSquareStyle = (theme: AppTheme, active: boolean): CSSProperties => (
 // Familiar sprite: sequential source fallback (mob → familiar → card), swapped via onError.
 // Exported for the profile Familiars bookmark's read-only cards.
 
-export function FamiliarCardSprite({ mobId, familiarId, cardId, size, theme, fill }: { mobId: string; familiarId: number | null; cardId: string; size: number; theme: AppTheme; fill?: boolean }) {
+export function FamiliarCardSprite({ mobId, familiarId, cardId, name, size, theme, fill }: { mobId: string; familiarId: number | null; cardId: string; name: string; size: number; theme: AppTheme; fill?: boolean }) {
   const sources = [
     resourceImageUrl("mob", mobId, "sprite.png"),
     // "familiar" sprites are keyed by the familiar's OWN id, not mobId — these are
@@ -284,12 +284,53 @@ export function FamiliarCardSprite({ mobId, familiarId, cardId, size, theme, fil
           } else {
             img.style.display = "none";
             const ph = img.nextElementSibling as HTMLElement | null;
-            if (ph) ph.style.display = "block";
+            if (ph) ph.style.display = "flex";
           }
         }}
       />
-      <span aria-hidden style={{ display: "none", fontSize: size * 0.5, fontWeight: 300, lineHeight: 1, color: theme.muted }}>?</span>
+      <span aria-hidden style={{
+        display: "none", alignItems: "center", justifyContent: "center", ...dims,
+        borderRadius: 6, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </span>
     </span>
+  );
+}
+
+// A missing/failed badge icon falls back to the badge's name-initial (mirrors
+// FamiliarCardSprite's treatment above) instead of a stray broken-image glyph. Used both
+// as a plain square (currently-selected header, picker rows) and inside a pentagon-clipped
+// tile (BadgeSlot/ReadOnlyBadgeSlot) — the parent's own clip-path handles the pentagon
+// shape either way, so this stays a plain rounded box. `pentagon` nudges the letter down
+// ~5.5% of the box (PENTAGON's own centroid, not the geometric center of its bounding box,
+// since the shape's point-up tip leaves the top third empty) so it reads as centered inside
+// the visible pentagon outline instead of the invisible square it's clipped from.
+function FamiliarBadgeImage({ badge, size, theme, style, pentagon }: { badge: string; size: number; theme: AppTheme; style?: CSSProperties; pentagon?: boolean }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ width: size, height: size, flexShrink: 0 }}>
+        <Image src={familiarBadgeUrl(BADGE_ID_MAP[badge])} alt={badge} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ objectFit: "cover", display: "block", ...style }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: 6, flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        <span style={{ transform: pentagon ? `translateY(${size * 0.055}px)` : undefined }}>
+          {badge.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -632,7 +673,7 @@ function FamiliarSlotCard({
         ) : (
           <>
             <HoverTooltip label={displayName} theme={theme}>
-              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} size={FAM_CARD_SIZE} theme={theme} />
+              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE} theme={theme} />
             </HoverTooltip>
             {slot.tier && (
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
@@ -686,7 +727,7 @@ function FamiliarSlotCard({
               onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
-              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} size={28} theme={theme} />
+              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={28} theme={theme} />
               <div style={{ overflow: "hidden", flex: 1 }}>
                 <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: theme.muted }}>Currently Selected</p>
                 <p title={displayName} style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</p>
@@ -748,7 +789,7 @@ function FamiliarSlotCard({
                     onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
-                    <FamiliarCardSprite mobId={entry.spriteMobId ?? entry.mobId} familiarId={entry.id} cardId={entry.cardId} size={FAM_LIST_SIZE} theme={theme} />
+                    <FamiliarCardSprite mobId={entry.spriteMobId ?? entry.mobId} familiarId={entry.id} cardId={entry.cardId} name={getFamiliarDisplayLabel(entry)} size={FAM_LIST_SIZE} theme={theme} />
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {getFamiliarDisplayLabel(entry)}
                     </span>
@@ -801,12 +842,12 @@ export function ReadOnlyFamiliarSlotCard({ slot, theme }: { slot: StoredFamiliar
     // below it, instead of sitting at a fixed size with dead space under it.
     <div style={{ flex: 1, minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <HoverTooltip label={displayName} theme={theme}>
-        <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} size={FAM_CARD_SIZE_READONLY} fill theme={theme} />
+        <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} fill theme={theme} />
       </HoverTooltip>
     </div>
   ) : (
     <HoverTooltip label={displayName} theme={theme}>
-      <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} size={FAM_CARD_SIZE_READONLY} theme={theme} />
+      <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} theme={theme} />
     </HoverTooltip>
   );
   return (
@@ -916,14 +957,7 @@ function BadgeSlot({
       >
         <div style={{ width: outerSize, height: outerSize, clipPath: PENTAGON, background: emptyBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {badge ? (
-            <Image
-              src={familiarBadgeUrl(BADGE_ID_MAP[badge])}
-              alt={badge}
-              width={outerSize}
-              height={outerSize}
-              unoptimized
-              style={{ objectFit: "cover", display: "block" }}
-            />
+            <FamiliarBadgeImage badge={badge} size={outerSize} theme={theme} pentagon />
           ) : (
             <span style={{ fontSize: 18, color: theme.muted, lineHeight: 1 }}>+</span>
           )}
@@ -938,7 +972,7 @@ function BadgeSlot({
         >
           {badge && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${theme.border}` }}>
-              <Image src={familiarBadgeUrl(BADGE_ID_MAP[badge])} alt="" width={28} height={28} unoptimized style={{ objectFit: "contain", flexShrink: 0 }} />
+              <FamiliarBadgeImage badge={badge} size={28} theme={theme} style={{ objectFit: "contain" }} />
               <div style={{ overflow: "hidden", flex: 1 }}>
                 <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: theme.muted }}>Currently Selected</p>
                 <p title={badge} style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{badge}</p>
@@ -983,7 +1017,7 @@ function BadgeSlot({
                 onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
-                <Image src={familiarBadgeUrl(BADGE_ID_MAP[name])} alt="" width={20} height={20} unoptimized style={{ objectFit: "contain", flexShrink: 0 }} />
+                <FamiliarBadgeImage badge={name} size={20} theme={theme} style={{ objectFit: "contain" }} />
                 {name}
               </button>
             ))}
@@ -1002,7 +1036,7 @@ export function ReadOnlyBadgeSlot({ badge, theme }: { badge: string; theme: AppT
   const pentagon = (
     <div style={{ width: outerSize, height: outerSize, clipPath: PENTAGON, background: badge ? undefined : `${theme.muted}28` }}>
       {badge && (
-        <Image src={familiarBadgeUrl(BADGE_ID_MAP[badge])} alt={badge} width={outerSize} height={outerSize} unoptimized style={{ objectFit: "cover", display: "block" }} />
+        <FamiliarBadgeImage badge={badge} size={outerSize} theme={theme} pentagon />
       )}
     </div>
   );

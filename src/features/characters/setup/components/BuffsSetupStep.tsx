@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import Image from "next/image";
 import { numericKeyDown } from "../../../../lib/inputUtils";
+import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
-import { ItemIcon, SkillIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
@@ -95,14 +96,52 @@ function buffSecondIconOverride(id: BoolBuffId, jobName: string): BoolBuffIconTy
   return undefined;
 }
 
+// A missing/failed icon falls back to the buff's name-initial (mirrors VMatrixNodeIcon's
+// treatment) instead of a stray broken-image glyph. Handles both "item" and "skill" icon
+// kinds since bool buffs draw from either.
+function BuffIconImage({ icon, name, theme, size = 32 }: {
+  icon: { kind: "item"; id: string; shadow?: boolean } | { kind: "skill"; id: string };
+  name: string;
+  theme: AppTheme;
+  size?: number;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  let src: string;
+  if (icon.kind === "item") {
+    const base = icon.shadow ? "icon" : "iconRaw";
+    src = resourceImageUrl("item", icon.id, `${base}.png`);
+  } else {
+    src = resourceImageUrl("skill", icon.id, "icon.png");
+  }
+  return (
+    <>
+      <div ref={wrapperRef} style={{ flexShrink: 0 }}>
+        <Image src={src} alt={name} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
+    </>
+  );
+}
+
 // ── BoolBuffTile ─────────────────────────────────────────────────────────────
 
-function renderIcon(icon: BoolBuffEntry["icon"], size: number, active: boolean) {
+function renderIcon(icon: BoolBuffEntry["icon"], size: number, active: boolean, name: string, theme: AppTheme) {
   return (
     <div style={{ opacity: active ? 1 : 0.32, filter: active ? "none" : "grayscale(1)", lineHeight: 0, flexShrink: 0 }}>
-      {icon.kind === "item"
-        ? <ItemIcon id={icon.id} size={size} shadow={icon.shadow} />
-        : <SkillIcon id={icon.id} size={size} />}
+      <BuffIconImage icon={icon} name={name} theme={theme} size={size} />
     </div>
   );
 }
@@ -126,13 +165,13 @@ function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, secondIcon
         {secondIcon ? (
           <div style={{ position: "relative", width: 42, height: 40, flexShrink: 0, filter: active ? "none" : "grayscale(1)" }}>
             <div style={{ position: "absolute", top: 0, left: 10, lineHeight: 0, opacity: active ? 0.5 : 0.16 }}>
-              {secondIcon.kind === "item" ? <ItemIcon id={secondIcon.id} size={32} shadow={secondIcon.shadow} /> : <SkillIcon id={secondIcon.id} size={32} />}
+              <BuffIconImage icon={secondIcon} name={entry.name} theme={theme} size={32} />
             </div>
             <div style={{ position: "absolute", top: 8, left: 0, lineHeight: 0, opacity: active ? 1 : 0.32 }}>
-              {icon.kind === "item" ? <ItemIcon id={icon.id} size={32} shadow={icon.shadow} /> : <SkillIcon id={icon.id} size={32} />}
+              <BuffIconImage icon={icon} name={entry.name} theme={theme} size={32} />
             </div>
           </div>
-        ) : renderIcon(icon, 32, active)}
+        ) : renderIcon(icon, 32, active, entry.name, theme)}
       </button>
     </HoverTooltip>
   );
@@ -291,7 +330,7 @@ export default function BuffsSetupStep({
             {GUILD_BUFFS.map((b) => (
               <LeveledIconTile
                 key={b.id}
-                icon={<SkillIcon id={b.skillId} size={32} />}
+                icon={<BuffIconImage icon={{ kind: "skill", id: b.skillId }} name={b.name} theme={theme} size={32} />}
                 name={b.name}
                 level={draft.guild[b.id] ?? ""}
                 max={GUILD_BUFF_MAX}
@@ -348,7 +387,7 @@ export default function BuffsSetupStep({
                 style={boolTileStyle(statPotionActive, theme)}
               >
                 <div style={{ opacity: statPotionActive ? 1 : 0.32, filter: statPotionActive ? "none" : "grayscale(1)", lineHeight: 0, display: "flex" }}>
-                  <ItemIcon id={statPotionTier10.itemId} size={32} />
+                  <BuffIconImage icon={{ kind: "item", id: statPotionTier10.itemId }} name={statPotionTier10.name} theme={theme} size={32} />
                 </div>
               </button>
             </HoverTooltip>
@@ -397,7 +436,7 @@ export default function BuffsSetupStep({
               const hasRenown = RENOWN_STATS.some((r) => (Number.parseInt(draft.renown[r.id] ?? "", 10) || 0) > 0);
               return (
                 <div style={{ lineHeight: 0, flexShrink: 0, opacity: hasRenown ? 1 : 0.32, filter: hasRenown ? "none" : "grayscale(1)" }}>
-                  <SkillIcon id={RENOWN_SKILL_ID} size={32} />
+                  <BuffIconImage icon={{ kind: "skill", id: RENOWN_SKILL_ID }} name="Champion's Renown" theme={theme} size={32} />
                 </div>
               );
             })()}

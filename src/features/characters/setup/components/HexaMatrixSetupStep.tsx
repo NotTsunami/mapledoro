@@ -348,7 +348,7 @@ function parseDraft(raw: string, classDef: HexaClassDef): HexaDraft {
   } catch { return empty; }
 }
 
-function SkillIcon({ skill, size = 28 }: { skill: HexaSkillDef; size?: number }) {
+function SkillIcon({ skill, theme, size = 28 }: { skill: HexaSkillDef; theme: AppTheme; size?: number }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   const src = skill.iconUrl ?? (skill.iconId !== "" ? resourceImageUrl("hexa-skill", skill.iconId, "icon.png") : null);
@@ -358,12 +358,18 @@ function SkillIcon({ skill, size = 28 }: { skill: HexaSkillDef; size?: number })
         <Image src={src ?? ""} alt={skill.name} width={size} height={size} unoptimized
           onError={() => {
             if (wrapperRef.current) wrapperRef.current.style.display = "none";
-            if (fallbackRef.current) fallbackRef.current.style.display = "block";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
           }}
           style={{ borderRadius: "6px", display: "block" }}
         />
       </div>
-      <div ref={fallbackRef} style={{ display: "none", width: size, height: size, borderRadius: "6px", flexShrink: 0 }} />
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {skill.name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
     </>
   );
 }
@@ -743,10 +749,10 @@ function HexaSkillLevelsSubstep({
               onMaxAll={() => update({ origin: String(MAX_LEVEL), ...(classDef.ascent ? { ascent: String(MAX_LEVEL) } : {}) })}
               onClear={() => update({ origin: "0", ...(classDef.ascent ? { ascent: "" } : {}) })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-              <LeveledIconTile icon={<SkillIcon skill={classDef.origin} size={32} />} name={classDef.origin.name} level={levels.origin}
+              <LeveledIconTile icon={<SkillIcon skill={classDef.origin} theme={theme} size={32} />} name={classDef.origin.name} level={levels.origin}
                 onLevel={(v) => update({ origin: clampLevelInput(v, MAX_LEVEL, 1) })} max={MAX_LEVEL} min={1} theme={theme} />
               {classDef.ascent && (
-                <LeveledIconTile icon={<SkillIcon skill={classDef.ascent} size={32} />} name={classDef.ascent.name} level={levels.ascent}
+                <LeveledIconTile icon={<SkillIcon skill={classDef.ascent} theme={theme} size={32} />} name={classDef.ascent.name} level={levels.ascent}
                   onLevel={(v) => update({ ascent: clampLevelInput(v, MAX_LEVEL) })} max={MAX_LEVEL} theme={theme} />
               )}
             </div>
@@ -761,7 +767,7 @@ function HexaSkillLevelsSubstep({
                 const skill = { iconId: node.iconId, iconUrl: node.iconUrl, name: node.skills.join("\n") };
                 return (
                   // react-doctor-disable-next-line no-array-index-as-key
-                  <LeveledIconTile key={`mastery-${i}`} icon={<SkillIcon skill={skill} size={32} />} name={skill.name}
+                  <LeveledIconTile key={`mastery-${i}`} icon={<SkillIcon skill={skill} theme={theme} size={32} />} name={skill.name}
                     level={levels.mastery[i] ?? ""}
                     onLevel={(v) => {
                       const next = [...levels.mastery];
@@ -782,7 +788,7 @@ function HexaSkillLevelsSubstep({
               onClear={() => update({ enhancement: classDef.enhancement.map(() => "") })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
               {classDef.enhancement.map((skill, i) => (
-                <LeveledIconTile key={`enhancement-${skill.name}`} icon={<SkillIcon skill={skill} size={32} />} name={skill.name}
+                <LeveledIconTile key={`enhancement-${skill.name}`} icon={<SkillIcon skill={skill} theme={theme} size={32} />} name={skill.name}
                   level={levels.enhancement[i] ?? ""}
                   onLevel={(v) => {
                     const next = [...levels.enhancement];
@@ -802,7 +808,7 @@ function HexaSkillLevelsSubstep({
               onClear={() => update({ common: COMMON_SKILLS.map(() => "") })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
               {COMMON_SKILLS.map((skill, i) => (
-                <LeveledIconTile key={skill.name} icon={<SkillIcon skill={skill} size={32} />} name={skill.name}
+                <LeveledIconTile key={skill.name} icon={<SkillIcon skill={skill} theme={theme} size={32} />} name={skill.name}
                   level={levels.common[i] ?? ""}
                   onLevel={(v) => {
                     const next = [...levels.common];

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { usePickerCoords } from "../hooks/usePickerCoords";
 import { numericKeyDown, sanitizeDigitsInput, isStrayClick } from "../../../../lib/inputUtils";
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
+import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import HoverTooltip from "../../../../components/HoverTooltip";
 import type { SetupStepDefinition } from "../steps";
-import { ItemIcon } from "../../../../components/ResourceImage";
 import CharacterAvatar from "../../tabs/components/CharacterAvatar";
 import SetupStepFrame from "./SetupStepFrame";
 import {
@@ -260,6 +261,43 @@ const spritePreviewStyle = (theme: AppTheme): CSSProperties => ({
   minHeight: SLOT_SIZE * 2,
 });
 
+// ── Icon ───────────────────────────────────────────────────────────────────
+
+// A missing/failed icon falls back to the item's name-initial (mirrors VMatrixNodeIcon's
+// treatment) instead of a stray broken-image glyph. `revealed` mirrors ItemIcon's own prop
+// (androids' actual-appearance variant vs. their pre-equip egg icon).
+function EquipItemIcon({ id, name, theme, size, revealed }: {
+  id: string;
+  name: string;
+  theme: AppTheme;
+  size: number;
+  revealed?: boolean;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  const src = resourceImageUrl("item", id, `iconRaw${revealed ? "D" : ""}.png`);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ flexShrink: 0 }}>
+        <Image src={src} alt={name} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
+    </>
+  );
+}
+
 // ── Item search ─────────────────────────────────────────────────────────────
 
 function filterItems(items: CatalogItem[], query: string): CatalogItem[] {
@@ -470,7 +508,7 @@ function ItemPicker({
           onClick={() => setPendingItem(current)}
           style={equippedHeaderStyle(theme, true)}
         >
-          {current.id && <ItemIcon id={current.id} size={28} revealed={isAndroid} />}
+          {current.id && <EquipItemIcon id={current.id} name={current.name} theme={theme} size={28} revealed={isAndroid} />}
           <div style={{ overflow: "hidden", flex: 1 }}>
             <p style={equippedHeaderLabelStyle(theme)}>Currently Equipped</p>
             <p style={equippedHeaderNameStyle(theme)}>{current.name}</p>
@@ -479,7 +517,7 @@ function ItemPicker({
         </button>
       ) : current && (
         <div style={equippedHeaderStyle(theme, false)}>
-          {current.id && <ItemIcon id={current.id} size={28} revealed={isAndroid} />}
+          {current.id && <EquipItemIcon id={current.id} name={current.name} theme={theme} size={28} revealed={isAndroid} />}
           <div style={{ overflow: "hidden" }}>
             <p style={equippedHeaderLabelStyle(theme)}>Currently Equipped</p>
             <p style={equippedHeaderNameStyle(theme)}>{current.name}</p>
@@ -501,7 +539,7 @@ function ItemPicker({
           onClick={() => selectItem({ id: presetBaseItem.id, name: presetBaseItem.name }, false)}
           style={presetBaseItemStyle(theme)}
         >
-          {presetBaseItem.id && <ItemIcon id={presetBaseItem.id} size={28} revealed={isAndroid} />}
+          {presetBaseItem.id && <EquipItemIcon id={presetBaseItem.id} name={presetBaseItem.name} theme={theme} size={28} revealed={isAndroid} />}
           <span style={{ flex: 1, fontSize: "0.8rem", fontWeight: 700, color: theme.text }}>{presetBaseItem.name}</span>
           <span style={presetBadgeStyle(theme)}>
             PRESET 1
@@ -543,7 +581,7 @@ function ItemPicker({
                 onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = `${theme.accent}22`; }}
                 onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
               >
-                <ItemIcon id={item.id} size={28} revealed={isAndroid} />
+                <EquipItemIcon id={item.id} name={item.name} theme={theme} size={28} revealed={isAndroid} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
               </button>
             );
@@ -612,7 +650,7 @@ function WeaponAttStepView({ item, theme, isAndroid, label, value, onChange, onB
   return (
     <div style={{ border: `1px solid ${theme.accent}`, borderRadius: 10, background: theme.panel, boxShadow: "0 4px 20px rgba(0,0,0,0.3)", overflow: "hidden" }}>
       <button type="button" onClick={onBack} style={weaponAttBackButtonStyle(theme)}>
-        {item.id && <ItemIcon id={item.id} size={28} revealed={isAndroid} />}
+        {item.id && <EquipItemIcon id={item.id} name={item.name} theme={theme} size={28} revealed={isAndroid} />}
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.8rem", fontWeight: 700, color: theme.text }}>
           ← {item.name}
         </span>
@@ -678,7 +716,7 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
       style={slotCellStyle(theme, isActive)}
     >
       {item ? (
-        <ItemIcon id={item.id} size={48} revealed={slotKey === "android"} />
+        <EquipItemIcon id={item.id} name={item.name} theme={theme} size={48} revealed={slotKey === "android"} />
       ) : (
         <span style={{ fontSize: "0.75rem", color: theme.muted, fontWeight: 700, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden" }}>
           {SLOT_LABELS[slotKey]}
@@ -715,7 +753,7 @@ export function ReadOnlySlotTile({ slotKey, item, theme }: {
   const box = (
     <div data-slot-key={slotKey} style={{ ...slotCellStyle(theme, false), cursor: "default", width: SLOT_SIZE, flexShrink: 0 }}>
       {item ? (
-        <ItemIcon id={item.id} size={48} revealed={slotKey === "android"} />
+        <EquipItemIcon id={item.id} name={item.name} theme={theme} size={48} revealed={slotKey === "android"} />
       ) : (
         <span style={{ fontSize: "0.75rem", color: theme.muted, fontWeight: 700, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden" }}>
           {SLOT_LABELS[slotKey]}
@@ -755,7 +793,7 @@ export function ReadOnlySymbolTile({ area, level, theme, locked, loadImage = tru
     <HoverTooltip label={area.name} theme={theme}>
       <div style={readOnlySymbolTileStyle(theme, locked)}>
         <div style={{ opacity: iconOpacity, filter: locked ? "grayscale(1)" : "none", lineHeight: 0 }}>
-          {loadImage ? <ItemIcon id={area.itemId} size={32} /> : <div style={{ width: 32, height: 32 }} />}
+          {loadImage ? <EquipItemIcon id={area.itemId} name={area.name} theme={theme} size={32} /> : <div style={{ width: 32, height: 32 }} />}
         </div>
         <span style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "0.8rem", color: placed ? theme.text : theme.muted }}>{label}</span>
       </div>
@@ -844,7 +882,7 @@ function SymbolLevelTile({ area, level, maxLevel, theme, onLevel }: {
     <div style={symbolTileStyle(theme, placed)}>
       <HoverTooltip label={area.name} theme={theme}>
         <div style={{ opacity: placed ? 1 : 0.3, filter: placed ? "none" : "grayscale(1)", lineHeight: 0, cursor: "pointer" }}>
-          <ItemIcon id={area.itemId} size={32} />
+          <EquipItemIcon id={area.itemId} name={area.name} theme={theme} size={32} />
         </div>
       </HoverTooltip>
       <input

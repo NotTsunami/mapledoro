@@ -275,13 +275,19 @@ function SkillIconBadge({ skill, theme, size = 32, style }: { skill: BuffSkill; 
               height={size}
               onError={() => {
                 if (wrapperRef.current) wrapperRef.current.style.display = "none";
-                if (fallbackRef.current) fallbackRef.current.style.display = "block";
+                if (fallbackRef.current) fallbackRef.current.style.display = "flex";
               }}
               style={{ borderRadius: "6px", display: "block" }}
               unoptimized
             />
           </div>
-          <div ref={fallbackRef} style={{ display: "none", width: size, height: size, borderRadius: "6px", background: theme.border }} />
+          <div ref={fallbackRef} style={{
+            display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+            borderRadius: "6px", fontWeight: 800, fontSize: size * 0.35,
+            background: "rgba(127,127,127,0.18)", color: theme.muted,
+          }}>
+            {skill.skillName.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+          </div>
         </>
       ) : placeholder}
     </HoverTooltip>
@@ -395,7 +401,7 @@ function TripleStatRow({
       <div style={tripleStatGridStyle}>
         <div style={{ gridColumn: 1, position: "relative" }}>
           {showBaseWarning && <InputWarningBubble message={`That looks like your total ${label}, enter your Base Value for ${label}.`} theme={theme} />}
-          <input type="text" aria-label={`${label} base value`} value={d.base} placeholder="0" style={sub}
+          <input type="text" inputMode="numeric" aria-label={`${label} base value`} value={d.base} placeholder="0" style={sub}
             data-flagged-field={showBaseWarning || (requireFilled && !d.base.trim()) ? "true" : undefined}
             onChange={(e) => onUpdate(id, "base", sanitizeDigitsInput(e.target.value))}
             onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
@@ -406,7 +412,7 @@ function TripleStatRow({
         </div>
         <div style={{ gridColumn: 2 }}>
           <div style={{ position: "relative" }}>
-            <input type="text" aria-label={`${label} percent value`} value={d.percent} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
+            <input type="text" inputMode="numeric" aria-label={`${label} percent value`} value={d.percent} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
               data-flagged-field={requireFilled && !d.percent.trim() ? "true" : undefined}
               onChange={(e) => onUpdate(id, "percent", sanitizeDigitsInput(e.target.value))}
               onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
@@ -421,7 +427,7 @@ function TripleStatRow({
           <div style={{ gridColumn: 3 }}>
             <div style={{ position: "relative" }}>
               {showPercentUnappliedWarning && <InputWarningBubble message={`That % looks too large, enter your % Value Not Applied for ${label}.`} theme={theme} />}
-              <input type="text" aria-label={`${label} percent not applied`} value={d.percentUnapplied} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
+              <input type="text" inputMode="numeric" aria-label={`${label} percent not applied`} value={d.percentUnapplied} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
                 data-flagged-field={showPercentUnappliedWarning || (requireFilled && !d.percentUnapplied.trim()) ? "true" : undefined}
                 onChange={(e) => onUpdate(id, "percentUnapplied", sanitizeDigitsInput(e.target.value))}
                 onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
@@ -459,7 +465,7 @@ function SingleStatRow({
       </p>
       <div style={tripleStatGridStyle}>
         <div style={{ gridColumn: 1 }}>
-          <input type="text" aria-label={`${label} value`} value={value} placeholder="0" style={statInputStyle(theme)}
+          <input type="text" inputMode="numeric" aria-label={`${label} value`} value={value} placeholder="0" style={statInputStyle(theme)}
             onChange={(e) => onUpdate(id, sanitizeDigitsInput(e.target.value))}
             onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
             onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
@@ -559,7 +565,7 @@ function CombatStatCell({
         <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
           <div style={{ position: "relative" }}>
-            <input type="text" aria-label={`${label} seconds`} value={cd.seconds} placeholder="0" style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
+            <input type="text" inputMode="numeric" aria-label={`${label} seconds`} value={cd.seconds} placeholder="0" style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
               data-flagged-field={requireFilled && !cd.seconds.trim() ? "true" : undefined}
               onChange={(e) => onUpdateCooldown("seconds", sanitizeDigitsInput(e.target.value))}
               onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
@@ -569,7 +575,7 @@ function CombatStatCell({
             <span style={inputSuffixStyle(theme)}>s</span>
           </div>
           <div style={{ position: "relative" }}>
-            <input type="text" aria-label={`${label} percent`} value={cd.percent} placeholder="0" style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
+            <input type="text" inputMode="numeric" aria-label={`${label} percent`} value={cd.percent} placeholder="0" style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
               data-flagged-field={requireFilled && !cd.percent.trim() ? "true" : undefined}
               onChange={(e) => onUpdateCooldown("percent", sanitizeDigitsInput(e.target.value))}
               onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
@@ -591,7 +597,7 @@ function CombatStatCell({
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
       <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <input type="text" aria-label={label} value={val} placeholder="0"
+        <input type="text" inputMode={allowsDecimal ? "decimal" : "numeric"} aria-label={label} value={val} placeholder="0"
           style={isRaw ? statInputStyle(theme, "4.6rem") : { ...statInputStyle(theme, "4.6rem"), paddingRight: "1.15rem" }}
           data-flagged-field={requireFilled && !val.trim() ? "true" : undefined}
           onChange={(e) => {

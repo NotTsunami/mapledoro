@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties } from "react";
+import Image from "next/image";
 import { numericKeyDown, sanitizeDigitsInput } from "../../../../lib/inputUtils";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
-import { ItemIcon } from "../../../../components/ResourceImage";
 import type { SetupStepDefinition } from "../steps";
 import { CLASS_SKILL_DATA } from "../data/classSkillData";
 import { readCharactersStore, selectCharacterByIgn } from "../../model/charactersStore";
@@ -55,6 +55,35 @@ const RING_MODE_OPTIONS: { mode: OzRingMode; label: string }[] = [
   { mode: "standard", label: "Standard" },
   { mode: "continuous", label: "Continuous" },
 ];
+
+// A missing/failed icon falls back to the ring's name-initial (mirrors VMatrixNodeIcon's
+// treatment) rather than a stray broken-image glyph — each Oz Ring has a distinct name,
+// unlike HEXA Stat's shared-prefix case that needed a slot number instead.
+function OzRingIcon({ id, name, theme, size = 32 }: { id: string; name: string; theme: AppTheme; size?: number }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  const src = resourceImageUrl("item", id, "iconRaw.png");
+  return (
+    <>
+      <div ref={wrapperRef} style={{ flexShrink: 0 }}>
+        <Image src={src} alt={name} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
+    </>
+  );
+}
 
 interface OzRingsSetupStepProps {
   theme: AppTheme;
@@ -247,7 +276,7 @@ export default function OzRingsSetupStep({
 
         {draft.ringMode === "continuous" && (
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <LeveledIconTile icon={<ItemIcon id={OZ_RING_ICON_IDS.continuous} size={32} />} name="Continuous Ring"
+            <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.continuous} name="Continuous Ring" theme={theme} />} name="Continuous Ring"
               level={draft.levels.continuous ?? ""} onLevel={(v) => setLevel("continuous", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
           </div>
         )}
@@ -255,11 +284,11 @@ export default function OzRingsSetupStep({
         {draft.ringMode === "standard" && (
           <>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <LeveledIconTile icon={<ItemIcon id={OZ_RING_ICON_IDS.restraint} size={32} />} name="Ring of Restraint"
+              <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.restraint} name="Ring of Restraint" theme={theme} />} name="Ring of Restraint"
                 level={draft.levels.restraint ?? ""} onLevel={(v) => setLevel("restraint", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
-              <LeveledIconTile icon={<ItemIcon id={ozInfo.weaponJumpIconId} size={32} />} name={ozInfo.weaponJumpLabel}
+              <LeveledIconTile icon={<OzRingIcon id={ozInfo.weaponJumpIconId} name={ozInfo.weaponJumpLabel} theme={theme} />} name={ozInfo.weaponJumpLabel}
                 level={draft.levels.weaponJump ?? ""} onLevel={(v) => setLevel("weaponJump", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
-              <LeveledIconTile icon={<ItemIcon id={OZ_RING_ICON_IDS.totalling} size={32} />} name="Totalling Ring"
+              <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.totalling} name="Totalling Ring" theme={theme} />} name="Totalling Ring"
                 level={draft.levels.totalling ?? ""} onLevel={(v) => setLevel("totalling", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
             </div>
 

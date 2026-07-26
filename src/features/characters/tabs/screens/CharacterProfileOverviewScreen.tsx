@@ -988,7 +988,7 @@ function OverviewFamiliarTile({ slot, theme }: { slot: StoredFamiliarSlot; theme
         display: "flex", alignItems: "center", justifyContent: "center", opacity: filled ? 1 : 0.4,
       }}>
         {filled ? (
-          <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} size={OVERVIEW_FAMILIAR_TILE_SIZE - 16} theme={theme} />
+          <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={OVERVIEW_FAMILIAR_TILE_SIZE - 16} theme={theme} />
         ) : (
           <span style={{ fontSize: 12, fontWeight: 800, color: theme.muted }}>?</span>
         )}

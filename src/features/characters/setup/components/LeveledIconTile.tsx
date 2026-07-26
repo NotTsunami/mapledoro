@@ -57,6 +57,7 @@ export function LeveledIconTile({ icon, name, level, onLevel, max, min = 0, them
       </HoverTooltip>
       <input
         type="number"
+        inputMode="numeric"
         className="no-spinner"
         min={min}
         max={max}
