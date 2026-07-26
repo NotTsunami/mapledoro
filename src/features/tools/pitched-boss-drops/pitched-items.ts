@@ -49,6 +49,8 @@ export const DROP_ITEMS: DropItem[] = [
   { id: "mitras-rage", name: "Mitra's Rage", category: "pitched", itemId: "01190555" }, // Mitra's Rage: Warrior
 
   // ── Armor Boxes ───────────────────────────────────────────────────────────
+  { id: "absolab-armor-box", name: "AbsoLab Armor Box", category: "armor-box", itemId: "02633913" },
+  { id: "arcane-umbra-armor-box", name: "Arcane Umbra Armor Box", category: "armor-box", itemId: "02633915" },
   { id: "divine-eternal-armor-box", name: "Divine Eternal Armor Box", category: "armor-box", itemId: "02638064" },
   { id: "ancient-eternal-armor-box", name: "Ancient Eternal Armor Box", category: "armor-box", itemId: "02831226" },
   { id: "eternal-armor-of-oaths-box", name: "Eternal Armor of Oaths Box", category: "armor-box", itemId: "02639253" },
