@@ -721,7 +721,7 @@ function CharacterCard({
 
   return (
     <div
-      className="fade-in dailies-card panel-card"
+      className="fade-in dailies-card panel-card card-reorder-surface"
       {...dragProps}
       style={{
         background: theme.panel,

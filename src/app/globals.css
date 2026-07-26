@@ -495,6 +495,19 @@ textarea:focus-visible {
   display: inline-flex;
 }
 
+/* Pointer-events drag-to-reorder surface (useCardReorder.ts) -- touch-action: none claims the
+   gesture for JS instead of letting the browser start its own scroll on the first bit of finger
+   movement; the callout/select suppression stops iOS's long-press "save image"-style menu from
+   appearing over what would otherwise look like a draggable image/link. Lives here instead of in
+   the hook's returned props because both call sites spread dragProps and then write a literal
+   style={{...}} afterward, which would silently clobber a style key coming from the spread. */
+.card-reorder-surface {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .hover-tip-bubble {
   position: fixed;
   max-width: min(240px, 90vw);

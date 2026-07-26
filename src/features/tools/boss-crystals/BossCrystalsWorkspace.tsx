@@ -205,7 +205,7 @@ function CharacterCard({
 
   return (
     <div
-      className="fade-in bc-card panel-card"
+      className="fade-in bc-card panel-card card-reorder-surface"
       {...dragProps}
       style={{
         background: theme.panel,
