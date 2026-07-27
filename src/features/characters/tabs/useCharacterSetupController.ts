@@ -1675,6 +1675,13 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         const existingRecord = existingStore.charactersById[id];
         acc[id] = {
           ...character,
+          // Unlike gender/marriage below, `tools` is never written through characterRoster --
+          // every per-character tool (symbols, liberation, hexa skills, scouterResult, etc.)
+          // saves via characterToolStorage.ts's writeCharacterToolData, which patches disk
+          // directly. So character.tools here is only ever as fresh as the last hydration,
+          // while existingRecord.tools reflects any out-of-band tool write since then. Prefer
+          // disk; fall back to the in-memory value only for a character not yet on disk at all.
+          tools: existingRecord?.tools ?? character.tools,
           // `character` (from characterRoster, the in-memory state) is always the
           // authoritative value for these two -- every upsert path already either sets them
           // explicitly (applyGenderDraftToRoster/applyMarriageDraftToRoster, quick/full setup)
