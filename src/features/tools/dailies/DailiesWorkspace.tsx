@@ -33,24 +33,15 @@ import { useCardReorder, type CardDragProps } from "../useCardReorder";
 
 // -- Style helpers ------------------------------------------------------------
 
+// Colors only; shape comes from the shared `.tool-check-item` class.
 function checkboxItemStyle(
   theme: AppTheme,
   checked: boolean,
 ): React.CSSProperties {
   return {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    padding: "5px 8px",
-    borderRadius: "8px",
-    cursor: "pointer",
     background: checked ? theme.accentSoft : theme.timerBg,
     border: `1px solid ${checked ? theme.accent : theme.border}`,
-    fontSize: "0.75rem",
-    fontWeight: 700,
     color: checked ? theme.accentText : theme.text,
-    userSelect: "none",
-    transition: "background 0.15s, border-color 0.15s",
   };
 }
 
@@ -102,7 +93,7 @@ function CheckboxItem({
   onToggle: () => void;
 }) {
   return (
-    <label style={checkboxItemStyle(theme, checked)}>
+    <label className="tool-check-item" style={checkboxItemStyle(theme, checked)}>
       <input
         type="checkbox"
         checked={checked}
@@ -806,6 +797,9 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
         }
         @media (max-width: 435px) {
           .dailies-check-grid { grid-template-columns: 1fr !important; }
+          /* One column means each task is a full-width row, so give it the same
+             thumb-sized height the account-wide dailies get. */
+          .dailies-check-grid .tool-check-item { min-height: 44px; padding: 5px 12px; }
         }
       `}</style>
 
