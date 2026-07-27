@@ -13,7 +13,7 @@ import WarningIcon from "../../../../components/WarningIcon";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
 import SetupStepFrame from "./SetupStepFrame";
-import InfoTooltip, { LockGlyph } from "./InfoTooltip";
+import InfoTooltip from "./InfoTooltip";
 import { CopyFromPreset } from "./CopyFromPreset";
 import { statInputStyle, inputSuffixStyle, ChecklistCheckbox, ChecklistGroup, LegionFinalAttackField, InputWarningBubble, scrollToFlaggedField, flaggedValueLinkStyle } from "./QuestionControls";
 import {
@@ -630,7 +630,6 @@ function WeaponAttField({ label, usesMagicWeapon, value, onUpdate, theme }: {
 }) {
   const statName = usesMagicWeapon ? "Magic ATT" : "Attack Power";
   const statShortName = usesMagicWeapon ? "Magic ATT" : "ATT";
-  const locked = value.trim() !== "";
   // MapleScouter flags this Total-vs-Weapon-only mix-up for every class, not just
   // magic ones — same threshold either way.
   const showWeaponAttWarning = Number(value) > WEAPON_ATT_WARN_AT;
@@ -648,15 +647,6 @@ function WeaponAttField({ label, usesMagicWeapon, value, onUpdate, theme }: {
               }}
               theme={theme}
             />
-            {locked && (
-              <InfoTooltip
-                content={{ title: "Why this is locked", description: "Auto-filled from your Equipment." }}
-                theme={theme}
-                icon={<LockGlyph />}
-                label="Why this is locked"
-                bordered={false}
-              />
-            )}
           </div>
           <div style={{ position: "relative", flexShrink: 0 }}>
             {showWeaponAttWarning && <InputWarningBubble message={`That looks like your total ${statShortName}, enter your weapon's ${statShortName}.`} theme={theme} />}
@@ -666,10 +656,9 @@ function WeaponAttField({ label, usesMagicWeapon, value, onUpdate, theme }: {
               aria-label={label}
               value={value}
               placeholder="0"
-              readOnly={locked}
-              style={{ ...statInputStyle(theme, "4.6rem"), ...(locked ? { borderColor: theme.muted, cursor: "default" } : {}) }}
+              style={statInputStyle(theme, "4.6rem")}
               data-flagged-field={showWeaponAttWarning || !value.trim() ? "true" : undefined}
-              onChange={(e) => { if (!locked) onUpdate(sanitizeDigitsInput(e.target.value)); }}
+              onChange={(e) => onUpdate(sanitizeDigitsInput(e.target.value))}
               onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
               onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
               onKeyDown={numericKeyDown}
