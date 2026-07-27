@@ -55,6 +55,7 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
             ? "confirm-fade"
             : "",
           shell.isSwitchingToDirectory ? "profile-to-directory-fade" : "",
+          shell.isDeleteTransitioning ? "deleting" : "",
           !shell.isConfirmFadeOut && !shell.isModeTransitioning && shell.isSearchFadeIn
             ? "search-fade-in"
             : "",

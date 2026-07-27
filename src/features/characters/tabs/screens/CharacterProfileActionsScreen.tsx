@@ -37,6 +37,7 @@ export default function CharacterProfileActionsScreen({
           "profile-actions-card",
           !shell.isSwitchingToDirectory ? "profile-actions-fade-in" : "",
           shell.isSwitchingToDirectory ? "profile-to-directory-fade" : "",
+          shell.isDeleteTransitioning ? "deleting" : "",
         ]
           .filter(Boolean)
           .join(" ")}

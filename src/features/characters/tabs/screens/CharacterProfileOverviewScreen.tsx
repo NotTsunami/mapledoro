@@ -3476,7 +3476,7 @@ export default function CharacterProfileOverviewScreen({
   }
 
   return (
-    <div className="profile-binder">
+    <div className={`profile-binder${model.setup.isDeleteTransitioning ? " profile-binder-closing" : ""}`}>
       <div
         className="profile-binder-page"
         role="tabpanel"

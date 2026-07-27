@@ -31,6 +31,9 @@ export interface SearchPaneModel {
     isSearchFadeIn: boolean;
     isBackTransitioning: boolean;
     isSwitchingToDirectory: boolean;
+    // See PreviewPaneModel["setup"]'s isDeleteTransitioning -- slows this pane's own
+    // profile-to-directory-fade down to match the profile binder's closing animation.
+    isDeleteTransitioning: boolean;
     isUiLocked: boolean;
   };
   search: {
@@ -112,6 +115,10 @@ export interface PreviewPaneModel {
     isFinishingSetup: boolean;
     isSwitchingToDirectory: boolean;
     isSwitchingToProfile: boolean;
+    // Drives the profile binder's own "closing" animation when the confirmed character is
+    // being deleted, instead of the plain fade every other isSwitchingToDirectory transition
+    // gets -- see CharacterProfileOverviewScreen's profile-binder-closing class.
+    isDeleteTransitioning: boolean;
     isUiLocked: boolean;
     activeFlowId: SetupFlowId;
     completedFlowIds: SetupFlowId[];

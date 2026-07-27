@@ -10,8 +10,6 @@ export const CHARACTERS_TRANSITION_MS = {
   slow: 320,
   searchFadeIn: 260,
   setupPanelRevealDelay: 80,
-  deleteNoticeVisible: 1000,
-  deleteNoticeTotal: 1500,
 } as const;
 
 interface SetupTransitionSetters {

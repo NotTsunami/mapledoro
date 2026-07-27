@@ -87,6 +87,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           animation: profileToDirectoryFadeOnly var(--characters-fast) ease forwards !important;
         }
 
+        /* Deleting reuses these same profile-to-directory-fade elements, but slowed down to
+           match .profile-binder-closing's own duration below -- otherwise this fade reaches
+           opacity 0 at --characters-fast (160ms) and hides the rest of the binder's closing
+           animation before it's had a chance to actually be seen. Same specificity (2 classes)
+           as the rules above, so source order (this comes after) settles the tie. */
+        .profile-to-directory-fade.deleting {
+          animation-duration: var(--characters-slow) !important;
+        }
+
         .profile-actions-card {
           transition:
             opacity var(--characters-standard) ease,
@@ -424,6 +433,25 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         @keyframes profileToDirectoryFadeOnly {
           from { opacity: 1; transform: none; }
           to { opacity: 0; transform: none; }
+        }
+
+        /* Runs on the .profile-binder element itself alongside the ancestor panels' own
+           profile-to-directory-fade (slowed to match via the .deleting modifier above), so a
+           deletion reads as the binder itself closing rather than a generic cross-fade -- see
+           isDeleteTransitioning's own comment in useCharacterSetupController.ts. Collapses
+           toward the spine's edge (left on desktop, top on mobile via the --binder-close-s*
+           override below) like the pages folding shut into the binder's cover, using scale()
+           on both axes driven by CSS vars rather than two separate keyframes for the two
+           directions. Duration matches --characters-slow (not -fast) -- the first version used
+           -fast and was too quick to actually register as a deliberate animation. */
+        @keyframes profileBinderClose {
+          from { opacity: 1; transform: scale(1, 1); }
+          to { opacity: 0; transform: scale(var(--binder-close-sx, 0.05), var(--binder-close-sy, 1)); }
+        }
+
+        .profile-binder-closing {
+          transform-origin: left center;
+          animation: profileBinderClose var(--characters-slow) ease forwards;
         }
 
         @media (max-width: 860px) {
@@ -925,6 +953,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             margin-top: 0 !important;
             padding-top: 0 !important;
             padding-bottom: 14px;
+          }
+
+          /* The binder's spine reorders to the top on mobile (.profile-binder-spine above),
+             so the closing animation should collapse toward the top edge here instead of the
+             left edge desktop uses. */
+          .profile-binder-closing {
+            transform-origin: top center;
+            --binder-close-sx: 1;
+            --binder-close-sy: 0.05;
           }
         }
   `;

@@ -85,6 +85,7 @@ function getSetupPanelClassName(setup: PreviewPaneModel["setup"]) {
     setup.isBackTransitioning ? "setup-panel-fade" : "",
     setup.isFinishingSetup ? "setup-finish-fade" : "",
     setup.isSwitchingToDirectory || setup.isSwitchingToProfile ? "profile-to-directory-fade" : "",
+    setup.isDeleteTransitioning ? "deleting" : "",
   ]
     .filter(Boolean)
     .join(" ");

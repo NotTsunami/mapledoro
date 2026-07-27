@@ -1081,8 +1081,6 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   const [isSwitchingToProfile, setIsSwitchingToProfile] = useState(false);
   const [isFinishingSetup, setIsFinishingSetup] = useState(false);
   const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
-  const [deleteNoticeCharacterName, setDeleteNoticeCharacterName] = useState<string | null>(null);
-  const [showDeleteNotice, setShowDeleteNotice] = useState(false);
   const [isAddingCharacter, setIsAddingCharacter] = useState(false);
   const [fastDirectoryRevealOnce, setFastDirectoryRevealOnce] = useState(false);
   const [characterRoster, setCharacterRoster] = useState<StoredCharacterRecord[]>([]);
@@ -2360,9 +2358,11 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     }
 
     removeSetupDraftForCharacter(removedCharacter);
+    // isDeleteTransitioning drives the profile binder's own "closing" animation (see
+    // CharacterProfileOverviewScreen's profile-binder-closing class) instead of the fade
+    // every other isSwitchingToDirectory transition gets, so the deletion reads as the
+    // binder itself closing rather than a generic cross-fade plus a separate text notice.
     setIsDeleteTransitioning(true);
-    // Fade the current view out first (the brief empty beat) for both cases — multi-char
-    // then reveals the directory; last-char cross-fades into the first-time setup screen.
     setIsSwitchingToDirectory(true);
     setSetupStepDirection("forward");
 
@@ -2385,10 +2385,8 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         setShowFlowOverview(false);
         setShowCharacterDirectory(false);
         transitions.setSetupPanelVisible(false);
-        // Keep isSwitchingToDirectory true here so the first-time card stays
-        // blanked (faded out) under the delete notice — same "blank for a beat"
-        // window the multi-char delete shows before its directory reveals. The
-        // final cleanup timer clears it and fades the first-time screen in.
+        // Keep isSwitchingToDirectory true here so the first-time card stays blanked
+        // until the closing animation has fully played -- the next timer below clears it.
       } else {
         setSetupMode("search");
         setSetupFlowStarted(true);
@@ -2398,28 +2396,21 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       }
       setSetupStepIndex(0);
       setSetupStepDirection("forward");
-      setDeleteNoticeCharacterName(removedCharacter.characterName);
-    }, CHARACTERS_TRANSITION_MS.standard);
+      // Waits for the slowed-down closing animation (--characters-slow, see the CSS'
+      // .deleting modifier) instead of the usual --characters-standard, so the state swap
+      // doesn't land while the binder is still visibly closing.
+    }, CHARACTERS_TRANSITION_MS.slow);
 
     transitions.queueTransitionTimer(() => {
-      setShowDeleteNotice(true);
-    }, CHARACTERS_TRANSITION_MS.standard + 30);
-
-    transitions.queueTransitionTimer(() => {
-      setShowDeleteNotice(false);
-    }, CHARACTERS_TRANSITION_MS.standard + 30 + CHARACTERS_TRANSITION_MS.deleteNoticeVisible);
-
-    transitions.queueTransitionTimer(() => {
-      setDeleteNoticeCharacterName(null);
       setIsDeleteTransitioning(false);
       setIsSwitchingToDirectory(false);
       if (isLastCharacter) {
-        // Now that the blank beat has elapsed, ease the first-time setup screen
+        // Now that the closing animation has played, ease the first-time setup screen
         // in instead of snapping it on.
         transitions.playSearchFadeIn();
       }
       immediateUiLockRef.current = false;
-    }, CHARACTERS_TRANSITION_MS.standard + CHARACTERS_TRANSITION_MS.deleteNoticeTotal);
+    }, CHARACTERS_TRANSITION_MS.slow + 30);
   }, [
     championCharacterKeysByWorld,
     characterRoster,
@@ -2594,8 +2585,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     isSwitchingToDirectory,
     isSwitchingToProfile,
     isFinishingSetup,
-    deleteNoticeCharacterName,
-    showDeleteNotice,
+    isDeleteTransitioning,
     isAddingCharacter,
     fastDirectoryRevealOnce,
     characterRoster,
