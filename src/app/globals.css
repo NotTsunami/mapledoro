@@ -404,6 +404,22 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
+/* Checkbox pill in a tool checklist (daily tasks, account-wide dailies); colors
+   inline. Callers give it a `min-height` in their own single-column breakpoint,
+   where the pill becomes a full-width row and needs a thumb-sized target. */
+.tool-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
 /* Responsive grid of selectable tool cards (bosses, symbols). Lives here rather
    than in a workspace's <style> block so a section can be rendered outside the
    workspace that used to inject it. */
