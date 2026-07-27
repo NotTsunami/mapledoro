@@ -25,7 +25,7 @@ import { isExpTrackingAvailable, resolveExpDelta, characterExpPercent, netExpGai
 import ExpDeltaBadge from "../components/ExpDeltaBadge";
 import { formatExpCompact } from "../../../tools/format";
 import { PillGroup } from "../../../tools/shared-ui";
-import type { ChartData, ChartOptions, Plugin, TooltipItem } from "chart.js";
+import type { Chart, ChartData, ChartOptions, ChartType, Plugin, TooltipItem } from "chart.js";
 import { SetupFlowButtons } from "./QuickSetupIntroScreen";
 import { STAT_LABELS } from "../../setup/data/statFields";
 import { HYPER_STAT_CATEGORIES, type HyperStatCategoryDef } from "../../setup/data/hyperStatData";
@@ -2234,13 +2234,13 @@ function FamiliarsBookmark({
           Equipped Badges
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="familiar-badge-row" style={{ display: "flex", gap: 8 }}>
             {badges.slice(0, 4).map((badge, i) => (
               // react-doctor-disable-next-line no-array-index-as-key
               <ReadOnlyBadgeSlot key={i} badge={badge} theme={theme} />
             ))}
           </div>
-          <div style={{ display: "flex", gap: 8, marginLeft: badgeRowOffset }}>
+          <div className="familiar-badge-row familiar-badge-row-offset" style={{ display: "flex", gap: 8, marginLeft: badgeRowOffset }}>
             {badges.slice(4).map((badge, i) => (
               // react-doctor-disable-next-line no-array-index-as-key
               <ReadOnlyBadgeSlot key={i} badge={badge} theme={theme} />
@@ -2726,14 +2726,33 @@ function resolveExpTickIntervalDays(n: number): number {
   return 15;
 }
 
+// Rough minimum pixel width a single date tick label ("Jul 20") needs to not visually run into
+// its neighbor -- maxRotation:0/autoSkip:false are both deliberately off on the x-axis (see
+// pickTickIndices below) so the two charts always agree on exactly which dates to show, which
+// also means Chart.js's own built-in overlap avoidance never kicks in to save us here.
+const MIN_TICK_LABEL_WIDTH_PX = 44;
+
 // Indices of the data points (already one per Nexon day, see nexonDayAnchorMs above) that
 // get an axis tick -- every `interval`-th day starting from the first point. Shared by the
 // line chart (linear scale) and the bar chart (category scale) so both land on the exact same
 // dates. The very last point isn't force-included if it doesn't fall on the interval, same as
 // how most chart libraries handle "nice" tick spacing -- forcing it back in is what produced
 // the earlier crammed/stretched end-of-axis look.
-function pickTickIndices(n: number): number[] {
-  const interval = resolveExpTickIntervalDays(n);
+//
+// axisWidthPx (the x-axis's own real rendered width, read from Chart.js's own layout at
+// afterBuildTicks time) widens the interval further than resolveExpTickIntervalDays alone
+// would pick whenever the chart itself is narrow enough that even that "nice" interval's
+// labels would overlap -- caught on a 360px-wide browser window, where a 7-point range's
+// always-one-tick-per-day default left every date label overlapping the next. This only ever
+// widens the interval (never narrows it), and only actually changes anything below roughly
+// 300px, so it trades the interval's normal "nice" divisibility (14/2, 30/5, 90/15 ticks) for
+// an uneven one only in that edge case -- unavoidable since there's no clean-dividing interval
+// that's also guaranteed to fit an arbitrarily narrow width.
+function pickTickIndices(n: number, axisWidthPx: number): number[] {
+  let interval = resolveExpTickIntervalDays(n);
+  while (axisWidthPx > 0 && interval < n && Math.ceil(n / interval) * MIN_TICK_LABEL_WIDTH_PX > axisWidthPx) {
+    interval += 1;
+  }
   const indices: number[] = [];
   for (let i = 0; i < n; i += interval) indices.push(i);
   return indices;
@@ -2779,8 +2798,30 @@ function computeExpChartPoints(entries: ExpHistoryEntry[], anchor: ExpHistoryEnt
   });
 }
 
+// Chart.js's tooltip only updates in response to real pointer events landing on the canvas
+// itself -- a mouse gets a "mouseleave" for free when it wanders off, but a tap has no
+// equivalent, so a tapped point's tooltip on mobile just stays stuck open forever once you
+// tap elsewhere on the page. Listens for a pointerdown anywhere outside the chart's own
+// canvas and manually clears the active tooltip/elements when that happens. Shared by both
+// EXP charts (line and bar) since both have the same tap-and-stick behavior.
+function useDismissChartTooltipOnOutsideTap<TType extends ChartType>(chartRef: React.RefObject<Chart<TType> | null>) {
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const chart = chartRef.current;
+      if (!chart || chart.canvas.contains(event.target as Node)) return;
+      chart.setActiveElements([]);
+      chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+      chart.update();
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [chartRef]);
+}
+
 function ExpChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistoryEntry[]; anchor: ExpHistoryEntry | null }) {
   const [Line, setLine] = useState<LineChartComponent | null>(null);
+  const chartRef = useRef<Chart<"line"> | null>(null);
+  useDismissChartTooltipOnOutsideTap(chartRef);
 
   useEffect(() => {
     let mounted = true;
@@ -2851,7 +2892,7 @@ function ExpChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistor
         // below, so both axes always agree on which dates to show), guaranteeing every
         // labeled gap is identical.
         afterBuildTicks: (axis) => {
-          const indices = pickTickIndices(points.length);
+          const indices = pickTickIndices(points.length, axis.width);
           axis.ticks = indices.map((i) => ({ value: points[i].x }));
         },
         ticks: {
@@ -2882,7 +2923,7 @@ function ExpChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistor
 
   return (
     <div style={{ height: 220 }} role="img" aria-label={`Line chart: EXP percent over time across ${points.length} data points.`}>
-      {Line ? <Line key={points.length} data={data} options={options} /> : null}
+      {Line ? <Line ref={chartRef} key={points.length} data={data} options={options} /> : null}
     </div>
   );
 }
@@ -2923,6 +2964,8 @@ function formatSignedExp(n: number): string {
 
 function ExpGainBarChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistoryEntry[]; anchor: ExpHistoryEntry | null }) {
   const [Bar, setBar] = useState<BarChartComponent | null>(null);
+  const chartRef = useRef<Chart<"bar"> | null>(null);
+  useDismissChartTooltipOnOutsideTap(chartRef);
 
   useEffect(() => {
     let mounted = true;
@@ -2959,6 +3002,16 @@ function ExpGainBarChart({ theme, entries, anchor }: { theme: Theme; entries: Ex
       // Same staleness guard as the old line-chart label plugin: meta.data can briefly lag
       // one render behind `points` when the dataset length changes (e.g. switching ranges).
       if (meta.data.length !== points.length) { ctx.restore(); return; }
+      // Skip entirely (not just some of them) rather than let adjacent labels visually run
+      // into each other on a narrow chart -- caught on a 360px-wide browser window, where
+      // these overlapped badly. The tooltip already shows the same amount on hover/tap
+      // regardless of range, so hiding is a clean fallback, not a loss of information.
+      // Measures the widest label against the tightest gap between bar centers (categoryPercentage/
+      // barPercentage keep bars evenly spaced, but the chart itself can still be too narrow).
+      let minGap = Infinity;
+      for (let i = 1; i < meta.data.length; i++) minGap = Math.min(minGap, meta.data[i].x - meta.data[i - 1].x);
+      const widestLabelWidth = Math.max(...points.map((p) => ctx.measureText(formatSignedExp(p.expGained)).width));
+      if (Number.isFinite(minGap) && widestLabelWidth > minGap - edgePad) { ctx.restore(); return; }
       meta.data.forEach((el, index) => {
         const point = points[index];
         if (!point) return;
@@ -3014,7 +3067,7 @@ function ExpGainBarChart({ theme, entries, anchor }: { theme: Theme; entries: Ex
         // pickTickIndices logic as the line chart's x-axis instead keeps both charts showing
         // the exact same subset of dates.
         afterBuildTicks: (axis) => {
-          const indices = pickTickIndices(points.length);
+          const indices = pickTickIndices(points.length, axis.width);
           axis.ticks = indices.map((value) => ({ value }));
         },
         ticks: { color: theme.muted, maxRotation: 0, autoSkip: false },
@@ -3030,7 +3083,7 @@ function ExpGainBarChart({ theme, entries, anchor }: { theme: Theme; entries: Ex
 
   return (
     <div style={{ height: 160 }} role="img" aria-label={`Bar chart: daily EXP gained across ${points.length} days.`}>
-      {Bar ? <Bar key={points.length} data={data} options={options} plugins={[dailyExpLabelPlugin]} /> : null}
+      {Bar ? <Bar ref={chartRef} key={points.length} data={data} options={options} plugins={[dailyExpLabelPlugin]} /> : null}
     </div>
   );
 }

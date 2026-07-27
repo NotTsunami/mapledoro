@@ -64,7 +64,7 @@ export function LockGlyph() {
 // (even just overflow-x, which silently forces overflow-y to "auto" too, see AppShell.tsx) turns
 // into an accidental clipping container for an absolutely-positioned popup. Fixed + portal sidesteps
 // the whole class of "which ancestor is clipping it this time" bugs instead of chasing each one.
-const infoPopupStyle = (theme: AppTheme, top: number, left: number): CSSProperties => ({
+const infoPopupStyle = (theme: AppTheme, top: number, left: number, maxHeight: number): CSSProperties => ({
   position: "fixed",
   top,
   left,
@@ -74,6 +74,8 @@ const infoPopupStyle = (theme: AppTheme, top: number, left: number): CSSProperti
   borderRadius: "10px",
   padding: "0.7rem 0.85rem",
   width: "min(240px, calc(100vw - 24px))",
+  maxHeight,
+  overflowY: "auto",
   boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
 });
 
@@ -129,7 +131,7 @@ export default function InfoTooltip({ content, theme, icon = "?", label = "More 
   bordered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -137,7 +139,10 @@ export default function InfoTooltip({ content, theme, icon = "?", label = "More 
     const next = !open;
     if (next && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + remToPx(0.4), left: rect.left });
+      // Generous placeholder for the one frame before the effect below measures the
+      // popup's real height and picks a side/cap -- never actually visible as a scroll gap
+      // since it's corrected before paint settles.
+      setPos({ top: rect.bottom + remToPx(0.4), left: rect.left, maxHeight: window.innerHeight });
     }
     setOpen(next);
   }
@@ -150,17 +155,23 @@ export default function InfoTooltip({ content, theme, icon = "?", label = "More 
       const margin = 8;
       const gap = remToPx(0.4);
       const rect = container.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+      const spaceAbove = rect.top - gap - margin;
+      const naturalHeight = popup.offsetHeight;
       // Flip above the trigger when there isn't enough room below in the viewport —
       // otherwise a tooltip opened near the bottom of a step forces the page to grow
-      // to fit it, visibly pushing content past the footer.
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const openAbove = spaceBelow < popup.offsetHeight + margin && rect.top > spaceBelow;
-      const top = openAbove ? rect.top - popup.offsetHeight - gap : rect.bottom + gap;
+      // to fit it, visibly pushing content past the footer. If the popup's natural height
+      // doesn't fully fit on EITHER side (a long description on a short viewport), pick
+      // whichever side has more room and cap it there with an internal scroll instead of
+      // running off the bottom of the screen uncapped.
+      const openAbove = naturalHeight > spaceBelow && (naturalHeight <= spaceAbove || spaceAbove > spaceBelow);
+      const maxHeight = Math.max(80, openAbove ? Math.min(naturalHeight, spaceAbove) : Math.min(naturalHeight, spaceBelow));
+      const top = openAbove ? rect.top - maxHeight - gap : rect.bottom + gap;
       const naturalRight = rect.left + popup.offsetWidth;
       let left = rect.left;
       if (naturalRight > window.innerWidth - margin) left = window.innerWidth - margin - popup.offsetWidth;
       if (left < margin) left = margin;
-      setPos({ top, left });
+      setPos({ top, left, maxHeight });
     }
     function handleMouseDown(e: MouseEvent) {
       const target = e.target as Node;
@@ -169,8 +180,12 @@ export default function InfoTooltip({ content, theme, icon = "?", label = "More 
       setOpen(false);
     }
     // Fixed positioning is computed once at open time, not tracked live — closing on scroll
-    // avoids the popup visibly detaching from its trigger as the page moves under it.
-    function handleScroll() {
+    // avoids the popup visibly detaching from its trigger as the page moves under it. Capture
+    // phase (see addEventListener below) means this also fires for a scroll *inside* the
+    // popup itself (its own overflowY: auto content, see infoPopupStyle's maxHeight) — that's
+    // not the page moving under it, so it shouldn't close, unlike every other scroll source.
+    function handleScroll(e: Event) {
+      if (e.target instanceof Node && popupRef.current?.contains(e.target)) return;
       setOpen(false);
     }
     document.addEventListener("mousedown", handleMouseDown);
@@ -192,7 +207,7 @@ export default function InfoTooltip({ content, theme, icon = "?", label = "More 
         {icon}
       </button>
       {open && pos && typeof document !== "undefined" && createPortal(
-        <div ref={popupRef} style={infoPopupStyle(theme, pos.top, pos.left)}>
+        <div ref={popupRef} style={infoPopupStyle(theme, pos.top, pos.left, pos.maxHeight)}>
           {content.imageUrls && content.imageUrls.length > 0 && (
             <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.4rem" }}>
               {content.imageUrls.map((entry) => {

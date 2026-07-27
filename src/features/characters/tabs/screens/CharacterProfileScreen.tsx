@@ -247,8 +247,13 @@ export default function CharacterProfileScreen({
           {/* Name centered as the sole flex child; gender/marriage icons are absolutely
               positioned off its right edge (same pattern as the Level/% row below) so their
               width doesn't pull the name itself off-center. A div, not a <p> -- HoverTooltip
-              (inside GenderMarriageIcons) renders a <div>, invalid inside a <p>. */}
-          <div style={{ margin: 0, width: "100%", fontSize: "1.32rem", fontWeight: 800, lineHeight: 1.15, color: theme.text, display: "flex", justifyContent: "center" }}>
+              (inside GenderMarriageIcons) renders a <div>, invalid inside a <p>. textAlign
+              (on top of the flex justifyContent, which only centers the name+icons span as
+              a whole box) is what actually centers the icons once they wrap onto their own
+              line below the name on a narrow viewport (.gender-marriage-icons switches to
+              position:static there) -- without it they default to flush-left within that
+              box, which is only as wide as the name itself since it's the widest line. */}
+          <div style={{ margin: 0, width: "100%", fontSize: "1.32rem", fontWeight: 800, lineHeight: 1.15, color: theme.text, display: "flex", justifyContent: "center", textAlign: "center" }}>
             <span style={{ position: "relative" }}>
               {profile.confirmedCharacter.characterName}
               <GenderMarriageIcons

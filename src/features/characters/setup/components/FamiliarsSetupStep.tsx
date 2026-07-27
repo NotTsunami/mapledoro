@@ -1214,7 +1214,7 @@ export default function FamiliarsSetupStep({
             }
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="familiar-badge-row" style={{ display: "flex", gap: 8 }}>
                   {preset.badges.slice(0, 4).map((badge, i) => {
                     const slotId = `b${i}`;
                     const goNext = goToNextBadge(i);
@@ -1240,7 +1240,7 @@ export default function FamiliarsSetupStep({
                     );
                   })}
                 </div>
-                <div style={{ display: "flex", gap: 8, marginLeft: badgeRowOffset }}>
+                <div className="familiar-badge-row familiar-badge-row-offset" style={{ display: "flex", gap: 8, marginLeft: badgeRowOffset }}>
                   {preset.badges.slice(4).map((badge, i) => {
                     const bi = i + 4;
                     const slotId = `b${bi}`;

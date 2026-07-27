@@ -983,6 +983,16 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             --binder-close-sx: 1;
             --binder-close-sy: 0.05;
           }
+
+          /* Familiars' "Equipped Badges" staggers its second row of 4 by half a badge width
+             (matches the in-game brick-offset look) -- on a narrow viewport that offset alone
+             is enough to push the row's last pentagon past the available width, clipping it.
+             Dropping the offset here in favor of a plain, flush 4-column x 2-row grid trades
+             the in-game-accurate stagger for never overflowing, which is the right call at
+             this width (same reasoning as .gender-marriage-icons above). */
+          .familiar-badge-row-offset {
+            margin-left: 0 !important;
+          }
         }
   `;
 }
