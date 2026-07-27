@@ -1675,13 +1675,19 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         const existingRecord = existingStore.charactersById[id];
         acc[id] = {
           ...character,
-          // Unlike gender/marriage below, `tools` is never written through characterRoster --
-          // every per-character tool (symbols, liberation, hexa skills, scouterResult, etc.)
-          // saves via characterToolStorage.ts's writeCharacterToolData, which patches disk
-          // directly. So character.tools here is only ever as fresh as the last hydration,
-          // while existingRecord.tools reflects any out-of-band tool write since then. Prefer
-          // disk; fall back to the in-memory value only for a character not yet on disk at all.
-          tools: existingRecord?.tools ?? character.tools,
+          // Two independent paths write `tools`: out-of-band, via characterToolStorage.ts's
+          // writeCharacterToolData (symbols, liberation, hexa skills, scouterResult, etc.,
+          // edited from their own tool pages -- patches disk directly, never syncs back into
+          // characterRoster), and in-band, via a setup-flow finish (e.g. HEXA Matrix inside
+          // MapleScouter/Full Setup), which builds a fresh tools object and pushes it into
+          // characterRoster BEFORE this very effect runs -- this effect is what's supposed to
+          // flush that fresh value to disk. Picking one side outright breaks the other: an
+          // outright `existingRecord.tools` (disk) discards the setup-flow finish that's
+          // mid-flight in `character.tools` right now; an outright `character.tools` (memory)
+          // is what caused the original out-of-band-write regression this comment used to
+          // describe. Spread disk first so a key only an out-of-band write has survives, then
+          // overlay memory so a key the current character object actually carries wins.
+          tools: { ...existingRecord?.tools, ...character.tools },
           // `character` (from characterRoster, the in-memory state) is always the
           // authoritative value for these two -- every upsert path already either sets them
           // explicitly (applyGenderDraftToRoster/applyMarriageDraftToRoster, quick/full setup)
