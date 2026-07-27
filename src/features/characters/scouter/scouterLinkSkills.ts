@@ -1,0 +1,27 @@
+/*
+  mapledoro's LinkSkillId (named after the skill effect, e.g. "unfairAdvantage") -> the
+  literal key MapleScouter's linkSkill object uses (named after the class, e.g. "kadena").
+  Confirmed live 2026-07-27 against a real request capture. "kadena" (not "cadena") is
+  MapleScouter's own spelling, kept as-is since it's their real field.
+
+  MapleScouter also has mihile/kaiser/hayato keys with no mapledoro equivalent, confirmed
+  by Yuki these can't even be entered on MapleScouter's own UI, so they always send "0".
+*/
+
+import type { LinkSkillId } from "../model/charactersStore";
+
+export const LINK_SKILL_TO_SCOUTER_KEY: Record<LinkSkillId, string> = {
+  unfairAdvantage: "kadena",
+  tideOfBattle: "illium",
+  solus: "ark",
+  timeToPrepare: "kain",
+  termsAndConditions: "angel",
+  elementalism: "kanna",
+  qiCultivation: "mukhyun",
+  bravado: "hoyoung",
+  empiricalKnowledge: "magician",
+  thiefsCunning: "thief",
+};
+
+/** Scouter linkSkill keys with no mapledoro equivalent, always sent as "0". */
+export const SCOUTER_UNMODELED_LINK_SKILL_KEYS = ["mihile", "kaiser", "hayato"] as const;

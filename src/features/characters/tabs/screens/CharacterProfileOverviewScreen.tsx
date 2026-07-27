@@ -39,6 +39,7 @@ import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAM
 import { statusText } from "../../../../components/statusColors";
 import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import ScouterFigure from "../../scouter/ScouterFigure";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
@@ -1293,7 +1294,9 @@ function OverviewBookmark({ model, onNavigateToBookmark, onNavigateToGearSlot, o
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-        <OverviewFigure label="Scouter" value="—" theme={theme} />
+        {mounted && character
+          ? <ScouterFigure character={character} theme={theme} />
+          : <OverviewFigure label="Scouter" value="—" theme={theme} />}
         <div style={{ display: "flex", gap: 6 }}>
           <WseSlot label="Weapon" item={equipGrid?.weapon} theme={theme} onNavigate={() => onNavigateToGearSlot("weapon")} />
           <WseSlot label="Secondary" item={equipGrid?.secondary} theme={theme} onNavigate={() => onNavigateToGearSlot("secondary")} />
