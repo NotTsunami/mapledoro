@@ -136,10 +136,10 @@ export interface ScouterStat {
   wildhunterUnion: string;
   resetCoolDown: string;
   statusAdditionalDmg: string;
-  passiveSkillLevelUp: false;
-  increaseTarget: false;
+  passiveSkillLevelUp: boolean;
+  increaseTarget: boolean;
   summonPersistTime: string;
-  artifact_increaseTarget: string;
+  artifact_increaseTarget: boolean;
   artifact_finalAttack: string;
   subStat_hyper: "";
   subStat_ability: "";
@@ -430,10 +430,19 @@ function buildStat(
     atkAbs: atk.percentUnapplied || "0",
     dmg: character.stats.damage || "0",
     bossDmg: character.stats.bossDamage || "0",
+    // Field is greyed out/disabled on MapleScouter's own site (Lara, 2026-07-27) -- looks
+    // like dead/buggy input on their end, not something worth collecting from mapledoro's
+    // users. Safe to always send 0; confirmed Lara's number matched with this at 0.
     normalDmg: character.stats.normalEnemyDamage || "0",
     ignoreDef: character.stats.ignoreDefense || "0",
     buffDuration: character.stats.buffDuration || "0",
-    critical: character.stats.criticalRate || "0",
+    // MapleScouter's own form rejects anything below 100% ("크확 100%미만!!" -- Crit Rate
+    // under 100%), since damage formulas assume you're always critting. Clamped up to 100
+    // here rather than validating/blocking the field itself, so the stored number stays a
+    // real, unrestricted stat (useful elsewhere) and only the payload we send is floored.
+    // A real value above 100 is sent as-is, uncapped -- some classes (Marksman, etc.) get
+    // real damage benefit from over-capping crit rate, so that bonus isn't thrown away.
+    critical: String(Math.max(Number(character.stats.criticalRate || "0"), 100)),
     criticalDmg: character.stats.criticalDamage || "0",
     weaponAtk: String(character.scouter?.weaponAtt ?? 0),
     atkPercent: atk.percent || "0",
@@ -442,10 +451,14 @@ function buildStat(
     wildhunterUnion: String(wildHunterUnionLevel(legion)),
     resetCoolDown: character.stats.cooldownSkip || "0",
     statusAdditionalDmg: character.stats.additionalStatusDamage || "0",
-    passiveSkillLevelUp: false,
-    increaseTarget: false,
+    // The two Inner Ability lines MapleScouter cares about (scouterQuestionsData.ts's
+    // IA_LINE_OPTIONS) -- previously hardcoded false, so innerAbilityLine was collected
+    // and gated on but never actually reached the payload (Yuki, 2026-07-27).
+    passiveSkillLevelUp: character.scouter?.innerAbilityLine === "passive",
+    increaseTarget: character.scouter?.innerAbilityLine === "multiTarget",
     summonPersistTime: character.stats.summonDuration || "0",
-    artifact_increaseTarget: legion?.artifactExtraTarget ? "1" : "0",
+    // Real MapleScouter capture sends this as an actual boolean, not "1"/"0" (Yuki, 2026-07-27).
+    artifact_increaseTarget: legion?.artifactExtraTarget === true,
     artifact_finalAttack: String(legion?.artifactFinalAttackDmg ?? 0),
     subStat_hyper: "",
     subStat_ability: "",
