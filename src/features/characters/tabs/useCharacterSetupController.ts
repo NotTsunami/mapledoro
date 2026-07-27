@@ -270,13 +270,18 @@ const WH_LEGION_RANK_SET = new Set<string>(["B", "A", "S", "SS", "SSS"]);
 // replaces the whole per-world blob, so dropping this would silently erase it on
 // every unrelated finish) vs. "none" when the user explicitly picked "No Wild
 // Hunter" or cleared their previous bracket pick (an explicit, deliberate clear).
+// "none" used to fall through to the WH_LEGION_RANK_SET check below and resolve to
+// undefined -- indistinguishable from never having answered at all, so anyone with
+// no Wild Hunter could never satisfy a completeness check that requires an answer
+// (Yuki, 2026-07-27). Checked explicitly now so it round-trips as its own value.
 function resolveWhLegionRank(
   derived: WhLegionRank | null,
   manual: string | undefined,
-  existing: WhLegionRank | undefined,
-): WhLegionRank | undefined {
+  existing: WhLegionRank | "none" | undefined,
+): WhLegionRank | "none" | undefined {
   if (derived) return derived;
   if (manual === undefined) return existing;
+  if (manual === "none") return "none";
   return WH_LEGION_RANK_SET.has(manual) ? (manual as WhLegionRank) : undefined;
 }
 

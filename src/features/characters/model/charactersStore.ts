@@ -152,7 +152,10 @@ export interface StoredLegionCrystal {
  * useCharacterSetupController.ts's applyScouterLegionForWorld.
  */
 export interface StoredScouterLegion {
-  wildHunterRank?: WhLegionRank;
+  // "none" is a real, deliberate "No Wild Hunter" answer, distinct from `undefined`
+  // ("never answered this question") -- see resolveWhLegionRank's own comment in
+  // useCharacterSetupController.ts for why the distinction matters.
+  wildHunterRank?: WhLegionRank | "none";
   /** "+1 targets hit on multi-target skills & EXP acquired" artifact is active. */
   artifactExtraTarget?: boolean;
   /** "Damage of Final Attack Skills" artifact bonus, as a percent (1–30). */
@@ -846,8 +849,8 @@ function parseStoredLegionCrystal(val: unknown): StoredLegionCrystal | null {
 
 function parseScouterLegionEntry(val: Record<string, unknown>): StoredScouterLegion {
   const entry: StoredScouterLegion = {};
-  if (typeof val.wildHunterRank === "string" && WH_LEGION_RANKS.has(val.wildHunterRank)) {
-    entry.wildHunterRank = val.wildHunterRank as WhLegionRank;
+  if (typeof val.wildHunterRank === "string" && (val.wildHunterRank === "none" || WH_LEGION_RANKS.has(val.wildHunterRank))) {
+    entry.wildHunterRank = val.wildHunterRank as WhLegionRank | "none";
   }
   if (val.artifactExtraTarget === true) entry.artifactExtraTarget = true;
   if (typeof val.artifactFinalAttackDmg === "number" && val.artifactFinalAttackDmg > 0) {

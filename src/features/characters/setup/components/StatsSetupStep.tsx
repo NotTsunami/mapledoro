@@ -1052,7 +1052,7 @@ function isScouterQuestionnaireComplete(
   opts: NonNullable<StatsStepDraft["setupOptions"]> | undefined,
   sq: NonNullable<StatsStepDraft["scouterQuestions"]> | undefined,
   whSource: WhAutofillSource | null,
-  whWorldRank: WhLegionRank | undefined,
+  whWorldRank: WhLegionRank | "none" | undefined,
   derivedInnerAbilityLine: InnerAbilityDerivedLine,
   derivedWeaponHand: "1h" | "2h" | undefined,
 ): boolean {
