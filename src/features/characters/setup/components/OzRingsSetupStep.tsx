@@ -231,7 +231,10 @@ export default function OzRingsSetupStep({
 
   const totallingLevel = Number.parseInt(draft.levels.totalling ?? "", 10);
   const totallingStatsEntered = Number.isFinite(totallingLevel) && totallingLevel > 0 && ozInfo.totallingStats.length > 0;
-  const showTotallingStats = draft.ringMode === "standard" && totallingStatsEntered;
+  // Not gated on ringMode -- every ring's level is enterable regardless of active mode
+  // now (MapleScouter wants all 4 independently of which one you actually equip), so
+  // Totalling's own stat sub-fields need to be reachable the same way its level tile is.
+  const showTotallingStats = totallingStatsEntered;
   // A value that's clearly wrong (same threshold as the warning bubble) shouldn't be
   // submittable, in any flow — checked off the draft data itself (not `showTotallingStats`)
   // so switching to the Continuous tab can't hide a bad Standard-side value past this gate;
@@ -274,60 +277,54 @@ export default function OzRingsSetupStep({
           </p>
         </div>
 
-        {draft.ringMode === "continuous" && (
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.continuous} name="Continuous Ring" theme={theme} />} name="Continuous Ring"
-              level={draft.levels.continuous ?? ""} onLevel={(v) => setLevel("continuous", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
-          </div>
-        )}
+        {/* All 4 rings shown regardless of active mode -- you can level a ring even when
+            it isn't the one currently equipped, and MapleScouter wants every ring's level
+            independently of which one you actually use (Yuki, 2026-07-27). `ringMode` still
+            marks which ring is active, for useContinuousRingAsMainRing and the character's
+            actual applied stats. */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.restraint} name="Ring of Restraint" theme={theme} />} name="Ring of Restraint"
+            level={draft.levels.restraint ?? ""} onLevel={(v) => setLevel("restraint", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
+          <LeveledIconTile icon={<OzRingIcon id={ozInfo.weaponJumpIconId} name={ozInfo.weaponJumpLabel} theme={theme} />} name={ozInfo.weaponJumpLabel}
+            level={draft.levels.weaponJump ?? ""} onLevel={(v) => setLevel("weaponJump", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
+          <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.totalling} name="Totalling Ring" theme={theme} />} name="Totalling Ring"
+            level={draft.levels.totalling ?? ""} onLevel={(v) => setLevel("totalling", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
+          <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.continuous} name="Continuous Ring" theme={theme} />} name="Continuous Ring"
+            level={draft.levels.continuous ?? ""} onLevel={(v) => setLevel("continuous", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
+        </div>
 
-        {draft.ringMode === "standard" && (
-          <>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.restraint} name="Ring of Restraint" theme={theme} />} name="Ring of Restraint"
-                level={draft.levels.restraint ?? ""} onLevel={(v) => setLevel("restraint", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
-              <LeveledIconTile icon={<OzRingIcon id={ozInfo.weaponJumpIconId} name={ozInfo.weaponJumpLabel} theme={theme} />} name={ozInfo.weaponJumpLabel}
-                level={draft.levels.weaponJump ?? ""} onLevel={(v) => setLevel("weaponJump", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
-              <LeveledIconTile icon={<OzRingIcon id={OZ_RING_ICON_IDS.totalling} name="Totalling Ring" theme={theme} />} name="Totalling Ring"
-                level={draft.levels.totalling ?? ""} onLevel={(v) => setLevel("totalling", v)} max={OZ_RING_MAX_LEVEL} theme={theme} />
+        {showTotallingStats && (
+          <div>
+            <p style={sectionLabelStyle(theme)}>Totalling Ring Stats</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {ozInfo.totallingStats.map((stat, index) => (
+                <StatRow
+                  key={stat}
+                  label={MAIN_STAT_LABELS[stat]}
+                  value={draft.totallingStatValues[stat] ?? ""}
+                  onChange={(v) => setTotallingStat(stat, v)}
+                  theme={theme}
+                  isFirst={index === 0}
+                />
+              ))}
             </div>
-
-            {showTotallingStats && (
-              <div>
-                <p style={sectionLabelStyle(theme)}>Totalling Ring Stats</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  {ozInfo.totallingStats.map((stat, index) => (
-                    <StatRow
-                      key={stat}
-                      label={MAIN_STAT_LABELS[stat]}
-                      value={draft.totallingStatValues[stat] ?? ""}
-                      onChange={(v) => setTotallingStat(stat, v)}
-                      theme={theme}
-                      isFirst={index === 0}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
       </div>
 
       {hasInsaneTotallingStat && (
+        // hasInsaneTotallingStat can only be true when totallingStatsEntered is (see
+        // insaneTotallingStatCount above), which is the same condition showTotallingStats
+        // now uses -- the fields being flagged are always on screen, so there's no longer
+        // a "switch modes to see them" case to handle here.
         <div role="alert">
-          {showTotallingStats ? (
-            <button
-              type="button"
-              onClick={() => scrollToFlaggedField(rootRef.current)}
-              style={flaggedValueLinkStyle(theme)}
-            >
-              {`Fix the flagged ${flaggedValueWord} above to continue.`}
-            </button>
-          ) : (
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.78rem", fontWeight: 700, color: theme.muted }}>
-              {`Switch to Standard ring setup and fix the flagged Totalling Ring ${flaggedValueWord} to continue.`}
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={() => scrollToFlaggedField(rootRef.current)}
+            style={flaggedValueLinkStyle(theme)}
+          >
+            {`Fix the flagged ${flaggedValueWord} above to continue.`}
+          </button>
         </div>
       )}
     </SetupStepFrame>

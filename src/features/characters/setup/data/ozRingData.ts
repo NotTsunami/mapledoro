@@ -164,11 +164,22 @@ export function storedOzRingsToOzRingsDraft(stored: StoredOzRings | undefined): 
  * Totalling Ring off-stat values to merge into the character's own shared
  * stats.str/dex/int/luk.base — the SAME real stat, not a private duplicate, so
  * whichever surface (this ring or the Stats profile pencil) was typed into last
- * wins. Only returns entries when the Totalling Ring is actually in use (level > 0)
- * and the value is a real positive number; blank/untouched off-stats are omitted so
- * they don't overwrite an already-set value with nothing.
+ * wins. Only returns entries when the Totalling Ring is actually in use -- a real
+ * level AND ringMode "standard" (not "continuous") -- and the value is a real
+ * positive number; blank/untouched off-stats are omitted so they don't overwrite an
+ * already-set value with nothing.
+ *
+ * A ring's stat bonus only applies while actually equipped in real gameplay, so
+ * leveling Totalling while running Continuous as your main ring must NOT silently
+ * merge its bonus into your real stats -- this used to only check the level, so
+ * having ever typed a Totalling level at all (even while on Continuous) permanently
+ * polluted the character's real stats the next time this step finished (Yuki,
+ * 2026-07-27). "standard" is an imperfect proxy (it also covers a pure Restraint/
+ * Weapon Jump swap with no Totalling in the build at all), but it correctly excludes
+ * the one case that was actually reported: Continuous mode with Totalling leveled.
  */
 export function ozRingsTotallingStatOverrides(draft: OzRingsDraft): Partial<Record<MainStatId, string>> {
+  if (draft.ringMode !== "standard") return {};
   const totallingLevel = parseOzRingLevel(draft.levels.totalling);
   if (totallingLevel === null) return {};
   const out: Partial<Record<MainStatId, string>> = {};
