@@ -9,7 +9,7 @@ import { ItemIcon } from "../../../components/ResourceImage";
 import { MF_FAMILIARS, type MfFamiliar } from "./familiars";
 import { potentialsForRarity, type ResolvedPotential } from "./potentialEngine";
 import {
-  MF_BONUS_COLORS, MF_BONUS_FAMILY_DESC, formatBonusEffect, getBonusItem,
+  MF_BONUS_COLORS, MF_BONUS_FAMILIES, MF_BONUS_FAMILY_DESC, formatBonusEffect, getBonusItem,
   type MfBonusColor, type MfBonusFamily,
 } from "./bonusItemsData";
 import type { MfRarity } from "./types";
@@ -375,12 +375,12 @@ function bonusOptionLabel(theme: AppTheme, title: string, sub: string) {
   );
 }
 
-function BonusFamilyList({ theme, available, onPick }: {
-  theme: AppTheme; available: readonly MfBonusFamily[]; onPick: (f: MfBonusFamily) => void;
+function BonusFamilyList({ theme, onPick }: {
+  theme: AppTheme; onPick: (f: MfBonusFamily) => void;
 }) {
   return (
     <div style={{ maxHeight: 300, overflowY: "auto" }}>
-      {available.map((family) => {
+      {MF_BONUS_FAMILIES.map((family) => {
         const icon = getBonusItem(family, "White");
         return (
           <button
@@ -425,11 +425,10 @@ function BonusColorList({ theme, family, onPick }: {
 }
 
 export function BonusItemPicker({
-  theme, isOpen, available, onToggle, onClose, onSelect, children,
+  theme, isOpen, onToggle, onClose, onSelect, children,
 }: {
   theme: AppTheme;
   isOpen: boolean;
-  available: readonly MfBonusFamily[];
   onToggle: () => void;
   onClose: () => void;
   onSelect: (family: MfBonusFamily, color: MfBonusColor) => void;
@@ -485,7 +484,7 @@ export function BonusItemPicker({
           </div>
           {family
             ? <BonusColorList theme={theme} family={family} onPick={pickColor} />
-            : <BonusFamilyList theme={theme} available={available} onPick={setFamily} />}
+            : <BonusFamilyList theme={theme} onPick={setFamily} />}
         </div>,
         document.body,
       )}

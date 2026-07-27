@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import { getMfFamiliar } from "./familiars";
-import { getBonusItem, type MfBonusColor, type MfBonusFamily, type MfBonusItem } from "./bonusItemsData";
+import {
+  getBonusItem, getBonusItemById, type MfBonusColor, type MfBonusFamily, type MfBonusItem,
+} from "./bonusItemsData";
 import {
   calculateScore,
   effectiveMaxDie,
@@ -13,6 +15,7 @@ import {
   type RerollSuggestion,
   type ScoreResult,
 } from "./calc";
+import { isLineSelectableFor } from "./potentialEngine";
 import { MF_RARITY_DICE, type MfRarity } from "./types";
 
 const STORAGE_KEY = "mysticFrontier";
@@ -38,7 +41,9 @@ interface WaveState {
 interface SavedState {
   waves: WaveState[];
   // Bonus dice items are equipped on the character, so they're shared across waves.
-  bonus: Partial<Record<MfBonusFamily, MfBonusColor>>;
+  // A flat list of item ids: any mix stacks, including several colors of the same
+  // family (a White and a Blue Swift-Rolling Dice together).
+  bonus: string[];
   activeWave: number;
 }
 
@@ -51,7 +56,23 @@ function emptyWave(): WaveState {
 }
 
 function defaultState(): SavedState {
-  return { waves: Array.from({ length: WAVE_COUNT }, emptyWave), bonus: {}, activeWave: 0 };
+  return { waves: Array.from({ length: WAVE_COUNT }, emptyWave), bonus: [], activeWave: 0 };
+}
+
+// Legacy saves held at most one color per family ({ Swift: "Blue" }); fold them into
+// the flat id list, dropping ids that no longer exist in the item data.
+function parseBonus(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((id): id is string => typeof id === "string" && getBonusItemById(id) !== undefined);
+  }
+  if (!raw || typeof raw !== "object") return [];
+  return Object.entries(raw as Record<string, unknown>).flatMap(([family, color]) => {
+    const item =
+      typeof color === "string"
+        ? getBonusItem(family as MfBonusFamily, color as MfBonusColor)
+        : undefined;
+    return item ? [item.id] : [];
+  });
 }
 
 function parseSlot(raw: unknown): SlotState {
@@ -86,7 +107,7 @@ function parseState(raw: unknown): SavedState {
     typeof r.activeWave === "number" ? Math.min(Math.max(0, Math.floor(r.activeWave)), WAVE_COUNT - 1) : 0;
   return {
     waves: Array.from({ length: WAVE_COUNT }, (_, i) => parseWave(waveSource[i])),
-    bonus: r.bonus && typeof r.bonus === "object" ? (r.bonus as SavedState["bonus"]) : {},
+    bonus: parseBonus(r.bonus),
     activeWave,
   };
 }
@@ -142,11 +163,15 @@ export function useMysticFrontierState() {
   }
 
   function setRarity(index: number, rarity: MfRarity): void {
-    // The selectable potential pool is rarity-specific, so drop a line that no
-    // longer belongs, and clamp the die to the new face count.
+    // The selectable potential pool is rarity-specific, so drop a line that no longer
+    // belongs (an Epic line survives a Unique ↔ Legendary switch), and clamp the die
+    // to the new face count.
     update((prev) =>
       editActiveSlot(prev, index, (s) => ({
-        ...s, rarity, line: null, die: Math.min(s.die, MF_RARITY_DICE[rarity]),
+        ...s,
+        rarity,
+        line: s.line !== null && isLineSelectableFor(s.line, rarity) ? s.line : null,
+        die: Math.min(s.die, MF_RARITY_DICE[rarity]),
       })),
     );
   }
@@ -154,14 +179,14 @@ export function useMysticFrontierState() {
   const setLine = (index: number, id: number | null) => patchSlot(index, { line: id });
   const setDie = (index: number, die: number) => patchSlot(index, { die });
 
-  function setBonus(family: MfBonusFamily, color: MfBonusColor | null): void {
-    update((prev) => {
-      const bonus = { ...prev.bonus };
-      if (color === null) delete bonus[family];
-      else bonus[family] = color;
-      return { ...prev, bonus };
-    });
+  function addBonus(family: MfBonusFamily, color: MfBonusColor): void {
+    const item = getBonusItem(family, color);
+    if (!item) return;
+    update((prev) => ({ ...prev, bonus: [...prev.bonus, item.id] }));
   }
+
+  const removeBonus = (index: number) =>
+    update((prev) => ({ ...prev, bonus: prev.bonus.filter((_, i) => i !== index) }));
 
   const setTarget = (target: number) => update((prev) => updateActiveWave(prev, (w) => ({ ...w, target })));
   const setActiveWave = (i: number) =>
@@ -184,8 +209,8 @@ export function useMysticFrontierState() {
 
   const bonusItems = useMemo<MfBonusItem[]>(
     () =>
-      (Object.entries(state.bonus) as [MfBonusFamily, MfBonusColor][]).flatMap(([family, color]) => {
-        const item = getBonusItem(family, color);
+      state.bonus.flatMap((id) => {
+        const item = getBonusItemById(id);
         return item ? [item] : [];
       }),
     [state.bonus],
@@ -219,12 +244,13 @@ export function useMysticFrontierState() {
     waveFilledCounts,
     slots,
     target,
-    bonus: state.bonus,
+    bonusItems,
     setFamiliar,
     setRarity,
     setLine,
     setDie,
-    setBonus,
+    addBonus,
+    removeBonus,
     setTarget,
     reset,
     result,

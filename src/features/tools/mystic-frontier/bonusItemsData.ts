@@ -51,6 +51,10 @@ export function getBonusItem(family: MfBonusFamily, color: MfBonusColor): MfBonu
   return MF_BONUS_ITEMS.find((b) => b.family === family && b.color === color);
 }
 
+export function getBonusItemById(id: string): MfBonusItem | undefined {
+  return MF_BONUS_ITEMS.find((b) => b.id === id);
+}
+
 // Concise per-item effect summary (the dice-total and multiplier components it adds).
 export function formatBonusEffect(item: MfBonusItem): string {
   const parts: string[] = [];
