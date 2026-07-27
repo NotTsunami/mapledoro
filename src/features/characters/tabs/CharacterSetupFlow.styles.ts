@@ -391,6 +391,10 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           flex: 0 0 auto;
         }
 
+        .profile-actions-divider {
+          display: none;
+        }
+
         @keyframes previewSwap {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
@@ -478,8 +482,24 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           }
 
           .profile-actions-wrap {
-            max-width: min(100%, 220px) !important;
+            /* No max-width override here anymore -- falls back to the 300px cap already set
+               inline (same as desktop). The old 220px override shrank this card noticeably
+               narrower than everything else on the page, which read as a random floating box
+               rather than a normal panel at this width. */
             margin-top: 0.35rem !important;
+          }
+
+          /* Standalone hairline (not a border baked into the danger button itself, which
+             would clash with the button's own full pill border) separating the destructive
+             Remove action from the two harmless toggle buttons above it -- otherwise all
+             three read as equally-weighted items in the same stacked list, and Remove doesn't
+             visually announce itself as a different, more serious kind of action. Desktop
+             isn't touched: its side-by-side wrapped row doesn't have this problem. */
+          .profile-actions-divider {
+            display: block;
+            width: 100%;
+            border-top: 1px solid ${theme.border};
+            margin: 0.15rem 0 0.05rem;
           }
 
           .character-profile-nav-row {

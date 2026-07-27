@@ -9,6 +9,7 @@ import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import WarningIcon from "../../../../components/WarningIcon";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
 import SetupStepFrame from "./SetupStepFrame";
@@ -306,7 +307,7 @@ function WarningList({ warnings, theme, characterLevel }: { warnings: ClassWarni
       {others.map((w) => (
         <div key={w.skill?.skillName ?? w.message}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-            <span style={{ fontSize: "0.75rem", color: statusText(theme, "warning"), flexShrink: 0, lineHeight: 1 }}>⚠</span>
+            <WarningIcon color={statusText(theme, "warning")} />
             <span style={{ fontSize: "0.82rem", color: statusText(theme, "warning"), fontWeight: 700 }}>{w.message}{w.skill ? ":" : ""}</span>
             {w.tooltip && <InfoTooltip content={w.tooltip} theme={theme} />}
           </div>
@@ -320,7 +321,7 @@ function WarningList({ warnings, theme, characterLevel }: { warnings: ClassWarni
       {doNotUse.length > 0 && (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.45rem" }}>
-            <span style={{ fontSize: "0.75rem", color: statusText(theme, "warning"), flexShrink: 0, lineHeight: 1 }}>⚠</span>
+            <WarningIcon color={statusText(theme, "warning")} />
             <span style={{ fontSize: "0.82rem", color: statusText(theme, "warning"), fontWeight: 700 }}>Do not use the following skills:</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", marginLeft: "1.2rem" }}>

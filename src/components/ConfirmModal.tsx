@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { AppTheme } from "./themes";
 import { STATUS, statusText } from "./statusColors";
+import WarningIcon from "./WarningIcon";
 
 function modalPanelStyle(theme: AppTheme): CSSProperties {
   return {
@@ -91,8 +92,9 @@ export default function ConfirmModal({
           {description}
         </p>
         {warning && (
-          <p style={{ margin: 0, color: statusText(theme, "warning"), fontSize: "0.86rem", fontWeight: 800 }}>
-            ⚠ {warning}
+          <p style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.4rem", color: statusText(theme, "warning"), fontSize: "0.86rem", fontWeight: 800 }}>
+            <WarningIcon color={statusText(theme, "warning")} />
+            {warning}
           </p>
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.55rem" }}>

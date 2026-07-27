@@ -16,6 +16,7 @@ import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
 import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
+import WarningIcon from "../../../../components/WarningIcon";
 import LegionPanel from "./LegionPanel";
 
 const rowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, 190px)", justifyContent: "center", alignItems: "start", gap: "0.6rem", width: "100%" };
@@ -149,7 +150,13 @@ function DirectoryCharacterCard({ character, showWorld, isUiLocked, theme, refre
               style={{ marginLeft: "0.2rem", verticalAlign: "middle" }}
             />
           )}
-          {stale && <span aria-label="Data outdated" style={{ color: statusText(theme, "warning"), marginLeft: "0.2rem" }}>⚠</span>}
+          {stale && (
+            <WarningIcon
+              aria-label="Data outdated"
+              color={statusText(theme, "warning")}
+              style={{ marginLeft: "0.2rem", verticalAlign: "middle" }}
+            />
+          )}
         </span>
         <span style={{ fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.1, color: theme.muted, textAlign: "center" }}>
           Lv {character.level}

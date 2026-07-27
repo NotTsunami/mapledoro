@@ -5,6 +5,7 @@ import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
 import { secondaryButtonStyle } from "../components/uiStyles";
 import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
+import WarningIcon from "../../../../components/WarningIcon";
 import HoverTooltip from "../../../../components/HoverTooltip";
 import { statusText } from "../../../../components/statusColors";
 import { characterExpPercent, isExpTrackingAvailable, resolveExpDelta, type ExpDelta } from "../../model/expProgress";
@@ -184,8 +185,7 @@ export default function CharacterProfileScreen({
   const isStale = isCharacterStale(profile.confirmedCharacter.expiresAt);
   const formattedDate = formatFetchedAt(profile.confirmedCharacter.fetchedAt);
   const expDelta = resolveExpDelta(profile.confirmedCharacter);
-  let statusPrefix: string | null = null;
-  if (!profile.isRefreshing && isStale) statusPrefix = "⚠ ";
+  const showStaleWarningIcon = !profile.isRefreshing && isStale;
 
   return (
     <div style={{ display: "grid", justifyItems: "center", gap: "0.5rem" }}>
@@ -299,7 +299,14 @@ export default function CharacterProfileScreen({
                   style={{ marginRight: "0.2rem", verticalAlign: "middle" }}
                 />
               )}
-              {statusPrefix}Updated {formattedDate}
+              {showStaleWarningIcon && (
+                <WarningIcon
+                  aria-label="Data outdated"
+                  color={statusText(theme, "warning")}
+                  style={{ marginRight: "0.2rem", verticalAlign: "middle" }}
+                />
+              )}
+              Updated {formattedDate}
             </p>
           )}
           {(isStale || profile.isRefreshing) && profile.onRefresh && !profile.isAddingCharacter && !profile.setupStepActive && (

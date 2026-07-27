@@ -113,7 +113,7 @@ function AnchorCard({ theme, label, active, onSelect }: { theme: AppTheme; label
 }
 
 function groupLabelStyle(theme: AppTheme): CSSProperties {
-  return { fontSize: "0.72rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 0.4rem" };
+  return { fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 0.4rem" };
 }
 
 function cardGridStyle(): CSSProperties {
