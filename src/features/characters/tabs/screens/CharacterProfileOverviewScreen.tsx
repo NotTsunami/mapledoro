@@ -3401,6 +3401,17 @@ function BookmarkSpine({
   charName: string | undefined;
 }) {
   const tabRefs = useRef<Map<BookmarkId, HTMLButtonElement>>(new Map());
+  // exportCharacterJson triggers a silent browser download with no confirmation of its own --
+  // some mobile browsers don't even show a download-bar UI, so tapping Export otherwise gives
+  // no feedback at all that anything happened. Flashes the same accent tint the active
+  // bookmark tab already uses (a bit stronger, see the button's own style below) rather than
+  // swapping its label or building a whole separate toast for it.
+  const [exported, setExported] = useState(false);
+  useEffect(() => {
+    if (!exported) return;
+    const t = setTimeout(() => setExported(false), 400);
+    return () => clearTimeout(t);
+  }, [exported]);
 
   // A page tablist should switch content immediately as focus moves (WAI-ARIA APG's
   // automatic-activation pattern) — unlike this codebase's picker-oriented
@@ -3456,8 +3467,13 @@ function BookmarkSpine({
             <button
               type="button"
               className="profile-bookmark-tab tap-target-44"
-              onClick={() => exportCharacterJson(charName)}
-              style={{ background: "transparent", color: theme.muted, gap: 6 }}
+              onClick={() => { exportCharacterJson(charName); setExported(true); }}
+              style={{
+                background: exported ? `${theme.accent}33` : "transparent",
+                color: exported ? theme.accentText : theme.muted,
+                gap: 6,
+                transition: "background 0.3s ease, color 0.3s ease",
+              }}
             >
               <ExportTabIcon />
               Export
