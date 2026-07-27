@@ -63,7 +63,7 @@ function OrderCard({
   theme: AppTheme; label: string; isDragging: boolean; isDropTarget: boolean; dragProps: CardDragProps; onRemove: () => void;
 }) {
   return (
-    <div {...dragProps} style={{ ...cardStyle(theme, true, isDropTarget, isDragging), cursor: "grab" }}>
+    <div className="card-reorder-surface" {...dragProps} style={{ ...cardStyle(theme, true, isDropTarget, isDragging), cursor: "grab" }}>
       <button
         type="button"
         aria-label={`Remove ${label}`}

@@ -839,9 +839,14 @@ export function ReadOnlyFamiliarSlotCard({ slot, theme }: { slot: StoredFamiliar
   };
   const sprite = tier ? (
     // flex: 1 so the sprite grows to fill whatever vertical room the card has past the chips
-    // below it, instead of sitting at a fixed size with dead space under it.
-    <div style={{ flex: 1, minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <HoverTooltip label={displayName} theme={theme}>
+    // below it, instead of sitting at a fixed size with dead space under it. position: relative
+    // + the HoverTooltip wrapper below pinned via inset: 0 (not width/height: 100%) -- .hover-tip
+    // is inline-flex and shrink-wraps its own box by default, so percentage sizing chained
+    // through it is circular (it and FamiliarCardSprite's fill mode would each be waiting on
+    // the other's size). Absolute positioning sidesteps that: inset: 0 sizes directly off this
+    // div's real box regardless of how that box's own size was determined.
+    <div style={{ flex: 1, minHeight: 0, width: "100%", position: "relative" }}>
+      <HoverTooltip label={displayName} theme={theme} style={{ position: "absolute", inset: 0 }}>
         <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} fill theme={theme} />
       </HoverTooltip>
     </div>

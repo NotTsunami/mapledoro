@@ -34,15 +34,17 @@ function createGhost(card: HTMLElement): HTMLElement {
   ghost.style.opacity = "0.9";
   ghost.style.boxShadow = "0 12px 28px rgba(0, 0, 0, 0.35)";
   ghost.style.transition = "none";
-  // cloneNode copies classList too -- these cards carry the shared .fade-in entrance class
-  // (globals.css), which replays its 0.5s opacity/translateY animation on any freshly-inserted
-  // element that still has it, making the ghost look like it takes half a second to "arrive".
-  // Inline animation: none overrides that regardless of which classes came along with the clone.
+  // cloneNode copies classList too -- Boss Crystal/Daily cards carry the shared .fade-in
+  // entrance class (globals.css), which replays its 0.5s opacity/translateY animation on any
+  // freshly-inserted element that still has it, making the ghost look like it takes half a
+  // second to "arrive". Inline animation: none overrides that regardless of which classes
+  // came along with the clone.
   ghost.style.animation = "none";
   ghost.style.willChange = "transform";
-  // A ghost appended while an ancestor dialog is open should stay inside it (an open <dialog>
-  // renders in the browser's top layer, above every z-index in the regular document) --
-  // falls back to document.body for cards outside any dialog.
+  // An open <dialog> (ModalShell) renders in the browser's top layer, which sits above every
+  // z-index in the regular document -- a ghost appended to document.body would render behind
+  // it no matter how high zIndex goes. Appending inside the dialog instead keeps it in that
+  // same top-layer paint context; falls back to body for cards outside any dialog.
   const container = card.closest("dialog") ?? document.body;
   container.appendChild(ghost);
   return ghost;
@@ -66,15 +68,16 @@ interface Gesture {
 
 /**
  * Pointer-events drag-to-reorder for a grid/list of cards. Shared by the Boss Crystal and
- * Daily trackers, which both hold an ordered, manually-added character list. `dragProps(index)`
- * spreads onto each card; `isDragging`/`isDropTarget` drive the dimmed / accent-border states.
+ * Daily trackers plus the profile Customize Layout dialog, which all hold an ordered,
+ * manually-arranged character/section list. `dragProps(index)` spreads onto each card,
+ * `isDragging`/`isDropTarget` drive the dimmed / accent-border states.
  *
  * Built on Pointer Events rather than the HTML5 Drag and Drop API -- `draggable` doesn't
  * fire drag gestures from touch input at all on iOS Safari (a long-press there just triggers
  * the OS's own image/link callout instead), so this needed to work via touch from the start.
  *
- * `dragProps` intentionally has no `style`/`className` -- both call sites spread it and then
- * write a literal `style={{...}}` afterward in JSX, which would silently clobber a `style` key
+ * `dragProps` intentionally has no `style`/`className` -- every call site spreads it and then
+ * writes a literal `style={{...}}` afterward in JSX, which would silently clobber a `style` key
  * returned here (later-written props win). The `touch-action: none` this needs to claim the
  * gesture from the browser's own scroll handling instead lives in the shared
  * `.card-reorder-surface` global class -- add that class name at each call site instead.

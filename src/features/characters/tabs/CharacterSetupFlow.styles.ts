@@ -821,6 +821,33 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
                render first visually, so a resize expands downward from the spine instead
                of moving it. */
             order: -1;
+            /* Fades the trailing edge so the row reads as swipeable at a glance instead of
+               looking like a fixed row of pills that happens to get cut off -- there's no
+               visible scrollbar on mobile otherwise. Static (not scroll-position-aware): it
+               keeps fading even once fully scrolled to the end, a small tradeoff against the
+               cost of tracking scroll position just to toggle it off. */
+            mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+            -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+            /* This row layout also kicks in on a narrowed desktop browser window, not just
+               real mobile -- there it gets a real (visible, non-overlay) OS scrollbar, which
+               reads as chunky next to the pill/fade treatment above. Kept visible rather than
+               hidden entirely (a mouse-only desktop user has no touch swipe to fall back on),
+               just slimmed down and themed to match. */
+            scrollbar-width: thin;
+            scrollbar-color: ${theme.border} transparent;
+          }
+
+          .profile-binder-spine::-webkit-scrollbar {
+            height: 6px;
+          }
+
+          .profile-binder-spine::-webkit-scrollbar-track {
+            background: transparent;
+          }
+
+          .profile-binder-spine::-webkit-scrollbar-thumb {
+            background: ${theme.border};
+            border-radius: 999px;
           }
 
           .profile-bookmark-tab {
@@ -865,6 +892,39 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
           .equipment-action-label-short {
             display: inline;
+          }
+
+          /* Several bookmarks (Stats/Hyper Stat/Ability, HEXA Skills/HEXA Stat, Gear/Titles/
+             Pets) stack their sub-views in one grid cell so the row sizes to the tallest of
+             them (desktop keeps that via visibility:hidden, see StatsBookmark's/
+             HexaMatrixBookmark's/EquipmentBookmark's own comments) — on mobile there's no
+             panel min-height for that extra space to disappear into, so it read as a giant
+             blank gap above the action bar whenever a shorter view was active. Switching the
+             inactive panes to real display:none here removes them from the grid's sizing
+             entirely, so the row matches whichever view is actually showing.
+          */
+          .bookmark-subview:not(.bookmark-subview-active) {
+            display: none !important;
+          }
+
+          /* That fix above then exposed a second-order jump: the same bookmarks' internal
+             switcher bar (Hyper Stats/Ability, HEXA Skills/Stat, Gear/Titles/Pets) sits below
+             the content via marginTop:auto, pinned to the panel's bottom edge -- fine on
+             desktop where the panel's height is fixed regardless of sub-view, but on mobile
+             the panel now genuinely grows/shrinks per sub-view, so a bottom-pinned bar moves
+             every time you tap it. Mirrors the outer bookmark spine's own top-anchoring fix:
+             order:-1 moves the bar above the content instead, right under the page header, so
+             its position no longer depends on how tall the content below it is. */
+          .bookmark-page-nav {
+            order: -1;
+            /* !important: overriding the inline paddingTop:14/marginTop:"auto" set for the
+               desktop bottom-pinned layout -- an external rule alone can't beat an inline
+               style, and the auto margin in particular would otherwise still absorb any free
+               space above this now-first flex item, recreating the same gap this was meant
+               to remove. */
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 14px;
           }
         }
   `;

@@ -999,8 +999,7 @@ interface InitialRouteIntent {
 // because the roster's actual localStorage write is still pending in a separate effect at that
 // point (see the "Resyncs every step draft" comment below) — an independent localStorage read
 // here would silently re-seed hexa_matrix with the pre-Finish value, so the profile's HEXA edit
-// pencil always showed a stale level right after saving a new one. Confirmed as a real bug
-// 2026-07-20 (Yuki: typed a new HEXA level, it saved, but reopening the pencil showed the old one).
+// pencil always showed a stale level right after saving a new one.
 function hexaValueFromStoredCharacter(hexaClassDef: ReturnType<typeof findClassById>, storedCharacter: StoredCharacterRecord | null): string {
   if (!hexaClassDef || !storedCharacter) return "";
   const savedSkills = storedCharacter.tools?.hexaSkills as { levels?: HexaSkillLevels } | undefined;
@@ -1043,7 +1042,7 @@ function buildSeededStepTestByStep(jobName: string, storedCharacter: StoredChara
     // reopening Oz Rings on a character that already answered it always started blank,
     // even though the stored ring levels were intact (its own useEffect only backfills
     // the Totalling Ring's off-stats from stats.str/dex/int/luk, not the ring levels
-    // themselves). Confirmed as a real bug 2026-07-18.
+    // themselves).
     oz_rings: storedCharacter ? serializeOzRingsDraft(storedOzRingsToOzRingsDraft(storedCharacter.scouter?.ozRings)) : "",
   };
 }
@@ -1678,8 +1677,16 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         const existingRecord = existingStore.charactersById[id];
         acc[id] = {
           ...character,
-          gender: character.gender ?? existingRecord?.gender ?? null,
-          marriage: character.marriage ?? existingRecord?.marriage ?? null,
+          // `character` (from characterRoster, the in-memory state) is always the
+          // authoritative value for these two -- every upsert path already either sets them
+          // explicitly (applyGenderDraftToRoster/applyMarriageDraftToRoster, quick/full setup)
+          // or carries them forward itself via spread (handleRefreshed passes existing.gender/
+          // existing.marriage through explicitly; every other upsert spreads ...existing).
+          // Falling back to existingRecord here (the pre-write value still on disk) used `??`,
+          // which can't tell "never touched this field" apart from "explicitly cleared to
+          // null" -- an intentional clear from the Bio bookmark's Gender/Partner pencil got
+          // silently reverted on the very next persist, since it looked identical to the
+          // untouched case.
           meta: {
             addedAt: character.meta.addedAt,
             updatedAt:
@@ -2201,9 +2208,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       // against a STALE readCharactersStore() snapshot (the first upsert's write hasn't
       // reached storage yet this tick — see upsertRosterCharacter's own comment), silently
       // reverting stats/isLiberated/weaponHand/scouter answers back to their pre-finish
-      // values while only hexa_matrix appeared to actually save. Confirmed as a real bug
-      // 2026-07-18: re-running MapleScouter Setup on an existing character via the profile's
-      // Setup bookmark wiped the whole finish except HEXA.
+      // values while only hexa_matrix appeared to actually save.
       const isMapleScouterFlow = effectiveFlowId === "maplescouter_setup";
       if (confirmedCharacter && !isFullSetupFlow && !isMapleScouterFlow) {
         applyStandaloneToolDrafts(confirmedCharacter, effectiveStepData, upsertRosterCharacter, effectiveFlowId);

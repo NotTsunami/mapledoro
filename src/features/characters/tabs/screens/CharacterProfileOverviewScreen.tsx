@@ -272,29 +272,40 @@ const biographyBlockMinHeight = 200;
 
 function biographyBlockStyle(theme: Theme, filled: boolean): CSSProperties {
   return {
+    position: "relative",
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
-    borderRadius: 14, background: theme.bg, cursor: "pointer", fontFamily: "inherit", textAlign: "center",
+    borderRadius: 14, background: theme.bg, textAlign: "center",
     border: filled ? `1px solid ${theme.border}` : `1px dashed ${theme.border}`,
     minHeight: biographyBlockMinHeight,
     padding: "1rem 0.5rem",
   };
 }
 
+// Every other bookmark's edit affordance is a pencil button (BookmarkPageHeader's header
+// pencil, same pencilButtonStyle/PencilIcon reused here) -- only the pencil is clickable, not
+// the whole card, so the label/caption text (e.g. a partner's name) stays plain, selectable
+// text instead of being swallowed into one big button that hijacks any tap/click as "edit".
 function BiographyBlock({ theme, icon, label, caption, filled, onClick, disabled }: {
   theme: Theme; icon: ReactNode; label: string; caption: string; filled: boolean; onClick: () => void; disabled: boolean;
 }) {
   return (
-    <button
-      type="button"
-      className="tap-target-44"
-      onClick={onClick}
-      disabled={disabled}
-      style={biographyBlockStyle(theme, filled)}
-    >
+    <div style={biographyBlockStyle(theme, filled)}>
+      <HoverTooltip label={`Edit ${label}`} theme={theme} style={{ position: "absolute", top: 8, right: 8 }}>
+        <button
+          type="button"
+          className="tap-target-44"
+          aria-label={`Edit ${label}`}
+          disabled={disabled}
+          onClick={onClick}
+          style={pencilButtonStyle(theme)}
+        >
+          <PencilIcon />
+        </button>
+      </HoverTooltip>
       <div style={{ color: filled ? theme.accentText : theme.muted }}>{icon}</div>
       <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}>{label}</div>
       <div style={{ fontSize: 13, color: theme.muted }}>{caption}</div>
-    </button>
+    </div>
   );
 }
 
@@ -1768,10 +1779,14 @@ function StatsBookmark({
   // whatever height the panel's own min-height reserves beyond this bookmark's actual
   // content, and marginTop: "auto" on the action bar's wrapper pins it to the panel's real
   // bottom edge instead of sitting right under a shorter view's content.
+  // Mobile has no panel min-height to fill (see .profile-binder's mobile override), so this
+  // same trick instead reserves the full Stats view's height behind a much shorter Hyper
+  // Stat/Ability view — .bookmark-subview's mobile CSS switches the inactive panes to real
+  // display:none there, so the grid sizes to whichever view is actually showing.
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <div style={{ display: "grid" }}>
-        <div style={{ gridArea: "1 / 1", visibility: view === "stats" ? "visible" : "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className={`bookmark-subview${view === "stats" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "stats" ? "visible" : "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
           <StatBlock label="Basic Stats" theme={theme} info={BASIC_STATS_INFO}>
             <div style={statGridStyle}>
               {primaryCells.map((c) => (
@@ -1794,7 +1809,7 @@ function StatsBookmark({
             </div>
           </StatBlock>
         </div>
-        <div style={{ gridArea: "1 / 1", visibility: view === "hyperStat" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "hyperStat" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "hyperStat" ? "visible" : "hidden" }}>
           <HyperStatView
             key={character?.characterName}
             theme={theme}
@@ -1805,7 +1820,7 @@ function StatsBookmark({
             onSetActivePreset={(presetIndex) => onSetActivePreset("hyperStat", presetIndex)}
           />
         </div>
-        <div style={{ gridArea: "1 / 1", visibility: view === "ability" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "ability" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "ability" ? "visible" : "hidden" }}>
           <AbilityView
             key={character?.characterName}
             theme={theme}
@@ -1814,7 +1829,7 @@ function StatsBookmark({
           />
         </div>
       </div>
-      <div style={{ paddingTop: 14, marginTop: "auto" }}>
+      <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
         <StatsActionBar view={view} theme={theme} onSelect={onViewChange} />
       </div>
     </div>
@@ -2106,11 +2121,12 @@ function EquipmentBookmark({
   // The 3 views are stacked in the same grid cell (all present, only one visible) so the
   // row auto-sizes to the tallest of the three, matching StatsBookmark's own pattern —
   // including the outer flex:1 + action bar's marginTop: "auto" that pins it to the panel's
-  // real bottom edge, see StatsBookmark's own comment above for why.
+  // real bottom edge, see StatsBookmark's own comment above for why (also covers the mobile
+  // display:none carve-out via .bookmark-subview — CSS-only, doesn't affect visitedViews below).
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <div style={{ display: "grid" }}>
-        <div style={{ gridArea: "1 / 1", visibility: view === "gear" ? "visible" : "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className={`bookmark-subview${view === "gear" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "gear" ? "visible" : "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
           <PresetTabs theme={theme} active={presetIdx} activePreset={activePresetStored} onSelect={setPresetIdx} onSetActive={equip ? onSetActivePreset : null} />
           {/* Same container-query carousel as EquipmentSetupStep's EquipmentGridSubstep — kicks
               in once the panel itself (not the viewport) narrows past ~520px, reusing the same
@@ -2157,7 +2173,7 @@ function EquipmentBookmark({
             </div>
           </div>
         </div>
-        <div style={{ gridArea: "1 / 1", visibility: view === "titles" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "titles" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "titles" ? "visible" : "hidden" }}>
           <TitlesView
             theme={theme}
             equip={visitedViews.has("titles") ? equip : undefined}
@@ -2169,11 +2185,11 @@ function EquipmentBookmark({
             onSymbolTabChange={setSymbolTab}
           />
         </div>
-        <div style={{ gridArea: "1 / 1", visibility: view === "pets" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "pets" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "pets" ? "visible" : "hidden" }}>
           <PetsView theme={theme} equip={visitedViews.has("pets") ? equip : undefined} />
         </div>
       </div>
-      <div style={{ paddingTop: 14, marginTop: "auto" }}>
+      <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
         <EquipmentActionBar view={view} theme={theme} onSelect={onViewChange} />
       </div>
     </div>
@@ -2623,18 +2639,18 @@ function HexaMatrixBookmark({ theme, character, view, onViewChange, onSetActiveP
   // The 2 views are stacked in the same grid cell (both present, only one visible) so the
   // row auto-sizes to the taller of the two, matching EquipmentBookmark's own pattern —
   // including the outer flex:1 + action bar's marginTop: "auto", see StatsBookmark's own
-  // comment for why.
+  // comment for why (also covers the mobile display:none carve-out via .bookmark-subview).
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <div style={{ display: "grid" }}>
-        <div style={{ gridArea: "1 / 1", visibility: view === "skills" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "skills" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "skills" ? "visible" : "hidden" }}>
           <HexaSkillsBookmarkView theme={theme} hexaClassDef={hexaClassDef} hexaLevels={hexaLevels ?? EMPTY_HEXA_LEVELS} />
         </div>
-        <div style={{ gridArea: "1 / 1", visibility: view === "stat" ? "visible" : "hidden" }}>
+        <div className={`bookmark-subview${view === "stat" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "stat" ? "visible" : "hidden" }}>
           <HexaStatBookmarkView theme={theme} character={character} classData={classData} hexaStatNodes={hexaStatNodes} onSetActivePreset={onSetActivePreset} />
         </div>
       </div>
-      <div style={{ paddingTop: 14, marginTop: "auto" }}>
+      <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
         <HexaActionBar view={view} theme={theme} onSelect={onViewChange} />
       </div>
     </div>

@@ -270,18 +270,24 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
         </div>
 
         {/* position: fixed + a document.body portal (not absolute inside .characters-main)
-            so this centers on the actual viewport regardless of page height -- an
+            so this positions against the actual viewport regardless of page height -- an
             absolutely-positioned inset:0 here centers within .characters-main's own box,
             which on a directory tall enough to scroll extends well past the visible
             viewport, pushing the notice down toward the bottom of the screen instead
-            of the center. Same fix ConfirmModal already relies on for this reason. */}
+            of the center. Same fix ConfirmModal already relies on for this reason.
+            Anchored at 18vh (not viewport-center, not glued to the header) so it still reads
+            as a normal floating toast with breathing room, while staying clear of the
+            near-empty first-time-setup screen's footer -- that footer's legal text is
+            surprisingly tall but doesn't start until roughly the screen's midpoint. */}
         {state.deleteNoticeCharacterName && typeof document !== "undefined" && createPortal(
           <div
             style={{
               position: "fixed",
               inset: 0,
-              display: "grid",
-              placeItems: "center",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              paddingTop: "18vh",
               zIndex: 65,
               pointerEvents: "none",
             }}
