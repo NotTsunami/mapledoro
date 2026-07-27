@@ -683,6 +683,32 @@ function WeaponAttField({ label, usesMagicWeapon, value, onUpdate, theme }: {
 
 // ── Setup options section ─────────────────────────────────────────────────────
 
+// Encodes a {soulType, soulLevel} pair into the flat radio value the Soul Weapon
+// ChecklistGroup uses. Ephenia is only ever offered to DA, so a stale "ephenia"
+// soulType left over from a class switch reads as unselected for anyone else.
+function deriveSoulValue(opts: NonNullable<StatsStepDraft["setupOptions"]>, isDA: boolean): string | null {
+  if (opts.soulType === "none") return "none";
+  if (opts.soulType === "mugong") {
+    if (opts.soulLevel === 1) return "mugong_1";
+    if (opts.soulLevel === 2) return "mugong_2";
+    return null;
+  }
+  if (isDA && opts.soulType === "ephenia") {
+    if (opts.soulLevel === 1) return "ephenia_1";
+    if (opts.soulLevel === 2) return "ephenia_2";
+    return null;
+  }
+  return null;
+}
+
+function soulPatchForValue(val: string | null): Partial<NonNullable<StatsStepDraft["setupOptions"]>> {
+  if (val === "mugong_1") return { soulType: "mugong", soulLevel: 1 };
+  if (val === "mugong_2") return { soulType: "mugong", soulLevel: 2 };
+  if (val === "ephenia_1") return { soulType: "ephenia", soulLevel: 1 };
+  if (val === "ephenia_2") return { soulType: "ephenia", soulLevel: 2 };
+  return { soulType: "none", soulLevel: undefined };
+}
+
 function SetupOptionsSection({
   optsDef, draft, onUpdate, theme, characterLevel, required, existingEquipment,
 }: {
@@ -707,20 +733,11 @@ function SetupOptionsSection({
   const derivedWeaponHand = deriveWeaponHandFromWeapon(existingEquipment);
   const derivedRuinForceShield = deriveHasRuinForceShield(existingEquipment);
 
-  let soulValue: string | null = null;
-  if (opts.soulType === "mugong") soulValue = "mugong";
-  else if (opts.soulType === "none") soulValue = "none";
-  if (isDA) {
-    if (opts.soulType === "ephenia" && opts.epheniaLevel === 1) soulValue = "ephenia_1";
-    else if (opts.soulType === "ephenia" && opts.epheniaLevel === 2) soulValue = "ephenia_2";
-  }
-
+  const soulValue = deriveSoulValue(opts, isDA);
+  // Deselecting the active option collapses to "none" rather than an ambiguous
+  // unanswered state — same pattern as WildHunterRankQuestion's onToggle.
   function handleSoulToggle(val: string | null) {
-    if (val === null) onUpdate({ soulType: undefined, epheniaLevel: undefined });
-    else if (val === "none") onUpdate({ soulType: "none", epheniaLevel: undefined });
-    else if (val === "mugong") onUpdate({ soulType: "mugong", epheniaLevel: undefined });
-    else if (val === "ephenia_1") onUpdate({ soulType: "ephenia", epheniaLevel: 1 });
-    else if (val === "ephenia_2") onUpdate({ soulType: "ephenia", epheniaLevel: 2 });
+    onUpdate(soulPatchForValue(val));
   }
 
   // "No soul weapon" is a real radio option here too, same reasoning as WH rank/IA
@@ -729,10 +746,15 @@ function SetupOptionsSection({
     ? [
         { value: "ephenia_1", label: "Ephenia Lv 1" },
         { value: "ephenia_2", label: "Ephenia Lv 2" },
-        { value: "mugong", label: "Mu Gong Soul" },
+        { value: "mugong_1", label: "Mu Gong Soul Lv 1" },
+        { value: "mugong_2", label: "Mu Gong Soul Lv 2" },
         { value: "none", label: "No soul weapon", standalone: true },
       ]
-    : [{ value: "mugong", label: "Mu Gong Soul" }];
+    : [
+        { value: "mugong_1", label: "Mu Gong Soul Lv 1" },
+        { value: "mugong_2", label: "Mu Gong Soul Lv 2" },
+        { value: "none", label: "No soul weapon", standalone: true },
+      ];
 
   return (
     <div>
@@ -775,23 +797,6 @@ function SetupOptionsSection({
           }}
         />
       )}
-      {soulOptions.length === 1 && (
-        // Only one real soul option for this class — a radio-style group of one
-        // reads oddly, so this is a plain checkbox instead, grouped with the other
-        // checkboxes above the radio-style questions below.
-        <ChecklistCheckbox
-          label="Mu Gong Soul applied to your weapon?"
-          checked={soulValue === "mugong"}
-          onToggle={(v) => handleSoulToggle(v ? "mugong" : null)}
-          theme={theme}
-          tooltip={{
-            title: "Soul Weapons",
-            description: <>A Soul Weapon is a weapon with a boss soul applied to it, providing passive stats based on your soul gauge and a unique skill. Mu Gong comes with <a href="https://maplestorywiki.net/w/Memories" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>Memories</a>.</>,
-            imageUrls: [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png")],
-            link: { href: "https://maplestorywiki.net/w/Soul_Weapon", label: "See more on the wiki" },
-          }}
-        />
-      )}
       {optsDef?.weaponType && (
         derivedWeaponHand !== undefined ? (
           <ChecklistGroup
@@ -825,22 +830,20 @@ function SetupOptionsSection({
           />
         )
       )}
-      {soulOptions.length > 1 && (
-        <ChecklistGroup
-          question="Which soul have you applied to your weapon?"
-          options={soulOptions}
-          value={soulValue}
-          onToggle={handleSoulToggle}
-          theme={theme}
-          required={required}
-          tooltip={{
-            title: "Soul Weapons",
-            description: <>A Soul Weapon is a weapon with a boss soul applied to it, providing passive stats based on your soul gauge and a unique skill. Mu Gong comes with <a href="https://maplestorywiki.net/w/Memories" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>Memories</a>, and Ephenia comes with <a href="https://maplestorywiki.net/w/A_Queenly_Fragrance" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>A Queenly Fragrance</a>.</>,
-            imageUrls: [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png"), resourceImageUrl("item", EPHENIA_SOUL_ITEM_ID, "iconRaw.png")],
-            link: { href: "https://maplestorywiki.net/w/Soul_Weapon", label: "See more on the wiki" },
-          }}
-        />
-      )}
+      <ChecklistGroup
+        question="Which soul have you applied to your weapon?"
+        options={soulOptions}
+        value={soulValue}
+        onToggle={handleSoulToggle}
+        theme={theme}
+        required={required}
+        tooltip={{
+          title: "Soul Weapons",
+          description: <>A Soul Weapon is a weapon with a boss soul applied to it, providing passive stats based on your soul gauge and a unique skill. Mu Gong comes with <a href="https://maplestorywiki.net/w/Memories" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>Memories</a>, and Ephenia comes with <a href="https://maplestorywiki.net/w/A_Queenly_Fragrance" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>A Queenly Fragrance</a>.</>,
+          imageUrls: [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png"), resourceImageUrl("item", EPHENIA_SOUL_ITEM_ID, "iconRaw.png")],
+          link: { href: "https://maplestorywiki.net/w/Soul_Weapon", label: "See more on the wiki" },
+        }}
+      />
     </div>
   );
 }
@@ -1066,11 +1069,10 @@ function isScouterQuestionnaireComplete(
 ): boolean {
   const o = opts ?? {};
   const s = sq ?? {};
-  const isDA = Boolean(optsDef?.epheniaSoul);
   // A locked, derived weapon hand (see SetupOptionsSection) counts as answered too — it's
   // never written into o.weaponHand since there's nothing to ask.
   if (optsDef?.weaponType && o.weaponHand === undefined && derivedWeaponHand === undefined) return false;
-  if (isDA && o.soulType === undefined) return false;
+  if (o.soulType === undefined) return false;
   // A rank already showing on screen via the world fallback (see WildHunterRankQuestion)
   // counts as answered — s.whLegion alone doesn't know about that fallback.
   if (!whSource && s.whLegion === undefined && whWorldRank === undefined) return false;

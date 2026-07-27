@@ -97,7 +97,7 @@ export interface StatsStepDraft {
     weaponHand?: "1h" | "2h";
     hasRuinForceShield?: boolean;
     soulType?: "mugong" | "ephenia" | "none";
-    epheniaLevel?: 1 | 2;
+    soulLevel?: 1 | 2;
   };
 
   // MapleScouter-only: the weapon's ATT/MATT value (the "+X" shown when hovering the
@@ -243,10 +243,10 @@ export function convertStatsStepDraftToStored(
   soul: CharacterSoul | null;
 } {
   const opts = draft.setupOptions ?? {};
-  const epheniaRaw = opts.epheniaLevel;
+  const levelRaw = opts.soulLevel;
   const soulType = opts.soulType ?? null;
   const soul: CharacterSoul | null = soulType !== null
-    ? { type: soulType, epheniaLevel: epheniaRaw === 1 || epheniaRaw === 2 ? epheniaRaw : null }
+    ? { type: soulType, soulLevel: levelRaw === 1 || levelRaw === 2 ? levelRaw : null }
     : null;
   const isBelowLiberationLevel = characterLevel !== undefined && characterLevel < GENESIS_LIBERATION_LEVEL;
   return {
@@ -367,7 +367,7 @@ export function storedStatsToStatsStepDraft(record: {
       weaponHand: weaponHand ?? undefined,
       hasRuinForceShield: hasRuinForceShield ?? undefined,
       soulType: soul?.type ?? undefined,
-      epheniaLevel: soul?.epheniaLevel ?? undefined,
+      soulLevel: soul?.soulLevel ?? undefined,
     },
   };
 }

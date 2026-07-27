@@ -12,7 +12,8 @@ export interface CharacterMarriage {
 
 export interface CharacterSoul {
   type: "mugong" | "ephenia" | "none" | null;
-  epheniaLevel: 1 | 2 | null;
+  // Applies to whichever soul `type` is active — Mu Gong and Ephenia both have real Lv 1/Lv 2 tiers.
+  soulLevel: 1 | 2 | null;
 }
 
 export interface StoredTripleStatField {
@@ -527,10 +528,10 @@ function parseMarriage(value: unknown): CharacterMarriage | null {
 function parseSoul(value: unknown): CharacterSoul | null {
   if (!isObject(value)) return null;
   const type = value.type;
-  const epheniaRaw = value.epheniaLevel;
+  const levelRaw = value.soulLevel;
   return {
     type: type === "mugong" || type === "ephenia" || type === "none" ? type : null,
-    epheniaLevel: epheniaRaw === 1 || epheniaRaw === 2 ? epheniaRaw : null,
+    soulLevel: levelRaw === 1 || levelRaw === 2 ? levelRaw : null,
   };
 }
 
