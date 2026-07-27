@@ -144,8 +144,16 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    // Check ok before ever reading the body -- fetch() resolves (doesn't reject) on a
+    // 4xx/5xx, so parsing first risks treating an error payload as a real one.
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { error: "MapleScouter's API returned an unexpected response.", code: "BAD_RESPONSE" },
+        { status: 502, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const data = await upstream.json().catch(() => null);
-    if (!upstream.ok || data === null) {
+    if (data === null) {
       return NextResponse.json(
         { error: "MapleScouter's API returned an unexpected response.", code: "BAD_RESPONSE" },
         { status: 502, headers: { "Cache-Control": "no-store" } },

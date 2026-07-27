@@ -23,36 +23,46 @@ export function getScouterDevOverride(characterName: string): ScouterFigureStatu
   return overrides.get(characterName.trim().toLowerCase()) ?? null;
 }
 
-const PLACEHOLDER_ENTRY = {
-  computedAt: Date.now(),
-  boss300Normal: 98765,
-  boss300Hexa: 96543,
-  boss380Normal: 118420,
-  boss380Hexa: 112984,
-  convertedPowerNormal: 61200,
-  convertedPowerHexa: 58900,
-};
+function placeholderEntry(computedAt: number) {
+  return {
+    computedAt,
+    boss300Normal: 98765,
+    boss300Hexa: 96543,
+    boss380Normal: 118420,
+    boss380Hexa: 112984,
+    convertedPowerNormal: 61200,
+    convertedPowerHexa: 58900,
+  };
+}
 
-const EXAMPLE_STATUSES: Record<string, ScouterFigureStatus> = {
-  unsupported: { kind: "unsupported" },
-  incomplete: { kind: "incomplete" },
-  empty: { kind: "empty" },
-  ready: { kind: "ready", entry: PLACEHOLDER_ENTRY, stale: false },
-  ready_stale_rate_limited: { kind: "ready", entry: { ...PLACEHOLDER_ENTRY, computedAt: Date.now() - 3600_000 }, stale: true, reason: "rate_limited" },
-  ready_stale_timeout: { kind: "ready", entry: { ...PLACEHOLDER_ENTRY, computedAt: Date.now() - 3600_000 }, stale: true, reason: "timeout" },
-  ready_stale_bad_response: { kind: "ready", entry: { ...PLACEHOLDER_ENTRY, computedAt: Date.now() - 3600_000 }, stale: true, reason: "bad_response" },
-  ready_stale_network: { kind: "ready", entry: { ...PLACEHOLDER_ENTRY, computedAt: Date.now() - 3600_000 }, stale: true, reason: "network" },
-  error: { kind: "error" },
-  error_rate_limited: { kind: "error", reason: "rate_limited" },
-  error_timeout: { kind: "error", reason: "timeout" },
-  error_bad_response: { kind: "error", reason: "bad_response" },
-  error_network: { kind: "error", reason: "network" },
-};
+// Built fresh per call (not a module-scope constant) -- Date.now() frozen at module load
+// would make "As of X ago" drift wrong the longer the page's been open before the drill
+// runs (a "1 hour stale" example would read as "3 hours ago" after sitting open a while).
+function buildExampleStatuses(): Record<string, ScouterFigureStatus> {
+  const now = Date.now();
+  const staleEntry = placeholderEntry(now - 3600_000);
+  return {
+    unsupported: { kind: "unsupported" },
+    incomplete: { kind: "incomplete" },
+    empty: { kind: "empty" },
+    ready: { kind: "ready", entry: placeholderEntry(now), stale: false },
+    ready_stale_rate_limited: { kind: "ready", entry: staleEntry, stale: true, reason: "rate_limited" },
+    ready_stale_timeout: { kind: "ready", entry: staleEntry, stale: true, reason: "timeout" },
+    ready_stale_bad_response: { kind: "ready", entry: staleEntry, stale: true, reason: "bad_response" },
+    ready_stale_network: { kind: "ready", entry: staleEntry, stale: true, reason: "network" },
+    error: { kind: "error" },
+    error_rate_limited: { kind: "error", reason: "rate_limited" },
+    error_timeout: { kind: "error", reason: "timeout" },
+    error_bad_response: { kind: "error", reason: "bad_response" },
+    error_network: { kind: "error", reason: "network" },
+  };
+}
 
 /** Dev-only drill: `__mapledoroForceScouterStatus("fuyurin64", "error_timeout")` forces
  *  that character's Scouter figure to render as if in that state, reactively (no reload,
  *  no navigation needed). Pass `null` as the second argument to clear the override. Valid
- *  names are EXAMPLE_STATUSES' keys. Nothing is saved -- purely an in-memory render override. */
+ *  names are buildExampleStatuses()' keys. Nothing is saved -- purely an in-memory render
+ *  override. */
 function installScouterStatusDrill() {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return;
   const target = window as typeof window & {
@@ -67,9 +77,10 @@ function installScouterStatusDrill() {
       notify();
       return;
     }
-    const status = EXAMPLE_STATUSES[statusName];
+    const exampleStatuses = buildExampleStatuses();
+    const status = exampleStatuses[statusName];
     if (!status) {
-      console.warn(`[scouter drill] unknown status "${statusName}". Options: ${Object.keys(EXAMPLE_STATUSES).join(", ")}`);
+      console.warn(`[scouter drill] unknown status "${statusName}". Options: ${Object.keys(exampleStatuses).join(", ")}`);
       return;
     }
     overrides.set(key, status);
