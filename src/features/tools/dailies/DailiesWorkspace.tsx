@@ -107,13 +107,12 @@ function CheckboxItem({
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        style={{ accentColor: theme.accent, cursor: "pointer" }}
+        style={{ accentColor: theme.accent, cursor: "pointer", flexShrink: 0 }}
       />
       <span
         style={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          minWidth: 0,
+          overflowWrap: "break-word",
         }}
       >
         {label}

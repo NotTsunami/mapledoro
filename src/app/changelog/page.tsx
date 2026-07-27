@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-07-27",
+    changes: [
+      { type: "fixed", text: "Fixed the Daily Tracker cutting off longer task names like Normal Crimson Queen on some browsers." },
+    ],
+  },
+  {
     date: "2026-07-25",
     changes: [
       { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, Eternal Armor of Radiance Box, Arcane Umbra Armor Box, and AbsoLab Armor Box." },
