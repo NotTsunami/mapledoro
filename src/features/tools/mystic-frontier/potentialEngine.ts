@@ -180,9 +180,29 @@ export function getPotential(id: number): ResolvedPotential | undefined {
   return byId.get(id);
 }
 
+// Familiars obtained before the Mystic Frontier patch could roll Epic potential lines
+// at Unique grade, and such a line survives an upgrade to Legendary, so both of those
+// pools include the Epic lines on top of their own.
+function poolRarities(rarity: MfRarity): readonly MfRarity[] {
+  return rarity === "unique" || rarity === "legendary" ? [rarity, "epic"] : [rarity];
+}
+
 // Potentials selectable for a familiar of the given rarity, sorted for display.
 export function potentialsForRarity(rarity: MfRarity): ResolvedPotential[] {
+  const pool = poolRarities(rarity);
   return allResolvedPotentials()
-    .filter((p) => p.rarity === rarity && !EVENT_PREFIX.test(p.label))
+    .filter((p) => pool.includes(p.rarity) && !EVENT_PREFIX.test(p.label))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+export function isLineSelectableFor(id: number, rarity: MfRarity): boolean {
+  const p = getPotential(id);
+  return p !== undefined && poolRarities(rarity).includes(p.rarity);
+}
+
+// An Epic line on a Unique/Legendary familiar is the prepatch case the in-game client
+// flags with a purple status icon.
+export function isPrepatchEpicLine(id: number | null, rarity: MfRarity): boolean {
+  if (id === null || (rarity !== "unique" && rarity !== "legendary")) return false;
+  return getPotential(id)?.rarity === "epic";
 }

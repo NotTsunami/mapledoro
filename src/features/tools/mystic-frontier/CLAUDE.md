@@ -10,13 +10,20 @@ output. Bonus items are per character and shared across waves.
 line, and a rolled **die**. The MF potential is separate from the two regular potential lines in the
 character setup flow. Rarity is the familiar's inventory grade, independent of the familiar, and sets
 die size: Common d3, Rare d4, Epic d5, Unique/Legendary d6 (`MF_RARITY_DICE`). The potential pool is
-rarity-specific, so changing rarity clears the slot's line.
+rarity-specific, so changing rarity clears a line that the new rarity can't hold.
+
+**Prepatch Epic lines:** familiars obtained before the Mystic Frontier patch could roll Epic
+potential lines at Unique grade, and such a line survives an upgrade to Legendary, so the
+Unique/Legendary pools include the Epic lines as well (`poolRarities` in `potentialEngine.ts`, which
+also keeps an Epic line alive across a Unique ↔ Legendary switch). The game flags that combination
+with a purple corner notch; `isPrepatchEpicLine` drives the matching notch on the slot card.
 
 **Type & element are never stored** — always derived from `FAMILIAR_TRAITS[familiarId]`
 (`familiarTraits.ts`, re-exported through `familiars.ts`).
 
-**Bonus items** (`bonusItemsData.ts`): one color per family at most; all selected items apply to
-every roll.
+**Bonus items** (`bonusItemsData.ts`): stored as a flat list of item ids, with no per-family limit
+(you can hold a White and a Blue Swift-Rolling Dice at once). All equipped items apply to every roll
+and stack. Legacy one-color-per-family saves migrate in `parseBonus`.
 
 **Scoring (`calc.ts`):** `finalResult = floor((diceSum + totalFlat) x totalMult)` where **`totalMult`
 is the SUM of all active multiplier components** (`+1.2x` and `+1.4x` give x2.6, additive not
