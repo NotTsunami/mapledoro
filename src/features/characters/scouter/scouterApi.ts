@@ -496,9 +496,14 @@ function wildHunterUnionLevel(legion: StoredScouterLegion | undefined): number {
 const SOL_JANUS_INDEX = COMMON_SKILLS.findIndex((s) => s.name === "Sol Janus");
 const SOL_HECATE_INDEX = COMMON_SKILLS.findIndex((s) => s.name === "Sol Hecate");
 
-function hexaCoreLevels(levels: HexaSkillLevels | undefined): { skillCore1: string; skillCore2: string; mastery: string[]; rein: string[] } {
+function hexaCoreLevels(levels: HexaSkillLevels | undefined, isHexaEligible: boolean): { skillCore1: string; skillCore2: string; mastery: string[]; rein: string[] } {
   return {
-    skillCore1: String(levels?.origin ?? 0),
+    // Origin always starts at level 1 once HEXA-eligible (real game rule, same floor
+    // useHexaSkillsState.ts's defaultLevels/normalizeLevels enforce) for a character who
+    // hasn't opened the HEXA Skills tool yet -- but NOT for a sub-260/legacy character, who
+    // genuinely has no Origin at all; gating on isHexaEligible keeps that case at 0
+    // (Yuki, 2026-07-27, caught this before it shipped as a regression).
+    skillCore1: String(levels?.origin ?? (isHexaEligible ? 1 : 0)),
     skillCore2: String(levels?.ascent ?? 0),
     mastery: [0, 1, 2, 3].map((i) => String(levels?.mastery[i] ?? 0)),
     rein: [0, 1, 2, 3].map((i) => String(levels?.enhancement[i] ?? 0)),
@@ -510,9 +515,9 @@ interface HexaBuildResult {
   solJanusLevel: number;
 }
 
-function buildHexa(characterName: string, koreanClassName: string): HexaBuildResult {
+function buildHexa(characterName: string, koreanClassName: string, isHexaEligible: boolean): HexaBuildResult {
   const saved = readCharacterToolData<{ levels?: HexaSkillLevels }>(characterName, "hexaSkills");
-  const cores = hexaCoreLevels(saved?.levels);
+  const cores = hexaCoreLevels(saved?.levels, isHexaEligible);
   const solJanusLevel = SOL_JANUS_INDEX >= 0 ? (saved?.levels?.common[SOL_JANUS_INDEX] ?? 0) : 0;
   const solHecateLevel = SOL_HECATE_INDEX >= 0 ? (saved?.levels?.common[SOL_HECATE_INDEX] ?? 0) : 0;
 
@@ -671,7 +676,8 @@ export function buildScouterPayload(character: StoredCharacterRecord, ctx: Scout
   };
 
   const legion = ctx.scouterLegionByWorld[String(character.worldID)];
-  const { hexa, solJanusLevel } = buildHexa(character.characterName, koreanClassName);
+  const isHexaEligible = character.level >= 260 && !classData.isLegacy;
+  const { hexa, solJanusLevel } = buildHexa(character.characterName, koreanClassName, isHexaEligible);
 
   return {
     doping: buildDoping(character),
