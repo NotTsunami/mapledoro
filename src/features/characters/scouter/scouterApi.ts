@@ -369,12 +369,17 @@ const DEMON_AVENGER_DROPPED_OFF_STAT: TripleStatFieldId = "int";
 
 function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
   const realStatSlots = requiredStats.filter((s) => REAL_STATS.includes(s));
-  const [main = null, sub = null, ssub = null] = realStatSlots;
+  const [first = null, second = null, third = null] = realStatSlots;
   let offStats = REAL_STATS.filter((s) => !realStatSlots.includes(s));
   if (classId === "demon_avenger") {
     offStats = offStats.filter((s) => s !== DEMON_AVENGER_DROPPED_OFF_STAT);
+    // Demon Avenger's Main Stat is HP (buildStat overrides mainField to "hp" directly),
+    // so its one real stat slot (STR, `first`) belongs in Sub, not Main -- otherwise STR
+    // gets silently discarded when mainField is overridden and never reaches the payload
+    // at all (Yuki, 2026-07-27, live diff caught it).
+    return { main: null, sub: first, ssub: third, offStats };
   }
-  return { main, sub, ssub, offStats };
+  return { main: first, sub: second, ssub: third, offStats };
 }
 
 /** Reads a stat's Base/%/Not-Applied triple as MapleScouter's Base/Per/Abs strings.
