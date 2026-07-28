@@ -54,6 +54,7 @@ function buildExampleStatuses(): Record<string, ScouterFigureStatus> {
     error_rate_limited: { kind: "error", reason: "rate_limited" },
     error_timeout: { kind: "error", reason: "timeout" },
     error_bad_response: { kind: "error", reason: "bad_response" },
+    error_bad_response_repeated: { kind: "error", reason: "bad_response", repeatedFailure: true },
     error_network: { kind: "error", reason: "network" },
   };
 }

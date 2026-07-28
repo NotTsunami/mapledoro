@@ -18,7 +18,9 @@ export type ScouterFigureStatus =
   | { kind: "ready"; entry: ScouterResultEntry; stale: false }
   // stale is only ever reached via a failed refresh, so the reason is always known.
   | { kind: "ready"; entry: ScouterResultEntry; stale: true; reason: ScouterErrorReason }
-  | { kind: "error"; reason?: ScouterErrorReason };
+  // reason/repeatedFailure are optional only so the dev drill can force a bare "error"
+  // preview with neither -- a real refresh always supplies both.
+  | { kind: "error"; reason?: ScouterErrorReason; repeatedFailure?: boolean };
 
 export interface ScouterFigureState {
   status: ScouterFigureStatus;
@@ -36,7 +38,7 @@ function resultToStatus(result: ScouterRefreshResult): ScouterFigureStatus {
         : { kind: "ready", entry: result.entry, stale: false };
     case "unsupported": return { kind: "unsupported" };
     case "empty": return { kind: "empty" };
-    case "error": return { kind: "error", reason: result.reason };
+    case "error": return { kind: "error", reason: result.reason, repeatedFailure: result.repeatedFailure };
   }
 }
 

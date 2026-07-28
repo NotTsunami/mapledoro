@@ -44,7 +44,11 @@ export type ScouterRefreshResult =
   | { status: "ok"; entry: ScouterResultEntry; stale: true; reason: ScouterErrorReason }
   | { status: "unsupported" }
   | { status: "empty" }
-  | { status: "error"; reason: ScouterErrorReason };
+  // repeatedFailure is true once the SAME input has failed with "bad_response" (a parsed-
+  // but-invalid result, the same signature a genuine 0/typo'd stat produces) more than once
+  // in a row -- a hint to double-check MapleScouter Setup, not just retry. Never true for
+  // rate_limited/timeout/network, those are infra blips unrelated to what was typed.
+  | { status: "error"; reason: ScouterErrorReason; repeatedFailure: boolean };
 
 function readCache(characterName: string): ScouterCacheData | null {
   return readCharacterToolData<ScouterCacheData>(characterName, SCOUTER_RESULT_TOOL_KEY);
@@ -144,6 +148,24 @@ function staleFallback(
   return lastEntry ? { status: "ok", entry: lastEntry, stale: true, reason } : null;
 }
 
+// Session-only key builder shared by the auto-refresh spam guard below and the repeated-
+// bad_response tracker -- both key on "this exact character, this exact input hash".
+function sessionKey(characterName: string, hash: string): string {
+  return `${characterName.trim().toLowerCase()}:${hash}`;
+}
+
+// Session-only count of consecutive "bad_response" failures for an UNCHANGED input hash.
+// Not persisted, same rationale as autoAttemptedThisSession below: a page reload asking
+// for one more fresh attempt before hinting isn't worth tracking across reloads.
+const consecutiveBadResponses = new Map<string, number>();
+const REPEATED_FAILURE_THRESHOLD = 2;
+
+function recordBadResponse(key: string): boolean {
+  const count = (consecutiveBadResponses.get(key) ?? 0) + 1;
+  consecutiveBadResponses.set(key, count);
+  return count >= REPEATED_FAILURE_THRESHOLD;
+}
+
 function buildPayloadAndHash(character: StoredCharacterRecord): { payload: ScouterUserStat; hash: string } | null {
   const store = readCharactersStore();
   const payload = buildScouterPayload(character, {
@@ -173,16 +195,23 @@ export async function refreshScouterResult(character: StoredCharacterRecord): Pr
   const built = buildPayloadAndHash(character);
   if (!built) return { status: "unsupported" };
   const { payload, hash } = built;
+  const key = sessionKey(character.characterName, hash);
 
   const cache = readCache(character.characterName);
   const cached = cache?.entries[hash];
-  if (cached) return { status: "ok", entry: cached, stale: false };
+  if (cached) {
+    consecutiveBadResponses.delete(key);
+    return { status: "ok", entry: cached, stale: false };
+  }
 
   const fetched = await fetchScouterResult(payload);
   if (!fetched.ok) {
-    return staleFallback(cache, fetched.reason) ?? { status: "error", reason: fetched.reason };
+    const repeatedFailure = fetched.reason === "bad_response" && recordBadResponse(key);
+    const fallback = staleFallback(cache, fetched.reason);
+    return fallback ?? { status: "error", reason: fetched.reason, repeatedFailure };
   }
 
+  consecutiveBadResponses.delete(key);
   storeCacheEntry(character.characterName, hash, fetched.entry, cache);
   return { status: "ok", entry: fetched.entry, stale: false };
 }
@@ -196,10 +225,6 @@ export async function refreshScouterResult(character: StoredCharacterRecord): Pr
 // the per-IP rate limit on the proxy route itself (Yuki, 2026-07-27).
 const autoAttemptedThisSession = new Set<string>();
 
-function autoAttemptKey(characterName: string, hash: string): string {
-  return `${characterName.trim().toLowerCase()}:${hash}`;
-}
-
 /** Auto-refresh trigger for useScouterResult's "empty -> silently try once" effect.
  *  Covers both of Yuki's cases with one rule: a brand-new character finishing setup and
  *  an existing character after a real edit both land on a hash `peekScouterCache` has
@@ -212,7 +237,7 @@ export async function autoRefreshScouterResultIfNeeded(character: StoredCharacte
   if (!built) return null;
   const cache = readCache(character.characterName);
   if (cache?.entries[built.hash]) return null;
-  const key = autoAttemptKey(character.characterName, built.hash);
+  const key = sessionKey(character.characterName, built.hash);
   if (autoAttemptedThisSession.has(key)) return null;
   autoAttemptedThisSession.add(key);
   return refreshScouterResult(character);

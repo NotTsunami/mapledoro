@@ -120,7 +120,12 @@ function figureTooltip(status: ScouterFigureStatus, theme: AppTheme): ReactNode 
     return <>Boss 380 HEXA<br />{asOf}<br /><span style={{ color: statusText(theme, "warning") }}>{STALE_REASON_TOOLTIP[status.reason]}</span></>;
   }
   if (status.kind === "error") {
-    return status.reason ? ERROR_REASON_TOOLTIP[status.reason] : "MapleScouter's API didn't respond. Click refresh to try again.";
+    const base = status.reason ? ERROR_REASON_TOOLTIP[status.reason] : "MapleScouter's API didn't respond. Click refresh to try again.";
+    if (!status.repeatedFailure) return base;
+    // Same input has now failed the same way more than once in a row -- more likely a
+    // typo'd stat (e.g. a real 0) than another transient blip, so add a pointer to Setup
+    // on top of the retry copy rather than replacing it.
+    return <>{base}<br /><span style={{ color: theme.muted }}>Double-check your MapleScouter Setup inputs if this keeps happening.</span></>;
   }
   return FIGURE_TOOLTIP[status.kind] ?? "Not calculated yet.";
 }
