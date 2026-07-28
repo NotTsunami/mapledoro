@@ -184,7 +184,7 @@ export default function OzRingsSetupStep({
   theme, step, stepNumber, totalSteps, jobName = "", confirmedCharacterName, value, onChange, onBack, onNext, onFinish, onValidityChange,
 }: OzRingsSetupStepProps) {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === jobName);
-  const ozInfo = getOzClassStatInfo(classData?.requiredStats ?? []);
+  const ozInfo = getOzClassStatInfo(classData?.id, classData?.requiredStats ?? []);
   const draft = parseOzRingsDraft(value);
   const initialValueRef = useRef(value);
 

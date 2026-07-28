@@ -58,12 +58,19 @@ export interface OzClassStatInfo {
  * (primary → secondary → tertiary first). Empty/unknown class → all 4 stats are
  * "off-stats" and the Weapon Jump variant is left generic.
  */
-export function getOzClassStatInfo(requiredStats: readonly string[]): OzClassStatInfo {
+export function getOzClassStatInfo(classId: string | undefined, requiredStats: readonly string[]): OzClassStatInfo {
   const used = requiredStats.filter((s): s is MainStatId => MAIN_STAT_SET.has(s));
   const primaryStat = used[0] ?? null;
   const weaponJumpLabel = primaryStat ? `Weapon Jump ${WEAPON_JUMP_LETTER[primaryStat]}` : "Weapon Jump";
   const weaponJumpIconId = WEAPON_JUMP_ICON_BY_STAT[primaryStat ?? "str"];
-  const totallingStats = MAIN_STATS.filter((s) => !used.includes(s));
+  let totallingStats = MAIN_STATS.filter((s) => !used.includes(s));
+  // Demon Avenger's kit is fully INT-independent (Yuki, 2026-07-27, same exclusion
+  // scouterApi.ts's DEMON_AVENGER_DROPPED_OFF_STAT already applies) -- INT shouldn't be
+  // offered as a Totalling Ring off-stat for this class even though it's technically
+  // one of the 2 unused main stats.
+  if (classId === "demon_avenger") {
+    totallingStats = totallingStats.filter((s) => s !== "int");
+  }
   return { primaryStat, weaponJumpLabel, weaponJumpIconId, totallingStats };
 }
 
