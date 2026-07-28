@@ -729,20 +729,25 @@ function SetupOptionsSection({
     onUpdate(soulPatchForValue(val));
   }
 
-  // "No soul weapon" is a real radio option here too, same reasoning as WH rank/IA
-  // line — it's the discoverable way to say "none", not a special opt-out.
+  // "Neither" is a real radio option here too, same reasoning as WH rank/IA line —
+  // it's the discoverable way to say "none", not a special opt-out. Named "Neither"
+  // rather than "No soul weapon" since a player can have a different, untracked boss
+  // soul equipped -- this question (and its answer) only concerns these two types.
+  const soulQuestion = isDA
+    ? "Do you have a Mu Gong Soul or Ephenia Soul on your weapon?"
+    : "Do you have a Mu Gong Soul on your weapon?";
   const soulOptions = isDA
     ? [
         { value: "ephenia_1", label: "Ephenia Lv 1" },
         { value: "ephenia_2", label: "Ephenia Lv 2" },
         { value: "mugong_1", label: "Mu Gong Soul Lv 1" },
         { value: "mugong_2", label: "Mu Gong Soul Lv 2" },
-        { value: "none", label: "No soul weapon", standalone: true },
+        { value: "none", label: "Neither", standalone: true },
       ]
     : [
         { value: "mugong_1", label: "Mu Gong Soul Lv 1" },
         { value: "mugong_2", label: "Mu Gong Soul Lv 2" },
-        { value: "none", label: "No soul weapon", standalone: true },
+        { value: "none", label: "Neither", standalone: true },
       ];
 
   return (
@@ -820,7 +825,7 @@ function SetupOptionsSection({
         )
       )}
       <ChecklistGroup
-        question="Which soul have you applied to your weapon?"
+        question={soulQuestion}
         options={soulOptions}
         value={soulValue}
         onToggle={handleSoulToggle}
@@ -828,8 +833,17 @@ function SetupOptionsSection({
         required={required}
         tooltip={{
           title: "Soul Weapons",
-          description: <>A Soul Weapon is a weapon with a boss soul applied to it, providing passive stats based on your soul gauge and a unique skill. Mu Gong comes with <a href="https://maplestorywiki.net/w/Memories" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>Memories</a>, and Ephenia comes with <a href="https://maplestorywiki.net/w/A_Queenly_Fragrance" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>A Queenly Fragrance</a>.</>,
-          imageUrls: [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png"), resourceImageUrl("item", EPHENIA_SOUL_ITEM_ID, "iconRaw.png")],
+          description: (
+            <>
+              A Soul Weapon is a weapon with a boss soul applied to it, that can provide a unique skill.
+              <br />
+              <br />
+              Mu Gong comes with <a href="https://maplestorywiki.net/w/Memories" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>Memories</a>, increasing ATT/Magic ATT.{isDA && <> Ephenia comes with <a href="https://maplestorywiki.net/w/A_Queenly_Fragrance" target="_blank" rel="noreferrer" style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}>A Queenly Fragrance</a>, increasing Max HP &amp; MP for party members.</>}
+            </>
+          ),
+          imageUrls: isDA
+            ? [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png"), resourceImageUrl("item", EPHENIA_SOUL_ITEM_ID, "iconRaw.png")]
+            : [resourceImageUrl("item", MU_GONG_SOUL_ITEM_ID, "iconRaw.png")],
           link: { href: "https://maplestorywiki.net/w/Soul_Weapon", label: "See more on the wiki" },
         }}
       />
@@ -860,7 +874,7 @@ function WildHunterRankQuestion({ sq, whSource, worldLegion, onUpdate, theme, re
     const matchedOption = WH_RANK_OPTIONS.find((o) => o.value === whSource.rank);
     return (
       <ChecklistGroup
-        question="What's your Wild Hunter's level?"
+        question="What is your Wild Hunter's level?"
         options={matchedOption ? [matchedOption] : []}
         value={whSource.rank}
         onToggle={() => {}}
@@ -881,7 +895,7 @@ function WildHunterRankQuestion({ sq, whSource, worldLegion, onUpdate, theme, re
   // did nothing (the displayed value falls right back to whWorldRank below).
   return (
     <ChecklistGroup
-      question="What's your Wild Hunter's level?"
+      question="What is your Wild Hunter's level?"
       options={WH_RANK_OPTIONS}
       value={sq.whLegion ?? whWorldRank ?? null}
       onToggle={(v) => onUpdate({ whLegion: v ?? "none" })}
@@ -1513,7 +1527,7 @@ function HyperStatSubstep({
       />
       {!confineToSubstep && (
         <p style={{ margin: "0 0 0.75rem", fontSize: "0.75rem", fontWeight: 600, color: theme.muted }}>
-          You can set which preset is active in-game later, from your profile.
+          Preset 1 is set as active by default. If you boss on a different preset, change that afterward from your profile.
         </p>
       )}
       <div className="stats-hyper-grid" style={{ display: "flex", minWidth: 0 }}>

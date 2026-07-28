@@ -1296,7 +1296,7 @@ function PetsSubstep({
 function EquipmentGridSubstep({
   theme, stepNumber, totalSteps, substepAnimStyle, activeGrid, activeSlot, toggleSlot, pickerCtx,
   activePreset, switchPreset, mobileGridPage, setMobileGridPage, confirmedCharacterImgURL,
-  substepIndex, substepCount, onBack, onNext, onFinish, nextLabel,
+  substepIndex, substepCount, onBack, onNext, onFinish, nextLabel, confineToSubstep,
 }: {
   theme: AppTheme;
   stepNumber: number;
@@ -1317,6 +1317,10 @@ function EquipmentGridSubstep({
   onNext: () => void;
   onFinish: () => void;
   nextLabel?: string;
+  /** Hides the bossing-preset hint when this step renders as a profile bookmark's
+   *  confined edit — the profile's own "Set preset X as active" control is right
+   *  there, same reasoning as Stats/Inner Ability's own confineToSubstep gating. */
+  confineToSubstep?: boolean;
 }) {
   return (
     <div key={0} className="eq-substep-root" style={substepAnimStyle}>
@@ -1348,6 +1352,11 @@ function EquipmentGridSubstep({
       nextLabel={nextLabel}
     >
       <PresetBar theme={theme} active={activePreset} onSwitch={switchPreset} />
+      {!confineToSubstep && (
+        <p style={{ margin: "0 0 6px", fontSize: "0.75rem", fontWeight: 600, color: theme.muted, textAlign: "center" }}>
+          Preset 1 is set as active by default. If you boss on a different preset, change that afterward from your profile.
+        </p>
+      )}
       <p className="eq-page-label" style={{ margin: "0 0 8px", fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}>
         {EQUIPMENT_PAGE_LABELS[mobileGridPage]}
       </p>
@@ -1784,6 +1793,7 @@ export default function EquipmentSetupStep({
       mobileGridPage={mobileGridPage}
       setMobileGridPage={setMobileGridPage}
       confirmedCharacterImgURL={confirmedCharacterImgURL}
+      confineToSubstep={confineToSubstep}
       substepIndex={frame.substepIndex}
       substepCount={frame.substepCount}
       onBack={frame.onBack}

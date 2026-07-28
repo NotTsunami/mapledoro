@@ -467,7 +467,7 @@ export default function InnerAbilitySetupStep({ draft, onUpdate, theme, showActi
       <IAPresetBar theme={theme} active={ia.activePreset} onSwitch={setPreset} onCopy={copyPreset} onClear={clearGrade} />
       {showActivePresetHint && (
         <p style={{ margin: "0 0 6px", fontSize: "0.75rem", fontWeight: 600, color: theme.muted }}>
-          You can set which preset is active in-game later, from your profile.
+          Preset 1 is set as active by default. If you boss on a different preset, change that afterward from your profile.
         </p>
       )}
       <IAGradeHeader
