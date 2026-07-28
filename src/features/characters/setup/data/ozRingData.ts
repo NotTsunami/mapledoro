@@ -9,6 +9,15 @@
   when its level > 0: the user enters the main stats (STR/DEX/INT/LUK) that are
   NOT their class's primary/secondary/tertiary stat. The Weapon Jump ring has a
   per-stat variant (S/I/L/D) auto-selected from the class's primary stat.
+
+  Totalling Ring stat values are the character's real current TOTAL for that stat
+  (its own in-game skill scales off "the sum of all your stats"), not the Stats
+  step's Base component -- stored as their own private value (StoredOzRings.
+  totallingStats), not synced with stats.str/dex/int/luk.base. An earlier design
+  did sync them, on the theory they're "the same real stat" -- reverted 2026-07-27
+  after it silently corrupted a character's real Base stats: entering a real total
+  there got stored as Base, then re-multiplied by the character's own % bonuses on
+  top of that.
 */
 
 import type { StoredOzRings } from "../../model/charactersStore";
@@ -137,26 +146,40 @@ function collectStoredRingLevels(draft: OzRingsDraft): Record<string, number> {
   return out;
 }
 
+/** Totalling Ring off-stat values as real numbers, skipping blank/zero entries so they
+ *  don't overwrite an already-stored value with nothing. Not gated on ringMode or the
+ *  ring's own level — these represent the character's real off-stat totals (what
+ *  MapleScouter's Character Info tab wants regardless of which ring build is active),
+ *  not something that only applies while Totalling is actually equipped. */
+function collectTotallingStats(draft: OzRingsDraft): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const stat of MAIN_STATS) {
+    const raw = draft.totallingStatValues[stat]?.trim();
+    const n = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(n) && n > 0) out[stat] = n;
+  }
+  return out;
+}
+
 /**
  * Converts a draft to its stored shape, keeping every ring level the user entered
  * across both modes (not just the currently active one). `ringMode` is stored only
  * as a flag for which build is active. Returns null when nothing was entered.
- *
- * The Totalling Ring's off-stat values are NOT part of this — they're the character's
- * own STR/DEX/INT/LUK, the same real stat the Stats step's profile pencil already
- * collects, not a private copy for this ring alone. See ozRingsTotallingStatOverrides.
  */
 export function convertOzRingsDraftToStored(draft: OzRingsDraft): StoredOzRings | null {
   const levels = collectStoredRingLevels(draft);
-  if (Object.keys(levels).length === 0) return null;
-  return { ringMode: draft.ringMode, levels };
+  const totallingStats = collectTotallingStats(draft);
+  if (Object.keys(levels).length === 0 && Object.keys(totallingStats).length === 0) return null;
+  return {
+    ringMode: draft.ringMode,
+    levels,
+    ...(Object.keys(totallingStats).length > 0 ? { totallingStats } : null),
+  };
 }
 
 /** Reverse of convertOzRingsDraftToStored — seeds the step's draft from what's already
  *  stored, so reopening Oz Rings on a character that already answered it doesn't start
- *  blank (the step has no other way to recover its own ring-level selections; they're
- *  only ever seeded via this, unlike the Totalling Ring's off-stats, which the step
- *  backfills itself from stats.str/dex/int/luk directly). */
+ *  blank. */
 export function storedOzRingsToOzRingsDraft(stored: StoredOzRings | undefined): OzRingsDraft {
   if (!stored) return emptyOzRingsDraft();
   const levels: Partial<Record<OzRingId, string>> = {};
@@ -164,35 +187,11 @@ export function storedOzRingsToOzRingsDraft(stored: StoredOzRings | undefined): 
     const lvl = stored.levels[ring];
     if (lvl !== undefined) levels[ring] = String(lvl);
   }
-  return { ringMode: stored.ringMode, levels, totallingStatValues: {} };
+  const totallingStatValues: Partial<Record<MainStatId, string>> = {};
+  for (const stat of MAIN_STATS) {
+    const v = stored.totallingStats?.[stat];
+    if (v !== undefined) totallingStatValues[stat] = String(v);
+  }
+  return { ringMode: stored.ringMode, levels, totallingStatValues };
 }
 
-/**
- * Totalling Ring off-stat values to merge into the character's own shared
- * stats.str/dex/int/luk.base — the SAME real stat, not a private duplicate, so
- * whichever surface (this ring or the Stats profile pencil) was typed into last
- * wins. Only returns entries when the Totalling Ring is actually in use -- a real
- * level AND ringMode "standard" (not "continuous") -- and the value is a real
- * positive number; blank/untouched off-stats are omitted so they don't overwrite an
- * already-set value with nothing.
- *
- * A ring's stat bonus only applies while actually equipped in real gameplay, so
- * leveling Totalling while running Continuous as your main ring must NOT silently
- * merge its bonus into your real stats -- this used to only check the level, so
- * having ever typed a Totalling level at all (even while on Continuous) permanently
- * polluted the character's real stats the next time this step finished (Yuki,
- * 2026-07-27). "standard" is an imperfect proxy (it also covers a pure Restraint/
- * Weapon Jump swap with no Totalling in the build at all), but it correctly excludes
- * the one case that was actually reported: Continuous mode with Totalling leveled.
- */
-export function ozRingsTotallingStatOverrides(draft: OzRingsDraft): Partial<Record<MainStatId, string>> {
-  if (draft.ringMode !== "standard") return {};
-  const totallingLevel = parseOzRingLevel(draft.levels.totalling);
-  if (totallingLevel === null) return {};
-  const out: Partial<Record<MainStatId, string>> = {};
-  for (const stat of MAIN_STATS) {
-    const raw = draft.totallingStatValues[stat]?.trim();
-    if (raw && Number.parseInt(raw, 10) > 0) out[stat] = raw;
-  }
-  return out;
-}

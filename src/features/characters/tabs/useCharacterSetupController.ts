@@ -51,7 +51,7 @@ import {
   parseStatsStepDraft, serializeStatsStepDraft, storedStatsToStatsStepDraft,
 } from "../setup/data/statsStepDraft";
 import { serializeEquipmentStepDraft, storedEquipmentToDraft } from "../setup/data/equipmentStepDraft";
-import { convertOzRingsDraftToStored, ozRingsTotallingStatOverrides, parseOzRingsDraft, serializeOzRingsDraft, storedOzRingsToOzRingsDraft, type MainStatId } from "../setup/data/ozRingData";
+import { convertOzRingsDraftToStored, parseOzRingsDraft, serializeOzRingsDraft, storedOzRingsToOzRingsDraft } from "../setup/data/ozRingData";
 import { convertBuffsDraftToStored, parseBuffsDraft } from "../setup/data/buffsData";
 import {
   convertScouterQuestionsDraftToStored,
@@ -461,7 +461,6 @@ function applyMapleScouterFlow(
   const { stats, isLiberated, weaponHand, hasRuinForceShield, soul } =
     convertStatsStepDraftToStored(statsDraft, character.level);
   const ozRingsDraft = parseOzRingsDraft(stepData.oz_rings ?? "");
-  applyOzRingsStatOverrides(stats, ozRingsDraft);
   const ozRings = convertOzRingsDraftToStored(ozRingsDraft);
   const buffs = convertBuffsDraftToStored(parseBuffsDraft(stepData.buffs ?? ""));
   const scouterQ = convertScouterQuestionsDraftToStored(statsDraft);
@@ -563,23 +562,6 @@ function preserveExistingHexaStatActivePresets(
   hexaStatToolData.nodes = hexaStatToolData.nodes.map((n, i) => ({ ...n, activePreset: existingNodes[i]?.activePreset ?? n.activePreset }));
 }
 
-// The Oz Ring Totalling Ring's off-stats (STR/DEX/INT/LUK not already part of the
-// class's build) are the SAME real stat the Stats step's profile pencil collects, not
-// a private copy — see ozRingsTotallingStatOverrides. Merges any typed here directly
-// into stats.str/dex/int/luk.base so both surfaces share one source of truth instead
-// of the player typing the same number twice.
-function applyOzRingsStatOverrides(
-  stats: Partial<StoredCharacterStats>,
-  ozRingsDraft: import("../setup/data/ozRingData").OzRingsDraft,
-): void {
-  const overrides = ozRingsTotallingStatOverrides(ozRingsDraft);
-  for (const stat of Object.keys(overrides) as MainStatId[]) {
-    const value = overrides[stat];
-    if (value === undefined) continue;
-    stats[stat] = { ...(stats[stat] ?? { base: "", percent: "", percentUnapplied: "" }), base: value };
-  }
-}
-
 function buildFullSetupRecord(
   character: NormalizedCharacterData,
   stepData: import("../setup/types").SetupStepInputById,
@@ -614,7 +596,6 @@ function buildFullSetupRecord(
     convertStatsStepDraftToStored(statsDraft, character.level);
   preserveExistingActivePresets(stats, existing);
   const ozRingsDraft = parseOzRingsDraft(stepData.oz_rings ?? "");
-  applyOzRingsStatOverrides(stats, ozRingsDraft);
   const hexaSkillsToolData = buildHexaSkillsToolData(character.jobName, stepData.hexa_matrix ?? "");
   const hexaStatToolData = buildHexaStatToolData(stepData.hexa_matrix ?? "");
   preserveExistingHexaStatActivePresets(hexaStatToolData, existing);

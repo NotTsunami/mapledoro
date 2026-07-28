@@ -390,17 +390,15 @@ function tripleStrings(character: StoredCharacterRecord, field: TripleStatFieldI
   return { base: triple.base || "0", per: triple.percent || "0", abs: triple.percentUnapplied || "0" };
 }
 
-// Mirrors CharacterProfileOverviewScreen.tsx's tripleStatTotal / damageRangeData.ts's
-// tripleStatValue (floor(Base × (1 + %/100)) + % Not Applied, the Character Info window's
-// own [Applied Value] breakdown), minus their familiar-bonus folding, which off-stats
-// rarely carry, not worth the extra familiar-preset lookup for a secondary contributor.
+// Off-stat totals live in their own private field (StoredOzRings.totallingStats), not
+// derived from stats.str/dex/int/luk's Base/%/Not Applied triple -- an earlier version
+// computed the Applied Value from that triple, which assumed the Totalling Ring step was
+// writing into Base, silently corrupting a character's real Base stat (Yuki, 2026-07-27,
+// see ozRingData.ts's file header for the full story).
 function offStatTotal(character: StoredCharacterRecord, field: TripleStatFieldId | undefined): string {
   if (!field) return "0";
-  const triple = character.stats[field];
-  const base = Number(triple.base) || 0;
-  const percent = Number(triple.percent) || 0;
-  const percentUnapplied = Number(triple.percentUnapplied) || 0;
-  return String(Math.floor(base * (1 + percent / 100)) + percentUnapplied);
+  const value = character.scouter?.ozRings?.totallingStats?.[field];
+  return value !== undefined ? String(value) : "0";
 }
 
 function buildStat(
