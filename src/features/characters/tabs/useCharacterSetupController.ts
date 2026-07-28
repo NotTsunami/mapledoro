@@ -460,6 +460,7 @@ function applyMapleScouterFlow(
 
   const { stats, isLiberated, weaponHand, hasRuinForceShield, soul } =
     convertStatsStepDraftToStored(statsDraft, character.level);
+  preserveExistingActivePresets(stats, existing);
   const ozRingsDraft = parseOzRingsDraft(stepData.oz_rings ?? "");
   const ozRings = convertOzRingsDraftToStored(ozRingsDraft);
   const buffs = convertBuffsDraftToStored(parseBuffsDraft(stepData.buffs ?? ""));
