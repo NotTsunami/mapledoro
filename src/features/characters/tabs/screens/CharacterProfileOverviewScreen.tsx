@@ -2362,7 +2362,10 @@ type HexaBookmarkView = "skills" | "stat";
 // A character with no saved HEXA Skills tool data at all (level-eligible but never ran the
 // step) used to render nothing below the header — this fills in the same all-zero, dimmed
 // shape VMatrixBookmark shows for an untouched V Matrix, instead of a blank panel.
-const EMPTY_HEXA_LEVELS: HexaSkillLevels = { origin: 0, ascent: 0, mastery: [], enhancement: [], common: [] };
+// Origin always starts at level 1 once HEXA-eligible (defaultLevels/emptyLevels elsewhere
+// already agree on this) -- 0 here made an untouched character's profile bookmark read
+// "0/30" while the setup step's own draft correctly showed "1/30" (Yuki, 2026-07-27).
+const EMPTY_HEXA_LEVELS: HexaSkillLevels = { origin: 1, ascent: 0, mastery: [], enhancement: [], common: [] };
 
 function hexaMatrixBookmarkHeaderLabel(view: HexaBookmarkView, defaultLabel: string): string {
   return view === "stat" ? "HEXA Stat" : defaultLabel;
