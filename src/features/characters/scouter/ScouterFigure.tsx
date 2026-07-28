@@ -6,6 +6,7 @@ import HoverTooltip from "../../../components/HoverTooltip";
 import { statusText } from "../../../components/statusColors";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
+import RefreshSpinnerIcon from "../tabs/components/RefreshSpinnerIcon";
 import { useScouterResult, type ScouterErrorReason, type ScouterFigureStatus } from "./useScouterResult";
 
 // Same glyph as the profile binder's own Setup bookmark tab (CharacterProfileOverviewScreen.tsx's
@@ -33,15 +34,6 @@ const SCOUTER_INFO: TooltipContent = {
   ),
   link: { href: "https://maplescouter.com/", label: "See more on MapleScouter" },
 };
-
-function RefreshIcon() {
-  return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-      <path d="M21 3v6h-6" />
-    </svg>
-  );
-}
 
 function refreshButtonStyle(theme: AppTheme, disabled: boolean, justRefreshed: boolean): CSSProperties {
   return {
@@ -161,7 +153,7 @@ export default function ScouterFigure({ character, theme }: { character: StoredC
             onClick={refresh}
             style={refreshButtonStyle(theme, !canRefresh, justRefreshed)}
           >
-            <RefreshIcon />
+            <RefreshSpinnerIcon color="currentColor" size={12} />
           </button>
         </HoverTooltip>
       </div>
