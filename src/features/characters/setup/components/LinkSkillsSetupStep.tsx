@@ -104,7 +104,7 @@ export function LinkSkillIcon({ iconId, name, theme, size = 32 }: { iconId: stri
       </div>
       <div ref={fallbackRef} style={{
         display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
-        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        borderRadius: "6px", flexShrink: 0, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
         background: "rgba(127,127,127,0.18)", color: theme.muted,
       }}>
         {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}

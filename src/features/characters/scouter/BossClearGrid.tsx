@@ -11,7 +11,7 @@ import { toolStyles } from "../../tools/tool-styles";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
-import { formatFigure } from "./ScouterFigure";
+import { formatFigure } from "./scouterFormat";
 import type { ScouterResultEntry } from "./scouterCache";
 
 // Icon ids hand-looked-up from manifests/v270/ui-boss.json (renamed from boss.json as of v269
@@ -188,6 +188,7 @@ function BossBanner({ theme, boss, iconId, displayName }: {
               alt=""
               fill
               unoptimized
+              sizes={`${BANNER_WIDTH}px`}
               onError={() => {
                 if (wrapperRef.current) wrapperRef.current.style.display = "none";
                 if (fallbackRef.current) fallbackRef.current.style.display = "flex";
@@ -223,10 +224,13 @@ type BossEntryList = [string, BossCutEntry[]];
  *  (missing formula fields) -- filtered out before rendering either view. */
 function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, showAll: boolean) {
   const sorted = [...entries].sort((a, b) => (DIFFICULTY_ORDER[a.difficulty] ?? 99) - (DIFFICULTY_ORDER[b.difficulty] ?? 99));
-  return sorted
-    .map((entry) => ({ entry, result: computeBossClear(entry, level, arcaneForce, authenticForce, inputs) }))
-    .filter((t): t is { entry: BossCutEntry; result: BossClearResult } => t.result !== null)
-    .filter((t) => showAll || isRelevant(t.result.clearRate, t.result.isPartyBoss, t.result.partyLimit));
+  return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
+    const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
+    if (result && (showAll || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
+      tiles.push({ entry, result });
+    }
+    return tiles;
+  }, []);
 }
 
 // Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill -- matches
@@ -472,6 +476,7 @@ function BossSpotlight({
               alt=""
               fill
               unoptimized
+              sizes="100vw"
               onError={() => {
                 if (wrapperRef.current) wrapperRef.current.style.display = "none";
                 if (fallbackRef.current) fallbackRef.current.style.display = "flex";

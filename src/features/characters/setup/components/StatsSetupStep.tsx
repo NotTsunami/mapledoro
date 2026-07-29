@@ -284,7 +284,7 @@ function SkillIconBadge({ skill, theme, size = 32, style }: { skill: BuffSkill; 
           </div>
           <div ref={fallbackRef} style={{
             display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
-            borderRadius: "6px", fontWeight: 800, fontSize: size * 0.35,
+            borderRadius: "6px", fontWeight: 800, fontSize: Math.max(12, size * 0.35),
             background: "rgba(127,127,127,0.18)", color: theme.muted,
           }}>
             {skill.skillName.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}

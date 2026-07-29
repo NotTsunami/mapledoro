@@ -290,7 +290,7 @@ export function FamiliarCardSprite({ mobId, familiarId, cardId, name, size, them
       />
       <span aria-hidden style={{
         display: "none", alignItems: "center", justifyContent: "center", ...dims,
-        borderRadius: 6, fontWeight: 800, fontSize: size * 0.35,
+        borderRadius: 6, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
         background: "rgba(127,127,127,0.18)", color: theme.muted,
       }}>
         {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
@@ -323,7 +323,7 @@ function FamiliarBadgeImage({ badge, size, theme, style, pentagon }: { badge: st
       </div>
       <div ref={fallbackRef} style={{
         display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
-        borderRadius: 6, flexShrink: 0, fontWeight: 800, fontSize: size * 0.35,
+        borderRadius: 6, flexShrink: 0, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
         background: "rgba(127,127,127,0.18)", color: theme.muted,
       }}>
         <span style={{ transform: pentagon ? `translateY(${size * 0.055}px)` : undefined }}>
