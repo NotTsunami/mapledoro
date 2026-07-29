@@ -6,18 +6,18 @@ import { ToolHeader } from "../../../components/ToolHeader";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
 import { ItemIcon } from "../../../components/ResourceImage";
+import HoverTooltip from "../../../components/HoverTooltip";
 import { toolStyles } from "../tool-styles";
 import { Field } from "../shared-ui";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { useMysticFrontierState, type SlotState } from "./useMysticFrontierState";
 import { BonusItemPicker, FamiliarPicker, FamiliarSprite, LinePicker } from "./pickers";
 import { getMfFamiliar } from "./familiars";
+import { isPrepatchEpicLine } from "./potentialEngine";
 import {
   MF_RARITY_DICE, MF_RARITY_LABELS, MF_RARITY_ORDER, type MfElement, type MfRarity,
 } from "./types";
-import {
-  MF_BONUS_FAMILIES, formatBonusEffect, getBonusItem, type MfBonusItem,
-} from "./bonusItemsData";
+import { formatBonusEffect, type MfBonusItem } from "./bonusItemsData";
 import type { RerollSuggestion, ScoreResult } from "./calc";
 
 // ── palette ──────────────────────────────────────────────────────────────────
@@ -94,13 +94,88 @@ function DiePicker({ theme, value, max, onChange }: {
 
 // ── lineup slot ────────────────────────────────────────────────────────────────
 
+const CARD_RADIUS = 12;
+
 const slotCardBase: CSSProperties = {
-  borderRadius: 12,
+  position: "relative",
+  borderRadius: CARD_RADIUS,
   padding: "0.85rem 0.75rem",
   display: "flex",
   flexDirection: "column",
   gap: "0.6rem",
 };
+
+// ── prepatch Epic-line notch ──────────────────────────────────────────────────
+// The client marks a Unique/Legendary familiar carrying an Epic potential line with a
+// purple corner notch. Recreated here in the card's top-right corner: a clipping layer
+// matching the card's radius rounds the triangle off flush with the border, and the
+// hover target sits outside it so the tooltip bubble isn't clipped away with it.
+//
+// The bubble opens above the notch, past the top of the lineup panel, which is why that
+// panel overrides `.panel-card`'s `overflow: hidden` (see the Lineup section below).
+
+const NOTCH_SIZE = 40;
+
+// Pulled out over the card's 1px border (which the card paints inside this radius) so
+// the triangle meets the border instead of leaving a hairline of it showing through.
+// zIndex keeps the notch above the familiar picker's wrapper, a later positioned sibling
+// that covers this corner and would otherwise take the hover.
+const notchClipStyle: CSSProperties = {
+  position: "absolute",
+  inset: -1,
+  borderRadius: CARD_RADIUS,
+  overflow: "hidden",
+  pointerEvents: "none",
+  zIndex: 2,
+};
+
+const notchTriangleStyle: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  width: NOTCH_SIZE,
+  height: NOTCH_SIZE,
+  background: RARITY_COLORS.epic,
+  clipPath: "polygon(0 0, 100% 0, 100% 100%)",
+};
+
+const notchHoverStyle: CSSProperties = {
+  position: "absolute",
+  top: -1,
+  right: -1,
+  width: NOTCH_SIZE,
+  height: NOTCH_SIZE,
+  cursor: "help",
+  zIndex: 2,
+};
+
+// Sits on the triangle's centroid (a third of the way in from the top-right corner),
+// which is where the in-game icon carries its mark.
+const notchMarkStyle: CSSProperties = {
+  position: "absolute",
+  top: 4,
+  right: 11,
+  fontSize: "1rem",
+  fontWeight: 800,
+  lineHeight: 1.2,
+  color: "#fff",
+};
+
+const EPIC_NOTCH_NOTE =
+  "This familiar has an Epic potential line, familiar likely obtained before the Mystic Frontier patch and has the purple status icon in-game. If this is incorrect, verify the potential matches up in-game.";
+
+function EpicLineNotch({ theme }: { theme: AppTheme }) {
+  return (
+    <>
+      <div style={notchClipStyle} aria-hidden="true">
+        <div style={notchTriangleStyle} />
+      </div>
+      <HoverTooltip theme={theme} label={EPIC_NOTCH_NOTE} style={notchHoverStyle}>
+        <span role="img" aria-label={EPIC_NOTCH_NOTE} style={notchMarkStyle}>!</span>
+      </HoverTooltip>
+    </>
+  );
+}
 
 function SlotTrigger({ slot, theme }: { slot: SlotState; theme: AppTheme }) {
   const fam = getMfFamiliar(slot.familiarId);
@@ -147,6 +222,7 @@ function LineupSlot({
 
   return (
     <div style={cardStyle}>
+      {present && isPrepatchEpicLine(slot.line, slot.rarity) && <EpicLineNotch theme={theme} />}
       <FamiliarPicker
         theme={theme}
         familiarId={slot.familiarId}
@@ -467,13 +543,6 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
 
   if (!mf.mounted) return null;
 
-  const equippedBonus = MF_BONUS_FAMILIES.flatMap((family) => {
-    const color = mf.bonus[family];
-    const item = color ? getBonusItem(family, color) : undefined;
-    return item ? [{ family, item }] : [];
-  });
-  const availableFamilies = MF_BONUS_FAMILIES.filter((family) => !mf.bonus[family]);
-
   return (
     <div className="page-content">
       <style>{`
@@ -540,8 +609,10 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
           </div>
         </div>
 
-        {/* Lineup */}
-        <div className="fade-in panel-card" style={styles.sectionPanel}>
+        {/* Lineup — overflow opts out of `.panel-card`'s clipping so the Epic-notch
+            tooltip can draw above the panel instead of being cut off at its edge.
+            Nothing in this panel sits near the rounded corners, so nothing needs it. */}
+        <div className="fade-in panel-card" style={{ ...styles.sectionPanel, overflow: "visible" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.85rem" }}>
             <h2 className="tool-panel-title" style={{ margin: 0, color: theme.text }}>
               {`Active Lineup · Wave ${mf.activeWave + 1}`}
@@ -572,27 +643,29 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
         <div className="fade-in panel-card" style={styles.sectionPanel}>
           <h2 className="tool-panel-title" style={{ marginBottom: "0.25rem", color: theme.text }}>Bonus Items</h2>
           <div style={{ fontSize: "0.75rem", fontWeight: 600, color: theme.muted, marginBottom: "0.85rem" }}>
-            Equipped dice items apply to every roll. Add the dice you own — one per type.
+            Equipped dice items apply to every roll. Add each dice owned.
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {equippedBonus.length === 0 && (
+            {mf.bonusItems.length === 0 && (
               <div style={{ fontSize: "0.75rem", fontWeight: 600, color: theme.muted }}>No bonus dice equipped yet.</div>
             )}
-            {equippedBonus.map(({ family, item }) => (
-              <EquippedBonusItem key={family} item={item} theme={theme} onRemove={() => mf.setBonus(family, null)} />
-            ))}
-            {availableFamilies.length > 0 && (
-              <BonusItemPicker
+            {mf.bonusItems.map((item, i) => (
+              <EquippedBonusItem
+                key={`${item.id}-${i}`}
+                item={item}
                 theme={theme}
-                isOpen={openId === "bonus"}
-                available={availableFamilies}
-                onToggle={() => setOpenId(openId === "bonus" ? null : "bonus")}
-                onClose={() => setOpenId(null)}
-                onSelect={(family, color) => mf.setBonus(family, color)}
-              >
-                <AddBonusTrigger theme={theme} />
-              </BonusItemPicker>
-            )}
+                onRemove={() => mf.removeBonus(i)}
+              />
+            ))}
+            <BonusItemPicker
+              theme={theme}
+              isOpen={openId === "bonus"}
+              onToggle={() => setOpenId(openId === "bonus" ? null : "bonus")}
+              onClose={() => setOpenId(null)}
+              onSelect={(family, color) => mf.addBonus(family, color)}
+            >
+              <AddBonusTrigger theme={theme} />
+            </BonusItemPicker>
           </div>
         </div>
 

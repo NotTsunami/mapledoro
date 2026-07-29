@@ -12,6 +12,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-07-27",
+    changes: [
+      { type: "fixed", text: "Fixed the Daily Tracker cutting off longer task names like Normal Crimson Queen on some browsers." },
+      { type: "fixed", text: "The Mystic Frontier Solver now lets you equip more than one bonus dice of the same type, like a White and a Blue Swift-Rolling Dice." },
+      { type: "fixed", text: "The Mystic Frontier Solver now offers Epic potential lines on Unique and Legendary familiars, which familiars obtained before the Mystic Frontier patch can have." },
+    ],
+  },
+  {
     date: "2026-07-25",
     changes: [
       { type: "added", text: "The Drop Tracker can now track Original Sin of Pride, Blissful Nightmare, Total Control, Eternal Twisted Armor Box, Eternal Armor of Radiance Box, Arcane Umbra Armor Box, and AbsoLab Armor Box." },
