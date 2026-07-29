@@ -39,7 +39,9 @@ import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAM
 import { statusText } from "../../../../components/statusColors";
 import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
-import ScouterFigure from "../../scouter/ScouterFigure";
+import ScouterFigure, { formatFigure, formatRelativeTime } from "../../scouter/ScouterFigure";
+import { useScouterResult, type ScouterErrorReason, type ScouterFigureStatus } from "../../scouter/useScouterResult";
+import BossClearGrid from "../../scouter/BossClearGrid";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
@@ -60,7 +62,7 @@ interface CharacterProfileOverviewScreenProps {
 }
 
 type Theme = PreviewPaneModel["theme"];
-type BookmarkId = "overview" | "gender_marriage" | Exclude<SetupStepId, "gender" | "marriage" | "link_skills" | "legion_artifacts" | "buffs" | "oz_rings"> | "exp" | "setup";
+type BookmarkId = "overview" | "gender_marriage" | Exclude<SetupStepId, "gender" | "marriage" | "link_skills" | "legion_artifacts" | "buffs" | "oz_rings"> | "exp" | "scouter" | "setup";
 
 interface BookmarkDef {
   id: BookmarkId;
@@ -73,6 +75,7 @@ const ALL_BOOKMARKS: BookmarkDef[] = [
   { id: "overview", tabLabel: "Overview", pageLabel: "Overview", flowId: null },
   { id: "gender_marriage", tabLabel: "Bio", pageLabel: "Biography", flowId: "quick_setup" },
   { id: "exp", tabLabel: "EXP", pageLabel: "EXP", flowId: null },
+  { id: "scouter", tabLabel: "Scouter", pageLabel: "Scouter", flowId: null },
   { id: "stats", tabLabel: "Stats", pageLabel: "Stats", flowId: "stats_flow" },
   { id: "equipment", tabLabel: "Gear", pageLabel: "Equipment", flowId: "equipment_flow" },
   { id: "v_matrix", tabLabel: "V Matrix", pageLabel: "V Matrix", flowId: "v_matrix_flow" },
@@ -3155,6 +3158,123 @@ function ExpBookmark({ theme, character }: { theme: Theme; character: StoredChar
   );
 }
 
+// Same reasons ScouterFigure's own tooltip already covers -- restated here as a full
+// sentence since this bookmark has room for prose instead of a hover popup.
+const SCOUTER_ERROR_REASON_TEXT: Record<ScouterErrorReason, string> = {
+  rate_limited: "You're refreshing too fast. Wait a moment and try again.",
+  timeout: "MapleScouter's API timed out. Try again in a moment.",
+  bad_response: "MapleScouter's API returned something unexpected. Try again in a moment.",
+  network: "Couldn't reach MapleScouter's API. Try again in a moment.",
+};
+
+function ScouterBookmarkNotice({ theme, children }: { theme: Theme; children: ReactNode }) {
+  return <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>{children}</p>;
+}
+
+type ScouterBookmarkView = "summary" | "bossClear";
+
+function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string): string {
+  return view === "bossClear" ? "Boss Clear" : defaultLabel;
+}
+
+function ScouterActionBar({ view, theme, onSelect }: { view: ScouterBookmarkView; theme: Theme; onSelect: (v: ScouterBookmarkView) => void }) {
+  const btnStyle: CSSProperties = { ...secondaryButtonStyle(theme, "8px 0"), width: "100%", height: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
+  return (
+    <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ flex: 1 }}>
+        {view === "bossClear" && (
+          <button type="button" style={btnStyle} onClick={() => onSelect("summary")}>
+            <span aria-hidden="true">‹</span>
+            <span>Scouter</span>
+          </button>
+        )}
+      </div>
+      <div style={{ flex: 1 }}>
+        {view === "summary" && (
+          <button type="button" style={btnStyle} onClick={() => onSelect("bossClear")}>
+            <span>Boss Clear</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScouterSummaryView({ theme, status }: {
+  theme: Theme;
+  status: Extract<ScouterFigureStatus, { kind: "ready" }>;
+}) {
+  const { entry } = status;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {status.stale && (
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
+          Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
+        </p>
+      )}
+      <StatBlock label="Boss 300" theme={theme}>
+        <SummaryRow label="Normal" value={formatFigure(entry.boss300Normal)} theme={theme} />
+        <SummaryRow label="HEXA" value={formatFigure(entry.boss300Hexa)} theme={theme} />
+      </StatBlock>
+      <StatBlock label="Boss 380" theme={theme}>
+        <SummaryRow label="Normal" value={formatFigure(entry.boss380Normal)} theme={theme} />
+        <SummaryRow label="HEXA" value={formatFigure(entry.boss380Hexa)} theme={theme} />
+      </StatBlock>
+      <StatBlock label="Converted Power" theme={theme}>
+        <SummaryRow label="Normal" value={formatFigure(entry.convertedPowerNormal)} theme={theme} />
+        <SummaryRow label="HEXA" value={formatFigure(entry.convertedPowerHexa)} theme={theme} />
+        <SummaryRow label="Dojo" value={formatFigure(entry.dojoPower)} theme={theme} />
+      </StatBlock>
+      <p style={{ margin: 0, fontSize: 11, color: theme.muted, textAlign: "right" }}>As of {formatRelativeTime(entry.computedAt)}</p>
+    </div>
+  );
+}
+
+// Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
+// happens via the Scouter figure on Overview (manual-refresh-only by design, see
+// useScouterResult's own doc comment), so this bookmark has no pencil/refresh of its own.
+// 2 swappable sub-views (Scouter summary / Boss Clear grid) sharing one read-only data source,
+// same stacked-grid-cell + bottom action-bar shape as HexaMatrixBookmark.
+function ScouterBookmark({ theme, character, view, onViewChange }: {
+  theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
+}) {
+  const { status } = useScouterResult(character);
+
+  if (status.kind === "unsupported") {
+    return <GatedFeatureNotice theme={theme} title="Not Available" description="MapleScouter doesn't support this class yet." />;
+  }
+  if (status.kind === "incomplete") {
+    return <GatedFeatureNotice theme={theme} title="Not Available" description={"Fill out MapleScouter Setup\nbefore viewing this."} />;
+  }
+  if (status.kind === "empty") {
+    return <ScouterBookmarkNotice theme={theme}>Not calculated yet. Refresh the Scouter figure on Overview to see these numbers.</ScouterBookmarkNotice>;
+  }
+  if (status.kind === "error") {
+    return (
+      <ScouterBookmarkNotice theme={theme}>
+        {status.reason ? SCOUTER_ERROR_REASON_TEXT[status.reason] : "MapleScouter's API didn't respond. Refresh the Scouter figure on Overview to try again."}
+      </ScouterBookmarkNotice>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+      <div style={{ display: "grid" }}>
+        <div className={`bookmark-subview${view === "summary" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "summary" ? "visible" : "hidden" }}>
+          <ScouterSummaryView theme={theme} status={status} />
+        </div>
+        <div className={`bookmark-subview${view === "bossClear" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "bossClear" ? "visible" : "hidden" }}>
+          <BossClearGrid theme={theme} character={character} entry={status.entry} />
+        </div>
+      </div>
+      <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
+        <ScouterActionBar view={view} theme={theme} onSelect={onViewChange} />
+      </div>
+    </div>
+  );
+}
+
 function isHexaMatrixFilled(character: StoredCharacterRecord, mounted: boolean): boolean {
   if (character.level < 260) return false;
   if (isLegacyClass(character.jobName)) return true;
@@ -3184,11 +3304,12 @@ function isBookmarkFilled(id: BookmarkId, character: StoredCharacterRecord | nul
     }
     case "hexa_matrix": return isHexaMatrixFilled(character, mounted);
     case "exp": return true;
+    case "scouter": return true;
     default: return false;
   }
 }
 
-const BOOKMARK_CONTENT: Record<Exclude<BookmarkId, "overview" | "setup" | "gender_marriage" | "stats" | "equipment" | "v_matrix" | "hexa_matrix" | "familiars" | "exp">, (props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode> = {};
+const BOOKMARK_CONTENT: Record<Exclude<BookmarkId, "overview" | "setup" | "gender_marriage" | "stats" | "equipment" | "v_matrix" | "hexa_matrix" | "familiars" | "exp" | "scouter">, (props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode> = {};
 
 function SetupBookmark({ model, actions }: { model: PreviewPaneModel; actions: PreviewPaneActions }) {
   const { theme } = model;
@@ -3262,6 +3383,10 @@ function BookmarkPageBody({
   const [hexaView, setHexaView] = useState<HexaBookmarkView>(() => {
     const remembered = setup.lastActiveBookmarkSubView;
     return active.id === "hexa_matrix" && remembered === "stat" ? remembered : "skills";
+  });
+  const [scouterView, setScouterView] = useState<ScouterBookmarkView>(() => {
+    const remembered = setup.lastActiveBookmarkSubView;
+    return active.id === "scouter" && remembered === "bossClear" ? remembered : "summary";
   });
 
   if (active.id === "overview") return <OverviewBookmark model={model} onNavigateToBookmark={onNavigateToBookmark} onNavigateToGearSlot={onNavigateToGearSlot} onSetOverviewLayout={actions.setOverviewLayout} />;
@@ -3384,6 +3509,20 @@ function BookmarkPageBody({
       <>
         <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={null} disabled={setup.isUiLocked} />
         <ExpBookmark theme={theme} character={character} />
+      </>
+    );
+  }
+
+  // Read-only, same shape as EXP above -- nothing here is user-editable, it's a display of
+  // whatever MapleScouter's API last returned. useScouterResult needs a real character (same
+  // constraint ScouterFigure already has on Overview), so the null-check happens at this call
+  // site rather than inside ScouterBookmark itself.
+  if (active.id === "scouter") {
+    const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel);
+    return (
+      <>
+        <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />
+        {character && <ScouterBookmark theme={theme} character={character} view={scouterView} onViewChange={setScouterView} />}
       </>
     );
   }
@@ -3521,7 +3660,7 @@ export default function CharacterProfileOverviewScreen({
   useEffect(() => { actions.clearRestoredBookmark(); }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filled = isBookmarkFilled(active.id, character, mounted);
-  const ContentComponent = active.id === "overview" || active.id === "setup" || active.id === "gender_marriage" || active.id === "stats" || active.id === "equipment" || active.id === "v_matrix" || active.id === "hexa_matrix" || active.id === "familiars" || active.id === "exp" ? null : BOOKMARK_CONTENT[active.id];
+  const ContentComponent = active.id === "overview" || active.id === "setup" || active.id === "gender_marriage" || active.id === "stats" || active.id === "equipment" || active.id === "v_matrix" || active.id === "hexa_matrix" || active.id === "familiars" || active.id === "exp" || active.id === "scouter" ? null : BOOKMARK_CONTENT[active.id];
 
   function startOptionalFlowRemembered(flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) {
     actions.rememberActiveBookmark(active.id, subView);

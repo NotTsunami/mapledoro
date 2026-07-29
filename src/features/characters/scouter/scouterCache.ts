@@ -18,6 +18,39 @@ import { buildScouterPayload, hashScouterPayload, type ScouterUserStat } from ".
 const SCOUTER_RESULT_TOOL_KEY = "scouterResult";
 const MAX_CACHE_ENTRIES = 8;
 
+// Bump this whenever we confirm (via a real live-diff test, never a guess) that MapleScouter
+// changed something on their end -- a formula tweak, a renamed/added response field -- or
+// whenever mapledoro's own payload builder changes in a way that could shift the result for
+// inputs that look unchanged to the user. The per-character input hash alone can't catch
+// either case, since it only changes when the character's own stats change. A version bump
+// makes every existing entry read as stale-by-version on next load, so it self-heals via one
+// real refetch per character, with no per-user localStorage clearing ever needed.
+const SCOUTER_CACHE_VERSION = 1;
+
+interface ScouterSpline {
+  x: number[];
+  y: number[];
+  m: number[];
+}
+
+/** Raw inputs to the Boss Clear (Cut) formula, see project_maplescouter_bosscut_formula_2026_07_28
+ *  memory for the full RE writeup. Optional on ScouterResultEntry (not every cached entry has it
+ *  yet -- a pre-existing entry just shows "not available yet, refresh" for Boss Clear instead of
+ *  needing a cache-version bump) and itself nullable field-by-field, since a malformed or missing
+ *  `simulatorData` shouldn't fail the whole cache entry, only the Boss Clear section. */
+export interface BossClearInputs {
+  calculatedHexaDamage300: number;
+  calculatedHexaDamage380: number;
+  calculatedDamage380: number;
+  calculatedHexaDamageKaling: number;
+  ascentConst: number;
+  ignoreDefConst300: number;
+  ignoreDefConst380: number;
+  spline300: ScouterSpline;
+  spline380: ScouterSpline;
+  genePassConst: number;
+}
+
 export interface ScouterResultEntry {
   computedAt: number;
   boss300Normal: number;
@@ -26,9 +59,12 @@ export interface ScouterResultEntry {
   boss380Hexa: number;
   convertedPowerNormal: number;
   convertedPowerHexa: number;
+  dojoPower: number;
+  bossClearInputs?: BossClearInputs;
 }
 
 interface ScouterCacheData {
+  version: number;
   entries: Record<string, ScouterResultEntry>;
   lastHash: string;
 }
@@ -50,8 +86,13 @@ export type ScouterRefreshResult =
   // rate_limited/timeout/network, those are infra blips unrelated to what was typed.
   | { status: "error"; reason: ScouterErrorReason; repeatedFailure: boolean };
 
+// A cache written under an older SCOUTER_CACHE_VERSION is treated as if it doesn't exist at
+// all (not just the current hash -- the whole per-character entries map), so a version bump
+// wipes every stale hash for that character in one go rather than leaving old-version
+// entries sitting alongside new ones under different hashes.
 function readCache(characterName: string): ScouterCacheData | null {
-  return readCharacterToolData<ScouterCacheData>(characterName, SCOUTER_RESULT_TOOL_KEY);
+  const cache = readCharacterToolData<ScouterCacheData>(characterName, SCOUTER_RESULT_TOOL_KEY);
+  return cache && cache.version === SCOUTER_CACHE_VERSION ? cache : null;
 }
 
 /** Stores a fresh result under its hash, evicting the oldest entry (by computedAt)
@@ -63,7 +104,7 @@ function storeCacheEntry(characterName: string, hash: string, entry: ScouterResu
     const oldest = hashes.toSorted((a, b) => entries[a].computedAt - entries[b].computedAt)[0];
     delete entries[oldest];
   }
-  writeCharacterToolData(characterName, SCOUTER_RESULT_TOOL_KEY, { entries, lastHash: hash } satisfies ScouterCacheData);
+  writeCharacterToolData(characterName, SCOUTER_RESULT_TOOL_KEY, { version: SCOUTER_CACHE_VERSION, entries, lastHash: hash } satisfies ScouterCacheData);
 }
 
 interface MapleScouterCalcResponse {
@@ -74,6 +115,60 @@ interface MapleScouterCalcResponse {
     boss380_hexaStat?: number;
     exchangePower?: number;
     exchangePowerHexa?: number;
+    // "mr" = Mu Lung Dojo. Unlike the other pairs above, MapleScouter's own result modal
+    // only ever shows this one HEXA figure as "Dojo" -- mr_stat (the would-be Normal
+    // counterpart) reads 0 in every real capture so far, seemingly dead on their end.
+    mr_hexaStat?: number;
+    // Raw inputs the Boss Clear formula needs, live-confirmed on Kanna's real captured
+    // response to sit directly on calculatedData -- an earlier session had wrongly concluded
+    // these lived under a separate `simulatorData` object (that name only exists client-side
+    // in MapleScouter's OWN Zustand store as a working copy of calculatedData for their build
+    // simulator feature, not a real API field). See project_maplescouter_bosscut_formula_2026_07_28
+    // memory for the correction.
+    calculatedHexaDamage_300?: number;
+    calculatedHexaDamage_380?: number;
+    calculatedDamage_380?: number;
+    calculatedHexaDamage_kaling?: number;
+    ascent_const?: number;
+    ignoreDefConst_300?: number;
+    ignoreDefConst_380?: number;
+    spline_300?: ScouterSpline;
+    spline_380?: ScouterSpline;
+    genePassConst?: number;
+  };
+}
+
+function isScouterSpline(value: unknown): value is ScouterSpline {
+  if (!value || typeof value !== "object") return false;
+  const { x, y, m } = value as Record<string, unknown>;
+  return Array.isArray(x) && Array.isArray(y) && Array.isArray(m);
+}
+
+/** Missing/malformed Boss Clear fields just means that section shows "not available yet,
+ *  refresh" instead of failing the whole cache entry -- Phase 1's Boss 300/380 figures don't
+ *  depend on any of them. */
+function parseBossClearInputs(c: NonNullable<MapleScouterCalcResponse["calculatedData"]>): BossClearInputs | undefined {
+  const {
+    calculatedHexaDamage_300, calculatedHexaDamage_380, calculatedDamage_380, calculatedHexaDamage_kaling,
+    ascent_const, ignoreDefConst_300, ignoreDefConst_380, spline_300, spline_380, genePassConst,
+  } = c;
+  if (
+    typeof calculatedHexaDamage_300 !== "number" || typeof calculatedHexaDamage_380 !== "number" ||
+    typeof calculatedDamage_380 !== "number" || typeof calculatedHexaDamage_kaling !== "number" ||
+    typeof ascent_const !== "number" || typeof ignoreDefConst_300 !== "number" || typeof ignoreDefConst_380 !== "number" ||
+    typeof genePassConst !== "number" || !isScouterSpline(spline_300) || !isScouterSpline(spline_380)
+  ) return undefined;
+  return {
+    calculatedHexaDamage300: calculatedHexaDamage_300,
+    calculatedHexaDamage380: calculatedHexaDamage_380,
+    calculatedDamage380: calculatedDamage_380,
+    calculatedHexaDamageKaling: calculatedHexaDamage_kaling,
+    ascentConst: ascent_const,
+    ignoreDefConst300: ignoreDefConst_300,
+    ignoreDefConst380: ignoreDefConst_380,
+    spline300: spline_300,
+    spline380: spline_380,
+    genePassConst,
   };
 }
 
@@ -82,11 +177,12 @@ interface MapleScouterCalcResponse {
 function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry | null {
   const c = data.calculatedData;
   if (!c) return null;
-  const { boss300_stat, boss380_stat, boss300_hexaStat, boss380_hexaStat, exchangePower, exchangePowerHexa } = c;
+  const { boss300_stat, boss380_stat, boss300_hexaStat, boss380_hexaStat, exchangePower, exchangePowerHexa, mr_hexaStat } = c;
   if (
     typeof boss300_stat !== "number" || typeof boss380_stat !== "number" ||
     typeof boss300_hexaStat !== "number" || typeof boss380_hexaStat !== "number" ||
-    typeof exchangePower !== "number" || typeof exchangePowerHexa !== "number"
+    typeof exchangePower !== "number" || typeof exchangePowerHexa !== "number" ||
+    typeof mr_hexaStat !== "number"
   ) return null;
   if (boss380_hexaStat <= 0) return null;
   return {
@@ -97,6 +193,8 @@ function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry |
     boss380Hexa: boss380_hexaStat,
     convertedPowerNormal: exchangePower,
     convertedPowerHexa: exchangePowerHexa,
+    dojoPower: mr_hexaStat,
+    bossClearInputs: parseBossClearInputs(c),
   };
 }
 

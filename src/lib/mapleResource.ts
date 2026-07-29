@@ -21,7 +21,8 @@ export function markIconUrl(id: string): string {
 }
 
 // Boss Maple Guide icon (haku.network `ui/boss` namespace). IDs are looked up by hand
-// from `manifests/v<version>/boss.json` and hardcoded at the call site.
+// from `manifests/v<version>/ui-boss.json` (named `boss.json` pre-v269) and hardcoded at
+// the call site.
 export function bossIconUrl(id: string): string {
   return `${RESOURCE_BASE}/api/img/ui/boss/${id}/icon.png`;
 }

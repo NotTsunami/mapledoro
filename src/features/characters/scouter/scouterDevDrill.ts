@@ -32,6 +32,7 @@ function placeholderEntry(computedAt: number) {
     boss380Hexa: 112984,
     convertedPowerNormal: 61200,
     convertedPowerHexa: 58900,
+    dojoPower: 43100,
   };
 }
 

@@ -48,14 +48,15 @@ function refreshButtonStyle(theme: AppTheme, disabled: boolean, justRefreshed: b
   };
 }
 
-function formatFigure(value: number): string {
+export function formatFigure(value: number): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
 // No shared relative-time formatter exists in the codebase yet (src/features/tools/date.ts
-// is all calendar-day formatters) -- kept local since this is the only place that needs one
-// so far, rather than growing a shared module for a single caller.
-function formatRelativeTime(ms: number): string {
+// is all calendar-day formatters) -- kept here rather than growing a shared module, but
+// exported since the Scouter bookmark (CharacterProfileOverviewScreen.tsx) needs the exact
+// same "as of" phrasing this figure's tooltip already uses.
+export function formatRelativeTime(ms: number): string {
   const diffMin = Math.floor((Date.now() - ms) / 60_000);
   if (diffMin < 1) return "just now";
   if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;

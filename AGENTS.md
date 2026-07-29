@@ -90,6 +90,12 @@ Game art comes from the self-hosted **MapleResource API** (`haku.network`), via 
 - **Finding IDs:** grep `manifests/v270/<type>.json` for the exact `name` (see Context Discipline), then hardcode the id with a name comment. There is no name→ID map; manifests are dev-only and never bundled. Current game version is **v270**. Older features whose generated data was built from an earlier manifest (and says so) are correct as-is.
 - **Bumping the version:** every `scripts/gen-*.mjs`/`generate-*.mjs` has its own hardcoded manifest path. Grep `scripts/` for the old version string and update every hit together, or a generator silently keeps reading the old manifest and masks real data drift.
 
+## External Data Scrapers
+
+Some generated data comes from live external sites rather than WZ manifests, and needs re-running on its own trigger, not the game-version bump above:
+
+- `scripts/scrape-bosscut.mjs` → `src/features/characters/scouter/bosscut-data.generated.ts`. MapleScouter's crowdsourced Boss Clear (Cut) thresholds and boss requirement physics. Re-run whenever a MapleStory version drops — MapleScouter tends to add new bosses ahead of the official patch, so this both picks up new content and re-syncs any community-revised numbers. It scrapes by content-fingerprinting the data's object shape rather than any hardcoded module ID or chunk filename, since both reshuffle on every MapleScouter deploy — if a run fails to find either fingerprint, or its output stops matching real in-game results, that means MapleScouter changed the shape of the data or the underlying formula itself, not just an ID, and needs investigation before trusting the output.
+
 ## Feature Docs
 
 Non-obvious domain rules and invariants live in nested `CLAUDE.md` files under `src/features/`. Consult them when working on a feature.
