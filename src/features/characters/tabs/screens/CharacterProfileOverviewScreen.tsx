@@ -39,9 +39,9 @@ import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAM
 import { statusText } from "../../../../components/statusColors";
 import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
-import ScouterFigure, { formatFigure, formatRelativeTime } from "../../scouter/ScouterFigure";
-import { useScouterResult, type ScouterErrorReason, type ScouterFigureStatus } from "../../scouter/useScouterResult";
-import BossClearGrid from "../../scouter/BossClearGrid";
+import ScouterFigure from "../../scouter/ScouterFigure";
+import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
+import BossClearGrid, { type ScouterBookmarkView } from "../../scouter/BossClearGrid";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
@@ -345,7 +345,7 @@ function BioTraitStat({ theme, icon, label, value, column }: {
   return (
     <>
       <div style={{ gridColumn: column, gridRow: 1, display: "flex", alignItems: "center", justifyContent: "center", height: 30, color: theme.accentText }}>{icon}</div>
-      <div style={{ gridColumn: column, gridRow: 2, fontSize: 11, fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", lineHeight: 1.3 }}>{label}</div>
+      <div style={{ gridColumn: column, gridRow: 2, fontSize: 12, fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", lineHeight: 1.3 }}>{label}</div>
       <div style={{ gridColumn: column, gridRow: 3, fontSize: 15, fontWeight: 800, color: theme.text, textAlign: "center", whiteSpace: "nowrap" }}>{value}</div>
     </>
   );
@@ -3171,10 +3171,8 @@ function ScouterBookmarkNotice({ theme, children }: { theme: Theme; children: Re
   return <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>{children}</p>;
 }
 
-type ScouterBookmarkView = "summary" | "bossClear";
-
 function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string): string {
-  return view === "bossClear" ? "Boss Clear" : defaultLabel;
+  return view === "spotlight" ? "Spotlight" : defaultLabel;
 }
 
 function ScouterActionBar({ view, theme, onSelect }: { view: ScouterBookmarkView; theme: Theme; onSelect: (v: ScouterBookmarkView) => void }) {
@@ -3182,17 +3180,17 @@ function ScouterActionBar({ view, theme, onSelect }: { view: ScouterBookmarkView
   return (
     <div style={{ display: "flex", gap: 10 }}>
       <div style={{ flex: 1 }}>
-        {view === "bossClear" && (
-          <button type="button" style={btnStyle} onClick={() => onSelect("summary")}>
+        {view === "spotlight" && (
+          <button type="button" style={btnStyle} onClick={() => onSelect("quickView")}>
             <span aria-hidden="true">‹</span>
-            <span>Scouter</span>
+            <span>Quick View</span>
           </button>
         )}
       </div>
       <div style={{ flex: 1 }}>
-        {view === "summary" && (
-          <button type="button" style={btnStyle} onClick={() => onSelect("bossClear")}>
-            <span>Boss Clear</span>
+        {view === "quickView" && (
+          <button type="button" style={btnStyle} onClick={() => onSelect("spotlight")}>
+            <span>Spotlight</span>
             <span aria-hidden="true">›</span>
           </button>
         )}
@@ -3201,41 +3199,14 @@ function ScouterActionBar({ view, theme, onSelect }: { view: ScouterBookmarkView
   );
 }
 
-function ScouterSummaryView({ theme, status }: {
-  theme: Theme;
-  status: Extract<ScouterFigureStatus, { kind: "ready" }>;
-}) {
-  const { entry } = status;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {status.stale && (
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
-          Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
-        </p>
-      )}
-      <StatBlock label="Boss 300" theme={theme}>
-        <SummaryRow label="Normal" value={formatFigure(entry.boss300Normal)} theme={theme} />
-        <SummaryRow label="HEXA" value={formatFigure(entry.boss300Hexa)} theme={theme} />
-      </StatBlock>
-      <StatBlock label="Boss 380" theme={theme}>
-        <SummaryRow label="Normal" value={formatFigure(entry.boss380Normal)} theme={theme} />
-        <SummaryRow label="HEXA" value={formatFigure(entry.boss380Hexa)} theme={theme} />
-      </StatBlock>
-      <StatBlock label="Converted Power" theme={theme}>
-        <SummaryRow label="Normal" value={formatFigure(entry.convertedPowerNormal)} theme={theme} />
-        <SummaryRow label="HEXA" value={formatFigure(entry.convertedPowerHexa)} theme={theme} />
-        <SummaryRow label="Dojo" value={formatFigure(entry.dojoPower)} theme={theme} />
-      </StatBlock>
-      <p style={{ margin: 0, fontSize: 11, color: theme.muted, textAlign: "right" }}>As of {formatRelativeTime(entry.computedAt)}</p>
-    </div>
-  );
-}
-
 // Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
 // happens via the Scouter figure on Overview (manual-refresh-only by design, see
 // useScouterResult's own doc comment), so this bookmark has no pencil/refresh of its own.
-// 2 swappable sub-views (Scouter summary / Boss Clear grid) sharing one read-only data source,
-// same stacked-grid-cell + bottom action-bar shape as HexaMatrixBookmark.
+// The old flat power figures (Boss 300/380, Converted Power, Dojo) now live inside
+// BossClearGrid's Quick View as a header strip instead of a separate sub-view here -- they're
+// the raw inputs feeding every row below them, not unrelated data. BossClearGrid owns the
+// Quick View/Spotlight sub-view split internally; this just passes view/onViewChange through
+// and keeps the bottom action-bar nav, same shape as HexaMatrixBookmark.
 function ScouterBookmark({ theme, character, view, onViewChange }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
 }) {
@@ -3259,15 +3230,13 @@ function ScouterBookmark({ theme, character, view, onViewChange }: {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ display: "grid" }}>
-        <div className={`bookmark-subview${view === "summary" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "summary" ? "visible" : "hidden" }}>
-          <ScouterSummaryView theme={theme} status={status} />
-        </div>
-        <div className={`bookmark-subview${view === "bossClear" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "bossClear" ? "visible" : "hidden" }}>
-          <BossClearGrid theme={theme} character={character} entry={status.entry} />
-        </div>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
+      {status.stale && (
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
+          Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
+        </p>
+      )}
+      <BossClearGrid theme={theme} character={character} entry={status.entry} view={view} onViewChange={onViewChange} />
       <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
         <ScouterActionBar view={view} theme={theme} onSelect={onViewChange} />
       </div>
@@ -3386,7 +3355,7 @@ function BookmarkPageBody({
   });
   const [scouterView, setScouterView] = useState<ScouterBookmarkView>(() => {
     const remembered = setup.lastActiveBookmarkSubView;
-    return active.id === "scouter" && remembered === "bossClear" ? remembered : "summary";
+    return active.id === "scouter" && remembered === "spotlight" ? remembered : "quickView";
   });
 
   if (active.id === "overview") return <OverviewBookmark model={model} onNavigateToBookmark={onNavigateToBookmark} onNavigateToGearSlot={onNavigateToGearSlot} onSetOverviewLayout={actions.setOverviewLayout} />;

@@ -27,6 +27,19 @@ export function bossIconUrl(id: string): string {
   return `${RESOURCE_BASE}/api/img/ui/boss/${id}/icon.png`;
 }
 
+// Full illustrated boss splash/cover art (`ui/boss` namespace, `mob.png`) -- only present
+// for entries whose manifest record has `hasSplash: true`.
+export function bossSplashUrl(id: string): string {
+  return `${RESOURCE_BASE}/api/img/ui/boss/${id}/mob.png`;
+}
+
+// Same boss sprite as bossIconUrl, but with that difficulty's ribbon/frame baked in
+// (`easy`/`normal`/`hard`/`chaos`/`extreme.png`). Difficulties without their own asset
+// (Destiny/Champion) should fall back to bossIconUrl at the call site.
+export function bossDifficultyIconUrl(id: string, difficulty: string): string {
+  return `${RESOURCE_BASE}/api/img/ui/boss/${id}/${difficulty.toLowerCase()}.png`;
+}
+
 // Familiar badge icon (haku.network `ui/familiar` namespace). IDs come from
 // `manifests/v<version>/…` ui/familiar extraction; see BADGE_ID_MAP in familiarsData.ts.
 export function familiarBadgeUrl(id: number): string {

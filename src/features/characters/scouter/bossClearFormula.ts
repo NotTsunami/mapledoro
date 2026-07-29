@@ -222,6 +222,17 @@ export interface BossClearResult {
   isPartyBoss: boolean;
   partyLimit: number;
   bossPower: number;
+  /** The character's own raw HEXA damage, inverse-splined back into stat-space AFTER the
+   *  level/arcane/authentic gap adjustments -- i.e. what this specific boss actually "sees"
+   *  as your stat, not your flat HEXA figure. Feeds bossPower; exposed so the UI can show it
+   *  directly (MapleScouter's own "adjusted stat / clear%" per-tile display). */
+  bossStat: number;
+  /** The three damage-loss multipliers that produced bossStat, each 1 = no loss. Exposed so
+   *  the UI can show WHICH gap (level/arcane/authentic) is actually costing damage on a given
+   *  boss, not just the combined result. */
+  levelGapDmg: number;
+  arcaneGapDmg: number;
+  authenticGapDmg: number;
 }
 
 /** Adjusts the character's raw HEXA damage for the handful of bosses whose real fight uses a
@@ -258,10 +269,10 @@ export function computeBossClear(
   const correctionFactor = 1.2 * arcaneCorrection * (hasAuthenticReq ? 1.25 : 1);
 
   const rawDamage = adjustedHexaDamage(entry.boss, entry.guard, inputs);
-  const gapAdjusted = rawDamage
-    * arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750))
-    * authenticGapDmg(entry.authenticForce, characterAuthenticForce)
-    * levelGapDmg(characterLevel, entry.level);
+  const arcaneGap = arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750));
+  const authenticGap = authenticGapDmg(entry.authenticForce, characterAuthenticForce);
+  const levelGap = levelGapDmg(characterLevel, entry.level);
+  const gapAdjusted = rawDamage * arcaneGap * authenticGap * levelGap;
   const damage = gapAdjusted / correctionFactor;
 
   const spline = entry.guard === 300 ? inputs.spline300 : inputs.spline380;
@@ -287,5 +298,9 @@ export function computeBossClear(
     isPartyBoss,
     partyLimit,
     bossPower: convertedBossPower(bossStat, entry.guard),
+    bossStat,
+    levelGapDmg: levelGap,
+    arcaneGapDmg: arcaneGap,
+    authenticGapDmg: authenticGap,
   };
 }

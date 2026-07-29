@@ -975,6 +975,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             padding-bottom: 14px;
           }
 
+
           /* The binder's spine reorders to the top on mobile (.profile-binder-spine above),
              so the closing animation should collapse toward the top edge here instead of the
              left edge desktop uses. */
@@ -992,6 +993,26 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
              this width (same reasoning as .gender-marriage-icons above). */
           .familiar-badge-row-offset {
             margin-left: 0 !important;
+          }
+        }
+
+        /* Boss Clear's Quick View row (BossClearGrid.tsx) wraps its banner+chips onto separate
+           lines once the ROW's own available width drops below ~392px (banner 180 + gap 12 +
+           chip-container's 200px flex-basis) -- that can happen well inside typical "desktop"
+           viewport widths if the bookmark panel itself is narrow (confirmed live: wrapped at a
+           970px viewport in a narrower panel layout, well above the 860px breakpoint above), so
+           a container query keyed to the row-list's own rendered width is the right tool here,
+           not a viewport media query. Threshold matches the flex math above, no !important
+           needed since nothing sets justify-content inline to fight with. */
+        .boss-quick-row-list {
+          container-type: inline-size;
+        }
+        @container (max-width: 400px) {
+          .boss-quick-row {
+            justify-content: center;
+          }
+          .boss-quick-chip-grid {
+            justify-content: center;
           }
         }
   `;
