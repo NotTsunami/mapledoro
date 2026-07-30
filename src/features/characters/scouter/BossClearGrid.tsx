@@ -243,6 +243,41 @@ function chipTagColor(theme: AppTheme, status: PillStatus): string {
   return theme.muted;
 }
 
+// Sectioned, left-aligned tooltip content -- the default hover-tip-bubble CSS centers short
+// one-line labels, which reads fine for those but turns a multi-row breakdown into an
+// unscannable wall of centered text. Overrides text-align via HoverTooltip's style prop.
+// Difficulty/clear% are deliberately left out: both are already visible on the chip being
+// hovered, so repeating them here was just noise.
+function chipTooltipDividerStyle(theme: AppTheme): CSSProperties {
+  return { borderTop: `1px solid ${theme.border}`, margin: "4px 0" };
+}
+function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; difficulty: string; result: BossClearResult }) {
+  const { combinedLossPercent, lines: losses } = lossBreakdown(result);
+  return (
+    <div style={{ minWidth: 168, textAlign: "left" }}>
+      <div style={{ fontWeight: 800 }}>{difficulty}</div>
+      <div style={chipTooltipDividerStyle(theme)} />
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+        <span style={{ color: theme.muted }}>Adjusted HEXA Stat</span>
+        <span>{formatFigure(result.bossStat)}</span>
+      </div>
+      <div style={chipTooltipDividerStyle(theme)} />
+      {combinedLossPercent > 0 && (
+        <div style={{ color: statusText(theme, "warning"), fontWeight: 800 }}>{combinedLossPercent}% FD Loss</div>
+      )}
+      {losses.map((line) => (
+        <div key={line.label} style={{ marginTop: 2 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+            <span style={{ color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
+            {line.lossPercent !== null && <span style={{ color: statusText(theme, "warning") }}>-{line.lossPercent}%</span>}
+          </div>
+          <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Tag + % both visible without hovering (per Yuki's friend's ask -- MapleScouter users expect
 // both at a glance), hover expands into the adjusted stat + damage-loss factor that used to be
 // Spotlight-only. A small neutral card (icon + stacked text) instead of the old saturated pill.
@@ -250,11 +285,10 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
   theme: AppTheme; iconId: string | undefined; displayName: string; entry: BossCutEntry; result: BossClearResult;
 }) {
   const tagColor = chipTagColor(theme, pillStatus(result.colorTier));
-  const loss = dominantLossLabel(result);
   return (
     <HoverTooltip
       theme={theme}
-      label={<>{entry.difficulty}: {result.clearRatePercent.toFixed(2)}%<br />Adjusted {formatFigure(result.bossStat)}{loss && <><br />{loss}</>}</>}
+      label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
     >
       {/* Fixed width so every chip lines up evenly instead of sizing to its own tag text.
           118px is measured, not guessed: "Needs Party" (the longest of TAG_TRANSLATIONS'
@@ -267,7 +301,7 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
           <span style={{ fontSize: 12, fontWeight: 800, color: tagColor, opacity: result.colorTier === "red" ? 0.7 : 1 }}>
             {pillLabel(result.colorTier, result.tagEnglish)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{result.clearRatePercent.toFixed(1)}%</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{result.clearRatePercent.toFixed(2)}%</span>
         </div>
       </div>
     </HoverTooltip>
@@ -412,21 +446,49 @@ function NavArrowButton({ theme, direction, disabled, onClick }: {
   );
 }
 
-/** The lowest of the 3 gap multipliers, if it's actually costing damage (< 1) -- surfaces WHICH
- *  of level/arcane/authentic is the limiting factor on this specific boss, not just the combined
- *  clear%. Part of the task-5 data exposure -- see bossClearFormula.ts's BossClearResult doc. */
-function dominantLossLabel(result: BossClearResult): string | null {
-  const gaps: [string, number][] = [
-    ["Level", result.levelGapDmg], ["Arcane", result.arcaneGapDmg], ["Authentic", result.authenticGapDmg],
+/** Every gap the boss actually requires (e.g. Arcane is omitted entirely for a Grandis boss --
+ *  see BossClearResult's boss/characterArcaneForce doc), each with the boss-vs-character values
+ *  behind it (MapleScouter shows this as a Boss/User table; we fold it into the same line) AND
+ *  its individual loss%, null when that stat isn't costing any damage. Requirement-relevant
+ *  stats are returned even at no loss so the UI can show a quiet boss-vs-you reference line for
+ *  players just checking whether they meet a requirement, not only when something's wrong. */
+function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number; yourValue: number; lossPercent: number | null }[] } {
+  const gaps: { label: string; bossValue: number; yourValue: number; gapDmg: number; gapCeiling: number }[] = [
+    { label: "Level", bossValue: result.bossLevel, yourValue: result.characterLevel, gapDmg: result.levelGapDmg, gapCeiling: result.levelGapCeiling },
   ];
-  const worst = gaps.reduce((a, b) => (b[1] < a[1] ? b : a), gaps[0]);
-  return worst[1] < 1 ? `${worst[0]} -${Math.round((1 - worst[1]) * 100)}%` : null;
+  if (result.bossArcaneForce !== null) {
+    gaps.push({ label: "Arcane Force", bossValue: result.bossArcaneForce, yourValue: result.characterArcaneForce, gapDmg: result.arcaneGapDmg, gapCeiling: result.arcaneGapCeiling });
+  }
+  if (result.bossAuthenticForce !== null) {
+    gaps.push({ label: "Sacred Power", bossValue: result.bossAuthenticForce, yourValue: result.characterAuthenticForce, gapDmg: result.authenticGapDmg, gapCeiling: result.authenticGapCeiling });
+  }
+  // Loss is relative to each stat's own bonus CEILING, not to 1 -- sitting exactly at a boss's
+  // requirement reads gapDmg ~1.0 but is still short of the max bonus tier (confirmed against a
+  // real MapleScouter reading: Black Mage arcane 1350/1320 required reads gapDmg 1.0 against a
+  // 1.1 ceiling for that boss specifically, i.e. 9.09% loss, not 0%).
+  //
+  // The combined total isn't a sum of the per-stat losses -- it's the achieved/ceiling PRODUCT
+  // across all gaps (confirmed against a real MapleScouter reading: Jupiter Level 295/295 +
+  // Sacred Power 810/820 gives 8.33% + 16% individually, but MapleScouter's own displayed total
+  // is 23.00%, which only matches (1.10*1.05)/(1.20*1.25)). A gap the boss doesn't require
+  // contributes gapDmg=gapCeiling=1 and drops out of the product on its own.
+  const achievedProduct = gaps.reduce((acc, g) => acc * g.gapDmg, 1);
+  const ceilingProduct = gaps.reduce((acc, g) => acc * g.gapCeiling, 1);
+  const combinedLossPercent = Math.round((1 - achievedProduct / ceilingProduct) * 100 * 100) / 100;
+  const lines = gaps.map((g) => ({
+    label: g.label,
+    bossValue: g.bossValue,
+    yourValue: g.yourValue,
+    lossPercent: g.gapDmg < g.gapCeiling ? Math.round((1 - g.gapDmg / g.gapCeiling) * 100 * 100) / 100 : null,
+  }));
+  return { combinedLossPercent, lines };
 }
 
 function SpotlightTile({ theme, iconId, displayName, entry, result }: {
   theme: AppTheme; iconId: string | undefined; displayName: string; entry: BossCutEntry; result: BossClearResult;
 }) {
-  const loss = dominantLossLabel(result);
+  const { combinedLossPercent, lines } = lossBreakdown(result);
+  const losses = lines.filter((line): line is typeof line & { lossPercent: number } => line.lossPercent !== null);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
       <FallbackSpriteIcon theme={theme} src={iconId ? difficultyImageUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
@@ -437,7 +499,16 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{result.clearRatePercent.toFixed(2)}%</span>
       <span style={{ marginLeft: "auto", fontSize: 12, color: theme.muted, textAlign: "right" }}>
         Adjusted {formatFigure(result.bossStat)}
-        {loss && <><br /><span style={{ color: statusText(theme, "warning") }}>{loss}</span></>}
+        {combinedLossPercent > 0 && (
+          <span style={{ display: "block", fontWeight: 700, color: statusText(theme, "warning") }}>
+            {combinedLossPercent}% FD Loss
+          </span>
+        )}
+        {losses.map((line) => (
+          <span key={line.label} style={{ display: "block", color: statusText(theme, "warning") }}>
+            {line.label} {line.bossValue} vs {line.yourValue} (-{line.lossPercent}%)
+          </span>
+        ))}
       </span>
     </div>
   );
@@ -546,8 +617,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
 
   if (!inputs) {
     return (
-      <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>
-        Boss Clear data isn&apos;t available yet -- refresh the Scouter figure on Overview to compute it.
+      <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>
+        Boss Clear data isn&apos;t available yet. Refresh the Scouter figure on Overview to compute it.
       </p>
     );
   }

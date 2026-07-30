@@ -227,13 +227,35 @@ export interface BossClearResult {
    *  as your stat, not your flat HEXA figure. Feeds bossPower; exposed so the UI can show it
    *  directly (MapleScouter's own "adjusted stat / clear%" per-tile display). */
   bossStat: number;
-  /** The three damage-loss multipliers that produced bossStat, each 1 = no loss. Exposed so
-   *  the UI can show WHICH gap (level/arcane/authentic) is actually costing damage on a given
-   *  boss, not just the combined result. */
+  /** The three damage-loss multipliers that produced bossStat. IMPORTANT: 1 is NOT "no loss" --
+   *  each stat has its own bonus ceiling above 1 (see the *GapCeiling fields below), and per the
+   *  wiki's own "Proportion compared to maximum" framing, anything short of that ceiling is real
+   *  FD loss even while the multiplier reads >= 1. Never compare these to 1 in the UI; compare
+   *  to the matching ceiling instead. */
   levelGapDmg: number;
   arcaneGapDmg: number;
   authenticGapDmg: number;
+  /** The max achievable multiplier for each gap on THIS boss -- level is always 1.2 (wiki's "+5
+   *  or more" bracket), authentic is always 1.25, but arcane varies per boss (1.5 normally, 1.1
+   *  for Black Mage specifically -- see arcaneCorrection above). True FD loss is
+   *  1 - gapDmg/gapCeiling, not 1 - gapDmg; a character sitting at the exact requirement reads
+   *  gapDmg near 1.0 but can still be well short of gapCeiling. */
+  levelGapCeiling: number;
+  arcaneGapCeiling: number;
+  authenticGapCeiling: number;
+  /** Raw boss-vs-character values behind each gap, for a MapleScouter-style contrast line next
+   *  to each loss percentage. Arcane/authentic are null when the boss has no requirement (the
+   *  matching *GapDmg is 1 in that case and the UI should omit the line entirely). */
+  bossLevel: number;
+  characterLevel: number;
+  bossArcaneForce: number | null;
+  characterArcaneForce: number;
+  bossAuthenticForce: number | null;
+  characterAuthenticForce: number;
 }
+
+const LEVEL_GAP_CEILING = 1.2;
+const AUTHENTIC_GAP_CEILING = 1.25;
 
 /** Adjusts the character's raw HEXA damage for the handful of bosses whose real fight uses a
  *  different damage figure than the plain 300/380 HEXA number -- Guardian Angel Slime divides
@@ -246,6 +268,16 @@ function adjustedHexaDamage(bossName: string, guard: number, inputs: BossClearIn
   if (bossName === "카링") return inputs.calculatedHexaDamageKaling || inputs.calculatedHexaDamage380;
   if (bossName === "메이린") return 0.95 * inputs.calculatedHexaDamage380 + 0.05 * inputs.calculatedDamage380;
   return inputs.calculatedHexaDamage380;
+}
+
+/** The raw boss-vs-character values behind the arcane/authentic gaps, null'd out when the boss
+ *  doesn't have that requirement at all (as opposed to 0 loss) -- split out of computeBossClear
+ *  to keep its own cognitive complexity under the sonarjs cap. */
+function gapContrastFields(entry: BossCutEntry, hasArcaneReq: boolean, hasAuthenticReq: boolean) {
+  return {
+    bossArcaneForce: hasArcaneReq ? entry.arcaneForce : null,
+    bossAuthenticForce: hasAuthenticReq ? entry.authenticForce : null,
+  };
 }
 
 /** Computes one boss+difficulty tile's clear rate, tag, and color for a character, or null if
@@ -302,5 +334,13 @@ export function computeBossClear(
     levelGapDmg: levelGap,
     arcaneGapDmg: arcaneGap,
     authenticGapDmg: authenticGap,
+    levelGapCeiling: LEVEL_GAP_CEILING,
+    arcaneGapCeiling: arcaneCorrection,
+    authenticGapCeiling: AUTHENTIC_GAP_CEILING,
+    bossLevel: entry.level,
+    characterLevel,
+    ...gapContrastFields(entry, hasArcaneReq, hasAuthenticReq),
+    characterArcaneForce: Math.min(characterArcaneForce, 1750),
+    characterAuthenticForce,
   };
 }
