@@ -46,7 +46,7 @@ const QUICK_VIEW_INFO_CONTENT: TooltipContent = {
     <>
       <p style={{ margin: "0 0 0.3rem" }}>
         The % shows how much of the boss&apos;s HP you can deal within the fight&apos;s time
-        limit. 100% means you fully clear it:
+        limit:
       </p>
       <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.1rem" }}>
         <li>90-129%: theoretically possible</li>
