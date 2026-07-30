@@ -623,10 +623,6 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             padding: 0.32rem 0.52rem;
           }
 
-          .confirmed-summary-card p:first-of-type {
-            font-size: 0.95rem !important;
-          }
-
           .confirmed-summary-card p:nth-of-type(2),
           .confirmed-summary-card p:nth-of-type(3) {
             font-size: 0.75rem !important;
@@ -654,7 +650,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
           .confirmed-summary-card--setup .char-profile-back-btn {
             padding: 0.4rem 0.72rem;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             border-radius: 10px;
           }
 
