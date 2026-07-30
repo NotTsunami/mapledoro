@@ -667,6 +667,16 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
           .confirmed-summary-card--setup .confirmed-avatar-wrap img {
             border-radius: 12px;
+            /* Overrides the base mobile rule's object-fit: cover (60 lines up), which crops a
+               full-body sprite down to just the head in this box -- a tall portrait sprite
+               (e.g. 43x68 native) forced to cover an 84x84 SQUARE box scales up until its
+               WIDTH fills the box, stretching height well past it, then object-position: center
+               top (below) anchors the crop window at the top, showing only the head/shoulders
+               and cutting off everything below. contain (matching desktop's own object-fit,
+               CharacterAvatar.tsx's fallback avatar bug report, 2026-07-30) letterboxes instead,
+               keeping the whole body visible. The base 64px non-setup card's own cover isn't
+               touched -- that's a different, smaller context this bug wasn't reported in. */
+            object-fit: contain;
             object-position: center top;
             image-rendering: auto;
           }

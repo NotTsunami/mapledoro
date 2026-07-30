@@ -1,13 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { STATUS, statusText } from "../../../components/statusColors";
 import { bossDifficultyIconUrl, bossIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
+import { searchAndRank } from "../../../lib/searchMatch";
+import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
 import HoverTooltip from "../../../components/HoverTooltip";
-import { Toggle } from "../../tools/shared-ui";
-import { toolStyles } from "../../tools/tool-styles";
+import { PillGroup } from "../../tools/shared-ui";
+import { usePickerCoords } from "../setup/hooks/usePickerCoords";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
@@ -213,13 +216,19 @@ function rowStyle(theme: AppTheme, isLast: boolean): CSSProperties {
 
 type BossEntryList = [string, BossCutEntry[]];
 
+type BossFilter = "relevant" | "all";
+const BOSS_FILTER_OPTIONS: { value: BossFilter; label: string }[] = [
+  { value: "relevant", label: "Relevant" },
+  { value: "all", label: "All" },
+];
+
 /** One boss+difficulty tile's computed result, or null if computeBossClear couldn't produce one
  *  (missing formula fields) -- filtered out before rendering either view. */
-function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, showAll: boolean) {
+function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, filter: BossFilter) {
   const sorted = [...entries].sort((a, b) => (DIFFICULTY_ORDER[a.difficulty] ?? 99) - (DIFFICULTY_ORDER[b.difficulty] ?? 99));
   return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
-    if (result && (showAll || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
+    if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
       tiles.push({ entry, result });
     }
     return tiles;
@@ -302,13 +311,13 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
 }
 
 function BossQuickViewRow({
-  theme, boss, entries, level, arcaneForce, authenticForce, inputs, showAll, isLast, onSelect,
+  theme, boss, entries, level, arcaneForce, authenticForce, inputs, filter, isLast, onSelect,
 }: {
   theme: AppTheme; boss: string; entries: BossCutEntry[]; level: number; arcaneForce: number;
   authenticForce: number; inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>;
-  showAll: boolean; isLast: boolean; onSelect: (boss: string) => void;
+  filter: BossFilter; isLast: boolean; onSelect: (boss: string) => void;
 }) {
-  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, showAll);
+  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
   if (tiles.length === 0) return null;
 
   const iconId = BOSS_ICON_ID[boss];
@@ -351,41 +360,161 @@ function PowerStrip({ theme, entry }: { theme: AppTheme; entry: ScouterResultEnt
   );
 }
 
+const BOSS_PICKER_WIDTH = 220;
+
+// Matches the search-input/option-list visual convention used by the setup flow's own pickers
+// (e.g. FamiliarsSetupStep.tsx's LinePicker) -- those constants are file-local there too (no
+// shared export exists for them), so this is its own copy, not a duplicate import.
+const bossPickerSearchInputStyle: CSSProperties = {
+  width: "100%", boxSizing: "border-box", borderRadius: 6, fontFamily: "inherit",
+  fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.5rem", outline: "none", border: "1px solid",
+};
+const bossPickerPopoverStyle: CSSProperties = { borderRadius: 10, boxShadow: "0 6px 24px rgba(0,0,0,0.28)", overflow: "hidden" };
+function bossOptionStyle(theme: AppTheme, isHighlighted: boolean): CSSProperties {
+  return {
+    display: "block", width: "100%", padding: "0.3rem 0.5rem",
+    background: isHighlighted ? `${theme.accent}22` : "transparent",
+    border: "none", borderBottom: `1px solid ${theme.border}`,
+    cursor: "pointer", fontFamily: "inherit", fontSize: "0.75rem", fontWeight: 600,
+    color: theme.text, textAlign: "left",
+  };
+}
+
+/** Searchable replacement for the old plain <select> -- lets a player type a boss name instead
+ *  of scrolling a long native dropdown (~15-17 bosses). Reuses the same shared pieces as the
+ *  setup flow's own search pickers (usePickerCoords for portal positioning, useKeyboardListNav
+ *  for arrow/Enter/Escape, searchAndRank for fuzzy-ish ranked matching) rather than a plain
+ *  <select>, but is its own standalone open/close (no cross-field openId chaining -- there's
+ *  only one picker here, not a group of them like a familiar's Line 1/Line 2). */
 function BossPicker({ theme, grouped, onSelectBoss }: {
   theme: AppTheme; grouped: BossEntryList[]; onSelectBoss: (boss: string) => void;
 }) {
-  const { selectStyle } = toolStyles(theme);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, BOSS_PICKER_WIDTH);
+  const options = grouped.map(([boss]) => ({ boss, label: BOSS_DISPLAY_NAME[boss] ?? boss }));
+  const filtered = query ? searchAndRank(options, query, (o) => o.label) : options;
+
+  useEffect(() => {
+    if (isOpen) inputRef.current?.focus();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointer = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node) && portalRef.current && !portalRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointer);
+    return () => document.removeEventListener("mousedown", handlePointer);
+  }, [isOpen, wrapperRef, portalRef]);
+
+  function select(boss: string) {
+    setIsOpen(false);
+    onSelectBoss(boss);
+  }
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: filtered,
+    resetKey: query,
+    onSelect: (o) => select(o.boss),
+    onClose: () => setIsOpen(false),
+  });
+
+  const triggerStyle: CSSProperties = {
+    width: "100%", maxWidth: 180, boxSizing: "border-box", borderRadius: 8, fontFamily: "inherit",
+    fontSize: "0.78rem", fontWeight: 700, padding: "0.4rem 0.6rem", border: `1px solid ${theme.border}`,
+    background: theme.bg, color: theme.muted, textAlign: "left", cursor: "pointer",
+  };
+
   return (
-    <select
-      className="tool-select"
-      style={{ ...selectStyle, maxWidth: 180 }}
-      value=""
-      aria-label="Jump to boss"
-      onChange={(e) => { if (e.target.value) onSelectBoss(e.target.value); }}
-    >
-      <option value="">Jump to boss…</option>
-      {grouped.map(([boss]) => (
-        <option key={boss} value={boss}>{BOSS_DISPLAY_NAME[boss] ?? boss}</option>
-      ))}
-    </select>
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="tap-target-44"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label="Jump to boss"
+        onClick={() => {
+          if (!isOpen) setQuery("");
+          setIsOpen((v) => !v);
+        }}
+        style={triggerStyle}
+      >
+        Jump to boss…
+      </button>
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ ...bossPickerPopoverStyle, position: "absolute", top: 0, left: 0, width: BOSS_PICKER_WIDTH, zIndex: 310, background: theme.panel, border: `1px solid ${theme.accent}` }}
+        >
+          <div style={{ padding: "0.3rem 0.4rem", borderBottom: `1px solid ${theme.border}` }}>
+            <input
+              ref={inputRef}
+              type="text"
+              aria-label="Search bosses"
+              value={query}
+              placeholder="Search…"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={navKeyDown}
+              style={{ ...bossPickerSearchInputStyle, borderColor: theme.border, background: theme.bg, color: theme.text }}
+            />
+          </div>
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            {filtered.map((o, i) => (
+              <button
+                key={o.boss}
+                ref={itemRef(i)}
+                type="button"
+                onClick={() => select(o.boss)}
+                style={bossOptionStyle(theme, i === highlightedIndex)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                {o.label}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p style={{ margin: 0, padding: "0.4rem 0.5rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 600 }}>
+                No results
+              </p>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }
 
 function BossQuickView({
-  theme, entry, grouped, showAll, onShowAllChange, level, arcaneForce, authenticForce, inputs, onSelectBoss,
+  theme, entry, grouped, filter, onFilterChange, level, arcaneForce, authenticForce, inputs, onSelectBoss,
 }: {
-  theme: AppTheme; entry: ScouterResultEntry; grouped: BossEntryList[]; showAll: boolean;
-  onShowAllChange: (v: boolean) => void; level: number; arcaneForce: number; authenticForce: number;
+  theme: AppTheme; entry: ScouterResultEntry; grouped: BossEntryList[]; filter: BossFilter;
+  onFilterChange: (v: BossFilter) => void; level: number; arcaneForce: number; authenticForce: number;
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onSelectBoss: (boss: string) => void;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <PowerStrip theme={theme} entry={entry} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-        <Toggle theme={theme} label="Show all bosses" checked={showAll} onChange={onShowAllChange} />
+        <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
         <BossPicker theme={theme} grouped={grouped} onSelectBoss={onSelectBoss} />
       </div>
-      <div className="boss-quick-row-list" style={{ display: "flex", flexDirection: "column" }}>
+      {/* 526px measured against a real character (Fuyurin64), not guessed: PowerStrip (57px) +
+          filter/picker row (36px) + this box + timestamp (16px) + 3 flex gaps (10px each) must
+          fit inside .profile-binder's pinned min-height (697px content + 32px page padding =
+          729px, see CharacterSetupFlow.styles.ts's own comment on that constant) alongside the
+          bookmark's own H3 heading (20px) and its gap -- without this cap the real content
+          measured 763px, 34px past every other bookmark's shared row height. Re-measure if
+          PowerStrip/filter-row/timestamp height ever changes. Bottom-edge fade mirrors
+          .profile-binder-spine's horizontal one (CharacterSetupFlow.styles.ts) -- same static,
+          not scroll-position-aware, tradeoff: keeps hinting "more below" even once fully
+          scrolled, matching the one existing precedent for this pattern in the codebase. */}
+      <div className="boss-quick-row-list tool-dialog-scroll" style={{ display: "flex", flexDirection: "column", maxHeight: 526, overflowY: "auto", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px", maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)" }}>
         {grouped.map(([boss, entries], i) => (
           <BossQuickViewRow
             key={boss}
@@ -396,13 +525,13 @@ function BossQuickView({
             arcaneForce={arcaneForce}
             authenticForce={authenticForce}
             inputs={inputs}
-            showAll={showAll}
+            filter={filter}
             isLast={i === grouped.length - 1}
             onSelect={onSelectBoss}
           />
         ))}
       </div>
-      <span style={{ fontSize: 12, color: theme.muted, textAlign: "right" }}>Data as of {BOSSCUT_SCRAPED_AT}</span>
+      <span style={{ fontSize: 12, color: theme.muted, textAlign: "right" }}>Boss thresholds as of {BOSSCUT_SCRAPED_AT}</span>
     </div>
   );
 }
@@ -510,12 +639,31 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
 // Full-bleed backdrop version of BossBanner's fade trick -- a radial mask (same shape as the
 // Bio bookmark's ClassPortrait fade) instead of a linear one, since this backdrop has content
 // overlaid on all sides rather than just needing to fade into whatever sits to its right.
+function BackToQuickViewButton({ theme, onClick }: { theme: AppTheme; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="tap-target-44"
+      aria-label="Back to Quick View"
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 4, height: 32, padding: "0 10px",
+        borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg,
+        color: theme.text, cursor: "pointer", fontSize: 12, fontWeight: 700,
+      }}
+    >
+      <span aria-hidden="true">‹</span>
+      <span>Quick View</span>
+    </button>
+  );
+}
+
 function BossSpotlight({
-  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, showAll,
+  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, filter, onBack,
 }: {
   theme: AppTheme; grouped: BossEntryList[]; selectedIndex: number; onNavigate: (i: number) => void;
   level: number; arcaneForce: number; authenticForce: number;
-  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; showAll: boolean;
+  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; filter: BossFilter; onBack: () => void;
 }) {
   const [boss, entries] = grouped[selectedIndex];
   const iconId = BOSS_ICON_ID[boss];
@@ -523,14 +671,17 @@ function BossSpotlight({
   const artPosition = BOSS_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
-  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, showAll);
+  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <NavArrowButton theme={theme} direction="prev" disabled={selectedIndex === 0} onClick={() => onNavigate(selectedIndex - 1)} />
-        <span style={{ fontSize: 12, color: theme.muted }}>{selectedIndex + 1} / {grouped.length}</span>
-        <NavArrowButton theme={theme} direction="next" disabled={selectedIndex === grouped.length - 1} onClick={() => onNavigate(selectedIndex + 1)} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <BackToQuickViewButton theme={theme} onClick={onBack} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <NavArrowButton theme={theme} direction="prev" disabled={selectedIndex === 0} onClick={() => onNavigate(selectedIndex - 1)} />
+          <span style={{ fontSize: 12, color: theme.muted }}>{selectedIndex + 1} / {grouped.length}</span>
+          <NavArrowButton theme={theme} direction="next" disabled={selectedIndex === grouped.length - 1} onClick={() => onNavigate(selectedIndex + 1)} />
+        </div>
       </div>
       <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", minHeight: SPOTLIGHT_HEIGHT, background: theme.panel }}>
         {iconId && (
@@ -604,7 +755,7 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
   view: ScouterBookmarkView;
   onViewChange: (v: ScouterBookmarkView) => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState<BossFilter>("relevant");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputs = entry.bossClearInputs;
 
@@ -634,8 +785,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           theme={theme}
           entry={entry}
           grouped={grouped}
-          showAll={showAll}
-          onShowAllChange={setShowAll}
+          filter={filter}
+          onFilterChange={setFilter}
           level={character.level}
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}
@@ -653,7 +804,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}
           inputs={inputs}
-          showAll={showAll}
+          filter={filter}
+          onBack={() => onViewChange("quickView")}
         />
       </div>
     </div>

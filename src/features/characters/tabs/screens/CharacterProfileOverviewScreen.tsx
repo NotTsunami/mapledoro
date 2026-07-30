@@ -3175,38 +3175,18 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
   return view === "spotlight" ? "Spotlight" : defaultLabel;
 }
 
-function ScouterActionBar({ view, theme, onSelect }: { view: ScouterBookmarkView; theme: Theme; onSelect: (v: ScouterBookmarkView) => void }) {
-  const btnStyle: CSSProperties = { ...secondaryButtonStyle(theme, "8px 0"), width: "100%", height: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
-  return (
-    <div style={{ display: "flex", gap: 10 }}>
-      <div style={{ flex: 1 }}>
-        {view === "spotlight" && (
-          <button type="button" style={btnStyle} onClick={() => onSelect("quickView")}>
-            <span aria-hidden="true">‹</span>
-            <span>Quick View</span>
-          </button>
-        )}
-      </div>
-      <div style={{ flex: 1 }}>
-        {view === "quickView" && (
-          <button type="button" style={btnStyle} onClick={() => onSelect("spotlight")}>
-            <span>Spotlight</span>
-            <span aria-hidden="true">›</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
 // happens via the Scouter figure on Overview (manual-refresh-only by design, see
 // useScouterResult's own doc comment), so this bookmark has no pencil/refresh of its own.
 // The old flat power figures (Boss 300/380, Converted Power, Dojo) now live inside
 // BossClearGrid's Quick View as a header strip instead of a separate sub-view here -- they're
 // the raw inputs feeding every row below them, not unrelated data. BossClearGrid owns the
-// Quick View/Spotlight sub-view split internally; this just passes view/onViewChange through
-// and keeps the bottom action-bar nav, same shape as HexaMatrixBookmark.
+// Quick View/Spotlight sub-view split internally, including its own Spotlight-side "back to
+// Quick View" button -- this just passes view/onViewChange through. The old bottom action-bar
+// nav (forward AND back buttons) was removed 2026-07-30: the forward direction was redundant
+// with clicking a boss's banner or the Quick View dropdown (3 ways to do the same thing), and
+// once that got removed the back-only button didn't earn its own dedicated row anymore either,
+// so it moved into BossSpotlight's own header instead.
 function ScouterBookmark({ theme, character, view, onViewChange }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
 }) {
@@ -3237,9 +3217,6 @@ function ScouterBookmark({ theme, character, view, onViewChange }: {
         </p>
       )}
       <BossClearGrid theme={theme} character={character} entry={status.entry} view={view} onViewChange={onViewChange} />
-      <div className="bookmark-page-nav" style={{ paddingTop: 14, marginTop: "auto" }}>
-        <ScouterActionBar view={view} theme={theme} onSelect={onViewChange} />
-      </div>
     </div>
   );
 }
