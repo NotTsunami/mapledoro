@@ -5,6 +5,7 @@ import { CHARACTERS_COPY } from "../content";
 import type { SearchPaneActions, SearchPaneModel, SetupDraftSummary } from "../paneModels";
 import { statusText } from "../../../../components/statusColors";
 import CharacterAvatar from "../components/CharacterAvatar";
+import { DropdownChevron } from "../../DropdownChevron";
 import {
   primaryButtonStyle,
   secondaryButtonStyle,
@@ -189,7 +190,7 @@ function DraftPicker({
         style={triggerStyle}
       >
         <span>Resume a setup in progress ({drafts.length})</span>
-        <span aria-hidden>{open ? "▴" : "▾"}</span>
+        <DropdownChevron open={open} />
       </button>
       {open && (
         <div style={draftListboxStyle(theme)}>

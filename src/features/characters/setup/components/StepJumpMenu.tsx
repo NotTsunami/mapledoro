@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { AppTheme } from "../../../../components/themes";
+import { DropdownChevron } from "../../DropdownChevron";
 import type { VisibleSetupStep } from "../flows";
 
 const triggerStyle = (theme: AppTheme, interactive: boolean): CSSProperties => ({
@@ -270,9 +271,7 @@ function TapStepRow({
             onClick={onToggleExpand}
             style={splitToggleStyle(theme, isTapExpanded)}
           >
-            <span style={{ display: "inline-block", fontSize: "1.5rem", lineHeight: 1, transform: isTapExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
-              ▾
-            </span>
+            <DropdownChevron open={isTapExpanded} size={20} />
           </button>
         )}
       </div>
@@ -574,14 +573,7 @@ export default function StepJumpMenu({
         style={triggerStyle(theme, canJump)}
       >
         Step {currentVisibleNumber} of {totalSteps}
-        {canJump && (
-          <span
-            aria-hidden
-            style={{ display: "inline-block", fontSize: "1.1rem", lineHeight: 1, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
-          >
-            ▾
-          </span>
-        )}
+        {canJump && <DropdownChevron open={open} />}
       </button>
       {open && canJump && (
         <div ref={menuRef} style={menuStyle(theme, openAbove)}>

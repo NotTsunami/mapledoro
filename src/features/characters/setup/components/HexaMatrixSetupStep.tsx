@@ -10,6 +10,7 @@ import type { AppTheme } from "../../../../components/themes";
 import { STATUS, statusText } from "../../../../components/statusColors";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
+import { DropdownChevron } from "../../DropdownChevron";
 import type { HexaClassDef, HexaSkillDef } from "../../../../features/tools/hexa-skills/hexa-classes";
 import { findClassById, COMMON_SKILLS } from "../../../../features/tools/hexa-skills/hexa-classes";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
@@ -563,14 +564,8 @@ function StatDropdown({ value, options, onChange, onAdvance, isOpen, onToggle, o
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {selected?.label ?? "Select stat…"}
         </span>
-        <span
-          style={{
-            fontSize: "0.75rem", flexShrink: 0, opacity: 0.6,
-            display: "inline-block", transform: isOpen ? "rotate(180deg)" : "none",
-            transition: "transform 0.15s ease",
-          }}
-        >
-          ▾
+        <span style={{ opacity: 0.6 }}>
+          <DropdownChevron open={isOpen} size={12} />
         </span>
       </button>
       {isOpen && (
