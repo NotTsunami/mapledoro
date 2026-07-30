@@ -33,11 +33,15 @@ export function bossSplashUrl(id: string): string {
   return `${RESOURCE_BASE}/api/img/ui/boss/${id}/mob.png`;
 }
 
-// Same boss sprite as bossIconUrl, but with that difficulty's ribbon/frame baked in
-// (`easy`/`normal`/`hard`/`chaos`/`extreme.png`). Difficulties without their own asset
-// (Destiny/Champion) should fall back to bossIconUrl at the call site.
+// Same boss sprite as bossIconUrl, but with that difficulty's ribbon/frame baked in. Easy
+// through Extreme are real WZ assets under `ui/boss`; Destiny/Champion (tiers above Extreme)
+// have no in-game badge, so they're hand-composited mapledoro-only art living in the `misc/boss`
+// namespace instead (see `misc-boss.json`'s `_meta.note`).
+const MISC_BOSS_DIFFICULTIES = new Set(["destiny", "champion"]);
 export function bossDifficultyIconUrl(id: string, difficulty: string): string {
-  return `${RESOURCE_BASE}/api/img/ui/boss/${id}/${difficulty.toLowerCase()}.png`;
+  const lower = difficulty.toLowerCase();
+  const namespace = MISC_BOSS_DIFFICULTIES.has(lower) ? "misc/boss" : "ui/boss";
+  return `${RESOURCE_BASE}/api/img/${namespace}/${id}/${lower}.png`;
 }
 
 // Familiar badge icon (haku.network `ui/familiar` namespace). IDs come from
@@ -47,9 +51,9 @@ export function familiarBadgeUrl(id: number): string {
 }
 
 // World/server icon (haku.network `misc` namespace, no `ui/` prefix). IDs are looked
-// up by hand from `manifests/v<version>/misc.json` and hardcoded at the call site.
+// up by hand from `manifests/v<version>/misc-world.json` and hardcoded at the call site.
 export function worldIconUrl(id: string): string {
-  return `${RESOURCE_BASE}/api/img/misc/${id}/icon.png`;
+  return `${RESOURCE_BASE}/api/img/misc/world/${id}/icon.png`;
 }
 
 // Legion Artifact crystal icon (haku.network `legion-artifact` namespace, no `ui/`
