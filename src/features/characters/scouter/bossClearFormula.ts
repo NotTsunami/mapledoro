@@ -140,75 +140,74 @@ function convertedBossPower(statValue: number, guard: number): number {
 // --- Tag bucketing (MapleScouter module 97571's `Rn`) ---------------------------------------
 
 /** Verified real English strings, found in MapleScouter's own i18n dictionary -- not a gloss. */
-export const TAG_TRANSLATIONS: Record<string, string> = {
-  "솔플 최소컷": "Solo Min",
-  "솔플 여유컷": "Easy",
-  "솔플 가능": "Possible",
-  "파티격 가능": "Party-able",
-  "파티 최소컷": "Party Min",
-  파티: "Party",
-  불가능: "Impossible",
-  "입장 불가능": "Can't Enter",
-  "2인 최소컷": "2p Min Cut",
-  "3인 최소컷": "3p Min Cut",
-  "4인 최소컷": "4p Min Cut",
-  "6인 최소컷": "6p Min Cut",
-  "격수 3인 최소컷": "3D Min Cut",
-  "숍+격수2인 최소컷": "2D1B Min Cut",
-};
+// Six genuinely distinct hues, one per severity step, best to worst: green -> blue -> red ->
+// orange -> purple -> gray. Replaces an earlier attempt at same-hue lightness shifts (e.g. two
+// greens for Easy/Possible), which read as identical at a glance -- Yuki's call 2026-07-30 to
+// scrap that and use a real 6-color ladder instead. Every value here matches its STATUS/
+// statusText key directly (BossClearGrid.tsx's pillStatus maps 1:1, no renaming in between).
+export type ClearColorTier = "green" | "blue" | "red" | "orange" | "purple" | "gray";
 
-// Soloable bosses share the same top 3 tiers regardless of partyLimit; only the party-assist
-// tiers at the bottom vary (and partyLimit=1 has none, since there's no party to fall back to).
-const SOLO_TAG_TIERS: Record<number, [number, string][]> = {
-  6: [[2, "솔플 여유컷"], [1.1, "솔플 가능"], [0.9, "솔플 최소컷"], [0.25, "파티격 가능"], [0.15, "파티 최소컷"]],
-  3: [[2, "솔플 여유컷"], [1.1, "솔플 가능"], [0.9, "솔플 최소컷"], [0.36, "파티격 가능"], [0.3, "파티 최소컷"]],
-  2: [[2, "솔플 여유컷"], [1.1, "솔플 가능"], [0.9, "솔플 최소컷"], [0.55, "파티격 가능"], [0.45, "파티 최소컷"]],
-  1: [[2, "솔플 여유컷"], [1.1, "솔플 가능"], [0.9, "솔플 최소컷"]],
+// Single source of truth for every tag's color, so the SAME tag string always renders the SAME
+// color everywhere it appears -- both tier tables below reference this instead of assigning
+// colors inline. Bug this fixed 2026-07-30: "3p Min Cut" rendered purple for a partyLimit-3 boss
+// (its own worst tier) but red for a partyLimit-6 boss (a middle tier there), since the two
+// tables used to assign colors independently by rank-within-that-table rather than by tag
+// identity. Yuki's call: identical tag text must mean identical severity, always.
+//
+// This is also why the party-only table's top tier is "1p Min Cut", not "Solo Min" like the
+// soloable table's borderline-pass tier -- they're different concepts (party-only: your own
+// damage alone covers the WHOLE party's requirement, the best outcome, green; soloable: you're
+// right at the edge of a solo pass, a worse outcome, red) that briefly shared a label and
+// therefore collided under this same-tag-same-color rule. Fixed 2026-07-30 by renaming the
+// party-only one to match its "2p/3p/4p/6p Min Cut" siblings instead of reusing "Solo Min".
+const TAG_COLOR: Record<string, ClearColorTier> = {
+  Easy: "green", Possible: "blue", "Solo Min": "red",
+  "Party-able": "orange", "Party Min": "purple",
+  "1p Min Cut": "green", "2p Min Cut": "blue", "3p Min Cut": "red", "4p Min Cut": "orange", "6p Min Cut": "purple",
+  Impossible: "gray", "Can't Enter": "gray",
 };
-// Party-only bosses (no solo option at all) use a different, party-size-labeled tag set.
-const PARTY_ONLY_TAG_TIERS_BY_LIMIT: Record<number, [number, string][]> = {
-  3: [[2.7, "솔플 최소컷"], [1.35, "2인 최소컷"], [0.9, "3인 최소컷"]],
-};
-const PARTY_ONLY_TAG_TIERS_DEFAULT: [number, string][] = [
-  [5.1, "솔플 최소컷"], [2.55, "2인 최소컷"], [1.7, "3인 최소컷"], [1.275, "4인 최소컷"], [0.9, "6인 최소컷"],
-];
-
-function tagBucket(clearRate: number, isPartyBoss: boolean, partyLimit: number): string {
-  if (isPartyBoss) {
-    const tiers = PARTY_ONLY_TAG_TIERS_BY_LIMIT[partyLimit] ?? PARTY_ONLY_TAG_TIERS_DEFAULT;
-    return pickTier(clearRate, tiers, "불가능");
-  }
-  const tiers = SOLO_TAG_TIERS[partyLimit];
-  return tiers ? pickTier(clearRate, tiers, "불가능") : "불가능";
+interface BossTier {
+  tag: string;
+  color: ClearColorTier;
+}
+function tier(tag: string): BossTier {
+  return { tag, color: TAG_COLOR[tag] };
 }
 
-// --- Tile color tier (the inline style ternary in MapleScouter's own render component) ------
-
-/** "red" isn't danger here -- MapleScouter uses it as "clearing by such a wide margin the exact
- *  number stopped being meaningful," a threshold consistently ABOVE the tag's own top tier. See
- *  the color-logic RESOLVED section in memory before reusing these thresholds elsewhere. */
-export type ClearColorTier = "red" | "green" | "primary" | "blue" | "purple" | "gray";
-
-const SOLOABLE_COLOR_TIERS: Record<number, [number, ClearColorTier][]> = {
-  1: [[2.5, "red"], [1.5, "green"], [0.9, "primary"]],
-  2: [[2.5, "red"], [1.5, "green"], [0.9, "primary"], [0.55, "blue"], [0.45, "purple"]],
-  3: [[2.5, "red"], [1.5, "green"], [0.9, "primary"], [0.36, "blue"], [0.3, "purple"]],
-  6: [[2.5, "red"], [1.5, "green"], [0.9, "primary"], [0.25, "blue"], [0.15, "purple"]],
+// mapledoro's own tag+color tiers, replacing MapleScouter's two independently-tuned tables
+// (SOLO_TAG_TIERS/SOLOABLE_COLOR_TIERS on their site) whose mismatched breakpoints let the same
+// tag render in two different colors -- e.g. "Easy" could show green OR their "red" (their
+// red meaning "cleared by such a wide margin the number stopped being meaningful," not danger,
+// but reading as an alert regardless). Yuki's call 2026-07-30: drop that distinction entirely --
+// one tag always maps to exactly one color, tuned to the TAG's own breakpoints (the meaningful
+// semantic categories), not a second independently-eyeballed scale. Overkill clears just stay
+// "Easy"/green with no visual distinction from a more marginal Easy clear.
+//
+// Bucket breakpoints themselves are unchanged from MapleScouter's original tag tiers (still
+// empirically fit -- see the formula memory) -- only the color assignment was unified onto them.
+const SOLO_TIERS: Record<number, [number, BossTier][]> = {
+  6: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.25, tier("Party-able")], [0.15, tier("Party Min")]],
+  3: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.36, tier("Party-able")], [0.3, tier("Party Min")]],
+  2: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.55, tier("Party-able")], [0.45, tier("Party Min")]],
+  1: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")]],
 };
-const PARTY_ONLY_COLOR_TIERS_BY_LIMIT: Record<number, [number, ClearColorTier][]> = {
-  3: [[2.7, "red"], [1.35, "green"], [0.9, "primary"]],
+// Party-only bosses (no solo option at all) use a different, party-size-labeled tag set.
+const PARTY_ONLY_TIERS_BY_LIMIT: Record<number, [number, BossTier][]> = {
+  3: [[2.7, tier("1p Min Cut")], [1.35, tier("2p Min Cut")], [0.9, tier("3p Min Cut")]],
 };
-const PARTY_ONLY_COLOR_TIERS_DEFAULT: [number, ClearColorTier][] = [
-  [5.1, "red"], [2.55, "green"], [1.7, "primary"], [1.275, "blue"], [0.9, "purple"],
+const PARTY_ONLY_TIERS_DEFAULT: [number, BossTier][] = [
+  [5.1, tier("1p Min Cut")], [2.55, tier("2p Min Cut")], [1.7, tier("3p Min Cut")], [1.275, tier("4p Min Cut")], [0.9, tier("6p Min Cut")],
 ];
+const IMPOSSIBLE_TIER: BossTier = tier("Impossible");
+const CANNOT_ENTER_TIER: BossTier = tier("Can't Enter");
 
-function colorTier(clearRate: number, isPartyBoss: boolean, partyLimit: number): ClearColorTier {
+function bossTier(clearRate: number, isPartyBoss: boolean, partyLimit: number): BossTier {
   if (isPartyBoss) {
-    const tiers = PARTY_ONLY_COLOR_TIERS_BY_LIMIT[partyLimit] ?? PARTY_ONLY_COLOR_TIERS_DEFAULT;
-    return pickTier(clearRate, tiers, "gray");
+    const tiers = PARTY_ONLY_TIERS_BY_LIMIT[partyLimit] ?? PARTY_ONLY_TIERS_DEFAULT;
+    return pickTier(clearRate, tiers, IMPOSSIBLE_TIER);
   }
-  const tiers = SOLOABLE_COLOR_TIERS[partyLimit] ?? SOLOABLE_COLOR_TIERS[6];
-  return pickTier(clearRate, tiers, "gray");
+  const tiers = SOLO_TIERS[partyLimit] ?? SOLO_TIERS[6];
+  return pickTier(clearRate, tiers, IMPOSSIBLE_TIER);
 }
 
 // --- Main per-boss calc (MapleScouter module 33528) ------------------------------------------
@@ -216,7 +215,6 @@ function colorTier(clearRate: number, isPartyBoss: boolean, partyLimit: number):
 export interface BossClearResult {
   clearRate: number;
   clearRatePercent: number;
-  tagKorean: string;
   tagEnglish: string;
   colorTier: ClearColorTier;
   isPartyBoss: boolean;
@@ -319,14 +317,13 @@ export function computeBossClear(
 
   const isPartyBoss = !!entry.partyBossCut;
   const partyLimit = entry.partyLimit || 6;
-  const tagKorean = cannotEnter(entry.boss, entry.difficulty, characterLevel) ? "입장 불가능" : tagBucket(clearRate, isPartyBoss, partyLimit);
+  const tier = cannotEnter(entry.boss, entry.difficulty, characterLevel) ? CANNOT_ENTER_TIER : bossTier(clearRate, isPartyBoss, partyLimit);
 
   return {
     clearRate,
     clearRatePercent: clearRate * 100,
-    tagKorean,
-    tagEnglish: TAG_TRANSLATIONS[tagKorean] ?? tagKorean,
-    colorTier: colorTier(clearRate, isPartyBoss, partyLimit),
+    tagEnglish: tier.tag,
+    colorTier: tier.color,
     isPartyBoss,
     partyLimit,
     bossPower: convertedBossPower(bossStat, entry.guard),

@@ -52,36 +52,29 @@ function isRelevant(clearRate: number, isPartyBoss: boolean, partyLimit: number)
   return !tooWeak;
 }
 
-type PillStatus = "success" | "info" | "warning" | null;
+type PillStatus = "success" | "info" | "danger" | "critical" | "severe" | null;
 
-// Collapses MapleScouter's 6-tier color scheme onto mapledoro's 3 usable STATUS tones:
-// green/red (both are "clears solo, comfortably or by a huge margin") -> success, primary
-// (borderline solo pass) -> info, blue/purple (both are "needs a party", worse vs less-worse)
-// -> warning, gray (impossible/can't enter) -> no status color, a neutral pill instead.
+// Maps mapledoro's 6-tier severity ladder onto real STATUS tones, best to worst: green (Easy) ->
+// success, blue (Possible) -> info, red (Solo Min, right at the pass/fail edge) -> danger, orange
+// (Party-able) -> critical, purple (Party Min, most desperate) -> severe, gray (impossible/can't
+// enter) -> no status color, a neutral pill instead.
 function pillStatus(colorTier: ClearColorTier): PillStatus {
-  if (colorTier === "green" || colorTier === "red") return "success";
-  if (colorTier === "primary") return "info";
-  if (colorTier === "blue" || colorTier === "purple") return "warning";
+  if (colorTier === "green") return "success";
+  if (colorTier === "blue") return "info";
+  if (colorTier === "red") return "danger";
+  if (colorTier === "orange") return "critical";
+  if (colorTier === "purple") return "severe";
   return null;
 }
 
-// The two "needs a party" tiers get one shared label instead of MapleScouter's granular
-// party-size-specific tags (2p/3p/4p/6p Min Cut, etc.) -- exact size shows in the tooltip.
-function pillLabel(colorTier: ClearColorTier, tagEnglish: string): string {
-  return colorTier === "blue" || colorTier === "purple" ? "Needs Party" : tagEnglish;
-}
-
-// "red" isn't a distinct status here, just the same success tier muted down -- see
-// bossClearFormula.ts's ClearColorTier doc comment for why red means "so far past the
-// threshold the exact number stopped being meaningful," not danger.
-function pillStyle(theme: AppTheme, status: PillStatus, overkill: boolean): CSSProperties {
+function pillStyle(theme: AppTheme, status: PillStatus): CSSProperties {
   const base: CSSProperties = {
     display: "inline-flex", alignItems: "center", padding: "3px 8px", borderRadius: 999,
     fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap", cursor: "default",
   };
   if (!status) return { ...base, background: theme.timerBg, color: theme.muted };
   const { fill, on } = STATUS[status];
-  return { ...base, background: fill, color: on, opacity: overkill ? 0.55 : 1 };
+  return { ...base, background: fill, color: on };
 }
 
 // Dual-render with refs (display:none on the fallback, swap via onError) rather than useState,
@@ -233,13 +226,13 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
   }, []);
 }
 
-// Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill -- matches
-// the "info" tier (colorTier "primary", the borderline-solo-pass tier) to theme.accentText since
-// statusText only covers success/danger/warning.
+// Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill.
 function chipTagColor(theme: AppTheme, status: PillStatus): string {
   if (status === "success") return statusText(theme, "success");
-  if (status === "warning") return statusText(theme, "warning");
-  if (status === "info") return theme.accentText;
+  if (status === "info") return statusText(theme, "info");
+  if (status === "danger") return statusText(theme, "danger");
+  if (status === "critical") return statusText(theme, "critical");
+  if (status === "severe") return statusText(theme, "severe");
   return theme.muted;
 }
 
@@ -291,15 +284,15 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
       label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
     >
       {/* Fixed width so every chip lines up evenly instead of sizing to its own tag text.
-          118px is measured, not guessed: "Needs Party" (the longest of TAG_TRANSLATIONS'
-          English strings) is 70px of text at this 12px font (React-Doctor's sub-12px-text
-          rule floor, not a design choice), +28 icon +6 gap +12 padding +2 border = 118px
-          exact fit. Don't shrink further without re-measuring. */}
+          118px is measured, not guessed: "Party-able"/"Impossible" (the longest tags in
+          bossClearFormula.ts's tier tables) are 70px of text at this 12px font (React-Doctor's
+          sub-12px-text rule floor, not a design choice), +28 icon +6 gap +12 padding +2 border
+          = 118px exact fit. Don't shrink further without re-measuring. */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, width: 118, padding: "4px 8px 4px 4px", borderRadius: 10, background: theme.bg, border: `1px solid ${theme.border}`, boxSizing: "border-box" }}>
         <FallbackSpriteIcon theme={theme} src={iconId ? difficultyImageUrl(iconId, entry.difficulty) : undefined} size={28} displayName={displayName} />
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.25, minWidth: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: tagColor, opacity: result.colorTier === "red" ? 0.7 : 1 }}>
-            {pillLabel(result.colorTier, result.tagEnglish)}
+          <span style={{ fontSize: 12, fontWeight: 800, color: tagColor }}>
+            {result.tagEnglish}
           </span>
           <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{result.clearRatePercent.toFixed(2)}%</span>
         </div>
@@ -493,8 +486,8 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
       <FallbackSpriteIcon theme={theme} src={iconId ? difficultyImageUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, minWidth: 52 }}>{entry.difficulty}</span>
-      <span style={pillStyle(theme, pillStatus(result.colorTier), result.colorTier === "red")}>
-        {pillLabel(result.colorTier, result.tagEnglish)}
+      <span style={pillStyle(theme, pillStatus(result.colorTier))}>
+        {result.tagEnglish}
       </span>
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{result.clearRatePercent.toFixed(2)}%</span>
       <span style={{ marginLeft: "auto", fontSize: 12, color: theme.muted, textAlign: "right" }}>
