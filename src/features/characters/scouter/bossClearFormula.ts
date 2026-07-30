@@ -183,13 +183,19 @@ function tier(tag: string): BossTier {
 // semantic categories), not a second independently-eyeballed scale. Overkill clears just stay
 // "Easy"/green with no visual distinction from a more marginal Easy clear.
 //
-// Bucket breakpoints themselves are unchanged from MapleScouter's original tag tiers (still
-// empirically fit -- see the formula memory) -- only the color assignment was unified onto them.
+// Bucket breakpoints started as MapleScouter's own original tag tiers (still empirically fit --
+// see the formula memory), with one deliberate departure: the Possible floor was moved from
+// MapleScouter's 1.1 (110%) to 1.3 (130%) on 2026-07-30, per a Discord poll of several players
+// finding 110% didn't feel like a comfortable clear in practice (100-150% range of opinions, one
+// citing Kalos specifically) -- 90-129% is now Solo Min end to end, matching that "still tight"
+// feel rather than splitting it at a threshold nobody agreed felt safe. This is a real, intentional
+// divergence from MapleScouter's own displayed tags for the same character -- Yuki's call, not a
+// bug. Every other breakpoint (Easy, Solo Min's own floor, Party-able, Party Min) is untouched.
 const SOLO_TIERS: Record<number, [number, BossTier][]> = {
-  6: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.25, tier("Party-able")], [0.15, tier("Party Min")]],
-  3: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.36, tier("Party-able")], [0.3, tier("Party Min")]],
-  2: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")], [0.55, tier("Party-able")], [0.45, tier("Party Min")]],
-  1: [[2, tier("Easy")], [1.1, tier("Possible")], [0.9, tier("Solo Min")]],
+  6: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.25, tier("Party-able")], [0.15, tier("Party Min")]],
+  3: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.36, tier("Party-able")], [0.3, tier("Party Min")]],
+  2: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.55, tier("Party-able")], [0.45, tier("Party Min")]],
+  1: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")]],
 };
 // Party-only bosses (no solo option at all) use a different, party-size-labeled tag set.
 const PARTY_ONLY_TIERS_BY_LIMIT: Record<number, [number, BossTier][]> = {

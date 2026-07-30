@@ -5,12 +5,14 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { STATUS, statusText } from "../../../components/statusColors";
-import { bossDifficultyIconUrl, bossIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
+import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
 import { searchAndRank } from "../../../lib/searchMatch";
 import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
 import HoverTooltip from "../../../components/HoverTooltip";
 import { PillGroup } from "../../tools/shared-ui";
 import { usePickerCoords } from "../setup/hooks/usePickerCoords";
+import { DropdownChevron } from "../DropdownChevron";
+import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
@@ -36,12 +38,33 @@ const BOSS_DISPLAY_NAME: Record<string, string> = {
 
 const DIFFICULTY_ORDER: Record<string, number> = { Easy: 0, Normal: 1, Hard: 2, Chaos: 3, Extreme: 4, Destiny: 5, Champion: 6 };
 
-// Only these 5 difficulties have their own ribboned sprite in the manifest (`_meta.assets` in
-// ui-boss.json) -- Destiny/Champion fall back to the plain icon.png.
-const DIFFICULTY_ASSET = new Set(["Easy", "Normal", "Hard", "Chaos", "Extreme"]);
-function difficultyImageUrl(iconId: string, difficulty: string): string {
-  return DIFFICULTY_ASSET.has(difficulty) ? bossDifficultyIconUrl(iconId, difficulty) : bossIconUrl(iconId);
-}
+// Tag order matches the severity ladder in bossClearFormula.ts's TAG_COLOR (best to worst),
+// so this list stays a direct reading aid for the pill colors on every chip/tile.
+const QUICK_VIEW_INFO_CONTENT: TooltipContent = {
+  title: "How to read this",
+  description: (
+    <>
+      <p style={{ margin: "0 0 0.3rem" }}>
+        The % shows how much of the boss&apos;s HP you can deal within the fight&apos;s time
+        limit. 100% means you fully clear it:
+      </p>
+      <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.1rem" }}>
+        <li>90-129%: theoretically possible</li>
+        <li>130%+: comfortable</li>
+      </ul>
+      <p style={{ margin: 0 }}>
+        &quot;Min&quot; means the bare minimum to pass, not a comfortable clear. Solo Min is
+        barely soloable, and a Min Cut tag (1p/2p/3p...) shows the smallest party size that can
+        just barely clear it.
+      </p>
+    </>
+  ),
+};
+
+const BOSS_THRESHOLD_INFO_CONTENT: TooltipContent = {
+  title: "Boss thresholds",
+  description: "Boss Clear thresholds from MapleScouter, informally curated by a small group of experienced players rather than measured across the whole playerbase.",
+};
 
 // MapleScouter's own "relevant" filter, ported verbatim (confirmed by clicking their own
 // "View my (relevant) boss standards" toggle live -- see project_maplescouter_bosscut_formula
@@ -206,13 +229,20 @@ function BossBanner({ theme, boss, iconId, displayName }: {
 // flexWrap so the chip column drops to its own full-width line below the banner once the row
 // gets too narrow for both side by side (mobile) -- see the chip container's own flex-basis
 // below, which is what actually triggers that wrap.
-function rowStyle(theme: AppTheme, isLast: boolean): CSSProperties {
+function rowStyle(isLast: boolean, theme: AppTheme): CSSProperties {
   return {
     display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, width: "100%",
-    background: "none", border: "none", padding: "8px 4px", font: "inherit", textAlign: "left",
-    cursor: "pointer", borderBottom: isLast ? "none" : `1px solid ${theme.border}`,
+    padding: "8px 4px", borderBottom: isLast ? "none" : `1px solid ${theme.border}`,
   };
 }
+
+// Reset to look like the plain banner wrapper it replaces -- only the banner itself opens
+// Spotlight now (used to be the whole row, which made every difficulty chip's own hover
+// tooltip fight the row's click target -- Yuki's call 2026-07-30 to scope the click down).
+const bannerButtonStyle: CSSProperties = {
+  background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", flexShrink: 0,
+  borderRadius: 10, transition: "transform 0.1s ease",
+};
 
 type BossEntryList = [string, BossCutEntry[]];
 
@@ -298,7 +328,7 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
           sub-12px-text rule floor, not a design choice), +28 icon +6 gap +12 padding +2 border
           = 118px exact fit. Don't shrink further without re-measuring. */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, width: 118, padding: "4px 8px 4px 4px", borderRadius: 10, background: theme.bg, border: `1px solid ${theme.border}`, boxSizing: "border-box" }}>
-        <FallbackSpriteIcon theme={theme} src={iconId ? difficultyImageUrl(iconId, entry.difficulty) : undefined} size={28} displayName={displayName} />
+        <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={28} displayName={displayName} />
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.25, minWidth: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: tagColor }}>
             {result.tagEnglish}
@@ -324,14 +354,23 @@ function BossQuickViewRow({
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
 
   return (
-    <button type="button" className="boss-quick-row" style={rowStyle(theme, isLast)} onClick={() => onSelect(boss)}>
-      <BossBanner theme={theme} boss={boss} iconId={iconId} displayName={displayName} />
+    <div className="boss-quick-row" style={rowStyle(isLast, theme)}>
+      <button
+        type="button"
+        aria-label={`View ${displayName} in Spotlight`}
+        onClick={() => onSelect(boss)}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
+        style={bannerButtonStyle}
+      >
+        <BossBanner theme={theme} boss={boss} iconId={iconId} displayName={displayName} />
+      </button>
       <div className="boss-quick-chip-grid" style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: "1 1 200px", minWidth: 0 }}>
         {tiles.map(({ entry, result }) => (
           <DifficultyChip key={entry.difficulty} theme={theme} iconId={iconId} displayName={displayName} entry={entry} result={result} />
         ))}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -351,11 +390,20 @@ function PowerStripItem({ theme, label, value, sub }: { theme: AppTheme; label: 
 // every row below it, so they read as this view's header now instead of an unrelated sibling.
 function PowerStrip({ theme, entry }: { theme: AppTheme; entry: ScouterResultEntry }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
-      <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} />
-      <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} />
-      <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} />
-      <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
+      {/* Boss 300/380/Converted default to the HEXA-adjusted figure (Normal tucked into each
+          tile's hover tooltip); Dojo has no HEXA/Normal split, so this note only spans the
+          first 3 rather than living inside each label. Grid, not flex-wrap: Converted's much
+          wider value (11 digits vs. Dojo's 9) skewed a flex row's column widths even after the
+          labels themselves were shortened -- equal-width grid columns hold regardless of how
+          long any one tile's value gets. */}
+      <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 / Converted shown as HEXA</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 16 }}>
+        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} />
+        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} />
+        <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} />
+        <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} />
+      </div>
     </div>
   );
 }
@@ -427,6 +475,7 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
     width: "100%", maxWidth: 180, boxSizing: "border-box", borderRadius: 8, fontFamily: "inherit",
     fontSize: "0.78rem", fontWeight: 700, padding: "0.4rem 0.6rem", border: `1px solid ${theme.border}`,
     background: theme.bg, color: theme.muted, textAlign: "left", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.3rem",
   };
 
   return (
@@ -443,7 +492,8 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
         }}
         style={triggerStyle}
       >
-        Jump to boss…
+        Jump to boss
+        <DropdownChevron open={isOpen} />
       </button>
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
@@ -501,7 +551,10 @@ function BossQuickView({
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <PowerStrip theme={theme} entry={entry} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-        <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
+          <InfoTooltip theme={theme} label="How to read this" content={QUICK_VIEW_INFO_CONTENT} />
+        </div>
         <BossPicker theme={theme} grouped={grouped} onSelectBoss={onSelectBoss} />
       </div>
       {/* 526px measured against a real character (Fuyurin64), not guessed: PowerStrip (57px) +
@@ -531,7 +584,10 @@ function BossQuickView({
           />
         ))}
       </div>
-      <span style={{ fontSize: 12, color: theme.muted, textAlign: "right" }}>Boss thresholds as of {BOSSCUT_SCRAPED_AT}</span>
+      <span style={{ fontSize: 12, color: theme.muted, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+        Boss thresholds as of {BOSSCUT_SCRAPED_AT}
+        <InfoTooltip theme={theme} label="Where do these numbers come from?" content={BOSS_THRESHOLD_INFO_CONTENT} />
+      </span>
     </div>
   );
 }
@@ -613,7 +669,7 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
   const losses = lines.filter((line): line is typeof line & { lossPercent: number } => line.lossPercent !== null);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
-      <FallbackSpriteIcon theme={theme} src={iconId ? difficultyImageUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
+      <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, minWidth: 52 }}>{entry.difficulty}</span>
       <span style={pillStyle(theme, pillStatus(result.colorTier))}>
         {result.tagEnglish}
