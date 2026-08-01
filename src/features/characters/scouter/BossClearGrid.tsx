@@ -576,21 +576,28 @@ function BossQuickView({
 // usable), minus Spotlight's own header row (back button + nav arrows, 32px) and its 10px gap.
 const SPOTLIGHT_HEIGHT = 623;
 
-// SpotlightTile is a fixed single-line row: 32px icon + 6px+6px padding = 44px per tile, 6px gap
-// between stacked tiles.
+// SpotlightTile is always 2 lines tall (difficulty/tag over clear%/Adjusted, see its own grid
+// layout): 2 x ~15px lines + 2px internal row-gap + 6px+6px padding = 44px per tile, 8px gap
+// between stacked tiles. This is only the initial-render estimate before BossSpotlight's
+// ResizeObserver measurement lands -- tiles can grow taller than this if a value wraps, so the
+// live measurement is what actually drives the fade once mounted.
 const SPOTLIGHT_TILE_HEIGHT = 44;
-const SPOTLIGHT_TILE_GAP = 6;
+const SPOTLIGHT_TILE_GAP = 8;
 // Total height the tile stack occupies (including its 1rem top+bottom padding) for a given count.
+// Used as the initial-render estimate before a live measurement lands.
 function spotlightTileStackHeight(tileCount: number): number {
   if (tileCount === 0) return 16 * 2;
   return 16 * 2 + tileCount * SPOTLIGHT_TILE_HEIGHT + (tileCount - 1) * SPOTLIGHT_TILE_GAP;
 }
 
 // Fade end deliberately bleeds 20px past the tile stack's top edge (tiles have their own opaque
-// background, so legibility holds); start sits 130px above end. Both scale up with tile count so
-// taller stacks (Destiny/Champion-tier bosses) don't overlap still-opaque art.
-function spotlightMaskStyle(tileCount: number): CSSProperties {
-  const stackTopPx = SPOTLIGHT_HEIGHT - spotlightTileStackHeight(tileCount);
+// background, so legibility holds); start sits 130px above end. Both scale up with stack height
+// so taller stacks (Destiny/Champion-tier bosses) don't overlap still-opaque art. Takes the
+// stack's height directly rather than a tile count so the caller can pass either the fixed-height
+// formula (pre-mount estimate) or a live ResizeObserver measurement (actual rendered height,
+// which can exceed the estimate once a value wraps onto extra lines).
+function spotlightMaskStyle(stackHeightPx: number): CSSProperties {
+  const stackTopPx = SPOTLIGHT_HEIGHT - stackHeightPx;
   const endPx = Math.max(0, stackTopPx + 20);
   const startPx = Math.max(0, endPx - 130);
   const start = (startPx / SPOTLIGHT_HEIGHT) * 100;
@@ -663,6 +670,20 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
 
 // Mirrors DifficultyChip's tag-text + hover-tooltip pattern (Quick View's current design,
 // replacing the old saturated pill this used to share) so both views read as the same system.
+//
+// 5 grid columns shared across every tile in the stack (icon, difficulty, tag, clear%, Adjusted)
+// via subgrid, so an 8-digit clear% (e.g. 474248.20%) on one tile grows that column for every
+// tile at once instead of just its own, keeping every column aligned across tiles regardless of
+// which one has the longest value (without subgrid, each tile sizing its own independent grid
+// meant a wide value on tile 1 didn't widen tile 3's matching column, so text drifted between
+// tiles). Desktop is one row (.spotlight-tile-cell classes place each cell in its own column);
+// below 400px (.spotlight-tile's container query, CharacterSetupFlow.styles.ts) the placement
+// classes switch clear%/Adjusted onto a second row sharing the difficulty/tag columns instead,
+// since a maxed-out end-game clear% has no room left on the same line as icon+difficulty+tag on
+// a narrow panel. Placement lives in CSS classes, not inline styles, specifically so the
+// container query can override it -- an inline gridColumn/gridRow would always win over any
+// stylesheet rule regardless of breakpoint. Requires the caller (stackRef's div) to be the
+// actual grid with the matching column template; this component only supplies rows.
 function SpotlightTile({ theme, iconId, displayName, entry, result }: {
   theme: AppTheme; iconId: string | undefined; displayName: string; entry: BossCutEntry; result: BossClearResult;
 }) {
@@ -670,22 +691,55 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
   return (
     <HoverTooltip
       theme={theme}
+      // .hover-tip is inline-flex and shrink-wraps its own box by default (see globals.css and
+      // FamiliarsSetupStep.tsx's sprite for the same issue) -- without an explicit grid-column
+      // span, the wrapper wouldn't participate in the parent subgrid's column tracks at all.
+      // className reuses .spotlight-tile's own gridRow rule (styles.ts) rather than setting it
+      // inline, since it needs to be 1 row on desktop (single-line, content vertically centers
+      // in a 1-row-tall box) and 2 rows on mobile (wrapped) -- an inline gridRow would always
+      // beat the container query that switches between them.
+      className="spotlight-tile"
+      style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", gridTemplateRows: "subgrid" }}
       label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
-        <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, width: 60, flexShrink: 0 }}>{entry.difficulty}</span>
-        {/* 70px fits "Party-able"/"6p Min Cut", the longest tags in bossClearFormula.ts's tier
-            tables (same measurement DifficultyChip's own comment used). Clear% gets flex:1
-            instead of a fixed width -- an overleveled character can clear a low-tier boss at
-            e.g. 449837.01%, which blows past any reasonable fixed budget, so it just grows into
-            whatever room the tile's full panel width leaves free. */}
-        <span style={{ fontSize: 12, fontWeight: 800, color: tagColor, width: 70, flexShrink: 0 }}>
+      <div
+        className="spotlight-tile"
+        style={{
+          display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", gridTemplateRows: "subgrid",
+          alignItems: "center", columnGap: 6, rowGap: 2, boxSizing: "border-box",
+          background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px",
+        }}
+      >
+        {/* margin-right on a grid item lives inside that item's own fixed-width track -- it
+            doesn't enlarge the track or push the next column over, so it had zero visible effect
+            here (tried it, the icon just clipped/overflowed its 32px box instead). The icon's
+            extra breathing room (see the 14px-vs-10px note this session) has to come from the
+            parent's own column-1 track width instead, via .spotlight-tile-cell-icon in styles.ts
+            widening column 1 past the icon's actual 32px size. */}
+        <div className="spotlight-tile-cell-icon" style={{ gridColumn: 1, gridRow: 1 }}>
+          <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
+        </div>
+        {/* paddingRight (not marginRight -- same reason as the icon's column-width trick above,
+            padding is included when max-content measures this cell's own intrinsic size, margin
+            isn't) gives diff<->tag extra breathing room without affecting the tag<->numbers gap,
+            which shares the same columnGap and should stay at its current tighter spacing. */}
+        <span className="spotlight-tile-cell-diff" style={{ fontSize: 12, fontWeight: 700, color: theme.text, whiteSpace: "nowrap", paddingRight: 8 }}>{entry.difficulty}</span>
+        <span className="spotlight-tile-cell-tag" style={{ fontSize: 12, fontWeight: 800, color: tagColor, whiteSpace: "nowrap" }}>
           {result.tagEnglish}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, flex: 1, minWidth: 0 }}>{result.clearRatePercent.toFixed(2)}%</span>
-        <span className="spotlight-tile-adjusted" style={{ fontSize: 12, color: theme.muted, textAlign: "right", flexShrink: 0 }}>
-          Adjusted {formatFigure(result.bossStat)}
+        {/* diff/tag are their own max-content columns (tight-packed against each other); this
+            group is 1fr and pins to the card's right edge via justifySelf: end on the group
+            itself, but clear%/Adjusted stay tight-packed against EACH OTHER inside it (small
+            fixed gap, not space-between) -- Yuki wanted the pair close together as a unit, not
+            spread across the remaining row width. On mobile (.spotlight-tile-cell-numbers's
+            container query, styles.ts) this switches to display: contents so its two spans
+            become direct grid items the mobile area map can place independently under the
+            diff/tag columns on their own row. */}
+        <span className="spotlight-tile-cell-numbers" style={{ gridColumn: 4, gridRow: 1, display: "flex", alignItems: "center", justifySelf: "end", gap: 10, minWidth: 0 }}>
+          <span className="spotlight-tile-cell-clear" style={{ fontSize: 12, fontWeight: 700, color: theme.text, whiteSpace: "nowrap" }}>{result.clearRatePercent.toFixed(2)}%</span>
+          <span className="spotlight-tile-cell-adjusted" style={{ fontSize: 12, color: theme.muted, whiteSpace: "nowrap", flexShrink: 0 }}>
+            Adjusted {formatFigure(result.bossStat)}
+          </span>
         </span>
       </div>
     </HoverTooltip>
@@ -722,7 +776,28 @@ function BossSpotlight({
   const artPosition = SPOTLIGHT_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
   const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, "all");
+
+  // Formula estimate holds on desktop (fixed single-line tiles); below 400px tiles can wrap onto
+  // a second line (.spotlight-tile-numbers) so the fixed-height assumption breaks and this gets
+  // replaced by a live measurement of the stack's actual rendered height once it's mounted. No
+  // reset-to-null on boss change: ResizeObserver's callback fires immediately on observe() with
+  // the newly-observed node's current size, so a boss switch naturally overwrites the stale
+  // value on its own -- an explicit reset would just be a same-effect setState with nothing to
+  // show for the one frame between the reset and the observer's own first callback.
+  const [measuredStackHeight, setMeasuredStackHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const node = stackRef.current;
+    if (!node) return;
+    // +32 restores the 1rem top+bottom padding stripped by measuring the inner content div
+    // directly (the outer .spotlight-tile-stack is always the full absolute-positioned panel
+    // height, so it can't be measured for its content size the same way).
+    const observer = new ResizeObserver(([e]) => setMeasuredStackHeight(e.contentRect.height + 32));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [boss]);
+  const stackHeight = measuredStackHeight ?? spotlightTileStackHeight(tiles.length);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -736,7 +811,7 @@ function BossSpotlight({
       </div>
       <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", height: SPOTLIGHT_HEIGHT, background: theme.panel }}>
         {iconId && (
-          <div ref={wrapperRef} style={spotlightMaskStyle(tiles.length)}>
+          <div ref={wrapperRef} style={spotlightMaskStyle(stackHeight)}>
             <Image
               src={bossSplashUrl(iconId)}
               alt=""
@@ -758,9 +833,30 @@ function BossSpotlight({
           <span style={{ fontSize: 40, fontWeight: 800, color: theme.accentText }}>{displayName.charAt(0)}</span>
         </div>
         <div className="spotlight-tile-stack" style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", gap: 8, padding: "1rem", justifyContent: "flex-end" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* The actual grid: 4 columns (icon, difficulty, tag, numbers) shared by every tile via
+              subgrid (see SpotlightTile) so a long clear% on any one tile grows the numbers
+              column for all of them, keeping columns aligned across tiles regardless of which one
+              has the longest value. diff/tag are max-content (tight-packed against each other,
+              don't stretch just because the panel is wide -- was the whole point of this pass: at
+              a very wide viewport, plain auto columns were resolving 60-90% wider than their
+              content actually needed). numbers is 1fr and pins to the card's right edge as a
+              whole group (justifySelf: end), with clear%/Adjusted tight-packed against each other
+              inside it (small fixed gap, not space-between) rather than spread across the row.
+              Desktop uses all 4 columns in one row per tile; below 400px
+              (.spotlight-tile-cell-numbers's container query, styles.ts) that group switches to
+              display: contents so clear%/Adjusted become direct grid items the mobile area map
+              can place independently onto a second row sharing the diff/tag columns. 8px row-gap
+              separates tiles from each other; each tile overrides this to 2px for its own
+              internal rows on mobile (subgrid permits per-spanned-track gap overrides). 6px
+              column-gap for the text-to-text gaps, but column 1 (icon) is 40px, not the icon's
+              actual 32px -- the extra 8px is the icon's own breathing room (confirmed via
+              DevTools: the sprite art has no internal padding baked into the asset, so a plain
+              6-10px gap still reads as touching). A margin on the icon's own grid item doesn't
+              work for this (tried it: margin lives inside that item's own track, doesn't push the
+              next column over), so the track itself has to be wider instead. */}
+          <div ref={stackRef} style={{ display: "grid", gridTemplateColumns: "40px max-content max-content 1fr", gridAutoRows: "auto", rowGap: 8, columnGap: 6 }}>
             {tiles.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>No relevant difficulties right now.</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)", gridColumn: "1 / -1" }}>No relevant difficulties right now.</p>
             ) : (
               tiles.map(({ entry, result }) => (
                 <SpotlightTile key={entry.difficulty} theme={theme} iconId={iconId} displayName={displayName} entry={entry} result={result} />

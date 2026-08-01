@@ -21,10 +21,11 @@ function isHoverCapable(): boolean {
  * CharacterSetupFlow.styles.ts) silently clips an absolutely-positioned bubble. InfoTooltip.tsx
  * hit the same class of bug earlier and uses the same fix.
  */
-export default function HoverTooltip({ label, theme, style, children }: {
+export default function HoverTooltip({ label, theme, style, className, children }: {
   label: ReactNode;
   theme: AppTheme;
   style?: CSSProperties;
+  className?: string;
   children: ReactNode;
 }) {
   const [hoverOpen, setHoverOpen] = useState(false);
@@ -118,7 +119,7 @@ export default function HoverTooltip({ label, theme, style, children }: {
     // react-doctor-disable-next-line no-static-element-interactions, click-events-have-key-events
     <div
       ref={ref}
-      className="hover-tip"
+      className={className ? `hover-tip ${className}` : "hover-tip"}
       style={style}
       // A click supersedes whatever passive hover/focus state was showing -- important when
       // the wrapped element's own click handler opens a native <dialog>, which makes the

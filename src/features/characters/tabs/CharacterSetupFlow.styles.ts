@@ -1033,16 +1033,53 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           }
         }
 
-        /* Spotlight's tile row (BossClearGrid.tsx) has no room left for "Adjusted ..." next to
-           the clear% on narrow panels, so it visually collides -- already shown in the tile's own
-           hover/tap tooltip, so dropping it here loses nothing. */
+        /* Spotlight's tile row (BossClearGrid.tsx, SpotlightTile) is one row across all 5
+           subgrid columns (icon/difficulty/tag/clear%/Adjusted) by default. Below 400px, some
+           end-game characters clear a low-tier boss at an 8-digit clear% (e.g. 474248.20%), which
+           has no room left on the same line as icon+difficulty+tag on a narrow panel -- so
+           clear%/Adjusted move onto a second row sharing the difficulty/tag columns instead.
+           Placement lives here (not inline) specifically so this query can override it. */
         .spotlight-tile-stack {
           container-type: inline-size;
         }
+        /* 1 row on desktop so content vertically centers in a single-row-tall box (align-items:
+           center on .spotlight-tile handles the centering itself); 2 rows on mobile since the
+           wrapped layout below needs the full 2-row height. Applies to both the HoverTooltip
+           wrapper and its inner div -- both carry this class (see SpotlightTile). */
+        .spotlight-tile {
+          grid-row: span 1;
+        }
+        .spotlight-tile-cell-diff { grid-column: 2; grid-row: 1; }
+        .spotlight-tile-cell-tag { grid-column: 3; grid-row: 1; }
         @container (max-width: 400px) {
-          .spotlight-tile-adjusted {
-            display: none;
+          .spotlight-tile {
+            grid-row: span 2 !important;
+          }
+          /* Icon spans both rows so it vertically centers against the tile's full 2-row height
+             instead of sitting in row 1 only, next to just the difficulty/tag line. */
+          .spotlight-tile-cell-icon {
+            grid-row: 1 / span 2 !important;
+          }
+          /* .spotlight-tile-cell-numbers is the desktop flex wrapper around clear%/Adjusted
+             (display: flex inline, see SpotlightTile) -- switching it to display: contents makes
+             its two children direct grid items in their own right, so the grid-column/-row below
+             can place them independently under the diff/tag columns on their own row instead of
+             staying grouped in column 4. !important required: the element's own inline
+             display: flex otherwise wins outright (inline beats a plain stylesheet rule
+             regardless of the @container match -- same class of bug hit earlier this session with
+             .spotlight-tile-numbers's flex-basis). */
+          .spotlight-tile-cell-numbers {
+            display: contents !important;
+          }
+          .spotlight-tile-cell-clear {
+            grid-column: 2 !important;
+            grid-row: 2 !important;
+          }
+          .spotlight-tile-cell-adjusted {
+            grid-column: 3 !important;
+            grid-row: 2 !important;
           }
         }
+
   `;
 }
