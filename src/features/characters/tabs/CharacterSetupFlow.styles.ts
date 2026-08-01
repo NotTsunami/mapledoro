@@ -1021,5 +1021,28 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             justify-content: center;
           }
         }
+
+        /* PowerStrip's 4-across grid (BossClearGrid.tsx) overflows "Converted"'s long value on
+           narrow panels -- same container-query approach as .boss-quick-row-list above. */
+        .power-strip {
+          container-type: inline-size;
+        }
+        @container (max-width: 400px) {
+          .power-strip-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+
+        /* Spotlight's tile row (BossClearGrid.tsx) has no room left for "Adjusted ..." next to
+           the clear% on narrow panels, so it visually collides -- already shown in the tile's own
+           hover/tap tooltip, so dropping it here loses nothing. */
+        .spotlight-tile-stack {
+          container-type: inline-size;
+        }
+        @container (max-width: 400px) {
+          .spotlight-tile-adjusted {
+            display: none;
+          }
+        }
   `;
 }

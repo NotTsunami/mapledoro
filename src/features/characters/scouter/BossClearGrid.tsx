@@ -4,16 +4,17 @@ import Image from "next/image";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
-import { STATUS, statusText } from "../../../components/statusColors";
+import { statusText } from "../../../components/statusColors";
 import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
 import { searchAndRank } from "../../../lib/searchMatch";
 import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
 import HoverTooltip from "../../../components/HoverTooltip";
 import { PillGroup } from "../../tools/shared-ui";
 import { usePickerCoords } from "../setup/hooks/usePickerCoords";
-import { DropdownChevron } from "../DropdownChevron";
+import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
+import { secondaryButtonStyle } from "../tabs/components/uiStyles";
 import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
@@ -93,16 +94,6 @@ function pillStatus(colorTier: ClearColorTier): PillStatus {
   return null;
 }
 
-function pillStyle(theme: AppTheme, status: PillStatus): CSSProperties {
-  const base: CSSProperties = {
-    display: "inline-flex", alignItems: "center", padding: "3px 8px", borderRadius: 999,
-    fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap", cursor: "default",
-  };
-  if (!status) return { ...base, background: theme.timerBg, color: theme.muted };
-  const { fill, on } = STATUS[status];
-  return { ...base, background: fill, color: on };
-}
-
 // Dual-render with refs (display:none on the fallback, swap via onError) rather than useState,
 // per root CLAUDE.md's React-Doctor Rules -- same pattern for every boss sprite here (row
 // difficulty chips, spotlight tile icons). Covers both a real load failure AND a boss with no
@@ -159,6 +150,13 @@ const BOSS_ART_POSITION: Record<string, string> = {
   칼로스: "55% 60%", 대적자: "75% 29%", 흉성: "50% 26%", 카링: "50% 26%", 림보: "50% 58%",
   발드릭스: "50% 40%", 유피테르: "48% 25%", 가엔슬: "50% 51%", 카이: "50% 28%",
 };
+
+// Spotlight's own crop anchors -- deliberately separate from BOSS_ART_POSITION above, which was
+// hand-tuned for Quick View's tiny wide 180x64 banner crop, not Spotlight's much taller/wider
+// SPOTLIGHT_HEIGHT-tall card. Left empty (falls back to DEFAULT_ART_POSITION for every boss)
+// until it gets its own eyeball pass against Spotlight's real aspect ratio -- BOSS_ART_POSITION's
+// values don't transfer, so a wrong per-boss override is worse than a plain, honest default.
+const SPOTLIGHT_ART_POSITION: Record<string, string> = {};
 
 function bannerMaskStyle(): CSSProperties {
   return {
@@ -390,15 +388,11 @@ function PowerStripItem({ theme, label, value, sub }: { theme: AppTheme; label: 
 // every row below it, so they read as this view's header now instead of an unrelated sibling.
 function PowerStrip({ theme, entry }: { theme: AppTheme; entry: ScouterResultEntry }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
-      {/* Boss 300/380/Converted default to the HEXA-adjusted figure (Normal tucked into each
-          tile's hover tooltip); Dojo has no HEXA/Normal split, so this note only spans the
-          first 3 rather than living inside each label. Grid, not flex-wrap: Converted's much
-          wider value (11 digits vs. Dojo's 9) skewed a flex row's column widths even after the
-          labels themselves were shortened -- equal-width grid columns hold regardless of how
-          long any one tile's value gets. */}
+    <div className="power-strip" style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
+      {/* Grid, not flex-wrap: Converted's long value skews flex column widths. 4 columns on
+          desktop, 2 on narrow panels (.power-strip-grid's container query in styles.ts). */}
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 / Converted shown as HEXA</span>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 16 }}>
+      <div className="power-strip-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} />
         <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} />
         <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} />
@@ -557,17 +551,10 @@ function BossQuickView({
         </div>
         <BossPicker theme={theme} grouped={grouped} onSelectBoss={onSelectBoss} />
       </div>
-      {/* 526px measured against a real character (Fuyurin64), not guessed: PowerStrip (57px) +
-          filter/picker row (36px) + this box + timestamp (16px) + 3 flex gaps (10px each) must
-          fit inside .profile-binder's pinned min-height (697px content + 32px page padding =
-          729px, see CharacterSetupFlow.styles.ts's own comment on that constant) alongside the
-          bookmark's own H3 heading (20px) and its gap -- without this cap the real content
-          measured 763px, 34px past every other bookmark's shared row height. Re-measure if
-          PowerStrip/filter-row/timestamp height ever changes. Bottom-edge fade mirrors
-          .profile-binder-spine's horizontal one (CharacterSetupFlow.styles.ts) -- same static,
-          not scroll-position-aware, tradeoff: keeps hinting "more below" even once fully
-          scrolled, matching the one existing precedent for this pattern in the codebase. */}
-      <div className="boss-quick-row-list tool-dialog-scroll" style={{ display: "flex", flexDirection: "column", maxHeight: 526, overflowY: "auto", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px", maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)" }}>
+      {/* 506px keeps total content within .profile-binder's shared 729px row height (see
+          CharacterSetupFlow.styles.ts). Re-measure if PowerStrip/filter-row/timestamp height
+          changes. */}
+      <div className="boss-quick-row-list tool-dialog-scroll" style={{ display: "flex", flexDirection: "column", maxHeight: 506, overflowY: "auto", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px", maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)" }}>
         {grouped.map(([boss, entries], i) => (
           <BossQuickViewRow
             key={boss}
@@ -592,13 +579,35 @@ function BossQuickView({
   );
 }
 
-const SPOTLIGHT_HEIGHT = 260;
+// Fixed (not min/flex) so every boss's banner crops identically regardless of tile count --
+// 623px was measured the same way as BossQuickView's 526px cap (see that comment): .profile-
+// binder's pinned 697px content area, minus .profile-binder-page's 32px vertical padding (665px
+// usable), minus Spotlight's own header row (back button + nav arrows, 32px) and its 10px gap.
+const SPOTLIGHT_HEIGHT = 623;
 
-function spotlightMaskStyle(): CSSProperties {
+// SpotlightTile is a fixed single-line row: 32px icon + 6px+6px padding = 44px per tile, 6px gap
+// between stacked tiles.
+const SPOTLIGHT_TILE_HEIGHT = 44;
+const SPOTLIGHT_TILE_GAP = 6;
+// Total height the tile stack occupies (including its 1rem top+bottom padding) for a given count.
+function spotlightTileStackHeight(tileCount: number): number {
+  if (tileCount === 0) return 16 * 2;
+  return 16 * 2 + tileCount * SPOTLIGHT_TILE_HEIGHT + (tileCount - 1) * SPOTLIGHT_TILE_GAP;
+}
+
+// Fade end deliberately bleeds 20px past the tile stack's top edge (tiles have their own opaque
+// background, so legibility holds); start sits 130px above end. Both scale up with tile count so
+// taller stacks (Destiny/Champion-tier bosses) don't overlap still-opaque art.
+function spotlightMaskStyle(tileCount: number): CSSProperties {
+  const stackTopPx = SPOTLIGHT_HEIGHT - spotlightTileStackHeight(tileCount);
+  const endPx = Math.max(0, stackTopPx + 20);
+  const startPx = Math.max(0, endPx - 130);
+  const start = (startPx / SPOTLIGHT_HEIGHT) * 100;
+  const end = (endPx / SPOTLIGHT_HEIGHT) * 100;
   return {
     position: "absolute", inset: 0,
-    maskImage: "radial-gradient(ellipse 90% 75% at 50% 30%, black 45%, transparent 95%)",
-    WebkitMaskImage: "radial-gradient(ellipse 90% 75% at 50% 30%, black 45%, transparent 95%)",
+    maskImage: `linear-gradient(to bottom, black ${start}%, transparent ${end}%)`,
+    WebkitMaskImage: `linear-gradient(to bottom, black ${start}%, transparent ${end}%)`,
   };
 }
 
@@ -616,10 +625,9 @@ function NavArrowButton({ theme, direction, disabled, onClick }: {
         display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32,
         borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg,
         color: theme.text, opacity: disabled ? 0.4 : 1, cursor: disabled ? "default" : "pointer",
-        fontSize: 16, fontWeight: 800,
       }}
     >
-      {direction === "prev" ? "‹" : "›"}
+      <NavChevron direction={direction} />
     </button>
   );
 }
@@ -662,72 +670,68 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
   return { combinedLossPercent, lines };
 }
 
+// Mirrors DifficultyChip's tag-text + hover-tooltip pattern (Quick View's current design,
+// replacing the old saturated pill this used to share) so both views read as the same system.
 function SpotlightTile({ theme, iconId, displayName, entry, result }: {
   theme: AppTheme; iconId: string | undefined; displayName: string; entry: BossCutEntry; result: BossClearResult;
 }) {
-  const { combinedLossPercent, lines } = lossBreakdown(result);
-  const losses = lines.filter((line): line is typeof line & { lossPercent: number } => line.lossPercent !== null);
+  const tagColor = chipTagColor(theme, pillStatus(result.colorTier));
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
-      <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
-      <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, minWidth: 52 }}>{entry.difficulty}</span>
-      <span style={pillStyle(theme, pillStatus(result.colorTier))}>
-        {result.tagEnglish}
-      </span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{result.clearRatePercent.toFixed(2)}%</span>
-      <span style={{ marginLeft: "auto", fontSize: 12, color: theme.muted, textAlign: "right" }}>
-        Adjusted {formatFigure(result.bossStat)}
-        {combinedLossPercent > 0 && (
-          <span style={{ display: "block", fontWeight: 700, color: statusText(theme, "warning") }}>
-            {combinedLossPercent}% FD Loss
-          </span>
-        )}
-        {losses.map((line) => (
-          <span key={line.label} style={{ display: "block", color: statusText(theme, "warning") }}>
-            {line.label} {line.bossValue} vs {line.yourValue} (-{line.lossPercent}%)
-          </span>
-        ))}
-      </span>
-    </div>
+    <HoverTooltip
+      theme={theme}
+      label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", background: `${theme.bg}dd`, borderRadius: 10, padding: "6px 10px" }}>
+        <FallbackSpriteIcon theme={theme} src={iconId ? bossDifficultyIconUrl(iconId, entry.difficulty) : undefined} size={32} displayName={displayName} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, width: 60, flexShrink: 0 }}>{entry.difficulty}</span>
+        {/* 70px fits "Party-able"/"6p Min Cut", the longest tags in bossClearFormula.ts's tier
+            tables (same measurement DifficultyChip's own comment used). Clear% gets flex:1
+            instead of a fixed width -- an overleveled character can clear a low-tier boss at
+            e.g. 449837.01%, which blows past any reasonable fixed budget, so it just grows into
+            whatever room the tile's full panel width leaves free. */}
+        <span style={{ fontSize: 12, fontWeight: 800, color: tagColor, width: 70, flexShrink: 0 }}>
+          {result.tagEnglish}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: theme.text, flex: 1, minWidth: 0 }}>{result.clearRatePercent.toFixed(2)}%</span>
+        <span className="spotlight-tile-adjusted" style={{ fontSize: 12, color: theme.muted, textAlign: "right", flexShrink: 0 }}>
+          Adjusted {formatFigure(result.bossStat)}
+        </span>
+      </div>
+    </HoverTooltip>
   );
 }
 
 // Full-bleed backdrop version of BossBanner's fade trick -- a radial mask (same shape as the
 // Bio bookmark's ClassPortrait fade) instead of a linear one, since this backdrop has content
 // overlaid on all sides rather than just needing to fade into whatever sits to its right.
+// Matches the "← Characters" nav button's look (secondaryButtonStyle, ← arrow glyph).
 function BackToQuickViewButton({ theme, onClick }: { theme: AppTheme; onClick: () => void }) {
   return (
     <button
       type="button"
       className="tap-target-44"
-      aria-label="Back to Quick View"
       onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 4, height: 32, padding: "0 10px",
-        borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bg,
-        color: theme.text, cursor: "pointer", fontSize: 12, fontWeight: 700,
-      }}
+      style={{ ...secondaryButtonStyle(theme, "0.38rem 0.62rem"), fontSize: "0.76rem" }}
     >
-      <span aria-hidden="true">‹</span>
-      <span>Quick View</span>
+      ← Quick View
     </button>
   );
 }
 
 function BossSpotlight({
-  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, filter, onBack,
+  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, onBack,
 }: {
   theme: AppTheme; grouped: BossEntryList[]; selectedIndex: number; onNavigate: (i: number) => void;
   level: number; arcaneForce: number; authenticForce: number;
-  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; filter: BossFilter; onBack: () => void;
+  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onBack: () => void;
 }) {
   const [boss, entries] = grouped[selectedIndex];
   const iconId = BOSS_ICON_ID[boss];
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
-  const artPosition = BOSS_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
+  const artPosition = SPOTLIGHT_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
-  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
+  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, "all");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -739,9 +743,9 @@ function BossSpotlight({
           <NavArrowButton theme={theme} direction="next" disabled={selectedIndex === grouped.length - 1} onClick={() => onNavigate(selectedIndex + 1)} />
         </div>
       </div>
-      <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", minHeight: SPOTLIGHT_HEIGHT, background: theme.panel }}>
+      <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", height: SPOTLIGHT_HEIGHT, background: theme.panel }}>
         {iconId && (
-          <div ref={wrapperRef} style={spotlightMaskStyle()}>
+          <div ref={wrapperRef} style={spotlightMaskStyle(tiles.length)}>
             <Image
               src={bossSplashUrl(iconId)}
               alt=""
@@ -762,8 +766,7 @@ function BossSpotlight({
         >
           <span style={{ fontSize: 40, fontWeight: 800, color: theme.accentText }}>{displayName.charAt(0)}</span>
         </div>
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8, padding: "1rem", minHeight: SPOTLIGHT_HEIGHT, justifyContent: "flex-end" }}>
-          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{displayName}</h3>
+        <div className="spotlight-tile-stack" style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", gap: 8, padding: "1rem", justifyContent: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {tiles.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>No relevant difficulties right now.</p>
@@ -804,16 +807,27 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  swappable sub-views (Quick View table / Spotlight card) internally, same stacked-grid-cell
  *  shape as every other multi-sub-view bookmark (see CharacterSetupFlow.styles.ts's
  *  .bookmark-subview comment) -- ScouterBookmark just passes view/onViewChange through. */
-export default function BossClearGrid({ theme, character, entry, view, onViewChange }: {
+export default function BossClearGrid({ theme, character, entry, view, onViewChange, onSpotlightBossChange }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
   entry: ScouterResultEntry;
   view: ScouterBookmarkView;
   onViewChange: (v: ScouterBookmarkView) => void;
+  onSpotlightBossChange?: (displayName: string) => void;
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputs = entry.bossClearInputs;
+  // Computed unconditionally (not after the !inputs early return below) since useEffect must run
+  // in the same order every render -- BOSSCUT_DATA/groupByBoss don't depend on bossClearInputs.
+  const grouped = groupByBoss(BOSSCUT_DATA);
+  const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
+  const selectedBossDisplayName = BOSS_DISPLAY_NAME[grouped[clampedIndex][0]] ?? grouped[clampedIndex][0];
+
+  // Reports the boss name up so the page header can show it if the banner art fails to load.
+  useEffect(() => {
+    if (view === "spotlight") onSpotlightBossChange?.(selectedBossDisplayName);
+  }, [view, selectedBossDisplayName, onSpotlightBossChange]);
 
   if (!inputs) {
     return (
@@ -825,8 +839,6 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
 
   const arcaneForce = Number(character.stats.arcanePower) || 0;
   const authenticForce = Number(character.stats.sacredPower) || 0;
-  const grouped = groupByBoss(BOSSCUT_DATA);
-  const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
 
   const handleSelectBoss = (boss: string) => {
     const idx = grouped.findIndex(([b]) => b === boss);
@@ -835,8 +847,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
   };
 
   return (
-    <div style={{ display: "grid" }}>
-      <div className={`bookmark-subview${view === "quickView" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "quickView" ? "visible" : "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      {view === "quickView" && (
         <BossQuickView
           theme={theme}
           entry={entry}
@@ -849,8 +861,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           inputs={inputs}
           onSelectBoss={handleSelectBoss}
         />
-      </div>
-      <div className={`bookmark-subview${view === "spotlight" ? " bookmark-subview-active" : ""}`} style={{ gridArea: "1 / 1", visibility: view === "spotlight" ? "visible" : "hidden" }}>
+      )}
+      {view === "spotlight" && (
         <BossSpotlight
           theme={theme}
           grouped={grouped}
@@ -860,10 +872,9 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}
           inputs={inputs}
-          filter={filter}
           onBack={() => onViewChange("quickView")}
         />
-      </div>
+      )}
     </div>
   );
 }

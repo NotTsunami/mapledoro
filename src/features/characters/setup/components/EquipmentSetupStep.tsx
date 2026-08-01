@@ -13,6 +13,7 @@ import HoverTooltip from "../../../../components/HoverTooltip";
 import type { SetupStepDefinition } from "../steps";
 import CharacterAvatar from "../../tabs/components/CharacterAvatar";
 import SetupStepFrame from "./SetupStepFrame";
+import { NavChevron } from "../../DropdownChevron";
 import {
   ARCANE_AREAS, SACRED_AREAS, GRAND_SACRED_AREAS,
   ARCANE_MAX_LEVEL, SACRED_MAX_LEVEL, type SymbolArea,
@@ -1364,7 +1365,7 @@ function EquipmentGridSubstep({
       <div className={`eq-page-${mobileGridPage}`}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
 
-        <button type="button" className="eq-page-nav-btn" aria-label="Previous section" onClick={() => setMobileGridPage((p) => (p + 2) % 3)} style={navBtnStyle(theme)}>‹</button>
+        <button type="button" className="eq-page-nav-btn" aria-label="Previous section" onClick={() => setMobileGridPage((p) => (p + 2) % 3)} style={navBtnStyle(theme)}><NavChevron direction="prev" /></button>
 
         <div style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
 
@@ -1418,7 +1419,7 @@ function EquipmentGridSubstep({
 
         </div>
 
-        <button type="button" className="eq-page-nav-btn" aria-label="Next section" onClick={() => setMobileGridPage((p) => (p + 1) % 3)} style={navBtnStyle(theme)}>›</button>
+        <button type="button" className="eq-page-nav-btn" aria-label="Next section" onClick={() => setMobileGridPage((p) => (p + 1) % 3)} style={navBtnStyle(theme)}><NavChevron direction="next" /></button>
 
       </div>
       </div>

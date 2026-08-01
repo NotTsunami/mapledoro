@@ -256,7 +256,7 @@ function buildDoping(character: StoredCharacterRecord): ScouterDoping {
     dragonsMeal: false,
     extreme: Boolean(buffs?.extremePotion),
     fish: false,
-    guildBlessing: true,
+    guildBlessing: false,
     jangBi: Boolean(buffs?.advWeaponTempering),
     legendHero: Boolean(buffs?.legendaryHero),
     legendHp: false,

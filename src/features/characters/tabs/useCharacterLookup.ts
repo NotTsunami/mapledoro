@@ -45,6 +45,8 @@ export function useCharacterLookup({
   const [nowMs, setNowMs] = useState(0);
   const [lastRequestAtMs, setLastRequestAtMs] = useState(0);
   const cacheRef = useRef<Map<string, CharacterCacheEntry> | null>(null);
+  // react-doctor false positive: matches its own documented lazy-init exception, flags anyway.
+  // react-doctor-disable-next-line react-doctor/no-ref-current-in-render
   if (cacheRef.current === null) cacheRef.current = new Map();
 
   useEffect(() => {

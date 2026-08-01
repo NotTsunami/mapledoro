@@ -215,10 +215,10 @@ export const slotCellStyle = (theme: AppTheme, isActive: boolean): CSSProperties
 });
 
 export const navBtnStyle = (theme: AppTheme): CSSProperties => ({
+  display: "flex", alignItems: "center", justifyContent: "center",
   border: `1px solid ${theme.border}`,
   borderRadius: 8,
   background: theme.bg,
   color: theme.text,
-  fontFamily: "inherit", fontWeight: 800, fontSize: "1.5rem",
   width: 44, height: 48, cursor: "pointer",
 });

@@ -12,6 +12,7 @@ import type { SetupStepId } from "../../setup/steps";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
 import { primaryButtonStyle, secondaryButtonStyle, successButtonStyle } from "../components/uiStyles";
 import { findClassById, COMMON_SKILLS, type HexaSkillDef, type HexaSkillLevels, type HexaMasteryNode } from "../../../tools/hexa-skills/hexa-classes";
+import { NavChevron } from "../../DropdownChevron";
 import { SkillIcon as HexaSkillTileIcon } from "../../../tools/hexa-skills/hexa-ui";
 import { readCharacterToolData } from "../../../tools/characterToolStorage";
 import { resolveClassId, getClassSetupOverrides, resolveDisplayJobName } from "../../setup/data/nexonJobMapping";
@@ -2156,7 +2157,7 @@ function EquipmentBookmark({
             </p>
             <div className={`eq-page-${mobileGridPage}`}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
-                <button type="button" className="eq-page-nav-btn" aria-label="Previous section" onClick={() => setMobileGridPage((p) => (p + 2) % 3)} style={navBtnStyle(theme)}>‹</button>
+                <button type="button" className="eq-page-nav-btn" aria-label="Previous section" onClick={() => setMobileGridPage((p) => (p + 2) % 3)} style={navBtnStyle(theme)}><NavChevron direction="prev" /></button>
                 <div style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
                   <div className="eq-section eq-section-0" style={{ gap: 4, flexShrink: 0 }}>
                     <ReadOnlySlotColumn slots={COL1_SLOTS} grid={activeGrid} theme={theme} />
@@ -2174,7 +2175,7 @@ function EquipmentBookmark({
                     <ReadOnlySlotColumn slots={COL7_SLOTS} grid={activeGrid} theme={theme} />
                   </div>
                 </div>
-                <button type="button" className="eq-page-nav-btn" aria-label="Next section" onClick={() => setMobileGridPage((p) => (p + 1) % 3)} style={navBtnStyle(theme)}>›</button>
+                <button type="button" className="eq-page-nav-btn" aria-label="Next section" onClick={() => setMobileGridPage((p) => (p + 1) % 3)} style={navBtnStyle(theme)}><NavChevron direction="next" /></button>
               </div>
             </div>
           </div>
@@ -3171,8 +3172,8 @@ function ScouterBookmarkNotice({ theme, children }: { theme: Theme; children: Re
   return <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>{children}</p>;
 }
 
-function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string): string {
-  return view === "spotlight" ? "Spotlight" : defaultLabel;
+function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string, spotlightBoss: string | null): string {
+  return view === "spotlight" ? (spotlightBoss ?? "Spotlight") : defaultLabel;
 }
 
 // Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
@@ -3187,8 +3188,9 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
 // with clicking a boss's banner or the Quick View dropdown (3 ways to do the same thing), and
 // once that got removed the back-only button didn't earn its own dedicated row anymore either,
 // so it moved into BossSpotlight's own header instead.
-function ScouterBookmark({ theme, character, view, onViewChange }: {
+function ScouterBookmark({ theme, character, view, onViewChange, onSpotlightBossChange }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
+  onSpotlightBossChange: (displayName: string) => void;
 }) {
   const { status } = useScouterResult(character);
 
@@ -3216,7 +3218,7 @@ function ScouterBookmark({ theme, character, view, onViewChange }: {
           Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
         </p>
       )}
-      <BossClearGrid theme={theme} character={character} entry={status.entry} view={view} onViewChange={onViewChange} />
+      <BossClearGrid theme={theme} character={character} entry={status.entry} view={view} onViewChange={onViewChange} onSpotlightBossChange={onSpotlightBossChange} />
     </div>
   );
 }
@@ -3334,6 +3336,7 @@ function BookmarkPageBody({
     const remembered = setup.lastActiveBookmarkSubView;
     return active.id === "scouter" && remembered === "spotlight" ? remembered : "quickView";
   });
+  const [scouterSpotlightBoss, setScouterSpotlightBoss] = useState<string | null>(null);
 
   if (active.id === "overview") return <OverviewBookmark model={model} onNavigateToBookmark={onNavigateToBookmark} onNavigateToGearSlot={onNavigateToGearSlot} onSetOverviewLayout={actions.setOverviewLayout} />;
 
@@ -3464,11 +3467,11 @@ function BookmarkPageBody({
   // constraint ScouterFigure already has on Overview), so the null-check happens at this call
   // site rather than inside ScouterBookmark itself.
   if (active.id === "scouter") {
-    const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel);
+    const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel, scouterSpotlightBoss);
     return (
       <>
         <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />
-        {character && <ScouterBookmark theme={theme} character={character} view={scouterView} onViewChange={setScouterView} />}
+        {character && <ScouterBookmark theme={theme} character={character} view={scouterView} onViewChange={setScouterView} onSpotlightBossChange={setScouterSpotlightBoss} />}
       </>
     );
   }
