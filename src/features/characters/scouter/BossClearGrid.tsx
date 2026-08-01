@@ -525,6 +525,12 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
   );
 }
 
+// Drops the row list's height cap/scroll/fade so every boss renders and the page grows instead
+// -- lets someone screenshot the whole list in one shot to share (e.g. "can I see your scouter"),
+// which the normal capped+scrollable list can't do without stitching two screenshots together.
+// State lives here, not lifted to BossClearGrid, specifically so switching to Spotlight (which
+// unmounts BossQuickView entirely, see the view === "quickView" conditional render) resets it for
+// free -- nobody's profile should stay stuck in the expanded layout after they navigate away.
 function BossQuickView({
   theme, entry, grouped, filter, onFilterChange, level, arcaneForce, authenticForce, inputs, onSelectBoss,
 }: {
@@ -532,6 +538,7 @@ function BossQuickView({
   onFilterChange: (v: BossFilter) => void; level: number; arcaneForce: number; authenticForce: number;
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onSelectBoss: (boss: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <PowerStrip theme={theme} entry={entry} />
@@ -540,12 +547,36 @@ function BossQuickView({
           <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
           <InfoTooltip theme={theme} label="How to read this" content={QUICK_VIEW_INFO_CONTENT} />
         </div>
-        <BossPicker theme={theme} grouped={grouped} onSelectBoss={onSelectBoss} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* minWidth sized to "Collapse list" (the longer of the two labels) so the button
+              doesn't visibly resize when the label swaps on toggle. */}
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            style={{ ...secondaryButtonStyle(theme, "0.38rem 0.62rem"), fontSize: "0.76rem", minWidth: 96, textAlign: "center" }}
+          >
+            {expanded ? "Collapse list" : "Expand list"}
+          </button>
+          <BossPicker theme={theme} grouped={grouped} onSelectBoss={onSelectBoss} />
+        </div>
       </div>
       {/* 506px keeps total content within .profile-binder's shared 729px row height (see
           CharacterSetupFlow.styles.ts). Re-measure if PowerStrip/filter-row/timestamp height
-          changes. */}
-      <div className="boss-quick-row-list tool-dialog-scroll" style={{ display: "flex", flexDirection: "column", maxHeight: 506, overflowY: "auto", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px", maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)" }}>
+          changes. Dropped entirely (maxHeight/overflow/fade) when expanded -- see this
+          component's own top comment. */}
+      <div
+        className="boss-quick-row-list tool-dialog-scroll"
+        style={{
+          display: "flex", flexDirection: "column", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px",
+          ...(expanded
+            ? {}
+            : {
+              maxHeight: 506, overflowY: "auto",
+              maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+            }),
+        }}
+      >
         {grouped.map(([boss, entries], i) => (
           <BossQuickViewRow
             key={boss}
