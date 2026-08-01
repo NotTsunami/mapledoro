@@ -514,7 +514,7 @@ function ItemPicker({
             <p style={equippedHeaderLabelStyle(theme)}>Currently Equipped</p>
             <p style={equippedHeaderNameStyle(theme)}>{current.name}</p>
           </div>
-          <span style={{ flexShrink: 0, color: theme.muted, fontSize: "0.85rem" }}>›</span>
+          <span style={{ flexShrink: 0, color: theme.muted, display: "flex" }}><NavChevron direction="next" size={14} /></span>
         </button>
       ) : current && (
         <div style={equippedHeaderStyle(theme, false)}>

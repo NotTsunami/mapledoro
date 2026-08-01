@@ -43,6 +43,8 @@ import HoverTooltip from "../../../../components/HoverTooltip";
 import ScouterFigure from "../../scouter/ScouterFigure";
 import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
 import BossClearGrid, { type ScouterBookmarkView } from "../../scouter/BossClearGrid";
+import { groupByBoss, resolveBossDisplayName } from "../../scouter/bossGrouping";
+import { BOSSCUT_DATA } from "../../scouter/bosscut-data.generated";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
@@ -3172,8 +3174,8 @@ function ScouterBookmarkNotice({ theme, children }: { theme: Theme; children: Re
   return <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>{children}</p>;
 }
 
-function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string, spotlightBoss: string | null): string {
-  return view === "spotlight" ? (spotlightBoss ?? "Spotlight") : defaultLabel;
+function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: string, spotlightBoss: string): string {
+  return view === "spotlight" ? spotlightBoss : defaultLabel;
 }
 
 // Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
@@ -3188,9 +3190,9 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
 // with clicking a boss's banner or the Quick View dropdown (3 ways to do the same thing), and
 // once that got removed the back-only button didn't earn its own dedicated row anymore either,
 // so it moved into BossSpotlight's own header instead.
-function ScouterBookmark({ theme, character, view, onViewChange, onSpotlightBossChange }: {
+function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
-  onSpotlightBossChange: (displayName: string) => void;
+  selectedBossIndex: number; onSelectedBossIndexChange: (i: number) => void;
 }) {
   const { status } = useScouterResult(character);
 
@@ -3218,7 +3220,15 @@ function ScouterBookmark({ theme, character, view, onViewChange, onSpotlightBoss
           Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
         </p>
       )}
-      <BossClearGrid theme={theme} character={character} entry={status.entry} view={view} onViewChange={onViewChange} onSpotlightBossChange={onSpotlightBossChange} />
+      <BossClearGrid
+        theme={theme}
+        character={character}
+        entry={status.entry}
+        view={view}
+        onViewChange={onViewChange}
+        selectedIndex={selectedBossIndex}
+        onSelectedIndexChange={onSelectedBossIndexChange}
+      />
     </div>
   );
 }
@@ -3336,7 +3346,7 @@ function BookmarkPageBody({
     const remembered = setup.lastActiveBookmarkSubView;
     return active.id === "scouter" && remembered === "spotlight" ? remembered : "quickView";
   });
-  const [scouterSpotlightBoss, setScouterSpotlightBoss] = useState<string | null>(null);
+  const [scouterSelectedBossIndex, setScouterSelectedBossIndex] = useState(0);
 
   if (active.id === "overview") return <OverviewBookmark model={model} onNavigateToBookmark={onNavigateToBookmark} onNavigateToGearSlot={onNavigateToGearSlot} onSetOverviewLayout={actions.setOverviewLayout} />;
 
@@ -3467,11 +3477,21 @@ function BookmarkPageBody({
   // constraint ScouterFigure already has on Overview), so the null-check happens at this call
   // site rather than inside ScouterBookmark itself.
   if (active.id === "scouter") {
+    const scouterSpotlightBoss = resolveBossDisplayName(groupByBoss(BOSSCUT_DATA), scouterSelectedBossIndex);
     const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel, scouterSpotlightBoss);
     return (
       <>
         <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />
-        {character && <ScouterBookmark theme={theme} character={character} view={scouterView} onViewChange={setScouterView} onSpotlightBossChange={setScouterSpotlightBoss} />}
+        {character && (
+          <ScouterBookmark
+            theme={theme}
+            character={character}
+            view={scouterView}
+            onViewChange={setScouterView}
+            selectedBossIndex={scouterSelectedBossIndex}
+            onSelectedBossIndexChange={setScouterSelectedBossIndex}
+          />
+        )}
       </>
     );
   }
@@ -3494,6 +3514,8 @@ function BookmarkSpine({
   onSelect: (id: BookmarkId) => void;
   charName: string | undefined;
 }) {
+  // react-doctor false positive: empty new Map() is a trivial allocation, not worth lazy-init ceremony.
+  // react-doctor-disable-next-line react-doctor/rerender-lazy-ref-init
   const tabRefs = useRef<Map<BookmarkId, HTMLButtonElement>>(new Map());
   // exportCharacterJson triggers a silent browser download with no confirmation of its own --
   // some mobile browsers don't even show a download-bar UI, so tapping Export otherwise gives

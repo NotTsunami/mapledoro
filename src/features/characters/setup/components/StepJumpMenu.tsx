@@ -420,6 +420,8 @@ export default function StepJumpMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const flyoutRef = useRef<HTMLDivElement>(null);
   const tapSubstepsRef = useRef<HTMLDivElement>(null);
+  // react-doctor false positive: empty new Map() is a trivial allocation, not worth lazy-init ceremony.
+  // react-doctor-disable-next-line react-doctor/rerender-lazy-ref-init
   const rowButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   // Set by the trigger's ArrowDown/ArrowUp handler when the menu is still closed —
   // the menu (and its rows) don't exist in the DOM yet to focus this same tick, so the

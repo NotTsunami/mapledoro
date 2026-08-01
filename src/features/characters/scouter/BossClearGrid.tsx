@@ -16,6 +16,7 @@ import InfoTooltip, { type TooltipContent } from "../setup/components/InfoToolti
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
 import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
+import { BOSS_DISPLAY_NAME, groupByBoss, type BossEntryList } from "./bossGrouping";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
 import type { ScouterResultEntry } from "./scouterCache";
@@ -27,14 +28,6 @@ const BOSS_ICON_ID: Record<string, string> = {
   스우: "13", 데미안: "15", 루시드: "19", 윌: "23", 더스크: "26", "진 힐라": "24",
   듄켈: "27", "검은 마법사": "25", 세렌: "28", 칼로스: "30", 대적자: "35", 흉성: "37",
   카링: "31", 림보: "33", 발드릭스: "34", 유피테르: "38", 가엔슬: "29", 카이: "36",
-};
-
-const BOSS_DISPLAY_NAME: Record<string, string> = {
-  스우: "Lotus", 데미안: "Damien", 루시드: "Lucid", 윌: "Will", 더스크: "Gloom",
-  "진 힐라": "Verus Hilla", 듄켈: "Darknell", "검은 마법사": "Black Mage", 세렌: "Seren",
-  칼로스: "Kalos", 대적자: "Adversary", 흉성: "Malefic Star", 카링: "Kaling",
-  림보: "Limbo", 발드릭스: "Baldrix", 유피테르: "Jupiter", 가엔슬: "Guardian Angel Slime",
-  카이: "Kai",
 };
 
 const DIFFICULTY_ORDER: Record<string, number> = { Easy: 0, Normal: 1, Hard: 2, Chaos: 3, Extreme: 4, Destiny: 5, Champion: 6 };
@@ -241,8 +234,6 @@ const bannerButtonStyle: CSSProperties = {
   background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", flexShrink: 0,
   borderRadius: 10, transition: "transform 0.1s ease",
 };
-
-type BossEntryList = [string, BossCutEntry[]];
 
 type BossFilter = "relevant" | "all";
 const BOSS_FILTER_OPTIONS: { value: BossFilter; label: string }[] = [
@@ -782,52 +773,29 @@ function BossSpotlight({
   );
 }
 
-function groupByBoss(entries: BossCutEntry[]): BossEntryList[] {
-  const byBoss = new Map<string, BossCutEntry[]>();
-  for (const e of entries) {
-    const list = byBoss.get(e.boss);
-    if (list) list.push(e);
-    else byBoss.set(e.boss, [e]);
-  }
-  // Highest level requirement first (Yuki's preference), tie-broken by each boss's HIGHEST
-  // tier (e.g. Lotus's 210 floor ties Damien's, but Lotus also has a 285 Extreme tier Damien
-  // has no equivalent for, so Lotus ranks above it -- this is "how hard does it get," not
-  // "when do you unlock it") rather than falling back to the scraper's own arbitrary array
-  // order. Both Quick View and Spotlight share this order.
-  return [...byBoss.entries()].sort(([, a], [, b]) => {
-    const minDiff = Math.min(...b.map((e) => e.level)) - Math.min(...a.map((e) => e.level));
-    return minDiff !== 0 ? minDiff : Math.max(...b.map((e) => e.level)) - Math.max(...a.map((e) => e.level));
-  });
-}
-
 export type ScouterBookmarkView = "quickView" | "spotlight";
 
 /** Renders once BossClearGrid confirms bossClearInputs exists -- kept as a separate component
  *  so that null-check lives at the call site, not scattered through every sub-view. Owns both
  *  swappable sub-views (Quick View table / Spotlight card) internally, same stacked-grid-cell
  *  shape as every other multi-sub-view bookmark (see CharacterSetupFlow.styles.ts's
- *  .bookmark-subview comment) -- ScouterBookmark just passes view/onViewChange through. */
-export default function BossClearGrid({ theme, character, entry, view, onViewChange, onSpotlightBossChange }: {
+ *  .bookmark-subview comment) -- ScouterBookmark just passes view/onViewChange through.
+ *  Spotlight's selected boss is owned by CharacterProfileOverviewScreen (not local state) so
+ *  the page header can read the same value directly instead of BossClearGrid reporting it back
+ *  up through an effect -- see resolveBossDisplayName's own comment. */
+export default function BossClearGrid({ theme, character, entry, view, onViewChange, selectedIndex, onSelectedIndexChange }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
   entry: ScouterResultEntry;
   view: ScouterBookmarkView;
   onViewChange: (v: ScouterBookmarkView) => void;
-  onSpotlightBossChange?: (displayName: string) => void;
+  selectedIndex: number;
+  onSelectedIndexChange: (i: number) => void;
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputs = entry.bossClearInputs;
-  // Computed unconditionally (not after the !inputs early return below) since useEffect must run
-  // in the same order every render -- BOSSCUT_DATA/groupByBoss don't depend on bossClearInputs.
   const grouped = groupByBoss(BOSSCUT_DATA);
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
-  const selectedBossDisplayName = BOSS_DISPLAY_NAME[grouped[clampedIndex][0]] ?? grouped[clampedIndex][0];
-
-  // Reports the boss name up so the page header can show it if the banner art fails to load.
-  useEffect(() => {
-    if (view === "spotlight") onSpotlightBossChange?.(selectedBossDisplayName);
-  }, [view, selectedBossDisplayName, onSpotlightBossChange]);
 
   if (!inputs) {
     return (
@@ -842,7 +810,7 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
 
   const handleSelectBoss = (boss: string) => {
     const idx = grouped.findIndex(([b]) => b === boss);
-    if (idx >= 0) setSelectedIndex(idx);
+    if (idx >= 0) onSelectedIndexChange(idx);
     onViewChange("spotlight");
   };
 
@@ -867,7 +835,7 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           theme={theme}
           grouped={grouped}
           selectedIndex={clampedIndex}
-          onNavigate={setSelectedIndex}
+          onNavigate={onSelectedIndexChange}
           level={character.level}
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}

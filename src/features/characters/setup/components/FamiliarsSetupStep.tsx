@@ -8,6 +8,7 @@ import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import { NavChevron } from "../../DropdownChevron";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
 import { readCharactersStore, selectCharacterByIgn, type StoredFamiliarSlot } from "../../model/charactersStore";
@@ -737,7 +738,7 @@ function FamiliarSlotCard({
                   {TIER_LABELS[slot.tier]}
                 </span>
               )}
-              <span style={{ flexShrink: 0, color: theme.muted, fontSize: "0.85rem" }}>›</span>
+              <span style={{ flexShrink: 0, color: theme.muted, display: "flex" }}><NavChevron direction="next" size={14} /></span>
             </button>
           )}
           {!isEmpty && !pendingEntry && (

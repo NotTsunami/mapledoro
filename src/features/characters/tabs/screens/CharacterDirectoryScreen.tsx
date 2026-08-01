@@ -14,6 +14,7 @@ import { CHARACTERS_COPY } from "../content";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
+import { NavChevron } from "../../DropdownChevron";
 import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
 import WarningIcon from "../../../../components/WarningIcon";
@@ -309,9 +310,9 @@ function DirectoryPager({ theme, isUiLocked, page, pageCount, onPageChange }: {
         type="button"
         disabled={isUiLocked || atStart}
         onClick={() => onPageChange(page - 1)}
-        style={pagerButtonStyle(theme, isUiLocked || atStart)}
+        style={{ ...pagerButtonStyle(theme, isUiLocked || atStart), display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
       >
-        ‹ Prev
+        <NavChevron direction="prev" size={12} /> Prev
       </button>
       <span style={{ fontSize: "0.78rem", fontWeight: 700, color: theme.muted }}>
         Page {page + 1} of {pageCount}
@@ -320,9 +321,9 @@ function DirectoryPager({ theme, isUiLocked, page, pageCount, onPageChange }: {
         type="button"
         disabled={isUiLocked || atEnd}
         onClick={() => onPageChange(page + 1)}
-        style={pagerButtonStyle(theme, isUiLocked || atEnd)}
+        style={{ ...pagerButtonStyle(theme, isUiLocked || atEnd), display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
       >
-        Next ›
+        Next <NavChevron direction="next" size={12} />
       </button>
     </div>
   );
