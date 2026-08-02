@@ -115,9 +115,9 @@ function SetupTabIcon() {
   );
 }
 
-function ExportTabIcon() {
+export function ExportTabIcon({ strokeWidth = 1.5 }: { strokeWidth?: number }) {
   return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth}>
       <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m-4-4l4 4 4-4" />
     </svg>
   );

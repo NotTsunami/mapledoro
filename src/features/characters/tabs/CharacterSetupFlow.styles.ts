@@ -688,6 +688,15 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
             justify-content: center;
           }
 
+          /* The setup card's info column is narrow (beside the avatar, not full card width --
+             see confirmed-summary-info above), so "Updated <date>" wraps wherever the browser
+             finds room, often splitting mid-date ("Aug 1," / "2026") instead of a clean break.
+             Force it onto its own line only here; the plain (non-setup) profile card is full
+             width with room to keep it on one line, so this shouldn't apply there. */
+          .confirmed-summary-card--setup .profile-updated-date {
+            display: block;
+          }
+
           .preview-pane,
           .characters-content.has-preview .preview-pane {
             flex-basis: auto;

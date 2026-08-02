@@ -295,7 +295,10 @@ export default function CharacterProfileScreen({
             </div>
           )}
           {!profile.isAddingCharacter && !profile.setupStepActive && (
-            <p style={{ margin: 0, marginTop: "0.4rem", fontSize: "0.78rem", color: isStale ? statusText(theme, "warning") : theme.muted, fontWeight: 700, lineHeight: 1.3 }}>
+            <p
+              className="profile-updated-line"
+              style={{ margin: 0, marginTop: "0.2rem", width: "100%", textAlign: "center", fontSize: "0.78rem", color: isStale ? statusText(theme, "warning") : theme.muted, fontWeight: 700, lineHeight: 1.3 }}
+            >
               {profile.isRefreshing && (
                 <RefreshSpinnerIcon
                   aria-label="Refreshing"
@@ -311,7 +314,7 @@ export default function CharacterProfileScreen({
                   style={{ marginRight: "0.2rem", verticalAlign: "middle" }}
                 />
               )}
-              Updated {formattedDate}
+              Updated <span className="profile-updated-date">{formattedDate}</span>
             </p>
           )}
           {(isStale || profile.isRefreshing) && profile.onRefresh && !profile.isAddingCharacter && !profile.setupStepActive && (
@@ -322,6 +325,7 @@ export default function CharacterProfileScreen({
               onClick={profile.onRefresh}
               style={{
                 marginTop: "0.4rem",
+                alignSelf: "center",
                 background: "transparent",
                 border: `1px solid ${theme.border}`,
                 borderRadius: "999px",

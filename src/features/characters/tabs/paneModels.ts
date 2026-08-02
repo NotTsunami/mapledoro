@@ -1,8 +1,9 @@
 import type { AppTheme } from "../../../components/themes";
 import type { NormalizedCharacterData } from "../model/types";
-import type { OverviewSectionId, StoredCharacterRecord } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord } from "../model/charactersStore";
 import type { SetupFlowId } from "../setup/flows";
 import type { SetupMode } from "../model/constants";
+import type { RosterRole } from "./useCharacterSetupController";
 
 // Lightweight, render-ready view of a resumable setup draft for the search-entry list.
 export interface SetupDraftSummary {
@@ -88,6 +89,13 @@ export interface SearchPaneActions {
   queryChange: (value: string) => void;
   confirmedImageLoaded: () => void;
   toggleCharacterDirectory: () => void;
+  importCharacter: (record: StoredCharacterRecord, role: RosterRole) => void;
+  importCharacterAsChampionSwap: (record: StoredCharacterRecord, swapOutKey: string) => void;
+  importCharacterMerged: (
+    existing: StoredCharacterRecord,
+    imported: StoredCharacterRecord,
+    choices: Record<ImportSectionId, "mine" | "imported">,
+  ) => void;
 }
 
 export interface PreviewPaneModel {

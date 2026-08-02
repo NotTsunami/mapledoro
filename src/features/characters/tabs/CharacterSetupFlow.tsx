@@ -174,6 +174,9 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
     queryChange: actions.handleQueryInput,
     confirmedImageLoaded: () => actions.setConfirmedImageLoaded(true),
     toggleCharacterDirectory: actions.toggleCharacterDirectory,
+    importCharacter: actions.importCharacter,
+    importCharacterAsChampionSwap: actions.importCharacterAsChampionSwap,
+    importCharacterMerged: actions.importCharacterMerged,
   };
 
   const previewPaneModel: PreviewPaneModel = {

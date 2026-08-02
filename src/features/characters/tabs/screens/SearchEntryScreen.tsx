@@ -227,37 +227,57 @@ export default function SearchEntryScreen({ model, actions }: SearchEntryScreenP
           marginBottom: "0.75rem",
         }}
       >
-        <button
-          type="button"
-          disabled={shell.isUiLocked}
-          onClick={() => {
-            if (shell.isUiLocked) return;
-            if (profile.isAddingCharacter) {
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.65rem", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            disabled={shell.isUiLocked}
+            onClick={() => {
+              if (shell.isUiLocked) return;
+              if (profile.isAddingCharacter) {
+                if (search.hasCompletedRequiredFlow) {
+                  actions.backFromAddCharacter();
+                  return;
+                }
+                actions.runBackToIntroTransition();
+                return;
+              }
               if (search.hasCompletedRequiredFlow) {
-                actions.backFromAddCharacter();
+                actions.backToCharactersDirectory();
                 return;
               }
               actions.runBackToIntroTransition();
-              return;
-            }
-            if (search.hasCompletedRequiredFlow) {
-              actions.backToCharactersDirectory();
-              return;
-            }
-            actions.runBackToIntroTransition();
-          }}
-          style={{
-            ...secondaryButtonStyle(theme, "0.38rem 0.62rem"),
-            fontSize: "0.76rem",
-            fontWeight: 800,
-            borderRadius: "999px",
-            marginBottom: "0.65rem",
-          }}
-        >
-          {search.hasCompletedRequiredFlow
-            ? CHARACTERS_COPY.searchEntry.backToCharactersButton
-            : CHARACTERS_COPY.searchEntry.backButton}
-        </button>
+            }}
+            style={{
+              ...secondaryButtonStyle(theme, "0.38rem 0.62rem"),
+              fontSize: "0.76rem",
+              fontWeight: 800,
+              borderRadius: "999px",
+            }}
+          >
+            {search.hasCompletedRequiredFlow
+              ? CHARACTERS_COPY.searchEntry.backToCharactersButton
+              : CHARACTERS_COPY.searchEntry.backButton}
+          </button>
+          <button
+            type="button"
+            disabled={shell.isUiLocked}
+            onClick={() => actions.runTransitionToMode("import")}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              fontSize: "0.76rem",
+              fontWeight: 700,
+              color: theme.muted,
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+              cursor: shell.isUiLocked ? "not-allowed" : "pointer",
+            }}
+          >
+            {CHARACTERS_COPY.firstTimeSetup.importButton}
+          </button>
+        </div>
         <div>
           <h1 style={titleStyle()}>{CHARACTERS_COPY.searchEntry.title}</h1>
           <p style={subtitleStyle(theme)}>{CHARACTERS_COPY.searchEntry.subtitle}</p>

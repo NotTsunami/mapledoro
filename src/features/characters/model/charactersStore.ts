@@ -380,6 +380,38 @@ export interface StoredCharacterRecord {
   };
 }
 
+/** Mergeable sections offered by the JSON import conflict picker when the imported
+ *  IGN already exists. `identity` bundles gender/marriage/isLiberated/weaponHand/
+ *  hasRuinForceShield into one row -- these are exactly the fields the Bio
+ *  bookmark's edit pencil lets a user hand-correct post-setup, so treating them
+ *  separately from "always take imported" avoids silently reverting a correction.
+ *  `soul` rides along with `scouter` instead (it's scouter-feeding data, not
+ *  something the Bio bookmark surfaces) -- see mergeImportedCharacterRecord. */
+export type ImportSectionId =
+  | "identity"
+  | "stats"
+  | "equipment"
+  | "vMatrix"
+  | "familiars"
+  | "scouter"
+  | "tools"
+  | "expHistory"
+  | "overviewLayout";
+
+// Display order for the import conflict picker -- tuned by hand, not derived from any
+// other ordering (e.g. the profile's own bookmark order) -- see Yuki if this needs revisiting.
+export const IMPORT_SECTION_DEFS: { id: ImportSectionId; label: string }[] = [
+  { id: "overviewLayout", label: "Overview Layout" },
+  { id: "identity", label: "Gender & Marriage" },
+  { id: "expHistory", label: "EXP History" },
+  { id: "scouter", label: "Scouter" },
+  { id: "stats", label: "Stats" },
+  { id: "equipment", label: "Gear" },
+  { id: "vMatrix", label: "V Matrix" },
+  { id: "familiars", label: "Familiars" },
+  { id: "tools", label: "Tool Data" },
+];
+
 export interface CharactersStore {
   version: typeof CHARACTERS_STORE_VERSION;
   order: string[];
@@ -722,7 +754,7 @@ function parseOverviewLayout(value: unknown): OverviewSectionId[] | undefined {
   return value.filter((id): id is OverviewSectionId => OVERVIEW_SECTION_IDS.includes(id as OverviewSectionId));
 }
 
-function parseStoredCharacterRecord(
+export function parseStoredCharacterRecord(
   value: unknown,
   idHint: string | null,
 ): StoredCharacterRecord | null {
@@ -755,6 +787,77 @@ function parseStoredCharacterRecord(
     meta: {
       addedAt: typeof meta.addedAt === "number" ? meta.addedAt : Date.now(),
       updatedAt: typeof meta.updatedAt === "number" ? meta.updatedAt : Date.now(),
+    },
+  };
+}
+
+// The only host characterImgURL is ever legitimately set to (Nexon's own ranking API --
+// see api/characters/lookup/route.ts) and the one already allowlisted for it in
+// next.config.mjs. A JSON import is untrusted input; without this check, a crafted
+// characterImgURL renders as a real <img src> the moment the preview card mounts,
+// before the user has confirmed anything, leaking their IP to an attacker-chosen host.
+const TRUSTED_CHARACTER_IMAGE_HOST = "msavatar1.nexon.net";
+
+// Mirrors CharacterAvatar.tsx's own FALLBACK_SRC -- duplicated rather than imported since
+// that's a "use client" component file and this is a plain data module.
+const FALLBACK_AVATAR_SRC = "https://haku.network/api/img/avatar/2000/stand1.png";
+
+function isTrustedCharacterImageUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname === TRUSTED_CHARACTER_IMAGE_HOST;
+  } catch {
+    return false;
+  }
+}
+
+/** Parses/validates an unknown JSON value as an importable StoredCharacterRecord.
+ *  Reuses parseStoredCharacterRecord's exact defensiveness -- import accepts
+ *  anything export can produce, nothing stricter -- except characterImgURL, which is
+ *  re-checked against the one real host it can ever legitimately be (see
+ *  isTrustedCharacterImageUrl), falling back to CharacterAvatar's own FALLBACK_SRC
+ *  rather than trusting an arbitrary URL from an untrusted file. */
+export function parseImportedCharacterRecord(value: unknown): StoredCharacterRecord | null {
+  const record = parseStoredCharacterRecord(value, null);
+  if (!record) return null;
+  if (isTrustedCharacterImageUrl(record.characterImgURL)) return record;
+  return { ...record, characterImgURL: FALLBACK_AVATAR_SRC };
+}
+
+/** Merges `imported` onto `existing` one ImportSectionId at a time: "mine" keeps
+ *  existing's value untouched, "imported" takes imported's value. Required
+ *  non-sectioned scalars (level, exp, jobName, rank/score fields, characterImgURL,
+ *  fetchedAt/expiresAt) always come from imported wholesale, since keeping "mine"
+ *  for those is meaningless -- they're refreshed by the app's own lookup elsewhere,
+ *  not something a user hand-edits. meta.addedAt always keeps existing's value;
+ *  meta.updatedAt is always Date.now(), matching the persist effect's own convention. */
+export function mergeImportedCharacterRecord(
+  existing: StoredCharacterRecord,
+  imported: StoredCharacterRecord,
+  choices: Record<ImportSectionId, "mine" | "imported">,
+): StoredCharacterRecord {
+  const take = <T,>(id: ImportSectionId, mine: T, theirs: T): T =>
+    choices[id] === "imported" ? theirs : mine;
+
+  return {
+    ...imported,
+    ign: existing.ign,
+    gender: take("identity", existing.gender, imported.gender),
+    marriage: take("identity", existing.marriage, imported.marriage),
+    isLiberated: take("identity", existing.isLiberated, imported.isLiberated),
+    weaponHand: take("identity", existing.weaponHand, imported.weaponHand),
+    hasRuinForceShield: take("identity", existing.hasRuinForceShield, imported.hasRuinForceShield),
+    soul: take("scouter", existing.soul, imported.soul),
+    stats: take("stats", existing.stats, imported.stats),
+    equipment: take("equipment", existing.equipment, imported.equipment),
+    vMatrix: take("vMatrix", existing.vMatrix, imported.vMatrix),
+    familiars: take("familiars", existing.familiars, imported.familiars),
+    scouter: take("scouter", existing.scouter, imported.scouter),
+    tools: take("tools", existing.tools, imported.tools),
+    expHistory: take("expHistory", existing.expHistory, imported.expHistory),
+    overviewLayout: take("overviewLayout", existing.overviewLayout, imported.overviewLayout),
+    meta: {
+      addedAt: existing.meta.addedAt,
+      updatedAt: Date.now(),
     },
   };
 }

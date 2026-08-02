@@ -10,6 +10,7 @@ import {
   appendExpHistoryEntry,
   createStoredCharacterRecord,
   hasStoredCompletedRequiredSetup,
+  mergeImportedCharacterRecord,
   readCharactersStore,
   selectCharacterById,
   type CharactersStore,
@@ -45,7 +46,7 @@ import {
   type SetupDraft,
   writeSetupDraft,
 } from "../model/setupDraftStorage";
-import type { OverviewSectionId, StoredCharacterRecord, StoredCharacterStats } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredCharacterStats } from "../model/charactersStore";
 import {
   convertStatsStepDraftToStored, deriveHasRuinForceShield, deriveIsLiberatedFromWeapon, marriageDraftToStored,
   parseStatsStepDraft, serializeStatsStepDraft, storedStatsToStatsStepDraft,
@@ -93,6 +94,9 @@ import {
 } from "./useSetupFlowTransitions";
 
 export const MAX_CHAMPIONS = 5;
+
+// Role chosen on ImportModeScreen's role picker for a freshly-imported character.
+export type RosterRole = "mule" | "main" | "champion";
 
 function tryParseJson(raw: string): unknown {
   try { return JSON.parse(raw); } catch { return null; }
@@ -1243,21 +1247,29 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   const lastUpsertedCharacterRef = useRef<StoredCharacterRecord | null>(null);
   const upsertRosterCharacter = useCallback((character: StoredCharacterRecord) => {
     lastUpsertedCharacterRef.current = character;
+    const key = toCharacterKey(character);
     setCharacterRoster((prev) => {
-      const key = toCharacterKey(character);
       const existingIndex = prev.findIndex((entry) => toCharacterKey(entry) === key);
       if (existingIndex === -1) return [...prev, character];
       const next = [...prev];
       next[existingIndex] = character;
       return next;
     });
-    // Set as main for their world only if no main exists yet for that world
+    // Set as main for their world only if this is the world's first-ever character -- not
+    // just "no main is currently set," which used to also fire for e.g. a 2nd/3rd mule added
+    // after the main was removed, silently promoting whichever character happened to be added
+    // next. A world with any other characters already in it never gets an automatic main;
+    // Set Main (setMainCharacter) stays the only way to assign one from that point on.
+    const worldIsEmpty = !characterRoster.some(
+      (entry) => entry.worldID === character.worldID && toCharacterKey(entry) !== key,
+    );
+    if (!worldIsEmpty) return;
     setMainCharacterKeyByWorld((prev) => {
       const worldKey = String(character.worldID);
       if (prev[worldKey]) return prev;
-      return { ...prev, [worldKey]: toCharacterKey(character) };
+      return { ...prev, [worldKey]: key };
     });
-  }, []);
+  }, [characterRoster]);
 
   // Profile-page correction for which Hyper Stat/Inner Ability preset is actually
   // equipped in-game — these are saved as preset 1 by default at setup time (never asked),
@@ -1512,11 +1524,15 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
           setSetupPanelVisible(true);
           return;
         }
-      } else if (initialAction === "add") {
+      } else if (initialAction === "add" && accountHasCompletedRequiredFlow) {
+        // A true first-time user (no characters yet) falls through instead of forcing
+        // search mode here -- the homepage's empty-state "Add Character" link should land
+        // on the intro screen's Import/Search choice, same as visiting /characters fresh,
+        // not skip straight past it the way a returning user's "add another" action should.
         setCharacterRoster(storedRoster);
         setMainCharacterKeyByWorld(store.mainCharacterIdByWorld);
         setChampionCharacterKeysByWorld(store.championCharacterIdsByWorld);
-        setHasCompletedRequiredSetupEver(accountHasCompletedRequiredFlow);
+        setHasCompletedRequiredSetupEver(true);
         applyAddCharacterView();
         return;
       }
@@ -1865,7 +1881,14 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     (nextMode: SetupMode) => {
       if (immediateUiLockRef.current) return;
       immediateUiLockRef.current = true;
-      setIsAddingCharacter(false);
+      // Does NOT reset isAddingCharacter -- a mode switch (search <-> import) isn't leaving
+      // the add-character flow, just picking a different screen within it. Search/Import's
+      // own "instead" links call this while mid-flow (isAddingCharacter true, arrived via
+      // the directory's + tile) and need that flag to survive, or Import's Back button would
+      // wrongly fall through to runBackToIntroTransition (first-time-setup) instead of
+      // backFromAddCharacter (directory) afterward. FirstTimeSetupScreen's own Search/Import
+      // buttons are the only other caller and are unaffected either way, since
+      // isAddingCharacter is already false whenever that screen is reachable.
       transitions.runTransitionToMode(nextMode, {
         resetSearchStateMessage: lookup.resetSearchStateMessage,
         setSetupMode,
@@ -2426,6 +2449,45 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     transitions.runBackTransition(applyAddCharacterView);
   }, [applyAddCharacterView, transitions]);
 
+  // Direct-add path: the imported IGN isn't in the roster yet. `role` is chosen on
+  // ImportModeScreen's own role picker -- "champion" is only ever passed here when the
+  // caller has already confirmed a free slot exists (ImportModeScreen checks first and
+  // routes to importCharacterAsChampionSwap instead when slots are full).
+  const importCharacter = useCallback((record: StoredCharacterRecord, role: RosterRole) => {
+    upsertRosterCharacter(record);
+    if (role === "main") setMainCharacter(record);
+    if (role === "champion") toggleChampionCharacter(record);
+    switchToCharacterProfile(record);
+  }, [setMainCharacter, switchToCharacterProfile, toggleChampionCharacter, upsertRosterCharacter]);
+
+  // Champion-slot-full path: adds the imported character as a champion while removing
+  // `swapOutKey` from the champion list in the same store update, rather than two separate
+  // toggle calls -- avoids a moment where the world briefly has 6 champions (over MAX_CHAMPIONS)
+  // or, if the add happened to lose a race with the remove, silently drops back to 4.
+  const importCharacterAsChampionSwap = useCallback((record: StoredCharacterRecord, swapOutKey: string) => {
+    upsertRosterCharacter(record);
+    setChampionCharacterKeysByWorld((prev) => {
+      const worldId = record.worldID;
+      const cur = getChampionKeysForWorld(prev, worldId).filter((k) => k !== swapOutKey);
+      return setChampionKeysForWorld(prev, worldId, [...cur, toCharacterKey(record)]);
+    });
+    switchToCharacterProfile(record);
+  }, [switchToCharacterProfile, upsertRosterCharacter]);
+
+  // Conflict-resolved path: the imported IGN already exists -- apply the user's
+  // per-section choices from the conflict dialog before upserting. Never touches
+  // main/champion status itself: upsertRosterCharacter only auto-assigns main for a
+  // world's first-ever character, which this can't be since the IGN already exists.
+  const importCharacterMerged = useCallback((
+    existing: StoredCharacterRecord,
+    imported: StoredCharacterRecord,
+    choices: Record<ImportSectionId, "mine" | "imported">,
+  ) => {
+    const merged = mergeImportedCharacterRecord(existing, imported, choices);
+    upsertRosterCharacter(merged);
+    switchToCharacterProfile(merged);
+  }, [switchToCharacterProfile, upsertRosterCharacter]);
+
   const backFromAddCharacter = useCallback(() => {
     if (immediateUiLockRef.current) return;
     immediateUiLockRef.current = true;
@@ -2441,6 +2503,11 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         setIsAddingCharacter(false);
         setFoundCharacter(null);
         setSetupFlowStarted(true);
+        // Reachable with setupMode still "import" (Directory -> Search -> "Import a
+        // character instead" -> Import screen -> Back), not just the plain search-add
+        // path (already "search") -- reset unconditionally rather than branching, a
+        // no-op for search, the fix for import.
+        setSetupMode("search");
         transitions.setSetupPanelVisible(true);
         setShowFlowOverview(targetShowFlowOverview);
         setShowCharacterDirectory(targetShowCharacterDirectory);
@@ -2663,6 +2730,9 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       removeCurrentCharacter,
       openAddCharacterSearch,
       backFromAddCharacter,
+      importCharacter,
+      importCharacterAsChampionSwap,
+      importCharacterMerged,
       refreshSingle,
       handleQueryInput,
       handleSearchSubmit,
