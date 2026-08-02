@@ -267,7 +267,6 @@ function recordBadResponse(key: string): boolean {
 function buildPayloadAndHash(character: StoredCharacterRecord): { payload: ScouterUserStat; hash: string } | null {
   const store = readCharactersStore();
   const payload = buildScouterPayload(character, {
-    linkSkillsByWorld: store.linkSkillsByWorld,
     scouterLegionByWorld: store.scouterLegionByWorld,
   });
   if (!payload) return null;

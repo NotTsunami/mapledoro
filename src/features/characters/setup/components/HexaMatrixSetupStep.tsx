@@ -39,7 +39,6 @@ interface HexaMatrixSetupStepProps {
   onSubstepChange?: (substepIndex: number) => void;
   characterRoster?: import("../../model/charactersStore").StoredCharacterRecord[];
   confirmedWorldId?: number;
-  worldLinkSkills?: string;
   characterLevel?: number;
   confirmedCharacterName?: string;
   value: string;

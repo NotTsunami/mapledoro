@@ -1,14 +1,14 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import { numericKeyDown, sanitizeDigitsInput } from "../../../../lib/inputUtils";
 import Image from "next/image";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
-import { linkSkillsDraftToStored, type StoredCharacterRecord, type LinkSkillId } from "../../model/charactersStore";
-import { LINK_SKILLS, CLASS_TO_SKILL, computeLinkSkillsFromRoster, reconcileLinkSkills, inferLinkLevel, type LinkSkillDef } from "../data/linkSkillsData";
+import { linkSkillsStoredToDraftString, type StoredCharacterRecord, type LinkSkillId, type LinkSkillsData } from "../../model/charactersStore";
+import { LINK_SKILLS, computeLinkSkillsFromRoster, linkSkillFloorsForCharacter, bestKnownLinkSkillFloors, type LinkSkillDef } from "../data/linkSkillsData";
 import SetupStepFrame from "./SetupStepFrame";
 import InfoTooltip, { type TooltipContent } from "./InfoTooltip";
 
@@ -17,7 +17,7 @@ interface LinkSkillsEditorProps {
   jobName?: string;
   characterRoster?: StoredCharacterRecord[];
   confirmedWorldId?: number;
-  worldLinkSkills?: string;
+  confirmedCharacterName?: string;
   value: string;
   onChange: (value: string) => void;
 }
@@ -113,12 +113,12 @@ export function LinkSkillIcon({ iconId, name, theme, size = 32 }: { iconId: stri
   );
 }
 
-const linkLevelInputStyle = (theme: AppTheme, locked: boolean | undefined): CSSProperties => ({
+const linkLevelInputStyle = (theme: AppTheme): CSSProperties => ({
   width: "2.2rem",
-  border: `1px solid ${locked ? theme.accent : theme.border}`,
+  border: `1px solid ${theme.border}`,
   borderRadius: "6px",
-  background: locked ? `${theme.accent}18` : theme.bg,
-  color: locked ? theme.accent : theme.text,
+  background: theme.bg,
+  color: theme.text,
   fontFamily: "inherit",
   fontSize: "0.82rem",
   fontWeight: 700,
@@ -127,20 +127,6 @@ const linkLevelInputStyle = (theme: AppTheme, locked: boolean | undefined): CSSP
   outline: "2px solid transparent",
   outlineOffset: "2px",
   transition: "outline-color 0.15s ease",
-  cursor: locked ? "default" : undefined,
-});
-
-const autofillButtonStyle = (theme: AppTheme): CSSProperties => ({
-  border: `1px solid ${theme.accent}`,
-  borderRadius: "8px",
-  background: "transparent",
-  color: theme.accentText,
-  fontFamily: "inherit",
-  fontWeight: 800,
-  fontSize: "0.75rem",
-  padding: "0.2rem 0.55rem",
-  cursor: "pointer",
-  flexShrink: 0,
 });
 
 // Renders a token list (class names, "name (Lv N)" entries) so long lines wrap
@@ -160,7 +146,7 @@ function NowrapTokens({ tokens, separator }: { tokens: string[]; separator: stri
 }
 
 function LinkSkillRow({
-  skill, value, source, onUpdate, theme, fullWidth, locked, min,
+  skill, value, source, onUpdate, theme, fullWidth, min,
 }: {
   skill: LinkSkillDef;
   value: string;
@@ -168,7 +154,6 @@ function LinkSkillRow({
   onUpdate: (id: LinkSkillId, val: string) => void;
   theme: AppTheme;
   fullWidth?: boolean;
-  locked?: boolean;
   min?: number;
 }) {
   return (
@@ -203,8 +188,6 @@ function LinkSkillRow({
           aria-label={`${skill.name} level`}
           value={value}
           placeholder="0"
-          disabled={locked}
-          title={locked ? "Locked because the character you're adding already brings this skill to Master Level 3" : undefined}
           onChange={(e) => {
             const sanitized = sanitizeDigitsInput(e.target.value);
             const n = parseInt(sanitized, 10);
@@ -222,7 +205,7 @@ function LinkSkillRow({
             if (parsed > skill.maxLevel) onUpdate(skill.id, String(skill.maxLevel));
           }}
           onKeyDown={numericKeyDown}
-          style={linkLevelInputStyle(theme, locked)}
+          style={linkLevelInputStyle(theme)}
         />
         <span style={{ fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>/ {skill.maxLevel}</span>
       </div>
@@ -230,45 +213,91 @@ function LinkSkillRow({
   );
 }
 
+/** This character's own floor: prefers the real tracked record (confirmedRecord) when it
+ *  exists, else falls back to just jobName/worldID for a character still mid-setup and
+ *  not yet a real persisted record -- linkSkillFloorsForCharacter only needs those two. */
+function resolveLinkSkillFloors(
+  confirmedRecord: StoredCharacterRecord | undefined,
+  jobName: string,
+  confirmedWorldId: number | undefined,
+  characterRoster: StoredCharacterRecord[],
+): LinkSkillsData {
+  if (confirmedRecord) return linkSkillFloorsForCharacter(confirmedRecord, characterRoster);
+  if (confirmedWorldId === undefined) return {};
+  return linkSkillFloorsForCharacter({ jobName, worldID: confirmedWorldId }, characterRoster);
+}
+
 /** The Link Skills step's actual editable content, with no wizard-frame chrome — reused
- *  standalone by LegionPanel's edit-in-place view (world-scoped, no confirmed character
- *  needed) as well as by the wizard step below. */
+ *  standalone by LegionPanel's edit-in-place view as well as by the wizard step below.
+ *  Values here belong to ONE character (identified by confirmedCharacterName within
+ *  characterRoster, if it's already a tracked record) -- the same-world roster is only
+ *  used to compute a FLOOR (what mastery the roster proves), never to overwrite this
+ *  character's own saved choice of which links it actually has equipped. */
 export function LinkSkillsEditor({
   theme, jobName = "", value, onChange,
-  characterRoster = [], confirmedWorldId, worldLinkSkills = "",
+  characterRoster = [], confirmedWorldId, confirmedCharacterName,
 }: LinkSkillsEditorProps) {
   const draft = parseDraft(value);
   const initialValueRef = useRef(value);
-  const [filled, setFilled] = useState(false);
 
-  useEffect(() => {
-    if (!filled) return;
-    const t = setTimeout(() => setFilled(false), 2000);
-    return () => clearTimeout(t);
-  }, [filled]);
+  // This character's own floor: only the ONE skill its own class belongs to (never every
+  // skill the roster happens to have data for -- a Kanna's floor must never involve
+  // Empirical Knowledge just because a same-world Bishop is tracked). Falls back to just
+  // jobName/worldID when the character isn't in characterRoster yet (still mid-setup, not
+  // yet a real persisted record) -- linkSkillFloorsForCharacter only needs those two.
+  const confirmedRecord = characterRoster.find((c) => c.characterName === confirmedCharacterName);
+  const floors = resolveLinkSkillFloors(confirmedRecord, jobName, confirmedWorldId, characterRoster);
 
-  const { values: autofillValues, sources } = confirmedWorldId !== undefined
-    ? computeLinkSkillsFromRoster(characterRoster, confirmedWorldId)
-    : { values: {}, sources: {} };
+  // "from X, Y" provenance text: scoped to ONLY the skill(s) `floors` already proved this
+  // character is eligible for (never every skill the world roster happens to have data
+  // on) -- a Kanna's Bravado row must never say "from Hoyoung" just because a same-world
+  // Hoyoung exists, since that's not this character's own link at all. For a multi-class
+  // skill (Empirical Knowledge/Thief's Cunning) this lists the real contributing siblings;
+  // for a single-class skill it's just this character itself (or empty if untracked).
+  const rawSources = confirmedWorldId !== undefined
+    ? computeLinkSkillsFromRoster(characterRoster, confirmedWorldId).sources
+    : {};
+  const sources: Partial<Record<LinkSkillId, string[]>> = {};
+  for (const skillId of Object.keys(floors) as LinkSkillId[]) {
+    if (rawSources[skillId]) sources[skillId] = rawSources[skillId];
+  }
 
-  // One-shot mount-time backfill (stored world total reconciled against same-world roster
-  // autofill, never letting a lower roster-computed value clobber a higher stored one,
-  // see reconcileLinkSkills), only when this step lands blank: can't run during render
-  // since it depends on a client-only localStorage read. Not worth lifting into the parent
-  // controller (which owns none of this step's domain logic) for a fetch that only ever
-  // fires once, at mount.
+  // One-shot mount-time backfill, only when this step lands blank -- a SUGGESTION only,
+  // never a constraint (the field stays freely editable down to `floors`, the real
+  // level-only minimum, regardless of what this seeds). Two sources, in priority order:
+  // (1) this character's OWN already-stored value, if it's a tracked record -- the
+  // strongest signal, since it's literally what was last saved for THIS character; (2)
+  // if not yet tracked at all (e.g. a fresh Full/MapleScouter Setup search-and-open,
+  // before Finish -- confirmedRecord doesn't exist, so (1) is empty), the roster's
+  // best-known value (bestKnownLinkSkillFloors -- levels + any tracked sibling's own
+  // stored value, e.g. Bishop's manually-saved 7) is the only useful starting number.
+  // Never a shared value written back to a world bucket -- purely a local draft seed.
+  // Can't run during render since it depends on a client-only localStorage read
+  // (characterRoster is already resolved by the caller, but the "landed blank" check
+  // below still needs to run post-mount to avoid clobbering an in-progress draft). Not
+  // worth lifting into the parent controller (which owns none of this step's domain
+  // logic) for a fetch that only ever fires once, at mount.
   useEffect(() => {
     if (initialValueRef.current) return;
-    const stored = linkSkillsDraftToStored(worldLinkSkills);
-    const reconciled = confirmedWorldId !== undefined
-      ? reconcileLinkSkills(stored, characterRoster, confirmedWorldId)
-      : stored;
+    const rawSuggestion = confirmedRecord?.linkSkills
+      ?? (confirmedWorldId !== undefined ? bestKnownLinkSkillFloors(characterRoster, confirmedWorldId) : {});
+    // Scoped to only the skill(s) `floors` already narrowed to this character's own
+    // class -- bestKnownLinkSkillFloors covers every skill the WHOLE world roster has
+    // evidence for, so without this an untracked F/P's blank Bravado/Elementalism/etc.
+    // rows would get seeded from a totally unrelated Hoyoung/Kanna just because they
+    // happen to also be tracked on the same world.
+    const suggestion: LinkSkillsData = {};
+    for (const skillId of Object.keys(floors) as LinkSkillId[]) {
+      if (rawSuggestion[skillId] !== undefined) suggestion[skillId] = rawSuggestion[skillId];
+    }
+    const reconciled: LinkSkillsData = { ...suggestion };
+    for (const [skillId, floor] of Object.entries(floors)) {
+      const id = skillId as LinkSkillId;
+      reconciled[id] = Math.max(reconciled[id] ?? 0, floor);
+    }
     if (Object.keys(reconciled).length > 0) {
-      const merged = Object.fromEntries(
-        Object.entries(reconciled).map(([id, level]) => [id, String(level)]),
-      );
       // react-doctor-disable-next-line no-pass-data-to-parent
-      onChange(JSON.stringify(merged));
+      onChange(linkSkillsStoredToDraftString(reconciled));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -277,20 +306,6 @@ export function LinkSkillsEditor({
     onChange(JSON.stringify({ ...draft, [id]: val }));
   }
 
-  function handleAutofill() {
-    const stringified = Object.fromEntries(
-      Object.entries(autofillValues).map(([id, level]) => [id, String(level)]),
-    );
-    onChange(JSON.stringify({ ...draft, ...stringified }));
-    setFilled(true);
-  }
-
-  const confirmedSkillId = CLASS_TO_SKILL[jobName];
-  const confirmedLevel = characterRoster[0]?.level ?? 0;
-  const confirmedContribution = confirmedSkillId ? inferLinkLevel(confirmedLevel) : 0;
-  const lockedSkillId = confirmedContribution === 3 ? confirmedSkillId : undefined;
-
-  const hasRosterData = Object.keys(autofillValues).length > 0;
   const singleSkills = LINK_SKILLS.filter((s) => s.maxLevel === 3);
   const multiSkills  = LINK_SKILLS.filter((s) => s.maxLevel > 3);
 
@@ -313,20 +328,8 @@ export function LinkSkillsEditor({
           <InfoTooltip content={masterLevelTooltip(theme)} theme={theme} />
         </div>
         <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>
-          These levels are shared across all characters on your world, and inherited automatically by new characters.
+          Only enter the levels for the links that this character actually has equipped.
         </p>
-        {hasRosterData && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-            <button
-              type="button"
-              className="tap-target-44"
-              onClick={handleAutofill}
-              style={autofillButtonStyle(theme)}
-            >
-              {filled ? "Filled!" : "Autofill from roster"}
-            </button>
-          </div>
-        )}
       </div>
       <div className="link-skills-grid" style={{ display: "grid", gap: "0.5rem" }}>
         {singleSkills.map((skill) => (
@@ -337,8 +340,7 @@ export function LinkSkillsEditor({
             source={sources[skill.id]}
             onUpdate={handleUpdate}
             theme={theme}
-            locked={skill.id === lockedSkillId}
-            min={autofillValues[skill.id]}
+            min={floors[skill.id]}
           />
         ))}
         {multiSkills.map((skill) => (
@@ -350,7 +352,7 @@ export function LinkSkillsEditor({
             onUpdate={handleUpdate}
             theme={theme}
             fullWidth
-            min={autofillValues[skill.id]}
+            min={floors[skill.id]}
           />
         ))}
       </div>

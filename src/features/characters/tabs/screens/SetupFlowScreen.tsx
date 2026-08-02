@@ -1,7 +1,7 @@
 import StepRenderer from "../../setup/StepRenderer";
 import StepJumpMenu from "../../setup/components/StepJumpMenu";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
-import { readCharactersStore, linkSkillsStoredToDraftString, type StoredScouterLegion, type StoredLegionArtifact } from "../../model/charactersStore";
+import { readCharactersStore, type StoredScouterLegion, type StoredLegionArtifact } from "../../model/charactersStore";
 import { getClassSetupOverrides } from "../../setup/data/nexonJobMapping";
 import { getVisibleSteps, getVisibleStepInfo, getRequiredSetupFlowId, getStepSubsteps, getFirstInvalidStepIndex, getFirstInvalidSubstepIndex, getFlowStepByIndex, getStepValidityKey } from "../../setup/flows";
 
@@ -59,13 +59,11 @@ export default function SetupFlowScreen({ model, actions }: SetupFlowScreenProps
       ]
     : model.directory.allCharacters;
 
-  let worldLinkSkills = "";
   let worldScouterLegion: StoredScouterLegion | undefined;
   let worldLegionArtifact: StoredLegionArtifact | undefined;
   if (confirmed?.worldID !== undefined) {
     const charactersStore = readCharactersStore();
     const worldIdKey = String(confirmed.worldID);
-    worldLinkSkills = linkSkillsStoredToDraftString(charactersStore.linkSkillsByWorld[worldIdKey]);
     worldScouterLegion = charactersStore.scouterLegionByWorld[worldIdKey];
     worldLegionArtifact = charactersStore.legionArtifactByWorld[worldIdKey];
   }
@@ -100,7 +98,6 @@ export default function SetupFlowScreen({ model, actions }: SetupFlowScreenProps
         onSubstepChange={actions.reportCurrentSubstep}
         characterRoster={characterRoster}
         confirmedWorldId={confirmed?.worldID}
-        worldLinkSkills={worldLinkSkills}
         worldScouterLegion={worldScouterLegion}
         worldLegionArtifact={worldLegionArtifact}
         equipmentRawValue={setup.equipmentRawValue}

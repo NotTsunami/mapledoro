@@ -582,8 +582,11 @@ function buildSeedRing(character: StoredCharacterRecord): ScouterSeedRing {
   };
 }
 
-function buildLinkSkill(worldId: number, linkSkillsByWorld: Record<string, LinkSkillsData>): Record<string, string> {
-  const stored = linkSkillsByWorld[String(worldId)] ?? {};
+/** Reads this character's OWN link skill levels directly -- Scouter's calc needs what's
+ *  actually equipped on THIS character, not a shared world total (see linkSkillsData.ts's
+ *  file-header reasoning: mastery is shared per-world, but equipping is per-character). */
+function buildLinkSkill(linkSkills: LinkSkillsData | undefined): Record<string, string> {
+  const stored = linkSkills ?? {};
   const out: Record<string, string> = {};
   for (const [id, scouterKey] of Object.entries(LINK_SKILL_TO_SCOUTER_KEY)) {
     out[scouterKey] = String(stored[id as LinkSkillId] ?? 0);
@@ -654,7 +657,6 @@ export function isScouterSupportedClass(jobName: string): boolean {
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 export interface ScouterPayloadContext {
-  linkSkillsByWorld: Record<string, LinkSkillsData>;
   scouterLegionByWorld: Record<string, StoredScouterLegion>;
 }
 
@@ -679,7 +681,7 @@ export function buildScouterPayload(character: StoredCharacterRecord, ctx: Scout
 
   return {
     doping: buildDoping(character),
-    linkSkill: buildLinkSkill(character.worldID, ctx.linkSkillsByWorld),
+    linkSkill: buildLinkSkill(character.linkSkills),
     special: buildSpecial(character, offStats),
     stat: buildStat(character, classData.id, koreanClassName, assignment, legion),
     hexa,

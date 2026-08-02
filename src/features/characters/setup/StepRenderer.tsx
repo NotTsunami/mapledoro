@@ -37,7 +37,6 @@ interface StepRendererProps {
   onSubstepChange?: (substepIndex: number) => void;
   characterRoster?: import("../model/charactersStore").StoredCharacterRecord[];
   confirmedWorldId?: number;
-  worldLinkSkills?: string;
   worldScouterLegion?: import("../model/charactersStore").StoredScouterLegion;
   worldLegionArtifact?: import("../model/charactersStore").StoredLegionArtifact;
   /** This session's own live Equipment/Legion Artifacts step drafts, independent of
@@ -73,7 +72,6 @@ interface SetupStepComponentProps {
   onSubstepChange?: (substepIndex: number) => void;
   characterRoster?: StoredCharacterRecord[];
   confirmedWorldId?: number;
-  worldLinkSkills?: string;
   worldScouterLegion?: StoredScouterLegion;
   worldLegionArtifact?: StoredLegionArtifact;
   equipmentRawValue?: string;
@@ -115,7 +113,6 @@ export default function StepRenderer({
   onSubstepChange,
   characterRoster,
   confirmedWorldId,
-  worldLinkSkills,
   worldScouterLegion,
   worldLegionArtifact,
   equipmentRawValue,
@@ -155,7 +152,6 @@ export default function StepRenderer({
       onSubstepChange={onSubstepChange}
       characterRoster={characterRoster}
       confirmedWorldId={confirmedWorldId}
-      worldLinkSkills={worldLinkSkills}
       worldScouterLegion={worldScouterLegion}
       worldLegionArtifact={worldLegionArtifact}
       equipmentRawValue={equipmentRawValue}

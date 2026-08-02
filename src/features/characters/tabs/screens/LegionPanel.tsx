@@ -2,8 +2,8 @@ import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore,
 import { useMounted } from "../../../../lib/useMounted";
 import { WORLD_NAMES } from "../../model/constants";
 import {
-  readCharactersStore, linkSkillsDraftToStored, linkSkillsStoredToDraftString,
-  writeLinkSkillsForWorld, writeLegionArtifactForWorld, writeScouterLegionForWorld,
+  readCharactersStore,
+  writeLegionArtifactForWorld, writeScouterLegionForWorld,
   type StoredCharacterRecord, type StoredLegionArtifact,
 } from "../../model/charactersStore";
 import {
@@ -13,8 +13,8 @@ import {
   parseLegionArtifactBoardDraft, deriveLegionArtifactFields,
   type LegionCrystalDraft, type LegionCrystalDef,
 } from "../../setup/data/legionArtifactData";
-import { LINK_SKILLS, computeLinkSkillsFromRoster, reconcileLinkSkills } from "../../setup/data/linkSkillsData";
-import { LinkSkillsEditor, LinkSkillIcon } from "../../setup/components/LinkSkillsSetupStep";
+import { LINK_SKILLS, computeLinkSkillsFromRoster } from "../../setup/data/linkSkillsData";
+import { LinkSkillIcon } from "../../setup/components/LinkSkillsSetupStep";
 import { LegionArtifactsEditor, CrystalIcon } from "../../setup/components/LegionArtifactsSetupStep";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
@@ -623,55 +623,20 @@ function DormantSkillChip({ theme, skill }: { theme: AppTheme; skill: (typeof LI
   );
 }
 
-// A dedicated component so its local draft state naturally resets each time the user
-// re-enters edit mode (it only mounts while editing=true). The draft is purely local
-// until Save — closing without saving (tab switch, back to Directory) just unmounts
-// this component and discards it, same as backing out of the wizard mid-step.
-function LinkSkillsEditPanel({ theme, worldId, worldCharacters, worldLinkSkills, onSave, ref }: {
-  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[]; worldLinkSkills: string; onSave: () => void; ref?: Ref<EditorHandle>;
-}) {
-  const [value, setValue] = useState("");
-  function handleSave() {
-    writeLinkSkillsForWorld(worldId, linkSkillsDraftToStored(value));
-    onSave();
-  }
-  useImperativeHandle(ref, () => ({ save: handleSave }));
-  return (
-    <LinkSkillsEditor
-      theme={theme}
-      characterRoster={worldCharacters}
-      confirmedWorldId={worldId}
-      worldLinkSkills={worldLinkSkills}
-      value={value}
-      onChange={setValue}
-    />
-  );
-}
-
-function LinkSkillsSection({ theme, worldId, worldCharacters, editing, onEditDone, editorRef }: {
-  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[]; editing: boolean; onEditDone: () => void; editorRef: Ref<EditorHandle>;
+// Read-only: link skill LEVELS live per-character now (each character's own linkSkills
+// field, see charactersStore.ts's file-header reasoning), not one shared per-world value,
+// so there's no longer a single number this world-level screen could save an edit back
+// to. This section shows what the same-world roster PROVES is mastered (a floor/ceiling
+// on what any one character here could equip), not any specific character's actual
+// choice of which links it runs -- editing that per-character choice happens on each
+// character's own Link Skills setup step instead.
+function LinkSkillsSection({ theme, worldId, worldCharacters }: {
+  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[];
 }) {
   const mounted = useMounted();
-  const stored = mounted ? readCharactersStore().linkSkillsByWorld[String(worldId)] : undefined;
-  const levels = mounted ? reconcileLinkSkills(stored, worldCharacters, worldId) : undefined;
-  // Only the per-class winner (highest level) actually contributes to the account-wide
-  // total -- a second tracked alt of an already-mastered class contributes nothing (see
-  // computeLinkSkillsFromRoster's own doc comment) -- so the sprite row must show only
-  // that winner, not every tracked character of a qualifying class.
-  const { winners } = computeLinkSkillsFromRoster(worldCharacters, worldId);
-
-  if (editing) {
-    return (
-      <LinkSkillsEditPanel
-        theme={theme}
-        worldId={worldId}
-        worldCharacters={worldCharacters}
-        worldLinkSkills={linkSkillsStoredToDraftString(stored)}
-        onSave={onEditDone}
-        ref={editorRef}
-      />
-    );
-  }
+  const { values: levels, winners } = mounted
+    ? computeLinkSkillsFromRoster(worldCharacters, worldId)
+    : { values: {}, winners: {} };
 
   const withEligibility = LINK_SKILLS.map((skill) => ({
     skill,
@@ -788,8 +753,11 @@ export default function LegionPanel({ theme, worldId, worldCharacters, onBack }:
         </div>
         {/* Lives in the header (fixed regardless of tab/edit state) instead of inside each
             section's own content, so opening the editor (and its Save button replacing
-            this one) never shifts anything below it. */}
-        {editing
+            this one) never shifts anything below it. Link Skills has no edit affordance
+            at all here -- levels live per-character now, editable only from each
+            character's own Link Skills setup step, not from this world-level screen
+            (see LinkSkillsSection's own comment). */}
+        {section === "artifact" && (editing
           ? <button type="button" onClick={() => editorRef.current?.save()} style={saveButtonStyle(theme)}>Save</button>
           : (
             <HoverTooltip label={`Edit ${sectionLabel}`} theme={theme}>
@@ -797,7 +765,7 @@ export default function LegionPanel({ theme, worldId, worldCharacters, onBack }:
                 <PencilIcon />
               </button>
             </HoverTooltip>
-          )}
+          ))}
       </div>
 
       <div style={{ display: "flex", gap: 3, padding: 3, background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 12, marginBottom: "0.75rem" }} role="tablist" aria-label="Legion sections">
@@ -825,7 +793,7 @@ export default function LegionPanel({ theme, worldId, worldCharacters, onBack }:
       <div key={section} className="legion-section-content">
         {section === "artifact"
           ? <LegionArtifactSection theme={theme} worldId={worldId} editing={editing} onEditDone={() => setEditing(false)} editorRef={editorRef} />
-          : <LinkSkillsSection theme={theme} worldId={worldId} worldCharacters={worldCharacters} editing={editing} onEditDone={() => setEditing(false)} editorRef={editorRef} />}
+          : <LinkSkillsSection theme={theme} worldId={worldId} worldCharacters={worldCharacters} />}
       </div>
     </div>
   );

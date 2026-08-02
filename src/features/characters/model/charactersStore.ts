@@ -122,7 +122,17 @@ export interface StoredVMatrixData {
 /** Wild Hunter legion-attacker grade (derived from the WH's level). */
 export type WhLegionRank = "B" | "A" | "S" | "SS" | "SSS";
 
-/** Per-world link skill levels, shared account-wide across a world's roster. */
+/** Per-character link skill levels. Mastery of a link skill is genuinely shared across a
+ *  world's roster (summed per contributing class, see computeLinkSkillsFromRoster) -- a
+ *  same-world Bishop and Arch Mage F/P read the identical Empirical Knowledge total. But
+ *  a link skill also has to be EQUIPPED to affect a given character (limited equip slots),
+ *  so mastering a link via one alt doesn't mean every other character on the account is
+ *  running it. This is why storage lives per-character, not per-world: a character's own
+ *  value is floored by what the roster proves is mastered, but is independently editable
+ *  at or above that floor -- a Kanna that doesn't equip Hoyoung's link stores 0 for Bravado
+ *  even if a same-world Hoyoung has mastered it to 3. See linkSkillsData.ts's
+ *  computeLinkSkillsFromRoster (the floor) and propagateLinkSkillFloors (the sibling
+ *  floor-raise sync that keeps stale floors from lingering after a later alt is added). */
 export type LinkSkillId =
   | "unfairAdvantage" | "tideOfBattle" | "solus" | "timeToPrepare"
   | "termsAndConditions" | "elementalism" | "qiCultivation" | "bravado"
@@ -373,6 +383,7 @@ export interface StoredCharacterRecord {
   scouter?: StoredScouterData;
   familiars?: StoredFamiliarsData;
   vMatrix?: StoredVMatrixData;
+  linkSkills?: LinkSkillsData;
   overviewLayout?: OverviewSectionId[];
   meta: {
     addedAt: number;
@@ -392,6 +403,7 @@ export type ImportSectionId =
   | "stats"
   | "equipment"
   | "vMatrix"
+  | "linkSkills"
   | "familiars"
   | "scouter"
   | "tools"
@@ -408,6 +420,7 @@ export const IMPORT_SECTION_DEFS: { id: ImportSectionId; label: string }[] = [
   { id: "stats", label: "Stats" },
   { id: "equipment", label: "Gear" },
   { id: "vMatrix", label: "V Matrix" },
+  { id: "linkSkills", label: "Link Skills" },
   { id: "familiars", label: "Familiars" },
   { id: "tools", label: "Tool Data" },
 ];
@@ -420,8 +433,6 @@ export interface CharactersStore {
   // Per-world: worldID (as string key) -> character ids
   championCharacterIdsByWorld: Record<string, string[]>;
   charactersById: Record<string, StoredCharacterRecord>;
-  // Per-world: worldID (as string key) -> committed link skill levels
-  linkSkillsByWorld: Record<string, LinkSkillsData>;
   // Per-world: worldID (as string key) -> account-level scouter inputs (WH legion, …)
   scouterLegionByWorld: Record<string, StoredScouterLegion>;
   // Per-world: worldID (as string key) -> real Legion Artifact board progress
@@ -690,7 +701,6 @@ function createEmptyCharactersStore(): CharactersStore {
     mainCharacterIdByWorld: {},
     championCharacterIdsByWorld: {},
     charactersById: {},
-    linkSkillsByWorld: {},
     scouterLegionByWorld: {},
     legionArtifactByWorld: {},
     updatedAt: 0,
@@ -783,6 +793,7 @@ export function parseStoredCharacterRecord(
     scouter: parseOptionalRecord<StoredScouterData>(value.scouter),
     familiars: parseOptionalRecord<StoredFamiliarsData>(value.familiars),
     vMatrix: parseOptionalRecord<StoredVMatrixData>(value.vMatrix),
+    linkSkills: parseOptionalLinkSkills(value.linkSkills),
     overviewLayout: parseOverviewLayout(value.overviewLayout),
     meta: {
       addedAt: typeof meta.addedAt === "number" ? meta.addedAt : Date.now(),
@@ -850,6 +861,7 @@ export function mergeImportedCharacterRecord(
     stats: take("stats", existing.stats, imported.stats),
     equipment: take("equipment", existing.equipment, imported.equipment),
     vMatrix: take("vMatrix", existing.vMatrix, imported.vMatrix),
+    linkSkills: take("linkSkills", existing.linkSkills, imported.linkSkills),
     familiars: take("familiars", existing.familiars, imported.familiars),
     scouter: take("scouter", existing.scouter, imported.scouter),
     tools: take("tools", existing.tools, imported.tools),
@@ -899,15 +911,14 @@ function parseLinkSkillsEntry(val: Record<string, unknown>): LinkSkillsData {
   return entry;
 }
 
-function parseLinkSkillsByWorld(raw: unknown): Record<string, LinkSkillsData> {
-  if (!isObject(raw)) return {};
-  const result: Record<string, LinkSkillsData> = {};
-  for (const [worldId, val] of Object.entries(raw)) {
-    if (!isObject(val)) continue;
-    const entry = parseLinkSkillsEntry(val);
-    if (Object.keys(entry).length > 0) result[worldId] = entry;
-  }
-  return result;
+/** Per-character `linkSkills` field parse -- unlike vMatrix's untyped `parseOptionalRecord`,
+ *  this validates real shape (drops unknown skill ids/non-number levels) via the same
+ *  `parseLinkSkillsEntry` the old per-world map used, since link skill levels feed directly
+ *  into the Scouter damage calc payload and a malformed value there isn't just cosmetic. */
+function parseOptionalLinkSkills(raw: unknown): LinkSkillsData | undefined {
+  if (!isObject(raw)) return undefined;
+  const entry = parseLinkSkillsEntry(raw);
+  return Object.keys(entry).length > 0 ? entry : undefined;
 }
 
 /** Converts the setup wizard's raw string-valued draft (`{"elementalism":"3",...}`)
@@ -1042,7 +1053,6 @@ function parseCharactersStore(raw: string): CharactersStore | null {
       mainCharacterIdByWorld,
       championCharacterIdsByWorld,
       charactersById,
-      linkSkillsByWorld: parseLinkSkillsByWorld(parsed.linkSkillsByWorld),
       scouterLegionByWorld: parseScouterLegionByWorld(parsed.scouterLegionByWorld),
       legionArtifactByWorld: parseLegionArtifactByWorld(parsed.legionArtifactByWorld),
       updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
@@ -1050,11 +1060,6 @@ function parseCharactersStore(raw: string): CharactersStore | null {
   } catch {
     return null;
   }
-}
-
-export function writeLinkSkillsForWorld(worldId: number, value: LinkSkillsData) {
-  const store = readCharactersStore();
-  writeCharactersStore({ ...store, linkSkillsByWorld: { ...store.linkSkillsByWorld, [String(worldId)]: value } });
 }
 
 export function writeScouterLegionForWorld(worldId: number, value: StoredScouterLegion) {

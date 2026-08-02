@@ -24,7 +24,6 @@ import {
   type WhLegionRank,
   selectCharactersList,
   linkSkillsDraftToStored,
-  writeLinkSkillsForWorld,
   writeScouterLegionForWorld,
   writeLegionArtifactForWorld,
   writeCharactersStore,
@@ -34,6 +33,7 @@ import { getClassDataByNexonJobName } from "../setup/data/classSkillData";
 import { deriveWeaponHandFromWeapon } from "../setup/data/classBranch";
 import { hexaStatHasData, type HexaStatNode, type HexaStatEntry, type HexaStatSlot } from "../setup/data/hexaStatData";
 import { deriveInnerAbilityLine, innerAbilityHasData } from "../setup/data/innerAbilityData";
+import { propagateLinkSkillFloors, syncLinkSkillToSiblings } from "../setup/data/linkSkillsData";
 import { ARCANE_AREAS, ALL_SACRED_AREAS, SACRED_AREAS, SACRED_MAX_LEVEL, type SymbolArea, type SymbolType } from "../../tools/symbols/symbol-data";
 import type { SymbolState } from "../../tools/symbols/useSymbolState";
 import {
@@ -266,6 +266,69 @@ function applyStatsDraftToRoster(
   });
 }
 
+// Propagates any resulting floor-raise from a just-upserted character's link skills to
+// same-world siblings whose own stored value is now stale (e.g. this character being the
+// 2nd tracked magician just raised Empirical Knowledge's true floor for a 1st-set-up
+// sibling who's still sitting at their own, now-too-low, saved number).
+//
+// Takes `justUpserted` and folds it into `roster` itself rather than re-reading
+// readCharactersStore() -- the actual localStorage write for a same-tick upsertFn call
+// only happens later, in the writeCharactersStore effect keyed off characterRoster state
+// (see upsertRosterCharacter's own comment above), so a disk re-read here would still see
+// the PRE-finish record. This is also why linkSkills must be folded directly into
+// buildFullSetupRecord's/applyMapleScouterFlow's one atomic upsertFn call rather than
+// upserted as a separate step afterward that reads "existing" from disk first: for a
+// brand-new character, that separate read would find nothing on disk yet (this same
+// character's own upsertFn call hasn't flushed), so an `if (!existing) return` guard
+// would silently no-op the whole linkSkills write.
+function propagateLinkSkillFloorsAfterUpsert(
+  justUpserted: StoredCharacterRecord,
+  roster: StoredCharacterRecord[],
+  upsertFn: (c: StoredCharacterRecord) => void,
+) {
+  const key = toCharacterKey(justUpserted);
+  const existingIndex = roster.findIndex((c) => toCharacterKey(c) === key);
+  const effectiveRoster = existingIndex === -1
+    ? [...roster, justUpserted]
+    : roster.map((c, i) => (i === existingIndex ? justUpserted : c));
+  propagateLinkSkillFloors(effectiveRoster, justUpserted.worldID, upsertFn);
+}
+
+// Same propagation as propagateLinkSkillFloorsAfterUpsert, but mutates `roster` in place
+// instead of taking an upsertFn -- for callers (handleRefreshed) already inside a
+// setCharacterRoster functional updater that owns the array being built, where routing
+// through upsertRosterCharacter isn't an option (not yet in scope at that call site) and
+// isn't needed anyway (this functional update already IS the commit).
+function applyLinkSkillFloorsInPlace(roster: StoredCharacterRecord[], worldId: number): void {
+  propagateLinkSkillFloors(roster, worldId, (raised) => {
+    const i = roster.findIndex((c) => toCharacterKey(c) === toCharacterKey(raised));
+    if (i !== -1) roster[i] = raised;
+  });
+}
+
+// Shared by both full_setup/quick_setup (finalizeQuickOrFullSetupRecord) and
+// maplescouter_setup (finishSetupFlow) after their own atomic upsert: `link_skills`
+// genuinely present in this run's step data means a human just looked at the pre-filled
+// value and deliberately kept or changed it -- mastery reads as one identical number
+// across every character sharing a skill in-game (live-tested), so that saved value
+// becomes every same-world sibling's new synced truth too (syncLinkSkillToSiblings,
+// clamped at the level-proven floor). No `link_skills` this run (Quick Setup never has
+// that step; a redo that didn't revisit it) means nobody made a deliberate choice to
+// sync from, so only a stale sibling gets raised, never overwritten down to a number
+// nobody actually chose (propagateLinkSkillFloorsAfterUpsert, raise-only).
+function syncOrPropagateLinkSkills(
+  linkSkillsStepValue: string | undefined,
+  justUpserted: StoredCharacterRecord,
+  roster: StoredCharacterRecord[],
+  upsertFn: (c: StoredCharacterRecord) => void,
+): void {
+  if (linkSkillsStepValue) {
+    syncLinkSkillToSiblings(justUpserted, roster, upsertFn);
+  } else {
+    propagateLinkSkillFloorsAfterUpsert(justUpserted, roster, upsertFn);
+  }
+}
+
 const WH_LEGION_RANK_SET = new Set<string>(["B", "A", "S", "SS", "SSS"]);
 
 // Resolves the world's WH Legion rank: roster-derived wins, else the manual pick,
@@ -332,6 +395,7 @@ function finalizeQuickOrFullSetupRecord(
   isFullSetupFlow: boolean,
   confirmedCharacter: NormalizedCharacterData,
   setupStepTestByStep: SetupStepInputById,
+  characterRoster: StoredCharacterRecord[],
   upsertRosterCharacter: (c: StoredCharacterRecord) => void,
 ): void {
   let storedRecord: StoredCharacterRecord;
@@ -357,6 +421,8 @@ function finalizeQuickOrFullSetupRecord(
     // (per-world) and safe to assume regardless of entry path — see the helper's own comment.
     ensureLegionArtifactDefaultForWorld(confirmedCharacter.worldID);
   }
+  // See syncOrPropagateLinkSkills's own comment for the sync-vs-raise-only split.
+  syncOrPropagateLinkSkills(setupStepTestByStep.link_skills, storedRecord, characterRoster, upsertRosterCharacter);
 }
 
 // A freshly-unlocked Legion Artifact starts at Artifact Level 1 (not 0 — namu.wiki's own
@@ -496,6 +562,10 @@ function applyMapleScouterFlow(
     ...(hexaSkillsToolData ? { hexaSkills: hexaSkillsToolData } : null),
     ...(hexaStatToolData ? { hexaStat: hexaStatToolData } : null),
   };
+  // Falls back to base.linkSkills (already existing?.linkSkills or undefined for a fresh
+  // record) when this run's Link Skills step produced no draft data, same rule as the
+  // other fields here.
+  const linkSkills = stepData.link_skills ? linkSkillsDraftToStored(stepData.link_skills) : base.linkSkills;
   upsertFn({
     ...base,
     stats: { ...base.stats, ...stats },
@@ -507,6 +577,7 @@ function applyMapleScouterFlow(
     soul,
     scouter: scouterPatch,
     tools,
+    linkSkills,
     expHistory: appendExpHistoryEntry(base.expHistory, character.level, character.exp),
   });
   if (created) removeSetupDraftForCharacter(character);
@@ -605,6 +676,11 @@ function buildFullSetupRecord(
   const hexaStatToolData = buildHexaStatToolData(stepData.hexa_matrix ?? "");
   preserveExistingHexaStatActivePresets(hexaStatToolData, existing);
   const vMatrixData = buildVMatrixDataForRecord(stepData.v_matrix ?? "");
+  // Falls back to existing.linkSkills (not base.linkSkills, always undefined on a fresh
+  // record) when this run's Link Skills step produced no draft data -- same rule as
+  // equipment/familiars/vMatrix below, so a full-setup redo that didn't revisit the step
+  // doesn't wipe a previously saved value.
+  const linkSkillsData = stepData.link_skills ? linkSkillsDraftToStored(stepData.link_skills) : null;
   const familiarsData = buildFamiliarsDataForRecord(stepData.familiars ?? "");
   preserveExistingFamiliarsActivePreset(familiarsData, existing);
   const equipmentData = stepData.equipment ? parseEquipmentDraft(stepData.equipment) : null;
@@ -670,6 +746,7 @@ function buildFullSetupRecord(
     soul, tools,
     familiars: familiarsData ?? existing?.familiars ?? base.familiars,
     vMatrix: vMatrixData ?? existing?.vMatrix ?? base.vMatrix,
+    linkSkills: linkSkillsData ?? existing?.linkSkills ?? base.linkSkills,
     expHistory: existing ? appendExpHistoryEntry(existing.expHistory, character.level, character.exp) : base.expHistory,
     // Merged against the EXISTING record's scouter (not `base`, which is always a
     // fresh blank object here — see the equipment/familiars/vMatrix comment above for
@@ -1164,12 +1241,22 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       scouter: existing.scouter,
       familiars: existing.familiars,
       vMatrix: existing.vMatrix,
+      linkSkills: existing.linkSkills,
     };
     setCharacterRoster((prev) => {
       const existingIndex = prev.findIndex((c) => toCharacterKey(c) === key);
       if (existingIndex === -1) return prev;
       const next = [...prev];
       next[existingIndex] = updated;
+      // A level-up crossing 70/120/210 can raise this character's OWN floor, and (for a
+      // magician/thief) a same-world sibling's floor too -- e.g. this character just being
+      // the one that pushed Empirical Knowledge's true total higher. Checked on every
+      // refresh, not just setup finishes, since a level-up is exactly the kind of
+      // "sibling fact changed without anyone visiting Link Skills" case propagation needs
+      // to catch. Applied in-place here (rather than via upsertRosterCharacter, which
+      // isn't in scope yet at handleRefreshed's position in this file) since this
+      // functional update already owns the array being mutated.
+      applyLinkSkillFloorsInPlace(next, updated.worldID);
       return next;
     });
     // A Wild Hunter leveling into a new legion bracket over time should update the
@@ -1728,8 +1815,11 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     // Re-read the world-scoped fields immediately before writing rather than reusing the
     // earlier existingStore read: this effect fires on every setup-flow keystroke (any step,
     // any open tab), and the roster rebuild above takes real time, leaving a window where a
-    // concurrent writeLinkSkillsForWorld/writeLegionArtifactForWorld call (e.g. from another
-    // tab) could land in between and get silently clobbered by this pass-through write.
+    // concurrent writeLegionArtifactForWorld call (e.g. from another tab) could land in
+    // between and get silently clobbered by this pass-through write. Link skills no longer
+    // need this treatment -- they live on each character's own record now (rides through
+    // nextCharactersById above via the ...character spread), not a world-scoped map that
+    // could race a separate writer.
     const freshWorldFields = readCharactersStore();
     const nextStore = {
       version: existingStore.version,
@@ -1737,7 +1827,6 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       mainCharacterIdByWorld: nextMainCharacterIdByWorld,
       championCharacterIdsByWorld: nextChampionCharacterIdsByWorld,
       charactersById: nextCharactersById,
-      linkSkillsByWorld: freshWorldFields.linkSkillsByWorld,
       scouterLegionByWorld: freshWorldFields.scouterLegionByWorld,
       legionArtifactByWorld: freshWorldFields.legionArtifactByWorld,
       updatedAt: now,
@@ -2201,7 +2290,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       const isQuickSetupFlow = effectiveFlowId === requiredFlowId;
       const isFullSetupFlow = effectiveFlowId === "full_setup";
       if ((isQuickSetupFlow || isFullSetupFlow) && confirmedCharacter) {
-        finalizeQuickOrFullSetupRecord(isFullSetupFlow, confirmedCharacter, effectiveStepData, upsertRosterCharacter);
+        finalizeQuickOrFullSetupRecord(isFullSetupFlow, confirmedCharacter, effectiveStepData, characterRoster, upsertRosterCharacter);
         setHasCompletedRequiredSetupEver(true);
         removeSetupDraftForCharacter(confirmedCharacter);
       }
@@ -2213,14 +2302,15 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       if (effectiveFlowId === "maplescouter_setup"
         && applyMapleScouterFlow(confirmedCharacter, effectiveStepData, upsertRosterCharacter)) {
         setHasCompletedRequiredSetupEver(true);
-      }
-
-      // Gated by the flow actually being finished, not just "is this draft field non-empty" —
-      // otherwise leftover data from a different, abandoned flow (e.g. Link Skills filled in
-      // during Full Setup, then backing out to finish Quick Setup) silently leaks into storage.
-      const linkSkillsValue = effectiveStepData.link_skills;
-      if (linkSkillsValue && confirmedCharacter && flowIncludesStep(effectiveFlowId, "link_skills")) {
-        writeLinkSkillsForWorld(confirmedCharacter.worldID, linkSkillsDraftToStored(linkSkillsValue));
+        // full_setup/quick_setup already run their own sync/propagation inside
+        // finalizeQuickOrFullSetupRecord above (right where storedRecord is built) --
+        // maplescouter_setup's own atomic upsert happens inside applyMapleScouterFlow
+        // instead, so it needs its own call here. Uses lastUpsertedCharacterRef (not a
+        // stale disk read) -- see propagateLinkSkillFloorsAfterUpsert's own comment for
+        // why; see syncOrPropagateLinkSkills's own comment for the sync-vs-raise split.
+        if (lastUpsertedCharacterRef.current) {
+          syncOrPropagateLinkSkills(effectiveStepData.link_skills, lastUpsertedCharacterRef.current, characterRoster, upsertRosterCharacter);
+        }
       }
 
       // maplescouter_setup, like full_setup, already handles every step it owns (stats,
@@ -2275,6 +2365,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     }, CHARACTERS_TRANSITION_MS.standard);
   }, [
     activeFlowId,
+    characterRoster,
     completedFlowIds,
     confirmedCharacter,
     requiredFlowId,
@@ -2455,10 +2546,15 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   // routes to importCharacterAsChampionSwap instead when slots are full).
   const importCharacter = useCallback((record: StoredCharacterRecord, role: RosterRole) => {
     upsertRosterCharacter(record);
+    // Same reasoning as finalizeQuickOrFullSetupRecord's own propagation call: floors
+    // only need class/level, which an imported record always has regardless of whether
+    // its own Link Skills field was ever exported/filled in, so a same-world sibling's
+    // stored value can still go stale the moment this import lands.
+    propagateLinkSkillFloorsAfterUpsert(record, characterRoster, upsertRosterCharacter);
     if (role === "main") setMainCharacter(record);
     if (role === "champion") toggleChampionCharacter(record);
     switchToCharacterProfile(record);
-  }, [setMainCharacter, switchToCharacterProfile, toggleChampionCharacter, upsertRosterCharacter]);
+  }, [characterRoster, setMainCharacter, switchToCharacterProfile, toggleChampionCharacter, upsertRosterCharacter]);
 
   // Champion-slot-full path: adds the imported character as a champion while removing
   // `swapOutKey` from the champion list in the same store update, rather than two separate
@@ -2466,13 +2562,14 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   // or, if the add happened to lose a race with the remove, silently drops back to 4.
   const importCharacterAsChampionSwap = useCallback((record: StoredCharacterRecord, swapOutKey: string) => {
     upsertRosterCharacter(record);
+    propagateLinkSkillFloorsAfterUpsert(record, characterRoster, upsertRosterCharacter);
     setChampionCharacterKeysByWorld((prev) => {
       const worldId = record.worldID;
       const cur = getChampionKeysForWorld(prev, worldId).filter((k) => k !== swapOutKey);
       return setChampionKeysForWorld(prev, worldId, [...cur, toCharacterKey(record)]);
     });
     switchToCharacterProfile(record);
-  }, [switchToCharacterProfile, upsertRosterCharacter]);
+  }, [characterRoster, switchToCharacterProfile, upsertRosterCharacter]);
 
   // Conflict-resolved path: the imported IGN already exists -- apply the user's
   // per-section choices from the conflict dialog before upserting. Never touches
@@ -2485,8 +2582,9 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   ) => {
     const merged = mergeImportedCharacterRecord(existing, imported, choices);
     upsertRosterCharacter(merged);
+    propagateLinkSkillFloorsAfterUpsert(merged, characterRoster, upsertRosterCharacter);
     switchToCharacterProfile(merged);
-  }, [switchToCharacterProfile, upsertRosterCharacter]);
+  }, [characterRoster, switchToCharacterProfile, upsertRosterCharacter]);
 
   const backFromAddCharacter = useCallback(() => {
     if (immediateUiLockRef.current) return;

@@ -23,13 +23,15 @@ const MAX_SNAPSHOTS = 3;
  *  -- it is a bag of independent per-tool blobs, checked one subkey at a time below so
  *  losing just one tool's data isn't masked by its neighbours still being populated. */
 const WATCHED_FIELDS = [
-  "equipment", "vMatrix", "familiars", "stats", "scouter", "expHistory",
+  "equipment", "vMatrix", "linkSkills", "familiars", "stats", "scouter", "expHistory",
 ] as const satisfies readonly (keyof StoredCharacterRecord)[];
 
 /** World-keyed maps that live on the store rather than on a character record, so the
- *  per-character pass never sees them (Legion's Link Skills and Artifact board). */
+ *  per-character pass never sees them (Legion's Artifact board -- Link Skills moved to a
+ *  per-character field, see charactersStore.ts's file-header reasoning, so it's covered
+ *  by WATCHED_FIELDS above now instead of here). */
 const WATCHED_WORLD_MAPS = [
-  "linkSkillsByWorld", "legionArtifactByWorld",
+  "legionArtifactByWorld",
 ] as const satisfies readonly (keyof CharactersStore)[];
 
 /** Ignore fields that were near-empty to begin with, so adding then clearing a single
