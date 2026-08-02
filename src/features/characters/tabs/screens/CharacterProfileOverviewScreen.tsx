@@ -43,6 +43,8 @@ import HoverTooltip from "../../../../components/HoverTooltip";
 import ScouterFigure from "../../scouter/ScouterFigure";
 import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
 import BossClearGrid, { type ScouterBookmarkView } from "../../scouter/BossClearGrid";
+import StatEfficiencyPanel from "../../scouter/StatEfficiencyPanel";
+import type { ScouterResultEntry } from "../../scouter/scouterCache";
 import { groupByBoss, resolveBossDisplayName } from "../../scouter/bossGrouping";
 import { BOSSCUT_DATA } from "../../scouter/bosscut-data.generated";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
@@ -65,7 +67,7 @@ interface CharacterProfileOverviewScreenProps {
 }
 
 type Theme = PreviewPaneModel["theme"];
-type BookmarkId = "overview" | "gender_marriage" | Exclude<SetupStepId, "gender" | "marriage" | "link_skills" | "legion_artifacts" | "buffs" | "oz_rings"> | "exp" | "scouter" | "setup";
+type BookmarkId = "overview" | "gender_marriage" | Exclude<SetupStepId, "gender" | "marriage" | "link_skills" | "legion_artifacts" | "buffs" | "oz_rings"> | "exp" | "scouter" | "efficiency" | "setup";
 
 interface BookmarkDef {
   id: BookmarkId;
@@ -79,6 +81,7 @@ const ALL_BOOKMARKS: BookmarkDef[] = [
   { id: "gender_marriage", tabLabel: "Bio", pageLabel: "Biography", flowId: "quick_setup" },
   { id: "exp", tabLabel: "EXP", pageLabel: "EXP", flowId: null },
   { id: "scouter", tabLabel: "Scouter", pageLabel: "Scouter", flowId: null },
+  { id: "efficiency", tabLabel: "Efficiency", pageLabel: "Stat Efficiency", flowId: null },
   { id: "stats", tabLabel: "Stats", pageLabel: "Stats", flowId: "stats_flow" },
   { id: "equipment", tabLabel: "Gear", pageLabel: "Equipment", flowId: "equipment_flow" },
   { id: "v_matrix", tabLabel: "V Matrix", pageLabel: "V Matrix", flowId: "v_matrix_flow" },
@@ -3180,19 +3183,14 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
 
 // Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
 // happens via the Scouter figure on Overview (manual-refresh-only by design, see
-// useScouterResult's own doc comment), so this bookmark has no pencil/refresh of its own.
-// The old flat power figures (Boss 300/380, Converted Power, Dojo) now live inside
-// BossClearGrid's Quick View as a header strip instead of a separate sub-view here -- they're
-// the raw inputs feeding every row below them, not unrelated data. BossClearGrid owns the
-// Quick View/Spotlight sub-view split internally, including its own Spotlight-side "back to
-// Quick View" button -- this just passes view/onViewChange through. The old bottom action-bar
-// nav (forward AND back buttons) was removed 2026-07-30: the forward direction was redundant
-// with clicking a boss's banner or the Quick View dropdown (3 ways to do the same thing), and
-// once that got removed the back-only button didn't earn its own dedicated row anymore either,
-// so it moved into BossSpotlight's own header instead.
-function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange }: {
-  theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
-  selectedBossIndex: number; onSelectedBossIndexChange: (i: number) => void;
+// useScouterResult's own doc comment), so neither bookmark below has a pencil/refresh of
+// its own.
+/** The four not-ready states every MapleScouter-backed bookmark shares (class unsupported,
+ *  setup incomplete, never calculated, last refresh failed) plus the stale-result banner,
+ *  in one place so Scouter and Stat Efficiency can't drift apart on what they say when
+ *  there's nothing to show. */
+function ScouterResultGate({ theme, character, children }: {
+  theme: Theme; character: StoredCharacterRecord; children: (entry: ScouterResultEntry) => ReactNode;
 }) {
   const { status } = useScouterResult(character);
 
@@ -3220,16 +3218,49 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
           Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
         </p>
       )}
-      <BossClearGrid
-        theme={theme}
-        character={character}
-        entry={status.entry}
-        view={view}
-        onViewChange={onViewChange}
-        selectedIndex={selectedBossIndex}
-        onSelectedIndexChange={onSelectedBossIndexChange}
-      />
+      {children(status.entry)}
     </div>
+  );
+}
+
+// The old flat power figures (Boss 300/380, Converted Power, Dojo) live inside BossClearGrid's
+// Quick View as a header strip instead of a separate sub-view here -- they're the raw inputs
+// feeding every row below them, not unrelated data. BossClearGrid owns the Quick View/Spotlight
+// sub-view split internally, including its own Spotlight-side "back to Quick View" button --
+// this just passes view/onViewChange through. The old bottom action-bar nav (forward AND back
+// buttons) was removed 2026-07-30: the forward direction was redundant with clicking a boss's
+// banner or the Quick View dropdown (3 ways to do the same thing), and once that got removed
+// the back-only button didn't earn its own dedicated row anymore either, so it moved into
+// BossSpotlight's own header instead.
+function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange }: {
+  theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
+  selectedBossIndex: number; onSelectedBossIndexChange: (i: number) => void;
+}) {
+  return (
+    <ScouterResultGate theme={theme} character={character}>
+      {(entry) => (
+        <BossClearGrid
+          theme={theme}
+          character={character}
+          entry={entry}
+          view={view}
+          onViewChange={onViewChange}
+          selectedIndex={selectedBossIndex}
+          onSelectedIndexChange={onSelectedBossIndexChange}
+        />
+      )}
+    </ScouterResultGate>
+  );
+}
+
+// Same MapleScouter response the Scouter bookmark reads, different slice of it: the per-unit
+// marginal damage table (statEfficiency.ts) rather than the boss-clear figures. Both its
+// sections render together in one page, so unlike Scouter it has no sub-view to remember.
+function StatEfficiencyBookmark({ theme, character }: { theme: Theme; character: StoredCharacterRecord }) {
+  return (
+    <ScouterResultGate theme={theme} character={character}>
+      {(entry) => <StatEfficiencyPanel theme={theme} character={character} entry={entry} />}
+    </ScouterResultGate>
   );
 }
 
@@ -3263,11 +3294,12 @@ function isBookmarkFilled(id: BookmarkId, character: StoredCharacterRecord | nul
     case "hexa_matrix": return isHexaMatrixFilled(character, mounted);
     case "exp": return true;
     case "scouter": return true;
+    case "efficiency": return true;
     default: return false;
   }
 }
 
-const BOOKMARK_CONTENT: Record<Exclude<BookmarkId, "overview" | "setup" | "gender_marriage" | "stats" | "equipment" | "v_matrix" | "hexa_matrix" | "familiars" | "exp" | "scouter">, (props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode> = {};
+const BOOKMARK_CONTENT: Record<Exclude<BookmarkId, "overview" | "setup" | "gender_marriage" | "stats" | "equipment" | "v_matrix" | "hexa_matrix" | "familiars" | "exp" | "scouter" | "efficiency">, (props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode> = {};
 
 function SetupBookmark({ model, actions }: { model: PreviewPaneModel; actions: PreviewPaneActions }) {
   const { theme } = model;
@@ -3496,6 +3528,15 @@ function BookmarkPageBody({
     );
   }
 
+  if (active.id === "efficiency") {
+    return (
+      <>
+        <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={null} disabled={setup.isUiLocked} />
+        {character && <StatEfficiencyBookmark theme={theme} character={character} />}
+      </>
+    );
+  }
+
   return (
     <>
       <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={filled ? onEdit : null} disabled={setup.isUiLocked} />
@@ -3631,7 +3672,7 @@ export default function CharacterProfileOverviewScreen({
   useEffect(() => { actions.clearRestoredBookmark(); }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filled = isBookmarkFilled(active.id, character, mounted);
-  const ContentComponent = active.id === "overview" || active.id === "setup" || active.id === "gender_marriage" || active.id === "stats" || active.id === "equipment" || active.id === "v_matrix" || active.id === "hexa_matrix" || active.id === "familiars" || active.id === "exp" || active.id === "scouter" ? null : BOOKMARK_CONTENT[active.id];
+  const ContentComponent = active.id === "overview" || active.id === "setup" || active.id === "gender_marriage" || active.id === "stats" || active.id === "equipment" || active.id === "v_matrix" || active.id === "hexa_matrix" || active.id === "familiars" || active.id === "exp" || active.id === "scouter" || active.id === "efficiency" ? null : BOOKMARK_CONTENT[active.id];
 
   function startOptionalFlowRemembered(flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) {
     actions.rememberActiveBookmark(active.id, subView);

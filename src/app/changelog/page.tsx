@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-02",
+    changes: [
+      { type: "added", text: "Character profiles now have a Stat Efficiency bookmark showing what a point of each stat is actually worth for that character, and how stats like Boss Damage, ATT and Ignore DEF trade off against each other." },
+    ],
+  },
+  {
     date: "2026-07-27",
     changes: [
       { type: "fixed", text: "Fixed the Daily Tracker cutting off longer task names like Normal Crimson Queen on some browsers." },

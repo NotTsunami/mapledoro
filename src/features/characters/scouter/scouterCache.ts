@@ -25,7 +25,11 @@ const MAX_CACHE_ENTRIES = 8;
 // either case, since it only changes when the character's own stats change. A version bump
 // makes every existing entry read as stale-by-version on next load, so it self-heals via one
 // real refetch per character, with no per-user localStorage clearing ever needed.
-const SCOUTER_CACHE_VERSION = 1;
+// Bumped to 2 for specEfficiency (below). A newly-parsed response field can never reach an
+// already-cached entry on its own: refreshScouterResult returns a hash hit without fetching,
+// and the hash only moves when the character's own stats do, so without a bump the Stat
+// Efficiency bookmark would read "not available" forever for every existing character.
+const SCOUTER_CACHE_VERSION = 2;
 
 interface ScouterSpline {
   x: number[];
@@ -51,6 +55,29 @@ export interface BossClearInputs {
   genePassConst: number;
 }
 
+/** The subset of MapleScouter's `calculatedData.specEfficiency` table the Stat Efficiency
+ *  bookmark reads. Each value is the fraction of extra final damage ONE unit of that stat
+ *  buys this character, so `value * amount` is the damage gain and a ratio between two
+ *  fields is an equivalence ("1 ATT is worth N main stat"). Computed server-side, so unlike
+ *  Boss Clear there's no formula to port -- only the site's presentation math on top of it
+ *  (statEfficiency.ts). Wire names kept verbatim so those ported formulas stay readable
+ *  next to the decompiled originals.
+ *
+ *  The real response carries more (`igreffminus{10,15,20,30,35}` and their `_380` twins, for
+ *  ignore-DEF amounts the panel doesn't offer); only what's rendered is stored. Optional on
+ *  ScouterResultEntry and all-or-nothing field-wise, same as BossClearInputs: a response
+ *  missing it degrades that one bookmark rather than failing the whole entry. */
+const SPEC_EFFICIENCY_KEYS = [
+  "dmgeff1", "atkeff1", "atkPereff1", "cridmgeff1",
+  "igreff1", "igreff1_380", "igreffminus40_380",
+  "mainStateff1", "mainStatPereff1", "mainStatAbseff1",
+  "subStateff1", "subStatPereff1", "subStatAbseff1",
+  "ssubStateff1", "ssubStatPereff1", "ssubStatAbseff1",
+  "allStatEff",
+] as const;
+
+export type ScouterSpecEfficiency = Record<(typeof SPEC_EFFICIENCY_KEYS)[number], number>;
+
 export interface ScouterResultEntry {
   computedAt: number;
   boss300Normal: number;
@@ -61,6 +88,7 @@ export interface ScouterResultEntry {
   convertedPowerHexa: number;
   dojoPower: number;
   bossClearInputs?: BossClearInputs;
+  specEfficiency?: ScouterSpecEfficiency;
 }
 
 interface ScouterCacheData {
@@ -135,6 +163,7 @@ interface MapleScouterCalcResponse {
     spline_300?: ScouterSpline;
     spline_380?: ScouterSpline;
     genePassConst?: number;
+    specEfficiency?: unknown;
   };
 }
 
@@ -172,6 +201,20 @@ function parseBossClearInputs(c: NonNullable<MapleScouterCalcResponse["calculate
   };
 }
 
+/** Every field or none: a partially-numeric table would silently render some efficiency rows
+ *  against a 0 (reading as "this stat is worth nothing") instead of hiding the section. */
+function parseSpecEfficiency(raw: unknown): ScouterSpecEfficiency | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const source = raw as Record<string, unknown>;
+  const parsed: Record<string, number> = {};
+  for (const key of SPEC_EFFICIENCY_KEYS) {
+    const value = source[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    parsed[key] = value;
+  }
+  return parsed as ScouterSpecEfficiency;
+}
+
 /** A 0 for the headline figure is MapleScouter's own known failure signature (e.g. the
  *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result. */
 function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry | null {
@@ -195,6 +238,7 @@ function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry |
     convertedPowerHexa: exchangePowerHexa,
     dojoPower: mr_hexaStat,
     bossClearInputs: parseBossClearInputs(c),
+    specEfficiency: parseSpecEfficiency(c.specEfficiency),
   };
 }
 
