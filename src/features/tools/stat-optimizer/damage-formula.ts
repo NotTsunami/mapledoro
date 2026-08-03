@@ -92,6 +92,39 @@ export interface KernelDelta {
   iedStrip: number;
 }
 
+/**
+ * Per-character corrections that move the kernel's buckets onto the same footing
+ * maplescouter evaluates against. Our stat inputs are the in-game stat window,
+ * which is unbuffed; scouter folds that character's link skills, noblesse and
+ * potion settings, Champion's Renown and seed-ring uptime into the same buckets
+ * before optimizing. Those are additive constants, so the whole gap collapses to
+ * one offset per bucket (`scouter-calibration.ts` solves them from the character's
+ * cached Scouter efficiency table). All zero = the raw stat window, unchanged.
+ */
+export interface KernelCalibration {
+  /** Added to (4*main + sub) inside the stat factor. */
+  statSum: number;
+  /** Added to the ATT base that ATT% multiplies. */
+  atkBase: number;
+  /** Added to ATT %. */
+  atkPct: number;
+  /** Percentage points added to the damage/boss bucket. */
+  dmgPct: number;
+  /** Percentage points added to critical damage. */
+  critDmgPct: number;
+  /** Ignore-DEF percent stacked (multiplicatively) onto the stat window's. */
+  iedPct: number;
+}
+
+export const zeroCalibration = (): KernelCalibration => ({
+  statSum: 0,
+  atkBase: 0,
+  atkPct: 0,
+  dmgPct: 0,
+  critDmgPct: 0,
+  iedPct: 0,
+});
+
 export const zeroDelta = (): KernelDelta => ({
   mainFlat: 0,
   mainPct: 0,
@@ -176,6 +209,17 @@ export function resolveClassDamageProfile(
   };
 }
 
+/**
+ * Whether the stat window carries a damage baseline to value an allocation
+ * against. With no main or secondary stat the stat factor is 0, so every
+ * candidate evaluates to 0, the greedy can't rank anything, and the 0% gain
+ * that falls out means "nothing entered" rather than "already optimal".
+ */
+export function hasStatBaseline(profile: ClassDamageProfile, inputs: OptimizerStatInputs): boolean {
+  const total = (t: TripleStat): number => Math.floor(t.base * (1 + t.pct / 100)) + t.flat;
+  return total(inputs.main) > 0 || (profile.subStat !== null && total(inputs.sub) > 0);
+}
+
 /** Reads a character's stored stats into the optimizer's editable input shape. */
 export function prefillFromStats(
   stats: StoredCharacterStats,
@@ -235,10 +279,17 @@ interface KernelOptions {
   bossPdrPct: number;
   /** Scouter's HEXA evaluations force 100% crit; hyper uses the real crit rate. */
   forceFullCrit: boolean;
+  /** Buffed-state corrections; `zeroCalibration()` leaves the raw stat window. */
+  calibration: KernelCalibration;
 }
 
 /** Stat factor for standard classes and Xenon (scouter's n8). */
-function statFactor(p: ClassDamageProfile, s: OptimizerStatInputs, d: KernelDelta): number {
+function statFactor(
+  p: ClassDamageProfile,
+  s: OptimizerStatInputs,
+  d: KernelDelta,
+  cal: KernelCalibration,
+): number {
   // Level-based AP term: scouter adds dpmMainStat * (5*level + 18) to whichever
   // stat carries the AP (for Xenon, the one with the highest % value; the other
   // two get a flat 330 instead).
@@ -266,10 +317,13 @@ function statFactor(p: ClassDamageProfile, s: OptimizerStatInputs, d: KernelDelt
     Math.floor((s.sub2.base + apFor(3)) * (1 + s.sub2.pct / 100)) + s.sub2.flat + d.sub2Flat,
   );
   const hasSub2 = p.subStat2 !== null;
-  return (4 * main + (sub + (hasSub2 ? sub2 : 0)) * (p.isXenon ? 4 : 1)) / 100;
+  return (4 * main + (sub + (hasSub2 ? sub2 : 0)) * (p.isXenon ? 4 : 1) + cal.statSum) / 100;
 }
 
-/** Demon Avenger stat factor (scouter's gt, output 0): HP-based, fixed 3.5 divisors. */
+/** Demon Avenger stat factor (scouter's gt, output 0): HP-based, fixed 3.5 divisors.
+ *  Takes no calibration: its factor isn't `4*main + sub`, so a stat-sum offset solved
+ *  from `mainStatAbseff1` wouldn't mean anything here. `calibrateFromSpecEfficiency`
+ *  returns null for HP-based classes for the same reason, so this stays a no-op path. */
 function statFactorHpBased(s: OptimizerStatInputs, d: KernelDelta): number {
   const x = 90 * s.level + 545;
   const hp = Math.max(
@@ -291,25 +345,31 @@ export function computeScouterDamage(
   opts: KernelOptions,
 ): number {
   const c = profile.constants;
+  const cal = opts.calibration;
 
-  const stat = profile.isHpBased ? statFactorHpBased(inputs, delta) : statFactor(profile, inputs, delta);
+  const stat = profile.isHpBased
+    ? statFactorHpBased(inputs, delta)
+    : statFactor(profile, inputs, delta, cal);
 
   // Attack (scouter's Ng): a flat +20 is always present on the live site, and
   // added ATT lands inside the base the ATT% multiplies.
   const attack =
-    Math.max(0, inputs.attack.base + 20 + c.dpmAtk + delta.atk) *
-      (1 + Math.max(0, inputs.attack.pct + c.dpmAtkPer) / 100) +
+    Math.max(0, inputs.attack.base + 20 + c.dpmAtk + cal.atkBase + delta.atk) *
+      (1 + Math.max(0, inputs.attack.pct + c.dpmAtkPer + cal.atkPct) / 100) +
     inputs.attack.flat;
 
   // Crit bucket, rounded to 4 decimals like the live site.
   const critRate = opts.forceFullCrit ? 1 : Math.min(1, (inputs.critRatePct + delta.critRate) / 100);
-  const critDmg = inputs.critDamagePct + c.dpmCritDmg + delta.critDmg;
+  const critDmg = inputs.critDamagePct + c.dpmCritDmg + cal.critDmgPct + delta.critDmg;
   const critBucket = Math.round(((1 - critRate) * 1 + (critRate * (135 + critDmg)) / 100) * 1e4) / 1e4;
 
   const dmgBucket =
-    1 + (c.dpmBossDmg + inputs.bossDamagePct + inputs.damagePct + delta.bossDmg + delta.dmg) / 100;
+    1 +
+    (c.dpmBossDmg + inputs.bossDamagePct + inputs.damagePct + cal.dmgPct + delta.bossDmg + delta.dmg) /
+      100;
 
-  let ied = 1 - (1 - inputs.ignoreDefPct / 100) * (1 - c.dpmIgnoreGuard / 100);
+  let ied =
+    1 - (1 - inputs.ignoreDefPct / 100) * (1 - c.dpmIgnoreGuard / 100) * (1 - cal.iedPct / 100);
   ied = applyIed(delta.ied, ied);
   ied = applyIed(delta.iedStrip, ied);
   const iedBucket = 1 - (opts.bossPdrPct * (1 - ied)) / 100;

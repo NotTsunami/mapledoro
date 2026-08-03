@@ -8,13 +8,18 @@
 
 import type { StoredCharacterRecord } from "../../characters/model/charactersStore";
 import type { HexaStatNode, HexaStatType } from "../../characters/setup/data/hexaStatData";
+import { hasMinimalScouterSetup, isScouterSupportedClass } from "../../characters/scouter/scouterApi";
+import type { ScouterSpecEfficiency } from "../../characters/scouter/scouterCache";
 import {
   prefillFromStats,
   resolveClassDamageProfile,
+  zeroCalibration,
   zeroTriple,
   type ClassDamageProfile,
+  type KernelCalibration,
   type OptimizerStatInputs,
 } from "./damage-formula";
+import { calibrateFromSpecEfficiency } from "./scouter-calibration";
 import { availableHyperPoints, HYPER_COST_CUMULATIVE, HYPER_MAX_LEVEL } from "./hyper-stat-data";
 import { mapStoredHyper, zeroHyperAllocation, type HyperAllocation } from "./hyper-stat-engine";
 import { HEXA_CORE_COUNT, HEXA_MAX_LINE_LEVEL, type HexaCore, type HexaLine } from "./hexa-stat-engine";
@@ -31,12 +36,36 @@ const VALID_TYPES: HexaStatType[] = [
   "criticalDamage",
 ];
 
+/**
+ * Why the kernel is running uncalibrated, so the panel can name the fix instead
+ * of just disclaiming. `null` = calibrated (or standalone entry, where the typed
+ * stats are taken at face value and there's nothing to calibrate against).
+ */
+export type CalibrationNotice =
+  /** Scouter setup isn't finished for this character — the actionable case. */
+  | "setup"
+  /** Set up, but no cached figure matches the character's current stats yet. */
+  | "refresh"
+  /** Calibration can't apply here at all (class scouter doesn't cover, or a
+   *  Demon Avenger, whose HP-based stat factor the table can't invert). */
+  | "unavailable";
+
 export interface CharacterSeed {
   profile: ClassDamageProfile;
   inputs: OptimizerStatInputs;
   availablePoints: number;
   storedHyper: HyperAllocation;
   cores: HexaCore[];
+  /** Buffed-state corrections solved from the character's cached Scouter data. */
+  calibration: KernelCalibration;
+  calibrationNotice: CalibrationNotice | null;
+}
+
+/** Which notice a failed calibration earns. Ordered most-actionable first, so a
+ *  character that could be calibrated is always told the specific step to take. */
+function noticeFor(record: StoredCharacterRecord, profile: ClassDamageProfile): CalibrationNotice {
+  if (profile.isHpBased || !isScouterSupportedClass(record.jobName)) return "unavailable";
+  return hasMinimalScouterSetup(record) ? "refresh" : "setup";
 }
 
 function readHexaNodes(record: StoredCharacterRecord): HexaStatNode[] {
@@ -95,18 +124,25 @@ function pointsSpentOnUntrackedLines(
   return spent;
 }
 
-export function seedFromCharacter(record: StoredCharacterRecord): CharacterSeed {
+export function seedFromCharacter(
+  record: StoredCharacterRecord,
+  specEfficiency?: ScouterSpecEfficiency,
+): CharacterSeed {
   const profile = resolveClassDamageProfile(record.jobName, record.stats);
   const nodes = readHexaNodes(record);
+  const inputs = prefillFromStats(record.stats, profile, record.level);
+  const calibration = calibrateFromSpecEfficiency(specEfficiency, profile, inputs);
   return {
     profile,
-    inputs: prefillFromStats(record.stats, profile, record.level),
+    inputs,
     availablePoints: Math.max(
       0,
       availableHyperPoints(record.level) - pointsSpentOnUntrackedLines(record, profile),
     ),
     storedHyper: mapStoredHyper(record.stats.hyperStat, profile),
     cores: Array.from({ length: HEXA_CORE_COUNT }, (_, i) => readCore(record, nodes[i], i)),
+    calibration: calibration ?? zeroCalibration(),
+    calibrationNotice: calibration ? null : noticeFor(record, profile),
   };
 }
 
@@ -148,5 +184,9 @@ export function emptyCharacterSeed(): CharacterSeed {
       primary: emptyLine(),
       additional: [emptyLine(), emptyLine()],
     })),
+    // Standalone mode has no character to calibrate against; the typed-in stats are
+    // taken at face value, so no "uncalibrated" warning is warranted either.
+    calibration: zeroCalibration(),
+    calibrationNotice: null,
   };
 }

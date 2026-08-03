@@ -8,17 +8,37 @@ import {
   selectCharacterByIgn,
   type StoredCharacterRecord,
 } from "../../characters/model/charactersStore";
+import { peekScouterCache } from "../../characters/scouter/scouterCache";
 import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
 import {
   ENDGAME_BOSS_PDR,
+  hasStatBaseline,
   type ClassDamageProfile,
+  type KernelCalibration,
   type OptimizerStatInputs,
   type TripleStat,
 } from "./damage-formula";
-import { optimizeHyper, type HyperAllocation, type HyperResult } from "./hyper-stat-engine";
+import {
+  capHyperLevelToBudget,
+  hyperAllocationCost,
+  optimizeHyper,
+  type HyperAllocation,
+  type HyperResult,
+} from "./hyper-stat-engine";
 import { availableHyperPoints, type HyperLineId } from "./hyper-stat-data";
-import { optimizeHexa, type HexaCore, type HexaLine, type HexaResult } from "./hexa-stat-engine";
-import { emptyCharacterSeed, seedFromCharacter, type CharacterSeed } from "./stat-optimizer-character";
+import {
+  capHexaLineLevel,
+  optimizeHexa,
+  type HexaCore,
+  type HexaLine,
+  type HexaResult,
+} from "./hexa-stat-engine";
+import {
+  emptyCharacterSeed,
+  seedFromCharacter,
+  type CalibrationNotice,
+  type CharacterSeed,
+} from "./stat-optimizer-character";
 
 export type OptimizerMode = "hyper" | "hexa";
 /** Editable single-number stat inputs (the triples are edited via setTriplePart;
@@ -33,6 +53,8 @@ export type TripleInputKey = "main" | "sub" | "sub2" | "attack";
 export type TriplePart = keyof TripleStat;
 /** Which of a core's three lines an edit targets. */
 export type CoreLineKey = "primary" | "alt0" | "alt1";
+/** Position of each line in a core's [primary, additional0, additional1] order. */
+const CORE_LINE_SLOT: Record<CoreLineKey, 0 | 1 | 2> = { primary: 0, alt0: 1, alt1: 2 };
 
 interface SelectionState {
   profile: ClassDamageProfile;
@@ -40,6 +62,8 @@ interface SelectionState {
   availablePoints: number;
   hyperAlloc: HyperAllocation;
   cores: HexaCore[];
+  calibration: KernelCalibration;
+  calibrationNotice: CalibrationNotice | null;
 }
 
 /** Maps a seed (from a character or the blank standalone one) into editable state. */
@@ -50,6 +74,8 @@ function seedToState(seed: CharacterSeed): SelectionState {
     availablePoints: seed.availablePoints,
     hyperAlloc: seed.storedHyper,
     cores: seed.cores,
+    calibration: seed.calibration,
+    calibrationNotice: seed.calibrationNotice,
   };
 }
 
@@ -73,7 +99,12 @@ export function useStatOptimizer() {
   const handleCharChange = useCallback((charName: string | null) => {
     setSelectedCharName(charName);
     const record = charName ? selectCharacterByIgn(readCharactersStore(), charName) : null;
-    setState(seedToState(record ? seedFromCharacter(record) : emptyCharacterSeed()));
+    // Cache-only read (no network call, see peekScouterCache): a hit calibrates the
+    // kernel onto scouter's buffed footing, a miss leaves the raw stat window.
+    const seed = record
+      ? seedFromCharacter(record, peekScouterCache(record)?.specEfficiency)
+      : emptyCharacterSeed();
+    setState(seedToState(seed));
   }, []);
 
   useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
@@ -100,23 +131,33 @@ export function useStatOptimizer() {
     }));
   }, []);
 
+  // Clamped against what the other lines already spend, so a typed-in allocation can
+  // never cost more hyper points than the character actually has.
   const setHyperLevel = useCallback((id: HyperLineId, level: number) => {
-    setState((prev) => ({ ...prev, hyperAlloc: { ...prev.hyperAlloc, [id]: level } }));
+    setState((prev) => {
+      const spentElsewhere = hyperAllocationCost({ ...prev.hyperAlloc, [id]: 0 });
+      const capped = capHyperLevelToBudget(level, prev.availablePoints - spentElsewhere);
+      return { ...prev, hyperAlloc: { ...prev.hyperAlloc, [id]: capped } };
+    });
   }, []);
 
   const setCoreUnlocked = useCallback((index: number, unlocked: boolean) => {
     setState((prev) => ({ ...prev, cores: prev.cores.map((c, i) => (i === index ? { ...c, unlocked } : c)) }));
   }, []);
 
+  // A typed level is clamped against what the core's other two lines already
+  // spend, so a core can never exceed the HEXA_CORE_TOTAL levels the game rolls.
   const setCoreLine = useCallback((index: number, line: CoreLineKey, patch: Partial<HexaLine>) => {
     setState((prev) => {
-      const cores = prev.cores.map((c, i) => {
+      const cores = prev.cores.map((c, i): HexaCore => {
         if (i !== index) return c;
-        if (line === "primary") return { ...c, primary: { ...c.primary, ...patch } };
-        const altIndex = line === "alt0" ? 0 : 1;
-        const additional: [HexaLine, HexaLine] = [c.additional[0], c.additional[1]];
-        additional[altIndex] = { ...additional[altIndex], ...patch };
-        return { ...c, additional };
+        const lines: [HexaLine, HexaLine, HexaLine] = [c.primary, c.additional[0], c.additional[1]];
+        const slot = CORE_LINE_SLOT[line];
+        const others = lines[0].level + lines[1].level + lines[2].level - lines[slot].level;
+        const applied =
+          patch.level === undefined ? patch : { ...patch, level: capHexaLineLevel(patch.level, others) };
+        lines[slot] = { ...lines[slot], ...applied };
+        return { unlocked: c.unlocked, primary: lines[0], additional: [lines[1], lines[2]] };
       });
       return { ...prev, cores };
     });
@@ -130,8 +171,9 @@ export function useStatOptimizer() {
         currentHyper: state.hyperAlloc,
         availablePoints: state.availablePoints,
         bossPdrPct,
+        calibration: state.calibration,
       }),
-    [state.profile, state.inputs, state.hyperAlloc, state.availablePoints, bossPdrPct],
+    [state.profile, state.inputs, state.hyperAlloc, state.availablePoints, bossPdrPct, state.calibration],
   );
 
   const hexaResult: HexaResult = useMemo(
@@ -141,8 +183,18 @@ export function useStatOptimizer() {
         inputs: state.inputs,
         cores: state.cores,
         bossPdrPct,
+        calibration: state.calibration,
       }),
-    [state.profile, state.inputs, state.cores, bossPdrPct],
+    [state.profile, state.inputs, state.cores, bossPdrPct, state.calibration],
+  );
+
+  const hyperPointsSpent = useMemo(() => hyperAllocationCost(state.hyperAlloc), [state.hyperAlloc]);
+
+  // Both optimizers return a 0% gain against an empty stat window; that means
+  // "nothing to work from", not "already optimal", so the panels gate on it.
+  const hasStats = useMemo(
+    () => hasStatBaseline(state.profile, state.inputs),
+    [state.profile, state.inputs],
   );
 
   return {
@@ -163,5 +215,7 @@ export function useStatOptimizer() {
     setCoreLine,
     hyperResult,
     hexaResult,
+    hyperPointsSpent,
+    hasStats,
   };
 }

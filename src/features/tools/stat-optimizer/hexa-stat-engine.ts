@@ -28,6 +28,7 @@ import {
   stackIedSources,
   zeroDelta,
   type ClassDamageProfile,
+  type KernelCalibration,
   type KernelDelta,
   type OptimizerStatInputs,
 } from "./damage-formula";
@@ -36,6 +37,17 @@ export const HEXA_CORE_COUNT = 3;
 export const HEXA_MAX_LINE_LEVEL = 10;
 /** A fully-enhanced core spreads this many levels across its three lines. */
 export const HEXA_CORE_TOTAL = 20;
+
+/**
+ * Highest level at or below `desired` that keeps a core's three lines within
+ * `HEXA_CORE_TOTAL`. Scouter enforces the same rule by refusing to optimize at
+ * all when `main + additional1 + additional2 > 20`; capping the input instead
+ * keeps the recommendation live while staying inside what the game can roll.
+ */
+export function capHexaLineLevel(desired: number, otherLinesTotal: number): number {
+  const wanted = Math.min(Math.max(Math.floor(desired), 0), HEXA_MAX_LINE_LEVEL);
+  return Math.min(wanted, Math.max(0, HEXA_CORE_TOTAL - otherLinesTotal));
+}
 
 /** Scouter's exact candidate iteration order (ties go to the earliest). */
 const TYPE_ORDER: HexaStatType[] = [
@@ -119,6 +131,7 @@ export interface OptimizeHexaInput {
   inputs: OptimizerStatInputs;
   cores: HexaCore[];
   bossPdrPct: number;
+  calibration: KernelCalibration;
 }
 
 /** Assignable lines from the unlocked cores, in scouter's order: Boss Damage
@@ -173,8 +186,8 @@ function bestTypeForLine(
   return bestType;
 }
 
-export function optimizeHexa({ profile, inputs, cores, bossPdrPct }: OptimizeHexaInput): HexaResult {
-  const opts = { bossPdrPct, forceFullCrit: true };
+export function optimizeHexa({ profile, inputs, cores, bossPdrPct, calibration }: OptimizeHexaInput): HexaResult {
+  const opts = { bossPdrPct, forceFullCrit: true, calibration };
   const evalAcc = (acc: TypeTally, convertXenon: boolean): number =>
     computeScouterDamage(profile, inputs, toKernelDelta(acc, profile, convertXenon), opts);
 

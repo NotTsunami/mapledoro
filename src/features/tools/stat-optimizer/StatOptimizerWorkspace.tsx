@@ -21,6 +21,7 @@ import type { ClassDamageProfile, MainStatId, OptimizerStatInputs, TripleStat } 
 import { HYPER_LINES, HYPER_MAX_LEVEL, type HyperLineId } from "./hyper-stat-data";
 import type { HyperResult, HyperAllocation } from "./hyper-stat-engine";
 import { HEXA_CORE_TOTAL, HEXA_MAX_LINE_LEVEL, type HexaCore, type HexaLine, type HexaResult } from "./hexa-stat-engine";
+import type { CalibrationNotice } from "./stat-optimizer-character";
 import {
   useStatOptimizer,
   type CoreLineKey,
@@ -90,12 +91,25 @@ function GainBanner({
   gainPct,
   label,
   alreadyOptimal,
+  ready,
 }: {
   theme: AppTheme;
   gainPct: number;
   label: string;
   alreadyOptimal: boolean;
+  /** False when the stat window is empty, where a 0% gain would read as a verdict. */
+  ready: boolean;
 }) {
+  if (!ready) {
+    return (
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "1.2rem", fontWeight: 800, color: theme.muted }}>No stats yet</span>
+        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.muted }}>
+          fill in your stats above to get a recommendation
+        </span>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
       {alreadyOptimal ? (
@@ -112,11 +126,37 @@ function GainBanner({
   );
 }
 
-function WarnNote({ theme, text }: { theme: AppTheme; text: string }) {
+function WarnNote({ theme, children }: { theme: AppTheme; children: ReactNode }) {
   return (
     <div style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 600, lineHeight: 1.5, marginBottom: "0.85rem", padding: "0.55rem 0.75rem", background: theme.timerBg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
-      {text}
+      {children}
     </div>
+  );
+}
+
+/** What an uncalibrated result is missing, and the step that fixes it. Only the
+ *  first two are actionable; "unavailable" states the limit without sending the
+ *  user somewhere that won't help. */
+function CalibrationNote({ theme, notice }: { theme: AppTheme; notice: CalibrationNotice }) {
+  if (notice === "unavailable") {
+    return (
+      <WarnNote theme={theme}>
+        Buffed-stat calibration is not available for this class, so this is valued against your
+        unbuffed stat window and will not line up with MapleScouter.
+      </WarnNote>
+    );
+  }
+  const action =
+    notice === "setup"
+      ? "finish this character's Scouter setup"
+      : "refresh this character's Scouter figure";
+  return (
+    <WarnNote theme={theme}>
+      This is valued against your unbuffed stat window, so it will not line up with MapleScouter.
+      For the most accurate recommendation, {action} in{" "}
+      <Link href="/characters" style={{ color: theme.accentText }}>Characters</Link>, which accounts
+      for your link skills and buffs.
+    </WarnNote>
   );
 }
 
@@ -126,6 +166,7 @@ function NumberInput({
   onChange,
   max,
   width,
+  id,
   ariaLabel,
   disabled,
 }: {
@@ -134,7 +175,9 @@ function NumberInput({
   onChange: (v: number) => void;
   max: number;
   width?: number | string;
-  ariaLabel: string;
+  /** Set instead of `ariaLabel` when a real <label htmlFor> already names the box. */
+  id?: string;
+  ariaLabel?: string;
   disabled?: boolean;
 }) {
   const styles = toolStyles(theme);
@@ -144,6 +187,7 @@ function NumberInput({
       min={0}
       max={max}
       integer
+      id={id}
       aria-label={ariaLabel}
       disabled={disabled}
       onKeyDown={replaceZeroOnDigit}
@@ -160,16 +204,23 @@ const TRIPLE_PARTS: { part: TriplePart; label: string }[] = [
   { part: "pct", label: "% Value" },
   { part: "flat", label: "% Not Applied" },
 ];
+/** No class currently gets ATT into the "% Not Applied" bucket, so the row hides
+ *  that field. The stored value still reaches the kernel if one ever shows up. */
+const ATTACK_PARTS = TRIPLE_PARTS.filter((p) => p.part !== "flat");
 
-/** One tooltip stat: Base Value / % Value / % Not Applied, as shown in-game. */
+/** One tooltip stat: Base Value / % Value / % Not Applied, as shown in-game.
+ *  The grid stays three columns wide whatever `parts` holds, so a shorter row's
+ *  boxes still line up with the rows above it. */
 function TripleFieldRow({
   theme,
   label,
+  parts,
   value,
   onChange,
 }: {
   theme: AppTheme;
   label: string;
+  parts: { part: TriplePart; label: string }[];
   value: TripleStat;
   onChange: (part: TriplePart, v: number) => void;
 }) {
@@ -178,7 +229,7 @@ function TripleFieldRow({
     <div>
       <div className="tool-field-label" style={styles.labelStyle}>{label}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.5rem" }}>
-        {TRIPLE_PARTS.map(({ part, label: partLabel }) => (
+        {parts.map(({ part, label: partLabel }) => (
           <div key={part}>
             <ToolNumberInput
               min={0}
@@ -210,11 +261,11 @@ function StatsPanel({
   onTripleChange: (key: TripleInputKey, part: TriplePart, value: number) => void;
 }) {
   const styles = toolStyles(theme);
-  const triples: { key: TripleInputKey; label: string }[] = [
-    { key: "main", label: `Main Stat (${statName(profile.mainStat)})` },
-    ...(profile.subStat ? [{ key: "sub" as const, label: `Secondary Stat (${statName(profile.subStat)})` }] : []),
-    ...(profile.subStat2 ? [{ key: "sub2" as const, label: `Secondary Stat II (${statName(profile.subStat2)})` }] : []),
-    { key: "attack", label: profile.usesMagic ? "Magic ATT" : "Attack Power" },
+  const triples: { key: TripleInputKey; label: string; parts: typeof TRIPLE_PARTS }[] = [
+    { key: "main", label: `Main Stat (${statName(profile.mainStat)})`, parts: TRIPLE_PARTS },
+    ...(profile.subStat ? [{ key: "sub" as const, label: `Secondary Stat (${statName(profile.subStat)})`, parts: TRIPLE_PARTS }] : []),
+    ...(profile.subStat2 ? [{ key: "sub2" as const, label: `Secondary Stat II (${statName(profile.subStat2)})`, parts: TRIPLE_PARTS }] : []),
+    { key: "attack", label: profile.usesMagic ? "Magic ATT" : "Attack Power", parts: ATTACK_PARTS },
   ];
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
@@ -229,6 +280,7 @@ function StatsPanel({
             key={t.key}
             theme={theme}
             label={t.label}
+            parts={t.parts}
             value={inputs[t.key]}
             onChange={(part, v) => onTripleChange(t.key, part, v)}
           />
@@ -266,8 +318,21 @@ function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile): string {
   return HYPER_LINES.find((l) => l.id === id)?.label ?? id;
 }
 
-// Shared columns so the header and every row align without magic widths.
-const HYPER_GRID = "minmax(0, 1fr) 58px 64px";
+/* The Now/Best table is real tabular data, so it's a real <table>: the stat name is
+   each row's header and doubles as its input's <label>, which makes the recommended
+   value a cell a screen reader can place ("Critical Damage, Best, 15") instead of
+   text floating beside an input. Shape lives here; colors stay inline per theme.
+   `border-spacing` reproduces the old 0.4rem gap between row cards, which needs
+   `border-collapse: separate`, so each row's border is painted per cell with the
+   radius split across the first and last one. */
+const HYPER_TABLE_CSS = `
+  .hyper-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 0.4rem; }
+  .hyper-table thead th { padding: 0 0.7rem 0.2rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+  .hyper-table tbody th, .hyper-table tbody td { padding: 0.4rem 0; border-style: solid; border-width: 1px 0; }
+  .hyper-table tbody th { padding-left: 0.7rem; border-left-width: 1px; border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+  .hyper-table tbody td.hyper-best { padding-right: 0.7rem; border-right-width: 1px; border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+  .hyper-table td.hyper-now { padding-right: 0.6rem; }
+`;
 
 // In-game hyper stat window order. Display only: HYPER_LINES keeps scouter's
 // greedy iteration order, which the engine's tie-breaking depends on.
@@ -285,26 +350,42 @@ const HYPER_DISPLAY_ORDER: HyperLineId[] = [
 
 function HyperLineRow({
   theme,
+  id,
   label,
   current,
   recommended,
   onChange,
 }: {
   theme: AppTheme;
+  id: HyperLineId;
   label: string;
   current: number;
   recommended: number;
   onChange: (v: number) => void;
 }) {
   const changed = recommended !== current;
+  const inputId = `hyper-level-${id}`;
+  const cell: CSSProperties = { background: theme.timerBg, borderColor: theme.border };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: HYPER_GRID, alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.7rem", background: theme.timerBg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
-      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text, minWidth: 0 }}>{label}</span>
-      <NumberInput theme={theme} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} ariaLabel={`${label} current level`} />
-      <span style={{ textAlign: "right", fontSize: "0.85rem", fontWeight: 800, color: changed ? theme.accentText : theme.muted }}>
-        {changed ? `→ ${recommended}` : recommended}
-      </span>
-    </div>
+    <tr>
+      <th scope="row" style={{ ...cell, textAlign: "left" }}>
+        <label htmlFor={inputId} style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text, cursor: "pointer" }}>
+          {label}
+        </label>
+      </th>
+      <td className="hyper-now" style={cell}>
+        <NumberInput theme={theme} id={inputId} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} />
+      </td>
+      {/* Weight carries the changed/unchanged split alongside color, so it survives
+          both a monochrome read and a screen reader (which gets the suffix). */}
+      <td
+        className="hyper-best"
+        style={{ ...cell, textAlign: "right", fontSize: "0.85rem", fontWeight: changed ? 800 : 600, color: changed ? theme.accentText : theme.muted }}
+      >
+        {recommended}
+        {changed && <span className="sr-only"> (change from {current})</span>}
+      </td>
+    </tr>
   );
 }
 
@@ -315,6 +396,9 @@ function HyperPanel({
   alloc,
   onLevelChange,
   tracked,
+  calibrationNotice,
+  pointsSpent,
+  ready,
 }: {
   theme: AppTheme;
   profile: ClassDamageProfile;
@@ -322,18 +406,22 @@ function HyperPanel({
   alloc: HyperAllocation;
   onLevelChange: (id: HyperLineId, level: number) => void;
   tracked: boolean;
+  calibrationNotice: CalibrationNotice | null;
+  pointsSpent: number;
+  ready: boolean;
 }) {
   const styles = toolStyles(theme);
   const rows = HYPER_DISPLAY_ORDER.filter((id) => id !== "subStat2" || profile.subStat2 !== null);
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
-      {/* The budget itself comes from the level input in the controls row. */}
+      {/* Counts what the Now column spends, which is also what the inputs clamp to;
+          the Best column always fits the same budget by construction. */}
       <PanelTitle
         theme={theme}
         title="Hyper Stat"
         aside={
           <span style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
-            {result.pointsUsed} / {result.pointsAvailable} points used
+            {pointsSpent} / {result.pointsAvailable} points used
           </span>
         }
       />
@@ -342,30 +430,48 @@ function HyperPanel({
         gainPct={result.gainPct}
         label="bossing damage vs your current hyper stats"
         alreadyOptimal={result.alreadyOptimal}
+        ready={ready}
       />
       {!tracked && (
-        <WarnNote
-          theme={theme}
-          text="No Hyper Stat allocation is tracked for this character. Your stats above already include your in-game hyper stats, so enter your current levels below (or set them in character setup) to keep the gain accurate."
-        />
+        <WarnNote theme={theme}>
+          No Hyper Stat allocation is tracked for this character. Your stats above already include
+          your in-game hyper stats, so enter your current levels below (or set them in character
+          setup) to keep the gain accurate.
+        </WarnNote>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: HYPER_GRID, gap: "0.6rem", padding: "0 0.7rem", marginBottom: "0.4rem" }}>
-        <span className="tool-field-label" style={styles.labelStyle}>Stat</span>
-        <span className="tool-field-label" style={{ ...styles.labelStyle, textAlign: "center" }}>Now</span>
-        <span className="tool-field-label" style={{ ...styles.labelStyle, textAlign: "right" }}>Best</span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-        {rows.map((id) => (
-          <HyperLineRow
-            key={id}
-            theme={theme}
-            label={hyperLineLabel(id, profile)}
-            current={alloc[id]}
-            recommended={result.allocation[id]}
-            onChange={(v) => onLevelChange(id, v)}
-          />
-        ))}
-      </div>
+      {calibrationNotice && <CalibrationNote theme={theme} notice={calibrationNotice} />}
+      <table className="hyper-table">
+        <caption className="sr-only">
+          Hyper Stat levels: your current level per line and the recommended level.
+        </caption>
+        <colgroup>
+          <col />
+          <col style={{ width: 64 }} />
+          <col style={{ width: 64 }} />
+        </colgroup>
+        {/* Typography lives in HYPER_TABLE_CSS, not `.tool-field-label`, whose
+            `display: block` would collapse the header row. */}
+        <thead>
+          <tr>
+            <th scope="col" style={{ ...styles.labelStyle, textAlign: "left" }}>Stat</th>
+            <th scope="col" style={{ ...styles.labelStyle, textAlign: "center" }}>Now</th>
+            <th scope="col" style={{ ...styles.labelStyle, textAlign: "right" }}>Best</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((id) => (
+            <HyperLineRow
+              key={id}
+              theme={theme}
+              id={id}
+              label={hyperLineLabel(id, profile)}
+              current={alloc[id]}
+              recommended={result.allocation[id]}
+              onChange={(v) => onLevelChange(id, v)}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -386,9 +492,14 @@ function LineLevelBar({ theme, level }: { theme: AppTheme; level: number }) {
   );
 }
 
+/* Both controls get a real <label htmlFor> rather than an aria-label, so clicking
+   the visible text focuses the control. The visible words alone don't say which
+   core they belong to, so each label carries the rest of its old aria-label in an
+   sr-only span, leaving the accessible names exactly as complete as before. */
 function HexaLineRow({
   theme,
   profile,
+  idPrefix,
   coreLabel,
   role,
   type,
@@ -399,6 +510,7 @@ function HexaLineRow({
 }: {
   theme: AppTheme;
   profile: ClassDamageProfile;
+  idPrefix: string;
   coreLabel: string;
   role: CoreLineKey;
   type: HexaStatType | "";
@@ -411,29 +523,31 @@ function HexaLineRow({
   const isPrimary = role === "primary";
   const rec = recommended !== undefined && recommended !== "" && recommended !== type && level > 0 ? recommended : null;
   const recBonus = rec ? getHexaStatBonus(rec, level, isPrimary, profile.classId) : "";
+  const statId = `${idPrefix}-stat`;
+  const levelId = `${idPrefix}-level`;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isPrimary ? theme.accentText : theme.muted }}>
+        <label
+          htmlFor={statId}
+          style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isPrimary ? theme.accentText : theme.muted, cursor: "pointer" }}
+        >
           {HEXA_LINE_LABELS[role]}
-        </span>
+          <span className="sr-only"> stat, {coreLabel}</span>
+        </label>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>Lv</span>
-          <NumberInput
-            theme={theme}
-            value={level}
-            onChange={onLevelChange}
-            max={HEXA_MAX_LINE_LEVEL}
-            width={46}
-            ariaLabel={`${coreLabel} ${HEXA_LINE_LABELS[role]} level`}
-          />
+          <label htmlFor={levelId} style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted, cursor: "pointer" }}>
+            <span aria-hidden="true">Lv</span>
+            <span className="sr-only">{HEXA_LINE_LABELS[role]} level, {coreLabel}</span>
+          </label>
+          <NumberInput theme={theme} id={levelId} value={level} onChange={onLevelChange} max={HEXA_MAX_LINE_LEVEL} width={46} />
         </div>
       </div>
       <select
+        id={statId}
         className="tool-select"
         style={{ ...styles.selectStyle, width: "100%" }}
         value={type}
-        aria-label={`${coreLabel} ${HEXA_LINE_LABELS[role]} stat`}
         onChange={(e) => onTypeChange(e.target.value as HexaStatType | "")}
       >
         <option value="">Select…</option>
@@ -442,9 +556,10 @@ function HexaLineRow({
         ))}
       </select>
       <LineLevelBar theme={theme} level={level} />
+      {/* "Best" carries the meaning in words; a glyph here announced inconsistently. */}
       {rec && (
         <div style={{ fontSize: "0.76rem", fontWeight: 700, color: theme.accentText }}>
-          ★ Best: {hexaTypeLabel(rec, profile)}{recBonus ? ` (${recBonus})` : ""}
+          Best: {hexaTypeLabel(rec, profile)}{recBonus ? ` (${recBonus})` : ""}
         </div>
       )}
     </div>
@@ -514,6 +629,7 @@ function CoreCard({
               <HexaLineRow
                 theme={theme}
                 profile={profile}
+                idPrefix={`hexa-${index}-${role}`}
                 coreLabel={CORE_LABELS[index]}
                 role={role}
                 type={line.type}
@@ -538,6 +654,8 @@ function HexaPanel({
   onUnlockedChange,
   onLineChange,
   tracked,
+  calibrationNotice,
+  ready,
 }: {
   theme: AppTheme;
   profile: ClassDamageProfile;
@@ -546,6 +664,8 @@ function HexaPanel({
   onUnlockedChange: (index: number, unlocked: boolean) => void;
   onLineChange: (index: number, line: CoreLineKey, patch: { type?: HexaStatType | ""; level?: number }) => void;
   tracked: boolean;
+  calibrationNotice: CalibrationNotice | null;
+  ready: boolean;
 }) {
   const styles = toolStyles(theme);
   // result.cores is aligned to the unlocked cores in order; map each core to its recommendation.
@@ -564,13 +684,16 @@ function HexaPanel({
         gainPct={result.gainPct}
         label="bossing damage from re-assigning your HEXA lines"
         alreadyOptimal={result.alreadyOptimal}
+        ready={ready}
       />
       {!tracked && (
-        <WarnNote
-          theme={theme}
-          text="No HEXA Stat data is tracked. Enter each core's line stat and level (they total 20 per maxed core), or set them in character setup, to get a recommendation."
-        />
+        <WarnNote theme={theme}>
+          No HEXA Stat data is tracked. Enter each core&apos;s line stat and level (they total 20 per
+          maxed core), or set them in character setup, to get a recommendation.
+        </WarnNote>
       )}
+      {/* HEXA runs through the same kernel as Hyper, so it needs the same footing. */}
+      {calibrationNotice && <CalibrationNote theme={theme} notice={calibrationNotice} />}
       <div className="stat-opt-core-grid">
         {cores.map((core, i) => (
           <CoreCard
@@ -626,23 +749,23 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
         )}
         <div style={{ display: "flex", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
           <div>
-            <div className="tool-field-label" style={styles.labelStyle}>Level</div>
+            <label className="tool-field-label" htmlFor="stat-opt-level" style={styles.labelStyle}>Level</label>
             {/* A stored character's level (and hyper-point budget, which deducts
                 untracked-line spending) comes from the store; only standalone
                 entry edits it, recomputing the budget from the closed form. */}
             <NumberInput
               theme={theme}
+              id="stat-opt-level"
               value={opt.state.inputs.level}
               onChange={opt.setLevel}
               max={300}
               width={72}
-              ariaLabel="Character level"
               disabled={opt.selectedCharName !== null}
             />
           </div>
           <div>
-            <div className="tool-field-label" style={styles.labelStyle}>Boss DEF %</div>
-            <NumberInput theme={theme} value={opt.bossPdrPct} onChange={opt.setBossPdr} max={999} width={96} ariaLabel="Boss DEF %" />
+            <label className="tool-field-label" htmlFor="stat-opt-boss-pdr" style={styles.labelStyle}>Boss DEF %</label>
+            <NumberInput theme={theme} id="stat-opt-boss-pdr" value={opt.bossPdrPct} onChange={opt.setBossPdr} max={999} width={96} />
           </div>
         </div>
       </div>
@@ -674,6 +797,9 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
           alloc={state.hyperAlloc}
           onLevelChange={opt.setHyperLevel}
           tracked={hyperTracked(state.hyperAlloc)}
+          calibrationNotice={state.calibrationNotice}
+          pointsSpent={opt.hyperPointsSpent}
+          ready={opt.hasStats}
         />
       ) : (
         <HexaPanel
@@ -684,6 +810,8 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
           onUnlockedChange={opt.setCoreUnlocked}
           onLineChange={opt.setCoreLine}
           tracked={hexaTracked(state.cores)}
+          calibrationNotice={state.calibrationNotice}
+          ready={opt.hasStats}
         />
       )}
     </>
@@ -708,7 +836,9 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
 
   return (
     <div className="page-content">
-      <style>{CORE_GRID_CSS}</style>
+      {/* One concatenated string, not two children: two text nodes serialize
+          differently on server and client and trip a hydration mismatch. */}
+      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS}</style>
       <div className="tool-container">
         <ToolHeader
           theme={theme}

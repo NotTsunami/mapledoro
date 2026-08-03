@@ -78,13 +78,84 @@ zero constants. Xenon: STR main / DEX sub / LUK sub2, tri-stat hyper lines.
 Demon Avenger: HP main / STR sub.
 
 ## Matching maplescouter exactly
-Given identical inputs, recommendations match the live site. Differences can
-still appear for a looked-up character on scouter because the site additionally
-folds that character's link skills, noblesse/potion settings, and seed-ring
-uptime into the same buckets (session data we don't collect). Those are additive
-constants; a user can reproduce them by adding the equivalent % into the
-damage/crit-damage fields. The `dpm*` class constants must be refreshed if
-scouter rebalances its class data.
+Given identical inputs, recommendations match the live site. The `dpm*` class
+constants must be refreshed if scouter rebalances its class data.
+
+Both modes need this equally. Scouter's HEXA optimizer (`async function G` in the
+optimizer chunk) is called as `G(userStat, calculatedData.myClassData, ...)` and
+evaluates candidates through the same kernel `A` the hyper path uses, differing
+only by the mode string (`"Hexa"` vs `"Hyper"`). `specEfficiency` appears nowhere
+in that chunk: it's a *derived* table computed in the store module from the same
+buffed state, which is exactly why inverting it recovers the buckets. So neither
+optimizer reads the efficiency table, and both need the same calibration; the
+kernel is shared, so `optimizeHexa` takes the same `KernelCalibration`.
+
+**Buffed-state calibration (`scouter-calibration.ts`).** Our stat inputs are the
+in-game stat window, which is unbuffed, while scouter optimizes a fully-buffed
+bossing state (link skills, noblesse/potion settings, Champion's Renown, seed-ring
+uptime). Those are all additive constants inside the same buckets, so the entire
+gap is one offset per bucket, and each bucket's size is exactly what one field of
+scouter's own `specEfficiency` table reports (`eff = d(bucket)/bucket` inverts to
+the bucket). `calibrateFromSpecEfficiency` solves those offsets from the character's
+cached Scouter entry (`peekScouterCache`, cache-only, no network call) into a
+`KernelCalibration` the kernel adds alongside `dpm*`. All-zero = the raw stat
+window, which is also the fallback whenever there's no cached entry — the panel
+says so, since results then won't line up with scouter.
+
+When calibration doesn't happen the seed carries a `CalibrationNotice` naming the
+reason, so the panel can point at the fix instead of only disclaiming: `"setup"`
+(Scouter setup unfinished, the actionable case), `"refresh"` (set up, but no cached
+figure matches the character's current stats), `"unavailable"` (class scouter doesn't
+cover, or a Demon Avenger). Standalone entry gets `null` — typed stats are taken at
+face value, so there's nothing to warn about.
+
+Left uncalibrated on purpose: **Demon Avenger** (its stat factor isn't `4*main + sub`,
+so `mainStatAbseff1` doesn't invert to a stat sum) and any character whose table has
+a non-positive field or 0% crit rate. Calibration is solved once at seed time from
+the seeded inputs, so later edits to the stat fields move the buckets *from* the
+calibrated baseline rather than re-deriving it.
+
+Verified end to end against a real endgame Kanna: uncalibrated the greedy returned
+main 5 / sub 3 / ATT 7 / boss 15 / dmg 14 / crit dmg 14 / IED 8, calibrated it
+returns scouter's live answer exactly (ATT 8 / dmg 13 / crit dmg 15 / IED 6), at
+both 300 and 380 PDR.
+
+## Now/Best table
+The hyper lines are a real `<table>` (`HYPER_TABLE_CSS`), not a CSS grid: each stat is
+a `<th scope="row">` whose text is the `<label htmlFor>` for that row's input, which
+both names the input and lets a screen reader place the recommended value
+("Critical Damage, Best, 15"). Consequences worth keeping:
+- The header cells must NOT use `.tool-field-label` — its `display: block` collapses
+  the header row. Their typography is duplicated in `HYPER_TABLE_CSS` instead.
+- Row cards need `border-collapse: separate` + `border-spacing` for the gap, so the
+  border and radius are painted per cell (`th` left, `td.hyper-best` right).
+- The changed/unchanged split is carried by weight AND color, plus an `.sr-only`
+  suffix. Don't reintroduce a `→` glyph; screen readers announce it inconsistently.
+
+The HEXA core cards follow the same rules in their own shape: each line's role text
+is the `<label htmlFor>` for its stat `<select>` and "Lv" is the one for its level
+input, each completing its accessible name with an `.sr-only` span (the visible
+words alone don't say which core they belong to). The recommendation line reads
+"Best: ..." for the same reason the arrow went: a `★` announced inconsistently.
+
+## Point budget
+Typed-in current levels are clamped so an allocation can never cost more than
+`availableHyperPoints(level)` (`capHyperLevelToBudget` against what the other lines
+already spend, in `setHyperLevel`). The panel's counter reports what the **current**
+levels cost (`hyperAllocationCost`), not the recommendation's, so hitting the cap
+reads as "1608 / 1608" rather than an unexplained snap-back.
+
+HEXA has the same rule per core: `capHexaLineLevel` clamps a typed level against
+what the core's other two lines spend, so the three can't exceed `HEXA_CORE_TOTAL`.
+Scouter enforces this by refusing to run (`main + additional1 + additional2 > 20`
+aborts with "입력값을 다시 확인해주세요"); clamping keeps the recommendation live instead.
+
+## Empty stat window
+With no main or secondary stat the kernel's stat factor is 0, so every candidate
+evaluates to 0, the greedy ranks nothing, and both engines fall out at a 0% gain.
+That is not "already optimal", so the panels gate their banner on `hasStatBaseline`
+and say there's nothing to work from yet. Don't fold this into `alreadyOptimal`:
+the engines mirror scouter, and this is our own reporting concern.
 
 ## Data sources
 Hyper tables/costs: `hyper-stat-data.ts` (== scouter's tD/ve/hR; == wiki). HEXA

@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-03",
+    changes: [
+      { type: "fixed", text: "The Stat Optimizer now values your Hyper Stats and HEXA Stats against your buffed bossing stats, using your character's Scouter data, so its recommendation matches MapleScouter instead of drifting toward Damage and Ignore DEF." },
+      { type: "fixed", text: "The Stat Optimizer no longer lets you enter Hyper Stat levels that cost more points than your character has." },
+      { type: "fixed", text: "The Stat Optimizer no longer lets you enter HEXA Stat levels that add up to more than 20 in one core." },
+      { type: "fixed", text: "The Stat Optimizer no longer says your stats are already optimized when you have not entered any stats yet." },
+      { type: "changed", text: "The Stat Optimizer's Hyper Stat points counter now shows what your current levels cost instead of what the recommendation costs." },
+      { type: "changed", text: "The Stat Optimizer now points you to Scouter setup when a character is missing the data it needs for the most accurate recommendation." },
+      { type: "fixed", text: "Fixed tool inputs zooming the page in on iPhone when you tapped them." },
+    ],
+  },
+  {
     date: "2026-08-02",
     changes: [
       { type: "added", text: "Character profiles now have a Stat Efficiency bookmark showing what a point of each stat is actually worth for that character, and how stats like Boss Damage, ATT and Ignore DEF trade off against each other." },

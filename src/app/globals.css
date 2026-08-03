@@ -339,10 +339,14 @@ textarea:focus-visible {
 }
 
 /* iOS Safari zooms the viewport in when a focused control's text is under 16px,
-   and this input takes focus every time the menu opens, so picking an item
-   scaled the page. 16px is the threshold that stops it. */
+   so every editable control has to clear that bar on phones or tapping one
+   scales the page and leaves the user panning. 16px is the threshold that stops
+   it. The boxes keep their widths -- a number input clips its text rather than
+   overflowing -- so this only changes the type size, not any layout. */
 @media (max-width: 560px) {
-  .searchable-select-input {
+  .searchable-select-input,
+  .tool-input,
+  .tool-select {
     font-size: 16px;
   }
 }

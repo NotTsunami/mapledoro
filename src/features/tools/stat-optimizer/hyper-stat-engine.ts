@@ -22,11 +22,13 @@ import {
   stackIedSources,
   zeroDelta,
   type ClassDamageProfile,
+  type KernelCalibration,
   type KernelDelta,
   type OptimizerStatInputs,
 } from "./damage-formula";
 import type { StoredHyperStat } from "../../characters/model/charactersStore";
 import {
+  HYPER_COST_CUMULATIVE,
   HYPER_DA_MAIN_VALUES,
   HYPER_LINES,
   HYPER_MAX_LEVEL,
@@ -58,6 +60,25 @@ export const zeroHyperAllocation = (): HyperAllocation => ({
   critRate: 0,
   ignoreDefense: 0,
 });
+
+/** Total hyper points an allocation spends. */
+export function hyperAllocationCost(alloc: HyperAllocation): number {
+  let total = 0;
+  for (const line of HYPER_LINES) {
+    const level = alloc[line.id];
+    if (level > 0) total += HYPER_COST_CUMULATIVE[Math.min(level, HYPER_MAX_LEVEL) - 1];
+  }
+  return total;
+}
+
+/** Highest level at or below `desired` that fits in `budget` points (0 if none does). */
+export function capHyperLevelToBudget(desired: number, budget: number): number {
+  const wanted = Math.min(Math.max(Math.floor(desired), 0), HYPER_MAX_LEVEL);
+  for (let level = wanted; level > 0; level -= 1) {
+    if (HYPER_COST_CUMULATIVE[level - 1] <= budget) return level;
+  }
+  return 0;
+}
 
 /** Preset key in the character store's hyper allocation for each line. */
 function presetKey(id: HyperLineId, profile: ClassDamageProfile): string | null {
@@ -173,6 +194,7 @@ export interface OptimizeHyperInput {
   currentHyper: HyperAllocation;
   availablePoints: number;
   bossPdrPct: number;
+  calibration: KernelCalibration;
 }
 
 export function optimizeHyper({
@@ -181,8 +203,9 @@ export function optimizeHyper({
   currentHyper,
   availablePoints,
   bossPdrPct,
+  calibration,
 }: OptimizeHyperInput): HyperResult {
-  const opts = { bossPdrPct, forceFullCrit: false };
+  const opts = { bossPdrPct, forceFullCrit: false, calibration };
   const score = (alloc: HyperAllocation): number =>
     computeScouterDamage(profile, inputs, buildDelta(alloc, currentHyper, profile.isHpBased), opts);
 
