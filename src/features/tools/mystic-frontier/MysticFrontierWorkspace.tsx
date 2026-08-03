@@ -629,6 +629,7 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
           </div>
           <div ref={zoneRef} className="mf-lineup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, alignItems: "start" }}>
             {mf.slots.map((slot, i) => (
+              // react-doctor-disable-next-line no-array-index-as-key -- a wave is exactly 3 fixed positional slots; the index is the slot's identity (it's also passed as `index`), and the list never reorders or filters
               <LineupSlot key={i} index={i} slot={slot} theme={theme} openId={openId} setOpenId={setOpenId} mf={mf} />
             ))}
           </div>
@@ -651,6 +652,7 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
             )}
             {mf.bonusItems.map((item, i) => (
               <EquippedBonusItem
+                // react-doctor-disable-next-line no-array-index-as-key -- bonus items are stored as bare ids with duplicates allowed, so `item.id` alone isn't unique and the index disambiguates. EquippedBonusItem is props-only with no state or inputs, so a shifted key after a removal can't misattribute anything.
                 key={`${item.id}-${i}`}
                 item={item}
                 theme={theme}

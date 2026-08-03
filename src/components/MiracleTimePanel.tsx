@@ -26,6 +26,7 @@ const activeBadgeStyle: CSSProperties = {
 };
 
 function formatLocal(iso: string): string {
+  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: `slots` only fills from the post-mount fetch below, and the panel returns null while it's empty, so this never renders on the server to mismatch against
   return new Date(iso).toLocaleString(undefined, {
     weekday: "short",
     month: "short",
@@ -75,6 +76,7 @@ export default function MiracleTimePanel({ theme }: { theme: AppTheme }) {
   const [slots, setSlots] = useState<MiracleTimeSlot[]>([]);
   const fetchedRef = useRef(false);
 
+  // react-doctor-disable-next-line no-fetch-in-effect -- one-shot fetch with proper AbortController cleanup; this project hasn't adopted a data-fetching library, matches the rule's own documented FP criteria
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;

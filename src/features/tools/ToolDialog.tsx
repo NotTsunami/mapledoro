@@ -114,18 +114,10 @@ export function ToolDialog({
   }, [onClose]);
 
   return (
+    // react-doctor-disable-next-line no-static-element-interactions, click-events-have-key-events -- backdrop dismissal is a pointer-only convenience; keyboard users close with Escape (handled above), and per ARIA APG the backdrop must stay out of the tab order rather than announce itself as a control
     <div
-      role="button"
-      tabIndex={0}
-      aria-label="Close dialog"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
-      }}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-          e.preventDefault();
-          onClose();
-        }
       }}
       style={overlayStyle}
     >

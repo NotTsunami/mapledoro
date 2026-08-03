@@ -185,7 +185,7 @@ export function CharacterDropdown({
   const [open, setOpen] = useState(false);
   // Fixed-position coords for the portaled menu, measured from the trigger.
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const positionMenu = () => {
@@ -247,6 +247,7 @@ export function CharacterDropdown({
     gap: "0.6rem",
     padding: "5px 10px",
     cursor: "pointer",
+    textAlign: "left", // <button> centers by default; the label rows must stay left-aligned
     ...triggerStyle,
   };
 
@@ -317,20 +318,13 @@ export function CharacterDropdown({
         .csp-dropdown::-webkit-scrollbar-track { background: transparent; }
         .csp-dropdown::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.45); border-radius: 4px; }
       `}</style>
-      <div
+      <button
         ref={triggerRef}
+        type="button"
         className="tool-input csp-trigger"
-        role="button"
-        tabIndex={0}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={toggleOpen}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            toggleOpen();
-          }
-        }}
         style={mergedTriggerStyle}
       >
         <CharacterLabel
@@ -349,7 +343,7 @@ export function CharacterDropdown({
         >
           ▼
         </span>
-      </div>
+      </button>
       {menu}
     </>
   );
