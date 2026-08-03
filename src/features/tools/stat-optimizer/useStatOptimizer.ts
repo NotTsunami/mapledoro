@@ -53,6 +53,10 @@ export type TripleInputKey = "main" | "sub" | "sub2" | "attack";
 export type TriplePart = keyof TripleStat;
 /** Which of a core's three lines an edit targets. */
 export type CoreLineKey = "primary" | "alt0" | "alt1";
+/** The active mode's optimizer output. Only one engine runs per render. */
+type OptimizerResult =
+  | { mode: "hyper"; hyper: HyperResult }
+  | { mode: "hexa"; hexa: HexaResult };
 /** Position of each line in a core's [primary, additional0, additional1] order. */
 const CORE_LINE_SLOT: Record<CoreLineKey, 0 | 1 | 2> = { primary: 0, alt0: 1, alt1: 2 };
 
@@ -163,29 +167,44 @@ export function useStatOptimizer() {
     });
   }, []);
 
-  const hyperResult: HyperResult = useMemo(
+  // Only the mode on screen is optimized. Both engines re-ran on every keystroke
+  // before, and the inactive one's result was never rendered; switching modes now
+  // costs the one pass that mode actually needs. Discriminated on `mode` so the
+  // panel branch reads the result it can use without a null check.
+  const result: OptimizerResult = useMemo(
     () =>
-      optimizeHyper({
-        profile: state.profile,
-        inputs: state.inputs,
-        currentHyper: state.hyperAlloc,
-        availablePoints: state.availablePoints,
-        bossPdrPct,
-        calibration: state.calibration,
-      }),
-    [state.profile, state.inputs, state.hyperAlloc, state.availablePoints, bossPdrPct, state.calibration],
-  );
-
-  const hexaResult: HexaResult = useMemo(
-    () =>
-      optimizeHexa({
-        profile: state.profile,
-        inputs: state.inputs,
-        cores: state.cores,
-        bossPdrPct,
-        calibration: state.calibration,
-      }),
-    [state.profile, state.inputs, state.cores, bossPdrPct, state.calibration],
+      mode === "hyper"
+        ? {
+            mode,
+            hyper: optimizeHyper({
+              profile: state.profile,
+              inputs: state.inputs,
+              currentHyper: state.hyperAlloc,
+              availablePoints: state.availablePoints,
+              bossPdrPct,
+              calibration: state.calibration,
+            }),
+          }
+        : {
+            mode,
+            hexa: optimizeHexa({
+              profile: state.profile,
+              inputs: state.inputs,
+              cores: state.cores,
+              bossPdrPct,
+              calibration: state.calibration,
+            }),
+          },
+    [
+      mode,
+      state.profile,
+      state.inputs,
+      state.hyperAlloc,
+      state.availablePoints,
+      state.cores,
+      bossPdrPct,
+      state.calibration,
+    ],
   );
 
   const hyperPointsSpent = useMemo(() => hyperAllocationCost(state.hyperAlloc), [state.hyperAlloc]);
@@ -213,8 +232,7 @@ export function useStatOptimizer() {
     setHyperLevel,
     setCoreUnlocked,
     setCoreLine,
-    hyperResult,
-    hexaResult,
+    result,
     hyperPointsSpent,
     hasStats,
   };

@@ -6,6 +6,7 @@ import { ToolHeader } from "../../../components/ToolHeader";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
 import { HexaSkillIcon } from "../../../components/ResourceImage";
 import { SegmentedToggle } from "../../../components/SegmentedToggle";
+import { STATUS, statusText } from "../../../components/statusColors";
 import type { AppTheme } from "../../../components/themes";
 import { ToolNumberInput } from "../shared-ui";
 import { toolStyles, type ToolStyles } from "../tool-styles";
@@ -66,6 +67,19 @@ const CORE_GRID_CSS = `
   .stat-opt-core-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   @media (max-width: 760px) { .stat-opt-core-grid { grid-template-columns: 1fr; } }
 `;
+// Pre-mount panel heights (see LoadingPlaceholder). The 860px breakpoint is the
+// one `.page-content` drops its padding at, which is also where the character
+// row wraps and the stat grid collapses to a single column.
+const SKELETON_CSS = `
+  .stat-opt-skeleton-chars { height: 88px; }
+  .stat-opt-skeleton-stats { height: 482px; }
+  .stat-opt-skeleton-mode { height: 628px; }
+  @media (max-width: 860px) {
+    .stat-opt-skeleton-chars { height: 146px; }
+    .stat-opt-skeleton-stats { height: 895px; }
+    .stat-opt-skeleton-mode { height: 717px; }
+  }
+`;
 
 // ── Small shared pieces ───────────────────────────────────────────────────────
 
@@ -86,6 +100,19 @@ function PanelTitle({ theme, title, subtitle, aside }: { theme: AppTheme; title:
   );
 }
 
+/* Sized to hold the 2rem gain figure's line box, so filling in the first stat
+   swaps the placeholder for the verdict without nudging the panel below it.
+   Shorter states center in that space rather than sitting at its top. */
+const GAIN_BANNER_ROW: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  alignContent: "center",
+  gap: "0.5rem",
+  marginBottom: "1rem",
+  minHeight: "2.4rem",
+  flexWrap: "wrap",
+};
+
 function GainBanner({
   theme,
   gainPct,
@@ -102,7 +129,7 @@ function GainBanner({
 }) {
   if (!ready) {
     return (
-      <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+      <div style={GAIN_BANNER_ROW}>
         <span style={{ fontSize: "1.2rem", fontWeight: 800, color: theme.muted }}>No stats yet</span>
         <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.muted }}>
           fill in your stats above to get a recommendation
@@ -111,12 +138,14 @@ function GainBanner({
     );
   }
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+    <div style={GAIN_BANNER_ROW}>
       {alreadyOptimal ? (
         <span style={{ fontSize: "1.5rem", fontWeight: 800, color: theme.accentText }}>Already optimized</span>
       ) : (
+        // Always signed "+": both engines revert to the current allocation and
+        // report 0 rather than ever handing back a loss.
         <span style={{ fontSize: "2rem", fontWeight: 800, color: theme.accentText }}>
-          {gainPct >= 0 ? "+" : ""}{gainPct.toFixed(2)}%
+          +{gainPct.toFixed(2)}%
         </span>
       )}
       <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.muted }}>
@@ -126,9 +155,13 @@ function GainBanner({
   );
 }
 
+/** A caveat that changes how much the recommendation can be trusted, so it reads
+ *  as a warning rather than as the quietest text on the panel. Background stays
+ *  `timerBg`: the notes carry links whose `accentText` is contrast-tuned against
+ *  the theme's own surfaces, not against a tinted one. */
 function WarnNote({ theme, children }: { theme: AppTheme; children: ReactNode }) {
   return (
-    <div style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 600, lineHeight: 1.5, marginBottom: "0.85rem", padding: "0.55rem 0.75rem", background: theme.timerBg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
+    <div style={{ fontSize: "0.78rem", color: statusText(theme, "warning"), fontWeight: 600, lineHeight: 1.5, marginBottom: "0.85rem", padding: "0.55rem 0.75rem", background: theme.timerBg, borderRadius: 10, border: `1px solid ${STATUS.warning.fill}55` }}>
       {children}
     </div>
   );
@@ -677,7 +710,7 @@ function HexaPanel({
       <PanelTitle
         theme={theme}
         title="HEXA Stat"
-        subtitle="Each core has 20 levels split across three lines (the split is set in-game, not chosen). Keeping your levels fixed, this finds the best stat type for each line; a ★ marks a better pick."
+        subtitle="Each core has 20 levels split across three lines (the split is set in-game, not chosen). Keeping your levels fixed, this finds the best stat type for each line; any line with a better pick shows it under the level bar."
       />
       <GainBanner
         theme={theme}
@@ -716,6 +749,10 @@ function HexaPanel({
 
 const MODE_OPTIONS = ["hyper", "hexa"] as const;
 const MODE_LABELS: Record<OptimizerMode, string> = { hyper: "Hyper Stat", hexa: "HEXA Stat" };
+/** The toggle swaps this whole panel rather than restyling one on screen, so the
+ *  buttons point at it: without the link the switch is silent to a screen
+ *  reader, which has no way to tell what the press changed. */
+const MODE_PANEL_ID = "stat-opt-mode-panel";
 
 type StatOptimizerState = ReturnType<typeof useStatOptimizer>;
 
@@ -789,43 +826,50 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
         onTripleChange={opt.setTriplePart}
       />
 
-      {opt.mode === "hyper" ? (
-        <HyperPanel
-          theme={theme}
-          profile={state.profile}
-          result={opt.hyperResult}
-          alloc={state.hyperAlloc}
-          onLevelChange={opt.setHyperLevel}
-          tracked={hyperTracked(state.hyperAlloc)}
-          calibrationNotice={state.calibrationNotice}
-          pointsSpent={opt.hyperPointsSpent}
-          ready={opt.hasStats}
-        />
-      ) : (
-        <HexaPanel
-          theme={theme}
-          profile={state.profile}
-          cores={state.cores}
-          result={opt.hexaResult}
-          onUnlockedChange={opt.setCoreUnlocked}
-          onLineChange={opt.setCoreLine}
-          tracked={hexaTracked(state.cores)}
-          calibrationNotice={state.calibrationNotice}
-          ready={opt.hasStats}
-        />
-      )}
+      <div id={MODE_PANEL_ID}>
+        {opt.result.mode === "hyper" ? (
+          <HyperPanel
+            theme={theme}
+            profile={state.profile}
+            result={opt.result.hyper}
+            alloc={state.hyperAlloc}
+            onLevelChange={opt.setHyperLevel}
+            tracked={hyperTracked(state.hyperAlloc)}
+            calibrationNotice={state.calibrationNotice}
+            pointsSpent={opt.hyperPointsSpent}
+            ready={opt.hasStats}
+          />
+        ) : (
+          <HexaPanel
+            theme={theme}
+            profile={state.profile}
+            cores={state.cores}
+            result={opt.result.hexa}
+            onUnlockedChange={opt.setCoreUnlocked}
+            onLineChange={opt.setCoreLine}
+            tracked={hexaTracked(state.cores)}
+            calibrationNotice={state.calibrationNotice}
+            ready={opt.hasStats}
+          />
+        )}
+      </div>
     </>
   );
 }
 
 /** Empty panels shaped like the mounted layout, so the page doesn't pop or
- *  jump while waiting for the localStorage-backed content. */
+ *  jump while waiting for the localStorage-backed content. Heights come from
+ *  SKELETON_CSS, not inline: the real panels are far taller once the character
+ *  row wraps, the stat fields drop to one column and every caption reflows, so
+ *  one desktop number left the swap shifting the page by hundreds of pixels on
+ *  a phone. Sized against the first-load state (blank stats, Hyper mode, the
+ *  untracked-allocation note showing). */
 function LoadingPlaceholder({ styles }: { styles: ToolStyles }) {
   return (
     <>
-      <div className="panel-card" style={{ ...styles.sectionPanel, height: 92 }} />
-      <div className="panel-card" style={{ ...styles.sectionPanel, height: 560 }} />
-      <div className="panel-card" style={{ ...styles.sectionPanel, height: 520 }} />
+      <div className="panel-card stat-opt-skeleton-chars" style={styles.sectionPanel} />
+      <div className="panel-card stat-opt-skeleton-stats" style={styles.sectionPanel} />
+      <div className="panel-card stat-opt-skeleton-mode" style={styles.sectionPanel} />
     </>
   );
 }
@@ -838,7 +882,7 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
     <div className="page-content">
       {/* One concatenated string, not two children: two text nodes serialize
           differently on server and client and trip a hydration mismatch. */}
-      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS}</style>
+      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS + SKELETON_CSS}</style>
       <div className="tool-container">
         <ToolHeader
           theme={theme}
@@ -852,6 +896,7 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
           labels={MODE_LABELS}
           value={opt.mode}
           ariaLabel="Optimizer"
+          ariaControls={MODE_PANEL_ID}
           onChange={opt.setMode}
           sectionPanel={styles.sectionPanel}
         />
