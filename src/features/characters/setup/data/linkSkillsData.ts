@@ -1,6 +1,19 @@
 import type { LinkSkillId, LinkSkillsData, StoredCharacterRecord } from "../../model/charactersStore";
 import { toCharacterKey } from "../../model/characterKeys";
 
+// Lore branch grouping, confirmed against grandislibrary.com/classes 2026-08-03 -- used
+// only to group the Legion panel's cards into collapsible sections, no gameplay meaning.
+export type LinkSkillBranch =
+  | "Explorer" | "Cygnus Knights" | "Heroes" | "Resistance" | "Nova" | "Sengoku"
+  | "Flora" | "Anima" | "Jianghu" | "Shine" | "Other";
+
+// Display order for the Legion panel's branch sections -- roughly release/prominence
+// order, not alphabetical.
+export const LINK_SKILL_BRANCH_ORDER: LinkSkillBranch[] = [
+  "Explorer", "Cygnus Knights", "Heroes", "Resistance", "Nova", "Sengoku",
+  "Flora", "Anima", "Jianghu", "Shine", "Other",
+];
+
 export interface LinkSkillDef {
   id: LinkSkillId;
   name: string;
@@ -8,22 +21,59 @@ export interface LinkSkillDef {
   maxLevel: number;
   /** manifests/v269/skill.json id — pixel-verified 2026-07-01 against maplestorywiki. */
   iconId: string;
+  branch: LinkSkillBranch;
 }
 
 export const LINK_SKILLS: LinkSkillDef[] = [
-  { id: "unfairAdvantage",    name: "Unfair Advantage",    classes: ["Cadena"],                                    maxLevel: 3, iconId: "60020218" },
-  { id: "tideOfBattle",       name: "Tide of Battle",      classes: ["Illium"],                                    maxLevel: 3, iconId: "150000017" },
-  { id: "solus",              name: "Solus",               classes: ["Ark"],                                       maxLevel: 3, iconId: "150010241" },
-  { id: "timeToPrepare",      name: "Time to Prepare",     classes: ["Kain"],                                      maxLevel: 3, iconId: "60030241" },
-  { id: "termsAndConditions", name: "Terms and Conditions",classes: ["Angelic Buster"],                            maxLevel: 3, iconId: "60011219" },
-  { id: "elementalism",       name: "Elementalism",        classes: ["Kanna"],                                     maxLevel: 3, iconId: "40020002" },
-  { id: "qiCultivation",      name: "Qi Cultivation",      classes: ["Mo Xuan"],                                   maxLevel: 3, iconId: "170000241" },
-  { id: "bravado",            name: "Bravado",             classes: ["Hoyoung"],                                   maxLevel: 3, iconId: "160000001" },
-  { id: "empiricalKnowledge", name: "Empirical Knowledge", classes: ["Arch Mage (F/P)", "Arch Mage (I/L)", "Bishop"], maxLevel: 9, iconId: "0000255" },
+  { id: "unfairAdvantage",    name: "Unfair Advantage",    classes: ["Cadena"],                                    maxLevel: 3, iconId: "60020218", branch: "Nova" },
+  { id: "tideOfBattle",       name: "Tide of Battle",      classes: ["Illium"],                                    maxLevel: 3, iconId: "150000017", branch: "Flora" },
+  { id: "solus",              name: "Solus",               classes: ["Ark"],                                       maxLevel: 3, iconId: "150010241", branch: "Flora" },
+  { id: "timeToPrepare",      name: "Time to Prepare",     classes: ["Kain"],                                      maxLevel: 3, iconId: "60030241", branch: "Nova" },
+  { id: "termsAndConditions", name: "Terms and Conditions",classes: ["Angelic Buster"],                            maxLevel: 3, iconId: "60011219", branch: "Nova" },
+  { id: "elementalism",       name: "Elementalism",        classes: ["Kanna"],                                     maxLevel: 3, iconId: "40020002", branch: "Sengoku" },
+  { id: "qiCultivation",      name: "Qi Cultivation",      classes: ["Mo Xuan"],                                   maxLevel: 3, iconId: "170000241", branch: "Jianghu" },
+  { id: "bravado",            name: "Bravado",             classes: ["Hoyoung"],                                   maxLevel: 3, iconId: "160000001", branch: "Anima" },
+  { id: "empiricalKnowledge", name: "Empirical Knowledge", classes: ["Arch Mage (F/P)", "Arch Mage (I/L)", "Bishop"], maxLevel: 9, iconId: "0000255", branch: "Explorer" },
   // "Dual Blade" here is the player-facing display name (classSkillData.ts's displayName
   // override); CLASS_TO_SKILL below intentionally keys on Nexon's raw jobName "Blade
   // Master" instead, since that's what actually comes back from the API.
-  { id: "thiefsCunning",      name: "Thief's Cunning",     classes: ["Night Lord", "Shadower", "Dual Blade"],      maxLevel: 9, iconId: "0000261" },
+  { id: "thiefsCunning",      name: "Thief's Cunning",     classes: ["Night Lord", "Shadower", "Dual Blade"],      maxLevel: 9, iconId: "0000261", branch: "Explorer" },
+  // Everything below researched against grandislibrary.com/content/link-skills and each
+  // class's own page (grandislibrary.com/<branch>/<class>, live JSON embedded in the page)
+  // 2026-08-02 -- names/maxLevel/grouping pixel- and text-verified per-class rather than
+  // trusted from the site's own summary table, which turned out to have several stale
+  // groupings (e.g. claimed all Heroes share "Close Call" and all non-Xenon Resistance
+  // demons share "Hybrid Logic" -- both wrong; Aran/Combo Kill Blessing and Demon
+  // Slayer/Fury Unleashed are actually solo). iconId cross-checked against
+  // manifests/v270/skill.json by exact name. `branch` per-entry confirmed 2026-08-03
+  // against grandislibrary.com/classes's own branch headings directly (not guessed).
+  { id: "nobleFire",             name: "Noble Fire",              classes: ["Adele"],                                                                          maxLevel: 3,  iconId: "150020241", branch: "Flora" },
+  { id: "spiritOfFreedom",       name: "Spirit of Freedom",       classes: ["Wild Hunter", "Battle Mage", "Mechanic", "Blaster"],                                maxLevel: 12, iconId: "30000074", branch: "Resistance" },
+  { id: "cygnusBlessing",        name: "Cygnus Blessing",         classes: ["Dawn Warrior", "Wind Archer", "Thunder Breaker", "Night Walker", "Blaze Wizard"],   maxLevel: 15, iconId: "10000255", branch: "Cygnus Knights" },
+  { id: "adventurersCuriosity",  name: "Adventurer's Curiosity",  classes: ["Bow Master", "Marksman", "Pathfinder"],                                              maxLevel: 9,  iconId: "0000258", branch: "Explorer" },
+  { id: "piratesBlessing",       name: "Pirate's Blessing",       classes: ["Corsair", "Buccaneer", "Cannoneer"],                                                 maxLevel: 9,  iconId: "0000264", branch: "Explorer" },
+  { id: "invincibleBelief",      name: "Invincible Belief",       classes: ["Hero", "Paladin", "Dark Knight"],                                                    maxLevel: 9,  iconId: "0000252", branch: "Explorer" },
+  { id: "wildRage",              name: "Wild Rage",               classes: ["Demon Avenger"],                                                                     maxLevel: 3,  iconId: "30010241", branch: "Resistance" },
+  { id: "furyUnleashed",         name: "Fury Unleashed",          classes: ["Demon Slayer"],                                                                      maxLevel: 3,  iconId: "30010112", branch: "Resistance" },
+  { id: "guidingStars",          name: "Guiding Stars",           classes: ["Sia Astelle", "Erel Light"],                                                         maxLevel: 6,  iconId: "180000001", branch: "Shine" },
+  { id: "runePersistence",       name: "Rune Persistence",        classes: ["Evan"],                                                                              maxLevel: 3,  iconId: "20010294", branch: "Heroes" },
+  { id: "moonlitBladeLearnings", name: "Moonlit Blade Learnings", classes: ["Hayato"],                                                                            maxLevel: 3,  iconId: "40010001", branch: "Sengoku" },
+  { id: "innateGift",            name: "Innate Gift",             classes: ["Khali"],                                                                             maxLevel: 3,  iconId: "150030241", branch: "Flora" },
+  { id: "judgment",              name: "Judgment",                classes: ["Kinesis"],                                                                           maxLevel: 3,  iconId: "140000292", branch: "Other" },
+  { id: "naturesFriend",         name: "Nature's Friend",         classes: ["Lara"],                                                                              maxLevel: 3,  iconId: "160010001", branch: "Anima" },
+  { id: "lightWash",             name: "Light Wash",              classes: ["Luminous"],                                                                          maxLevel: 3,  iconId: "20040218", branch: "Heroes" },
+  { id: "spiritGuideBlessing",   name: "Spirit Guide Blessing",   classes: ["Lynn"],                                                                              maxLevel: 3,  iconId: "170010241", branch: "Jianghu" },
+  { id: "knightsWatch",          name: "Knight's Watch",          classes: ["Mihile"],                                                                            maxLevel: 3,  iconId: "50001214", branch: "Cygnus Knights" },
+  { id: "phantomInstinct",       name: "Phantom Instinct",        classes: ["Phantom"],                                                                           maxLevel: 3,  iconId: "20030204", branch: "Heroes" },
+  { id: "groundedBody",          name: "Grounded Body",           classes: ["Ren"],                                                                               maxLevel: 3,  iconId: "160020001", branch: "Anima" },
+  { id: "closeCall",             name: "Close Call",              classes: ["Shade"],                                                                             maxLevel: 3,  iconId: "20050286", branch: "Heroes" },
+  { id: "rhinnesBlessing",       name: "Rhinne's Blessing",       classes: ["Zero"],                                                                              maxLevel: 6,  iconId: "80000110", branch: "Other" },
+  { id: "comboKillBlessing",     name: "Combo Kill Blessing",     classes: ["Aran"],                                                                              maxLevel: 3,  iconId: "20000297", branch: "Heroes" },
+  { id: "hybridLogic",           name: "Hybrid Logic",            classes: ["Xenon"],                                                                             maxLevel: 3,  iconId: "30020233", branch: "Resistance" },
+  { id: "ironWill",              name: "Iron Will",               classes: ["Kaiser"],                                                                            maxLevel: 3,  iconId: "60000222", branch: "Nova" },
+  // Grandis Library's page omits maxLevel for this one (typed "Active" unlike every other
+  // link skill's "Passive") -- confirmed maxLevel 3 directly by Yuki.
+  { id: "elvenBlessing",         name: "Elven Blessing",          classes: ["Mercedes"],                                                                          maxLevel: 3,  iconId: "20021110", branch: "Heroes" },
 ];
 
 export function inferLinkLevel(level: number): number {
@@ -50,6 +100,45 @@ export const CLASS_TO_SKILL: Record<string, LinkSkillId> = {
   "Night Lord":       "thiefsCunning",
   "Shadower":         "thiefsCunning",
   "Blade Master":     "thiefsCunning",
+  "Adele":            "nobleFire",
+  "Wild Hunter":      "spiritOfFreedom",
+  "Battle Mage":      "spiritOfFreedom",
+  "Mechanic":         "spiritOfFreedom",
+  "Blaster":          "spiritOfFreedom",
+  "Dawn Warrior":     "cygnusBlessing",
+  "Wind Archer":      "cygnusBlessing",
+  "Thunder Breaker":  "cygnusBlessing",
+  "Night Walker":     "cygnusBlessing",
+  "Blaze Wizard":     "cygnusBlessing",
+  "Bow Master":       "adventurersCuriosity",
+  "Marksman":         "adventurersCuriosity",
+  "Pathfinder":       "adventurersCuriosity",
+  "Corsair":          "piratesBlessing",
+  "Buccaneer":        "piratesBlessing",
+  "Cannon Master":    "piratesBlessing",
+  "Hero":             "invincibleBelief",
+  "Paladin":          "invincibleBelief",
+  "Dark Knight":      "invincibleBelief",
+  "Demon Avenger":    "wildRage",
+  "Demon Slayer":     "furyUnleashed",
+  "Sia Astelle":      "guidingStars",
+  "Erel Light":       "guidingStars",
+  "Evan":             "runePersistence",
+  "Hayato":           "moonlitBladeLearnings",
+  "Khali":            "innateGift",
+  "Kinesis":          "judgment",
+  "Lara":             "naturesFriend",
+  "Luminous":         "lightWash",
+  "Lynn":             "spiritGuideBlessing",
+  "Mihile":           "knightsWatch",
+  "Phantom":          "phantomInstinct",
+  "Ren":              "groundedBody",
+  "Shade":            "closeCall",
+  "Zero":             "rhinnesBlessing",
+  "Aran":             "comboKillBlessing",
+  "Xenon":            "hybridLogic",
+  "Kaiser":           "ironWill",
+  "Mercedes":         "elvenBlessing",
 };
 
 /** Winning (highest-level) tracked character per class, keyed by the class's jobName. */

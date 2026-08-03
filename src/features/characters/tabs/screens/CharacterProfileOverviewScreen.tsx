@@ -7,6 +7,7 @@ import { classPortraitUrl } from "../../../../lib/classPortraits";
 import { worldIconUrl } from "../../../../lib/mapleResource";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useMounted } from "../../../../lib/useMounted";
+import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import type { SetupFlowId } from "../../setup/flows";
 import type { SetupStepId } from "../../setup/steps";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
@@ -3517,6 +3518,12 @@ function BookmarkSpine({
   // react-doctor false positive: empty new Map() is a trivial allocation, not worth lazy-init ceremony.
   // react-doctor-disable-next-line react-doctor/rerender-lazy-ref-init
   const tabRefs = useRef<Map<BookmarkId, HTMLButtonElement>>(new Map());
+  // Only the mobile layout (.profile-binder-spine's max-width: 860px media query) scrolls
+  // horizontally -- desktop's vertical column never overflows, where a solid black-to-black
+  // mask (both atStart/atEnd true when there's no horizontal overflow) is a visual no-op,
+  // so this is safe to apply unconditionally rather than gating it on viewport width.
+  const { ref: spineRef, atStart: spineAtStart, atEnd: spineAtEnd } = useScrollEdges<HTMLDivElement>([bookmarks.length]);
+  const spineMask = edgeFadeMask(spineAtStart, spineAtEnd);
   // exportCharacterJson triggers a silent browser download with no confirmation of its own --
   // some mobile browsers don't even show a download-bar UI, so tapping Export otherwise gives
   // no feedback at all that anything happened. Flashes the same accent tint the active
@@ -3546,7 +3553,21 @@ function BookmarkSpine({
   }
 
   return (
-    <div className="profile-binder-spine" role="tablist" aria-label="Character profile sections" aria-orientation="vertical">
+    <div
+      ref={spineRef}
+      className="profile-binder-spine"
+      role="tablist"
+      aria-label="Character profile sections"
+      aria-orientation="vertical"
+      // Set as a custom property, not a literal maskImage/WebkitMaskImage style: the
+      // mobile media query (max-width: 860px, CharacterSetupFlow.styles.ts) is the only
+      // place that actually consumes it into a real mask. Desktop's vertical column
+      // never overflows horizontally and has no `overflow` set at all (defaults to
+      // visible), so scrollWidth/clientWidth there aren't meaningful scroll-edge signals
+      // -- applying the gradient unconditionally as a literal style previously clipped
+      // the desktop list incorrectly.
+      style={{ "--edge-fade-mask": spineMask } as CSSProperties}
+    >
       {bookmarks.map((b, i) => {
         const active = b.id === activeId;
         const tab = (

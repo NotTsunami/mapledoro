@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type Ref } from "react";
 import { useMounted } from "../../../../lib/useMounted";
+import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import { WORLD_NAMES } from "../../model/constants";
 import {
   readCharactersStore,
@@ -13,7 +14,7 @@ import {
   parseLegionArtifactBoardDraft, deriveLegionArtifactFields,
   type LegionCrystalDraft, type LegionCrystalDef,
 } from "../../setup/data/legionArtifactData";
-import { LINK_SKILLS, computeLinkSkillsFromRoster } from "../../setup/data/linkSkillsData";
+import { LINK_SKILLS, LINK_SKILL_BRANCH_ORDER, computeLinkSkillsFromRoster, type LinkSkillBranch } from "../../setup/data/linkSkillsData";
 import { LinkSkillIcon } from "../../setup/components/LinkSkillsSetupStep";
 import { LegionArtifactsEditor, CrystalIcon } from "../../setup/components/LegionArtifactsSetupStep";
 import type { AppTheme } from "../../../../components/themes";
@@ -623,53 +624,21 @@ function DormantSkillChip({ theme, skill }: { theme: AppTheme; skill: (typeof LI
   );
 }
 
-// Read-only: link skill LEVELS live per-character now (each character's own linkSkills
-// field, see charactersStore.ts's file-header reasoning), not one shared per-world value,
-// so there's no longer a single number this world-level screen could save an edit back
-// to. This section shows what the same-world roster PROVES is mastered (a floor/ceiling
-// on what any one character here could equip), not any specific character's actual
-// choice of which links it runs -- editing that per-character choice happens on each
-// character's own Link Skills setup step instead.
-function LinkSkillsSection({ theme, worldId, worldCharacters }: {
-  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[];
+// One branch's worth of active cards (single- and multi-class grids) plus its dormant
+// chips. Rendered only for whichever branch tab is currently selected (see
+// LinkSkillsSection) -- with 53+ classes across 11 branches now covered (see
+// linkSkillsData.ts), showing every branch's cards at once would turn this into an
+// endless scroll even for a modest roster.
+function LinkSkillBranchGrids({ theme, active, dormant }: {
+  theme: AppTheme;
+  active: { skill: (typeof LINK_SKILLS)[number]; eligible: StoredCharacterRecord[]; level: number | undefined }[];
+  dormant: { skill: (typeof LINK_SKILLS)[number] }[];
 }) {
-  const mounted = useMounted();
-  const { values: levels, winners } = mounted
-    ? computeLinkSkillsFromRoster(worldCharacters, worldId)
-    : { values: {}, winners: {} };
-
-  const withEligibility = LINK_SKILLS.map((skill) => ({
-    skill,
-    eligible: winners[skill.id] ?? [],
-    level: levels?.[skill.id],
-  }));
-  // A skill explicitly set to 0 (no progress yet) reads the same as never having been
-  // touched — level 0 with no eligible tracked character still belongs in the dormant
-  // chip list, not the full sprite card (which would otherwise render an empty "no
-  // tracked character" placeholder for a skill that has no real data either way).
-  const active = withEligibility.filter(({ eligible, level }) => eligible.length > 0 || Boolean(level));
-  const dormant = withEligibility.filter(({ eligible, level }) => eligible.length === 0 && !level);
-  // Skills shared across several classes (Thief's Cunning, Empirical Knowledge: 3
-  // member classes each) need room for more sprites per card than a single-class skill
-  // ever will, so they get their own wider, separately-uniform grid, shown last.
   const activeMulti = active.filter(({ skill }) => skill.classes.length > 1);
   const activeSingle = active.filter(({ skill }) => skill.classes.length === 1);
-  const dormantMulti = dormant.filter(({ skill }) => skill.classes.length > 1);
-  const dormantSingle = dormant.filter(({ skill }) => skill.classes.length === 1);
-
-  // Pull just enough dormant skills into each grid to complete its last row (never the
-  // full dormant backlog, see LinkSkillCard's dormant-prop comment for why), leaving
-  // the rest as compact chips below.
-  const SINGLE_COLS = 4;
-  const MULTI_COLS = 2;
-  const singleFillCount = (SINGLE_COLS - (activeSingle.length % SINGLE_COLS)) % SINGLE_COLS;
-  const multiFillCount = (MULTI_COLS - (activeMulti.length % MULTI_COLS)) % MULTI_COLS;
-  const singleFiller = dormantSingle.slice(0, singleFillCount);
-  const multiFiller = dormantMulti.slice(0, multiFillCount);
-  const chips = [...dormantSingle.slice(singleFillCount), ...dormantMulti.slice(multiFillCount)];
 
   return (
-    <div className="legion-link-skills-root" style={{ display: "grid", gap: 14 }}>
+    <div className="legion-link-skills-root" style={{ display: "grid", gap: 10 }}>
       <style>{`
         .legion-link-skills-root { container-type: inline-size; }
         .legion-single-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -689,9 +658,6 @@ function LinkSkillsSection({ theme, worldId, worldCharacters }: {
           {activeSingle.map(({ skill, eligible, level }) => (
             <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} />
           ))}
-          {singleFiller.map(({ skill, eligible, level }) => (
-            <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} dormant />
-          ))}
         </div>
       )}
       {activeMulti.length > 0 && (
@@ -699,22 +665,147 @@ function LinkSkillsSection({ theme, worldId, worldCharacters }: {
           {activeMulti.map(({ skill, eligible, level }) => (
             <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} />
           ))}
-          {multiFiller.map(({ skill, eligible, level }) => (
-            <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} dormant />
+        </div>
+      )}
+      {dormant.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {dormant.map(({ skill }) => (
+            <DormantSkillChip key={skill.id} theme={theme} skill={skill} />
           ))}
         </div>
       )}
-      {chips.length > 0 && (
-        <div>
-          <p style={{ margin: "0 0 0.5rem", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: theme.muted }}>
-            No progress ({chips.length})
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {chips.map(({ skill }) => (
-              <DormantSkillChip key={skill.id} theme={theme} skill={skill} />
+    </div>
+  );
+}
+
+// Landing/"All" view: one dense row per skill (icon, name, level), no big sprite cards --
+// scannable in a glance across every branch without the vertical weight of the full card
+// grids. Clicking a specific branch pill switches to LinkSkillBranchGrids instead.
+function LinkSkillCompactRow({ theme, skill, level }: {
+  theme: AppTheme; skill: (typeof LINK_SKILLS)[number]; level: number | undefined;
+}) {
+  const hasProgress = Boolean(level);
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "0.4rem 0.6rem", borderRadius: 8,
+      opacity: hasProgress ? 1 : 0.55,
+    }}>
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={24} />
+      <span style={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {skill.name}
+      </span>
+      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: hasProgress ? theme.text : theme.muted, flexShrink: 0 }}>
+        {level ?? 0} / {skill.maxLevel}
+      </span>
+    </div>
+  );
+}
+
+// Read-only: link skill LEVELS live per-character now (each character's own linkSkills
+// field, see charactersStore.ts's file-header reasoning), not one shared per-world value,
+// so there's no longer a single number this world-level screen could save an edit back
+// to. This section shows what the same-world roster PROVES is mastered (a floor/ceiling
+// on what any one character here could equip), not any specific character's actual
+// choice of which links it runs -- editing that per-character choice happens on each
+// character's own Link Skills setup step instead.
+type LinkSkillTab = "All" | LinkSkillBranch;
+
+function LinkSkillsSection({ theme, worldId, worldCharacters }: {
+  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[];
+}) {
+  const mounted = useMounted();
+  const { values: levels, winners } = mounted
+    ? computeLinkSkillsFromRoster(worldCharacters, worldId)
+    : { values: {}, winners: {} };
+
+  // "All" lands first: a dense scannable list beats forcing a branch pick before seeing
+  // anything (see LinkSkillCompactRow). Picking a specific branch pill swaps the content
+  // area to that branch's full card grids instead of stacking every branch open at once
+  // (53+ classes across 11 branches -- see linkSkillsData.ts -- would be an endless
+  // scroll if every branch rendered its cards simultaneously).
+  const [tab, setTab] = useState<LinkSkillTab>("All");
+
+  const withEligibility = LINK_SKILLS.map((skill) => ({
+    skill,
+    eligible: winners[skill.id] ?? [],
+    level: levels?.[skill.id],
+  }));
+  // A skill explicitly set to 0 (no progress yet) reads the same as never having been
+  // touched — level 0 with no eligible tracked character still belongs in the dormant
+  // chip list, not the full sprite card (which would otherwise render an empty "no
+  // tracked character" placeholder for a skill that has no real data either way).
+  const active = withEligibility.filter(({ eligible, level }) => eligible.length > 0 || Boolean(level));
+  const dormant = withEligibility.filter(({ eligible, level }) => eligible.length === 0 && !level);
+
+  const branchesWithData = new Set(withEligibility.map(({ skill }) => skill.branch));
+  const tabOptions: LinkSkillTab[] = ["All", ...LINK_SKILL_BRANCH_ORDER.filter((b) => branchesWithData.has(b))];
+
+  // Fades whichever edge actually has more to scroll to (see useScrollEdges/edgeFadeMask)
+  // -- a static fade misreads as "more to scroll" even once fully scrolled to an edge, or
+  // when the row never overflows in the first place (branchesWithData can be short
+  // enough to fit).
+  const { ref: tabsRef, atStart, atEnd } = useScrollEdges<HTMLDivElement>([tabOptions.length]);
+  const tabsMask = edgeFadeMask(atStart, atEnd);
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <style>{`
+        .legion-link-skill-tabs {
+          display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+          scrollbar-width: thin;
+          scrollbar-color: ${theme.border} transparent;
+        }
+        .legion-link-skill-tabs::-webkit-scrollbar { height: 6px; }
+        .legion-link-skill-tabs::-webkit-scrollbar-track { background: transparent; }
+        .legion-link-skill-tabs::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 999px; }
+      `}</style>
+      <div
+        ref={tabsRef}
+        className="legion-link-skill-tabs"
+        style={{ maskImage: tabsMask, WebkitMaskImage: tabsMask }}
+      >
+        {tabOptions.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setTab(option)}
+            style={{
+              flexShrink: 0, padding: "0.4rem 0.85rem", borderRadius: 999,
+              border: `1px solid ${tab === option ? theme.accent : theme.border}`,
+              background: tab === option ? theme.accent : "transparent",
+              color: tab === option ? theme.accentOn : theme.muted,
+              fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+      {tab === "All" ? (
+        <div className="legion-link-skills-all-root">
+          <style>{`
+            .legion-link-skills-all-root { container-type: inline-size; }
+            .legion-link-skills-all-grid { display: grid; gap: 2px 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            @container (max-width: 860px) {
+              .legion-link-skills-all-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            }
+            @container (max-width: 520px) {
+              .legion-link-skills-all-grid { grid-template-columns: minmax(0, 1fr); }
+            }
+          `}</style>
+          <div className="legion-link-skills-all-grid">
+            {withEligibility.map(({ skill, level }) => (
+              <LinkSkillCompactRow key={skill.id} theme={theme} skill={skill} level={level} />
             ))}
           </div>
         </div>
+      ) : (
+        <LinkSkillBranchGrids
+          theme={theme}
+          active={active.filter((entry) => entry.skill.branch === tab)}
+          dormant={dormant.filter((entry) => entry.skill.branch === tab)}
+        />
       )}
     </div>
   );

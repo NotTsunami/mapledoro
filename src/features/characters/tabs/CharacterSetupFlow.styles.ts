@@ -884,13 +884,13 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
                render first visually, so a resize expands downward from the spine instead
                of moving it. */
             order: -1;
-            /* Fades the trailing edge so the row reads as swipeable at a glance instead of
-               looking like a fixed row of pills that happens to get cut off -- there's no
-               visible scrollbar on mobile otherwise. Static (not scroll-position-aware): it
-               keeps fading even once fully scrolled to the end, a small tradeoff against the
-               cost of tracking scroll position just to toggle it off. */
-            mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-            -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+            /* --edge-fade-mask is set inline via useScrollEdges/edgeFadeMask
+               (CharacterProfileOverviewScreen.tsx) -- only consumed into a real mask HERE,
+               inside this mobile-only media query, never as a literal inline style, since
+               the desktop vertical column has no horizontal overflow and would otherwise
+               get an incorrect fade clipping its content. */
+            mask-image: var(--edge-fade-mask);
+            -webkit-mask-image: var(--edge-fade-mask);
             /* This row layout also kicks in on a narrowed desktop browser window, not just
                real mobile -- there it gets a real (visible, non-overlay) OS scrollbar, which
                reads as chunky next to the pill/fade treatment above. Kept visible rather than

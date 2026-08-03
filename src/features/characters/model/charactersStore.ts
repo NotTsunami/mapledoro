@@ -136,7 +136,14 @@ export type WhLegionRank = "B" | "A" | "S" | "SS" | "SSS";
 export type LinkSkillId =
   | "unfairAdvantage" | "tideOfBattle" | "solus" | "timeToPrepare"
   | "termsAndConditions" | "elementalism" | "qiCultivation" | "bravado"
-  | "empiricalKnowledge" | "thiefsCunning";
+  | "empiricalKnowledge" | "thiefsCunning"
+  | "nobleFire" | "spiritOfFreedom" | "cygnusBlessing" | "adventurersCuriosity"
+  | "piratesBlessing" | "invincibleBelief" | "wildRage" | "furyUnleashed"
+  | "guidingStars" | "runePersistence" | "moonlitBladeLearnings" | "innateGift"
+  | "judgment" | "naturesFriend" | "lightWash" | "spiritGuideBlessing"
+  | "knightsWatch" | "phantomInstinct" | "groundedBody" | "closeCall"
+  | "rhinnesBlessing" | "comboKillBlessing" | "hybridLogic" | "ironWill"
+  | "elvenBlessing";
 
 export type LinkSkillsData = Partial<Record<LinkSkillId, number>>;
 
@@ -144,6 +151,13 @@ const LINK_SKILL_IDS = new Set<LinkSkillId>([
   "unfairAdvantage", "tideOfBattle", "solus", "timeToPrepare",
   "termsAndConditions", "elementalism", "qiCultivation", "bravado",
   "empiricalKnowledge", "thiefsCunning",
+  "nobleFire", "spiritOfFreedom", "cygnusBlessing", "adventurersCuriosity",
+  "piratesBlessing", "invincibleBelief", "wildRage", "furyUnleashed",
+  "guidingStars", "runePersistence", "moonlitBladeLearnings", "innateGift",
+  "judgment", "naturesFriend", "lightWash", "spiritGuideBlessing",
+  "knightsWatch", "phantomInstinct", "groundedBody", "closeCall",
+  "rhinnesBlessing", "comboKillBlessing", "hybridLogic", "ironWill",
+  "elvenBlessing",
 ]);
 
 /** Max percent for the "Damage of Final Attack Skills" Maple Union artifact. */

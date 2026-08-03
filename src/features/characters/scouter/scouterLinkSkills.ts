@@ -6,11 +6,16 @@
 
   MapleScouter also has mihile/kaiser/hayato keys with no mapledoro equivalent, confirmed
   by Yuki these can't even be entered on MapleScouter's own UI, so they always send "0".
+
+  This is intentionally NOT exhaustive over LinkSkillId: MapleScouter's own linkSkill
+  object is a fixed external contract that only covers the classes above, unrelated to
+  mapledoro's own LINK_SKILLS coverage (see linkSkillsData.ts) -- a link skill added there
+  for mapledoro's own Legion panel has no bearing on what MapleScouter's API accepts.
 */
 
 import type { LinkSkillId } from "../model/charactersStore";
 
-export const LINK_SKILL_TO_SCOUTER_KEY: Record<LinkSkillId, string> = {
+export const LINK_SKILL_TO_SCOUTER_KEY: Partial<Record<LinkSkillId, string>> = {
   unfairAdvantage: "kadena",
   tideOfBattle: "illium",
   solus: "ark",
