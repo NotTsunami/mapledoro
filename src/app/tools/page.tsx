@@ -53,7 +53,7 @@ const CALCULATORS: ToolCard[] = [
   {
     title: "Stat Optimizer",
     description:
-      "Find the optimal Hyper Stat and HEXA Stat allocation for bossing, using your tracked character's stats.",
+      "Find the optimal Hyper Stat and HEXA Stat allocation for bossing.",
     skillId: "500071000", // HEXA Stats
     iconType: "skill",
     href: "/tools/stat-optimizer",
