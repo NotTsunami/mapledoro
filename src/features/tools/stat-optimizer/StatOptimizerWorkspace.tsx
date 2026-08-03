@@ -39,7 +39,13 @@ const HEXA_LINE_LABELS: Record<CoreLineKey, string> = { primary: "Primary", alt0
 
 const STAT_NAME: Record<MainStatId, string> = { str: "STR", dex: "DEX", int: "INT", luk: "LUK", hp: "Max HP" };
 
-const statName = (id: MainStatId | null): string => (id ? STAT_NAME[id] : "");
+/** Names a stat's role, and which stat fills it once a class is known. Standalone
+ *  entry has no class, so the blank seed's STR/DEX are placeholders the kernel
+ *  never reads as themselves; printing them would answer a question the tool has
+ *  not been told, and send a mage looking for an INT field that doesn't exist. */
+function statLabel(role: string, id: MainStatId | null, standalone: boolean): string {
+  return standalone || !id ? role : `${role} (${STAT_NAME[id]})`;
+}
 
 const SCALAR_FIELDS: { key: ScalarInputKey; label: string }[] = [
   { key: "damagePct", label: "Damage %" },
@@ -49,8 +55,10 @@ const SCALAR_FIELDS: { key: ScalarInputKey; label: string }[] = [
   { key: "ignoreDefPct", label: "Ignore Enemy DEF %" },
 ];
 
-function hexaTypeLabel(type: HexaStatType | "", profile: ClassDamageProfile): string {
-  const primary = profile.mainStat;
+function hexaTypeLabel(type: HexaStatType | "", profile: ClassDamageProfile, standalone: boolean): string {
+  // Withholding the placeholder primary stat drops getMainStatLabel onto its own
+  // generic "Main Stat", matching the stat fields above for the same reason.
+  const primary = standalone ? "" : profile.mainStat;
   if (type === "mainStat") return getMainStatLabel(profile.classId ?? "", primary);
   if (type === "attackPower") return getAttackLabel(primary);
   if (type === "criticalDamage") return "Critical Damage";
@@ -119,27 +127,57 @@ const GAIN_BANNER_ROW: CSSProperties = {
   flexWrap: "wrap",
 };
 
+/** Stands in for the gain figure whenever the panel has nothing to compute one
+ *  from. Both engines report 0% in those states, which would otherwise read as a
+ *  verdict ("no gain available") rather than as missing input. */
+interface GainPending {
+  title: string;
+  detail: string;
+}
+
+const NO_STATS_PENDING: GainPending = {
+  title: "No stats yet",
+  detail: "fill in your stats above to get a recommendation",
+};
+
+/** A zero budget means no level is set, not that the allocation can't improve. */
+function hyperPending(hasStats: boolean, pointsAvailable: number): GainPending | null {
+  if (!hasStats) return NO_STATS_PENDING;
+  if (pointsAvailable <= 0) {
+    return { title: "No points to spend", detail: "set your level above to get a recommendation" };
+  }
+  return null;
+}
+
+/** With no unlocked core carrying levels there are no lines to re-assign, so the
+ *  engine's 0% gain means "nothing entered", not "already optimal". */
+function hexaPending(hasStats: boolean, tracked: boolean): GainPending | null {
+  if (!hasStats) return NO_STATS_PENDING;
+  if (!tracked) {
+    return { title: "No HEXA lines yet", detail: "unlock a core and enter its levels to get a recommendation" };
+  }
+  return null;
+}
+
 function GainBanner({
   theme,
   gainPct,
   label,
   alreadyOptimal,
-  ready,
+  pending,
 }: {
   theme: AppTheme;
   gainPct: number;
   label: string;
   alreadyOptimal: boolean;
-  /** False when the stat window is empty, where a 0% gain would read as a verdict. */
-  ready: boolean;
+  /** Non-null replaces the figure entirely; see GainPending. */
+  pending: GainPending | null;
 }) {
-  if (!ready) {
+  if (pending) {
     return (
       <div style={GAIN_BANNER_ROW}>
-        <span style={{ fontSize: "1.2rem", fontWeight: 800, color: theme.muted }}>No stats yet</span>
-        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.muted }}>
-          fill in your stats above to get a recommendation
-        </span>
+        <span style={{ fontSize: "1.2rem", fontWeight: 800, color: theme.muted }}>{pending.title}</span>
+        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.muted }}>{pending.detail}</span>
       </div>
     );
   }
@@ -288,6 +326,7 @@ function StatsPanel({
   theme,
   styles,
   profile,
+  standalone,
   inputs,
   onScalarChange,
   onTripleChange,
@@ -295,14 +334,15 @@ function StatsPanel({
   theme: AppTheme;
   styles: ToolStyles;
   profile: ClassDamageProfile;
+  standalone: boolean;
   inputs: OptimizerStatInputs;
   onScalarChange: (key: ScalarInputKey, value: number) => void;
   onTripleChange: (key: TripleInputKey, part: TriplePart, value: number) => void;
 }) {
   const triples: { key: TripleInputKey; label: string; parts: typeof TRIPLE_PARTS }[] = [
-    { key: "main", label: `Main Stat (${statName(profile.mainStat)})`, parts: TRIPLE_PARTS },
-    ...(profile.subStat ? [{ key: "sub" as const, label: `Secondary Stat (${statName(profile.subStat)})`, parts: TRIPLE_PARTS }] : []),
-    ...(profile.subStat2 ? [{ key: "sub2" as const, label: `Secondary Stat II (${statName(profile.subStat2)})`, parts: TRIPLE_PARTS }] : []),
+    { key: "main", label: statLabel("Main Stat", profile.mainStat, standalone), parts: TRIPLE_PARTS },
+    ...(profile.subStat ? [{ key: "sub" as const, label: statLabel("Secondary Stat", profile.subStat, standalone), parts: TRIPLE_PARTS }] : []),
+    ...(profile.subStat2 ? [{ key: "sub2" as const, label: statLabel("Secondary Stat II", profile.subStat2, standalone), parts: TRIPLE_PARTS }] : []),
     { key: "attack", label: profile.usesMagic ? "Magic ATT" : "Attack Power", parts: ATTACK_PARTS },
   ];
   return (
@@ -347,12 +387,12 @@ function StatsPanel({
 // ── Hyper Stat ────────────────────────────────────────────────────────────────
 
 /** Class-aware label for a hyper line. */
-function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile): string {
+function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile, standalone: boolean): string {
   if (id === "mainStat") {
-    return profile.isHpBased ? "Max HP %" : `Main Stat (${statName(profile.mainStat)})`;
+    return profile.isHpBased ? "Max HP %" : statLabel("Main Stat", profile.mainStat, standalone);
   }
-  if (id === "subStat") return `Secondary Stat (${statName(profile.subStat)})`;
-  if (id === "subStat2") return `Secondary Stat II (${statName(profile.subStat2)})`;
+  if (id === "subStat") return statLabel("Secondary Stat", profile.subStat, standalone);
+  if (id === "subStat2") return statLabel("Secondary Stat II", profile.subStat2, standalone);
   if (id === "attack") return profile.usesMagic ? "Magic ATT" : "ATT";
   return HYPER_LINES.find((l) => l.id === id)?.label ?? id;
 }
@@ -434,24 +474,26 @@ function HyperPanel({
   theme,
   styles,
   profile,
+  standalone,
   result,
   alloc,
   onLevelChange,
   tracked,
   calibrationNotice,
   pointsSpent,
-  ready,
+  hasStats,
 }: {
   theme: AppTheme;
   styles: ToolStyles;
   profile: ClassDamageProfile;
+  standalone: boolean;
   result: HyperResult;
   alloc: HyperAllocation;
   onLevelChange: (id: HyperLineId, level: number) => void;
   tracked: boolean;
   calibrationNotice: CalibrationNotice | null;
   pointsSpent: number;
-  ready: boolean;
+  hasStats: boolean;
 }) {
   const rows = HYPER_DISPLAY_ORDER.filter((id) => id !== "subStat2" || profile.subStat2 !== null);
   return (
@@ -472,7 +514,7 @@ function HyperPanel({
         gainPct={result.gainPct}
         label="bossing damage vs your current hyper stats"
         alreadyOptimal={result.alreadyOptimal}
-        ready={ready}
+        pending={hyperPending(hasStats, result.pointsAvailable)}
       />
       {!tracked && (
         <WarnNote theme={theme}>
@@ -507,7 +549,7 @@ function HyperPanel({
               theme={theme}
               inputStyle={styles.inputStyle}
               id={id}
-              label={hyperLineLabel(id, profile)}
+              label={hyperLineLabel(id, profile, standalone)}
               current={alloc[id]}
               recommended={result.allocation[id]}
               onChange={(v) => onLevelChange(id, v)}
@@ -544,6 +586,7 @@ function HexaLineRow({
   theme,
   styles,
   profile,
+  standalone,
   idPrefix,
   coreLabel,
   role,
@@ -556,6 +599,7 @@ function HexaLineRow({
   theme: AppTheme;
   styles: ToolStyles;
   profile: ClassDamageProfile;
+  standalone: boolean;
   idPrefix: string;
   coreLabel: string;
   role: CoreLineKey;
@@ -597,14 +641,14 @@ function HexaLineRow({
       >
         <option value="">Select…</option>
         {HEXA_STAT_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>{hexaTypeLabel(o.value, profile)}</option>
+          <option key={o.value} value={o.value}>{hexaTypeLabel(o.value, profile, standalone)}</option>
         ))}
       </select>
       <LineLevelBar theme={theme} level={level} />
       {/* "Best" carries the meaning in words; a glyph here announced inconsistently. */}
       {rec && (
         <div style={{ fontSize: "0.76rem", fontWeight: 700, color: theme.accentText }}>
-          Best: {hexaTypeLabel(rec, profile)}{recBonus ? ` (${recBonus})` : ""}
+          Best: {hexaTypeLabel(rec, profile, standalone)}{recBonus ? ` (${recBonus})` : ""}
         </div>
       )}
     </div>
@@ -615,6 +659,7 @@ function CoreCard({
   theme,
   styles,
   profile,
+  standalone,
   index,
   core,
   recommended,
@@ -624,6 +669,7 @@ function CoreCard({
   theme: AppTheme;
   styles: ToolStyles;
   profile: ClassDamageProfile;
+  standalone: boolean;
   index: number;
   core: HexaCore;
   recommended: HexaResult["cores"][number] | undefined;
@@ -677,6 +723,7 @@ function CoreCard({
                 theme={theme}
                 styles={styles}
                 profile={profile}
+                standalone={standalone}
                 idPrefix={`hexa-${index}-${role}`}
                 coreLabel={CORE_LABELS[index]}
                 role={role}
@@ -698,24 +745,26 @@ function HexaPanel({
   theme,
   styles,
   profile,
+  standalone,
   cores,
   result,
   onUnlockedChange,
   onLineChange,
   tracked,
   calibrationNotice,
-  ready,
+  hasStats,
 }: {
   theme: AppTheme;
   styles: ToolStyles;
   profile: ClassDamageProfile;
+  standalone: boolean;
   cores: HexaCore[];
   result: HexaResult;
   onUnlockedChange: (index: number, unlocked: boolean) => void;
   onLineChange: (index: number, line: CoreLineKey, patch: { type?: HexaStatType | ""; level?: number }) => void;
   tracked: boolean;
   calibrationNotice: CalibrationNotice | null;
-  ready: boolean;
+  hasStats: boolean;
 }) {
   // result.cores is aligned to the unlocked cores in order; map each core to its recommendation.
   const recByCore: (HexaResult["cores"][number] | undefined)[] = [];
@@ -733,7 +782,7 @@ function HexaPanel({
         gainPct={result.gainPct}
         label="bossing damage from re-assigning your HEXA lines"
         alreadyOptimal={result.alreadyOptimal}
-        ready={ready}
+        pending={hexaPending(hasStats, tracked)}
       />
       {!tracked && (
         <WarnNote theme={theme}>
@@ -750,6 +799,7 @@ function HexaPanel({
             theme={theme}
             styles={styles}
             profile={profile}
+            standalone={standalone}
             index={i}
             core={core}
             recommended={recByCore[i]}
@@ -852,6 +902,9 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
 
 function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles: ToolStyles; opt: StatOptimizerState }) {
   const { state } = opt;
+  // No character behind the numbers, so the seed's class-shaped placeholders
+  // (STR main / DEX secondary) are withheld rather than presented as facts.
+  const standalone = opt.selectedCharName === null;
 
   return (
     <>
@@ -861,6 +914,7 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
         theme={theme}
         styles={styles}
         profile={state.profile}
+        standalone={standalone}
         inputs={state.inputs}
         onScalarChange={opt.setScalarInput}
         onTripleChange={opt.setTriplePart}
@@ -872,26 +926,28 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
             theme={theme}
             styles={styles}
             profile={state.profile}
+            standalone={standalone}
             result={opt.result.hyper}
             alloc={state.hyperAlloc}
             onLevelChange={opt.setHyperLevel}
             tracked={hyperTracked(state.hyperAlloc)}
             calibrationNotice={state.calibrationNotice}
             pointsSpent={opt.hyperPointsSpent}
-            ready={opt.hasStats}
+            hasStats={opt.hasStats}
           />
         ) : (
           <HexaPanel
             theme={theme}
             styles={styles}
             profile={state.profile}
+            standalone={standalone}
             cores={state.cores}
             result={opt.result.hexa}
             onUnlockedChange={opt.setCoreUnlocked}
             onLineChange={opt.setCoreLine}
             tracked={hexaTracked(state.cores)}
             calibrationNotice={state.calibrationNotice}
-            ready={opt.hasStats}
+            hasStats={opt.hasStats}
           />
         )}
       </div>

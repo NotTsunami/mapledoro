@@ -149,6 +149,15 @@ export function seedFromCharacter(
 const emptyLine = (): HexaLine => ({ type: "", level: 0 });
 
 /**
+ * Level standalone entry opens at. It cannot be 0: the hyper-point budget comes
+ * from the level, and a 0 budget makes `capHyperLevelToBudget` clamp every typed
+ * Hyper Stat level back to 0, so the panel refuses the levels its own warning
+ * asks for. 290 is a real endgame level rather than the 300 cap, and it stays
+ * editable, so it reads as a starting point instead of a claim about the user.
+ */
+const STANDALONE_LEVEL = 290;
+
+/**
  * A blank seed so the optimizer works standalone (no character selected): a
  * generic main + secondary + ATT profile, zeroed inputs, and three locked cores
  * the user unlocks and fills in by hand. A picked character overwrites this.
@@ -166,7 +175,7 @@ export function emptyCharacterSeed(): CharacterSeed {
       constants: { dpmMainStat: 0, dpmAtk: 0, dpmAtkPer: 0, dpmBossDmg: 0, dpmIgnoreGuard: 0, dpmCritDmg: 0 },
     },
     inputs: {
-      level: 0,
+      level: STANDALONE_LEVEL,
       main: zeroTriple(),
       sub: zeroTriple(),
       sub2: zeroTriple(),
@@ -177,7 +186,7 @@ export function emptyCharacterSeed(): CharacterSeed {
       critDamagePct: 0,
       ignoreDefPct: 0,
     },
-    availablePoints: 0,
+    availablePoints: availableHyperPoints(STANDALONE_LEVEL),
     storedHyper: zeroHyperAllocation(),
     cores: Array.from({ length: HEXA_CORE_COUNT }, () => ({
       unlocked: false,

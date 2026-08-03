@@ -152,12 +152,37 @@ what the core's other two lines spend, so the three can't exceed `HEXA_CORE_TOTA
 Scouter enforces this by refusing to run (`main + additional1 + additional2 > 20`
 aborts with "입력값을 다시 확인해주세요"); clamping keeps the recommendation live instead.
 
-## Empty stat window
-With no main or secondary stat the kernel's stat factor is 0, so every candidate
-evaluates to 0, the greedy ranks nothing, and both engines fall out at a 0% gain.
-That is not "already optimal", so the panels gate their banner on `hasStatBaseline`
-and say there's nothing to work from yet. Don't fold this into `alreadyOptimal`:
-the engines mirror scouter, and this is our own reporting concern.
+## Nothing-to-optimize states
+Three inputs make an engine report a 0% gain for want of input rather than as a
+verdict, and all three are reported by the panel, never by the engine (the engines
+mirror scouter; this is our own concern). `GainBanner` takes a `GainPending` that
+replaces the figure outright:
+
+- **No stats.** With no main or secondary stat the stat factor is 0, so every
+  candidate evaluates to 0 and the greedy ranks nothing (`hasStatBaseline`).
+- **No hyper points.** A zero budget makes the greedy allocate nothing, so the
+  recommendation ties the current one at 0% (`result.pointsAvailable <= 0`).
+- **No HEXA lines.** No unlocked core carrying levels means no assignable lines,
+  so the optimized damage equals the current damage and `optimizeHexa` returns
+  `alreadyOptimal` (`hexaTracked`).
+
+Don't fold any of them into `alreadyOptimal`, and don't let the HEXA one reach the
+banner: "already optimized" on a character with no HEXA at all is the exact wrong
+answer, and it sits directly above the untracked-data warning that contradicts it.
+
+## Standalone entry
+No character behind the numbers, so `emptyCharacterSeed` supplies a generic
+STR-main / DEX-secondary profile with zero class constants. Two consequences the
+UI has to honor (`standalone = selectedCharName === null`):
+
+- **The stat ids are placeholders, not answers.** `statLabel` prints "Main Stat",
+  not "Main Stat (STR)", and `hexaTypeLabel` withholds the primary stat so
+  `getMainStatLabel` falls back to its own generic. The kernel only ever reads
+  main/sub/sub2 by position, so nothing downstream depends on the id.
+- **The level cannot start at 0.** The hyper-point budget comes from the level, and
+  a 0 budget makes `capHyperLevelToBudget` clamp every typed level straight back to
+  0, so the panel silently refuses the levels its own warning asks for.
+  `STANDALONE_LEVEL` (290) is the guard; keep it at or above 140.
 
 ## Data sources
 Hyper tables/costs: `hyper-stat-data.ts` (== scouter's tD/ve/hR; == wiki). HEXA
