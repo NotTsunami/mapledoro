@@ -3256,10 +3256,21 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
 // Same MapleScouter response the Scouter bookmark reads, different slice of it: the per-unit
 // marginal damage table (statEfficiency.ts) rather than the boss-clear figures. Both its
 // sections render together in one page, so unlike Scouter it has no sub-view to remember.
+// The fifth not-ready state (a result that predates specEfficiency, or one the API returned
+// without it) is this bookmark's alone, so it sits here rather than in the shared gate --
+// Scouter's own figures are all present in that same entry.
+// Keyed by character so the per-stat table's typed amounts and unit choice don't carry over
+// onto the next character the way EquipmentBookmark's own key guards against.
 function StatEfficiencyBookmark({ theme, character }: { theme: Theme; character: StoredCharacterRecord }) {
   return (
     <ScouterResultGate theme={theme} character={character}>
-      {(entry) => <StatEfficiencyPanel theme={theme} character={character} entry={entry} />}
+      {(entry) => (entry.specEfficiency ? (
+        <StatEfficiencyPanel key={character.characterName} theme={theme} character={character} eff={entry.specEfficiency} />
+      ) : (
+        <ScouterBookmarkNotice theme={theme}>
+          MapleScouter didn&apos;t return efficiency numbers for this result. Refresh the Scouter figure on Overview to try again.
+        </ScouterBookmarkNotice>
+      ))}
     </ScouterResultGate>
   );
 }

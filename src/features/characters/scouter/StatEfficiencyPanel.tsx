@@ -6,11 +6,11 @@ import HoverTooltip from "../../../components/HoverTooltip";
 import { ToolNumberInput } from "../../tools/shared-ui";
 import { toolStyles } from "../../tools/tool-styles";
 import type { StoredCharacterRecord } from "../model/charactersStore";
-import type { ScouterResultEntry, ScouterSpecEfficiency } from "./scouterCache";
+import type { ScouterSpecEfficiency } from "./scouterCache";
 import {
   computeMainEfficiencies, detailEfficiencyRows, efficiencyUnitOptions,
   formatEfficiencyValue, meterPosition, resolveEfficiencyStatLabels,
-  type DetailEfficiencyRow, type EfficiencyUnitId, type MainEfficiencyRow,
+  type DetailEfficiencyRow, type EfficiencyStatLabels, type EfficiencyUnitId, type MainEfficiencyRow,
 } from "./statEfficiency";
 
 // ── Shared chrome ──────────────────────────────────────────────────────────────
@@ -115,10 +115,9 @@ function ComparisonColumn({ theme, rows }: { theme: AppTheme; rows: MainEfficien
   );
 }
 
-function ComparisonList({ theme, jobName, level, eff }: {
-  theme: AppTheme; jobName: string; level: number; eff: ScouterSpecEfficiency;
+function ComparisonList({ theme, labels, level, eff }: {
+  theme: AppTheme; labels: EfficiencyStatLabels; level: number; eff: ScouterSpecEfficiency;
 }) {
-  const labels = useMemo(() => resolveEfficiencyStatLabels(jobName), [jobName]);
   const rows = useMemo(() => computeMainEfficiencies(eff, level, labels), [eff, level, labels]);
   // Reads down the left column then down the right, so scouter's own ordering (which groups
   // related comparisons) survives the split.
@@ -138,7 +137,6 @@ function cellStyle(theme: AppTheme, isLast: boolean): CSSProperties {
 }
 
 const unitLabelStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: "0.75rem", fontWeight: 700 };
-const amountInputStyle: CSSProperties = { width: "100%", boxSizing: "border-box", padding: "1px 5px", fontSize: "0.75rem" };
 const worthCellStyle: CSSProperties = { textAlign: "right", fontWeight: 800, fontFamily: "var(--font-heading)" };
 const headCellStyle: CSSProperties = { textAlign: "left", fontWeight: 800 };
 
@@ -158,14 +156,20 @@ interface PerStatColumnProps {
 }
 
 function PerStatColumn({ theme, eff, rows, unit, amounts, onAmount, inputStyle }: PerStatColumnProps) {
+  // Four cell styles per column rather than one built per cell: this table re-renders on every
+  // keystroke in an Amount box, and only the last row differs (it drops the divider).
+  const cell = cellStyle(theme, false);
+  const lastCell = cellStyle(theme, true);
+  const worthCell = { ...cell, ...worthCellStyle };
+  const lastWorthCell = { ...lastCell, ...worthCellStyle };
   return (
     <div style={boxStyle(theme)}>
       <table style={perStatTableStyle}>
         <thead>
           <tr style={{ background: theme.timerBg }}>
-            <th style={{ ...cellStyle(theme, false), ...headCellStyle, color: theme.muted }}>Stat</th>
-            <th style={{ ...cellStyle(theme, false), ...headCellStyle, color: theme.muted, width: 60 }}>Amount</th>
-            <th style={{ ...cellStyle(theme, false), ...worthCellStyle, color: theme.muted, width: 52 }}>Worth</th>
+            <th style={{ ...cell, ...headCellStyle, color: theme.muted }}>Stat</th>
+            <th style={{ ...cell, ...headCellStyle, color: theme.muted, width: 60 }}>Amount</th>
+            <th style={{ ...worthCell, color: theme.muted, width: 52 }}>Worth</th>
           </tr>
         </thead>
         <tbody>
@@ -174,22 +178,23 @@ function PerStatColumn({ theme, eff, rows, unit, amounts, onAmount, inputStyle }
             const amount = amounts[row.id] ?? row.defaultAmount;
             return (
               <tr key={row.id}>
-                <td style={cellStyle(theme, isLast)}>{row.label}</td>
-                <td style={cellStyle(theme, isLast)}>
+                <td style={isLast ? lastCell : cell}>{row.label}</td>
+                <td style={isLast ? lastCell : cell}>
                   <ToolNumberInput
                     value={amount}
                     min={0}
                     max={100000}
                     aria-label={`${row.label} amount`}
-                    // Chromium reserves room inside a number input for its spinner arrows even
-                    // while they're hidden, which is enough to clip the second digit in a box
-                    // this narrow. Dropping them gives the width back to the value.
-                    className="tool-input no-spinner"
-                    style={{ ...inputStyle, ...amountInputStyle }}
+                    // Shape (the compact padding/type size this narrow column needs, and dropping
+                    // the spinner arrows Chromium reserves room for even while they're hidden)
+                    // stays in CSS so the ≤560px 16px rule that stops iOS zooming on focus can
+                    // still reach it -- an inline font-size would win over that media query.
+                    className="tool-input no-spinner stat-efficiency-amount"
+                    style={inputStyle}
                     onCommit={(v) => onAmount(row.id, v)}
                   />
                 </td>
-                <td style={{ ...cellStyle(theme, isLast), ...worthCellStyle }}>
+                <td style={isLast ? lastWorthCell : worthCell}>
                   {formatEfficiencyValue(eff, row, amount, unit)}
                 </td>
               </tr>
@@ -201,10 +206,9 @@ function PerStatColumn({ theme, eff, rows, unit, amounts, onAmount, inputStyle }
   );
 }
 
-function PerStatTable({ theme, jobName, eff }: {
-  theme: AppTheme; jobName: string; eff: ScouterSpecEfficiency;
+function PerStatTable({ theme, labels, eff }: {
+  theme: AppTheme; labels: EfficiencyStatLabels; eff: ScouterSpecEfficiency;
 }) {
-  const labels = useMemo(() => resolveEfficiencyStatLabels(jobName), [jobName]);
   const rows = useMemo(() => detailEfficiencyRows(eff, labels), [eff, labels]);
   const unitOptions = useMemo(() => efficiencyUnitOptions(labels), [labels]);
   const [unit, setUnit] = useState<EfficiencyUnitId>("finalDamage");
@@ -248,17 +252,12 @@ function PerStatTable({ theme, jobName, eff }: {
  *  come from the cached /api/calc/dmg result, and refreshing them only happens via the Scouter
  *  figure on Overview (manual-refresh-only by design, see useScouterResult). The per-stat
  *  table's amount boxes are a scratchpad on top of those numbers, not character data. */
-export default function StatEfficiencyPanel({ theme, character, entry }: {
-  theme: AppTheme; character: StoredCharacterRecord; entry: ScouterResultEntry;
+export default function StatEfficiencyPanel({ theme, character, eff }: {
+  theme: AppTheme; character: StoredCharacterRecord; eff: ScouterSpecEfficiency;
 }) {
-  const eff = entry.specEfficiency;
-  if (!eff) {
-    return (
-      <p style={{ margin: 0, fontSize: "0.8rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>
-        MapleScouter didn&apos;t return efficiency numbers for this result. Refresh the Scouter figure on Overview to try again.
-      </p>
-    );
-  }
+  // Both sections name the same stats, so they resolve them once here rather than each
+  // running the class lookup off the same jobName.
+  const labels = useMemo(() => resolveEfficiencyStatLabels(character.jobName), [character.jobName]);
   return (
     <div className="stat-efficiency-panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <Section
@@ -266,14 +265,14 @@ export default function StatEfficiencyPanel({ theme, character, entry }: {
         heading="Comparisons"
         caption="What a typical potential line is worth to you, measured against another stat. The marker shows where you sit in the range most characters land in."
       >
-        <ComparisonList theme={theme} jobName={character.jobName} level={character.level} eff={eff} />
+        <ComparisonList theme={theme} labels={labels} level={character.level} eff={eff} />
       </Section>
       <Section
         theme={theme}
         heading="Per Stat"
-        caption="What that much of each stat adds to your damage, re-expressed in whichever unit you pick."
+        caption="What each stat is worth at the amount shown, re-expressed in whichever unit you pick. Type a different amount to price a bigger or smaller line."
       >
-        <PerStatTable theme={theme} jobName={character.jobName} eff={eff} />
+        <PerStatTable theme={theme} labels={labels} eff={eff} />
       </Section>
     </div>
   );
