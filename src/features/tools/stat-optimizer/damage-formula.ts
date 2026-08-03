@@ -27,8 +27,11 @@ import {
   type ScouterClassConstants,
 } from "./scouter-class-data";
 
-/** Endgame boss physical damage reduction (300%); scouter's selector offers 50-380. */
-export const ENDGAME_BOSS_PDR = 300;
+/** Boss physical damage reduction the allocation is valued against. Scouter's
+ *  selector spans 50-380; the picker offers the two ends players actually plan
+ *  around, 300% (standard endgame bosses) and 380% (the hardest tier), and
+ *  opens on 380% since that is the fight an allocation gets tuned for. */
+export const DEFAULT_BOSS_PDR = 380;
 
 export type MainStatId = "str" | "dex" | "int" | "luk" | "hp";
 

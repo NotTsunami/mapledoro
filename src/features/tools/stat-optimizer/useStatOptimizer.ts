@@ -11,7 +11,7 @@ import {
 import { peekScouterCache } from "../../characters/scouter/scouterCache";
 import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
 import {
-  ENDGAME_BOSS_PDR,
+  DEFAULT_BOSS_PDR,
   hasStatBaseline,
   type ClassDamageProfile,
   type KernelCalibration,
@@ -96,9 +96,9 @@ export function useStatOptimizer() {
   // is picked, which autopopulates it). Edits stay in memory and are intentionally
   // not persisted; we could later save them per character if that proves useful.
   const [state, setState] = useState<SelectionState>(() => seedToState(emptyCharacterSeed()));
-  // Boss physical defense the allocation is valued against (percent), editable
+  // Boss physical defense the allocation is valued against (percent), picked
   // per boss like maplescouter. Only rescales the ignore-def bucket.
-  const [bossPdrPct, setBossPdr] = useState<number>(ENDGAME_BOSS_PDR);
+  const [bossPdrPct, setBossPdr] = useState<number>(DEFAULT_BOSS_PDR);
 
   const handleCharChange = useCallback((charName: string | null) => {
     setSelectedCharName(charName);

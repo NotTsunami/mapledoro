@@ -30,7 +30,9 @@ marginal values and therefore recommendations.
 - **iedBucket** `1 - PDR%*(1 - ied)/100`; sources stack multiplicatively with
   scouter's exact stack/un-stack arithmetic (`stackIedSources`/`applyIed`,
   including their odd mixed-sign combine). `dpmIgnoreGuard` is stacked in.
-- Boss PDR is an editable input (`ENDGAME_BOSS_PDR` = 300; scouter offers 50-380).
+- Boss PDR is a two-option picker, 300% (standard endgame) or 380% (hardest
+  tier), defaulting to `DEFAULT_BOSS_PDR` = 380. Scouter offers the full 50-380
+  range; the kernel still takes any number, so widening it is a UI change only.
 
 ## Strip-then-optimize
 Stored character stats are displayed totals that already include the current

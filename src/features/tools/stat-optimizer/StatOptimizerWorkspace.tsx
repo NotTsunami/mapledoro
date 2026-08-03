@@ -67,6 +67,12 @@ const CORE_GRID_CSS = `
   .stat-opt-core-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   @media (max-width: 760px) { .stat-opt-core-grid { grid-template-columns: 1fr; } }
 `;
+// Compact segmented options for the Boss PDR picker. Both class names are on the
+// element, so the selector is doubled up to win on specificity rather than on
+// the order this <style> happens to land in relative to globals.css.
+const PDR_PICKER_CSS = `
+  .segmented-toggle-option.stat-opt-pdr-option { flex: 0 0 auto; padding: 0 14px; font-size: 0.82rem; }
+`;
 // Pre-mount panel heights (see LoadingPlaceholder). The 860px breakpoint is the
 // one `.page-content` drops its padding at, which is also where the character
 // row wraps and the stat grid collapses to a single column.
@@ -764,6 +770,16 @@ function hexaTracked(cores: HexaCore[]): boolean {
   return cores.some((c) => c.unlocked && (c.primary.level > 0 || c.additional[0].level > 0 || c.additional[1].level > 0));
 }
 
+/* The two boss defense values worth planning around, out of the 50-380 range
+   scouter's own selector spans. Kept as strings because they are the segmented
+   track's option keys; `DEFAULT_BOSS_PDR` picks which one the tool opens on. */
+const BOSS_PDR_OPTIONS = ["300", "380"] as const;
+const BOSS_PDR_LABELS: Record<(typeof BOSS_PDR_OPTIONS)[number], string> = { "300": "300%", "380": "380%" };
+const bossPdrChoice = (pct: number): (typeof BOSS_PDR_OPTIONS)[number] => (pct === 300 ? "300" : "380");
+// Height matches `.tool-control-row`'s pinned control height; the options size
+// to their own text rather than splitting the width like the mode switch.
+const BOSS_PDR_TRACK: CSSProperties = { height: 34 };
+
 function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatOptimizerState; styles: ReturnType<typeof toolStyles> }) {
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
@@ -784,7 +800,9 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
             <Link href="/characters" style={{ color: theme.accentText }}>Characters</Link> to autopopulate.
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "1rem", flexWrap: "wrap" }}>
+        {/* Opts into the shared control row so the level box and the PDR track
+            take its pinned 34px and their labels stay on one line. */}
+        <div className="tool-control-row">
           <div>
             <label className="tool-field-label" htmlFor="stat-opt-level" style={styles.labelStyle}>Level</label>
             {/* A stored character's level (and hyper-point budget, which deducts
@@ -801,8 +819,19 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
             />
           </div>
           <div>
-            <label className="tool-field-label" htmlFor="stat-opt-boss-pdr" style={styles.labelStyle}>Boss DEF %</label>
-            <NumberInput theme={theme} id="stat-opt-boss-pdr" value={opt.bossPdrPct} onChange={opt.setBossPdr} max={999} width={96} />
+            {/* A plain <div>, not a <label>: there is no single control to point
+                `htmlFor` at, so the group names itself through `ariaLabel`. */}
+            <div className="tool-field-label" style={styles.labelStyle}>Boss PDR</div>
+            <SegmentedToggle
+              theme={theme}
+              options={BOSS_PDR_OPTIONS}
+              labels={BOSS_PDR_LABELS}
+              value={bossPdrChoice(opt.bossPdrPct)}
+              ariaLabel="Boss PDR"
+              btnClassName="stat-opt-pdr-option"
+              trackStyle={BOSS_PDR_TRACK}
+              onChange={(v) => opt.setBossPdr(Number(v))}
+            />
           </div>
         </div>
       </div>
@@ -882,7 +911,7 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
     <div className="page-content">
       {/* One concatenated string, not two children: two text nodes serialize
           differently on server and client and trip a hydration mismatch. */}
-      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS + SKELETON_CSS}</style>
+      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS + PDR_PICKER_CSS + SKELETON_CSS}</style>
       <div className="tool-container">
         <ToolHeader
           theme={theme}
