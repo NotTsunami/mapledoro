@@ -200,26 +200,24 @@ function CalibrationNote({ theme, notice }: { theme: AppTheme; notice: Calibrati
 }
 
 function NumberInput({
-  theme,
+  inputStyle,
   value,
   onChange,
   max,
   width,
   id,
-  ariaLabel,
   disabled,
 }: {
-  theme: AppTheme;
+  /** Theme colors from the workspace's one `toolStyles`; shape is `.tool-input`. */
+  inputStyle: CSSProperties;
   value: number;
   onChange: (v: number) => void;
   max: number;
   width?: number | string;
-  /** Set instead of `ariaLabel` when a real <label htmlFor> already names the box. */
-  id?: string;
-  ariaLabel?: string;
+  /** Required: every box here is named by a real <label htmlFor>. */
+  id: string;
   disabled?: boolean;
 }) {
-  const styles = toolStyles(theme);
   return (
     <ToolNumberInput
       value={value}
@@ -227,11 +225,10 @@ function NumberInput({
       max={max}
       integer
       id={id}
-      aria-label={ariaLabel}
       disabled={disabled}
       onKeyDown={replaceZeroOnDigit}
       onCommit={onChange}
-      style={{ ...styles.inputStyle, width: width ?? "100%", textAlign: "center", opacity: disabled ? 0.55 : 1 }}
+      style={{ ...inputStyle, width: width ?? "100%", textAlign: "center", opacity: disabled ? 0.55 : 1 }}
     />
   );
 }
@@ -252,18 +249,19 @@ const ATTACK_PARTS = TRIPLE_PARTS.filter((p) => p.part !== "flat");
  *  boxes still line up with the rows above it. */
 function TripleFieldRow({
   theme,
+  styles,
   label,
   parts,
   value,
   onChange,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   label: string;
   parts: { part: TriplePart; label: string }[];
   value: TripleStat;
   onChange: (part: TriplePart, v: number) => void;
 }) {
-  const styles = toolStyles(theme);
   return (
     <div>
       <div className="tool-field-label" style={styles.labelStyle}>{label}</div>
@@ -288,18 +286,19 @@ function TripleFieldRow({
 
 function StatsPanel({
   theme,
+  styles,
   profile,
   inputs,
   onScalarChange,
   onTripleChange,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   profile: ClassDamageProfile;
   inputs: OptimizerStatInputs;
   onScalarChange: (key: ScalarInputKey, value: number) => void;
   onTripleChange: (key: TripleInputKey, part: TriplePart, value: number) => void;
 }) {
-  const styles = toolStyles(theme);
   const triples: { key: TripleInputKey; label: string; parts: typeof TRIPLE_PARTS }[] = [
     { key: "main", label: `Main Stat (${statName(profile.mainStat)})`, parts: TRIPLE_PARTS },
     ...(profile.subStat ? [{ key: "sub" as const, label: `Secondary Stat (${statName(profile.subStat)})`, parts: TRIPLE_PARTS }] : []),
@@ -318,6 +317,7 @@ function StatsPanel({
           <TripleFieldRow
             key={t.key}
             theme={theme}
+            styles={styles}
             label={t.label}
             parts={t.parts}
             value={inputs[t.key]}
@@ -389,6 +389,7 @@ const HYPER_DISPLAY_ORDER: HyperLineId[] = [
 
 function HyperLineRow({
   theme,
+  inputStyle,
   id,
   label,
   current,
@@ -396,6 +397,7 @@ function HyperLineRow({
   onChange,
 }: {
   theme: AppTheme;
+  inputStyle: CSSProperties;
   id: HyperLineId;
   label: string;
   current: number;
@@ -413,7 +415,7 @@ function HyperLineRow({
         </label>
       </th>
       <td className="hyper-now" style={cell}>
-        <NumberInput theme={theme} id={inputId} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} />
+        <NumberInput inputStyle={inputStyle} id={inputId} value={current} onChange={onChange} max={HYPER_MAX_LEVEL} />
       </td>
       {/* Weight carries the changed/unchanged split alongside color, so it survives
           both a monochrome read and a screen reader (which gets the suffix). */}
@@ -430,6 +432,7 @@ function HyperLineRow({
 
 function HyperPanel({
   theme,
+  styles,
   profile,
   result,
   alloc,
@@ -440,6 +443,7 @@ function HyperPanel({
   ready,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   profile: ClassDamageProfile;
   result: HyperResult;
   alloc: HyperAllocation;
@@ -449,7 +453,6 @@ function HyperPanel({
   pointsSpent: number;
   ready: boolean;
 }) {
-  const styles = toolStyles(theme);
   const rows = HYPER_DISPLAY_ORDER.filter((id) => id !== "subStat2" || profile.subStat2 !== null);
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
@@ -502,6 +505,7 @@ function HyperPanel({
             <HyperLineRow
               key={id}
               theme={theme}
+              inputStyle={styles.inputStyle}
               id={id}
               label={hyperLineLabel(id, profile)}
               current={alloc[id]}
@@ -519,13 +523,14 @@ function HyperPanel({
 
 /** Segmented level indicator (one pip per level), matching the character setup flow. */
 function LineLevelBar({ theme, level }: { theme: AppTheme; level: number }) {
+  // Two style objects for the whole bar rather than one per pip: nine of these
+  // bars re-render on every keystroke in the stat fields.
+  const filled: CSSProperties = { flex: 1, height: 3, borderRadius: 2, background: theme.accent, transition: "background 0.1s ease" };
+  const empty: CSSProperties = { ...filled, background: theme.border };
   return (
     <div style={{ display: "flex", gap: 2 }}>
       {Array.from({ length: HEXA_MAX_LINE_LEVEL }, (_, i) => (
-        <div
-          key={i}
-          style={{ flex: 1, height: 3, borderRadius: 2, background: i < level ? theme.accent : theme.border, transition: "background 0.1s ease" }}
-        />
+        <div key={i} style={i < level ? filled : empty} />
       ))}
     </div>
   );
@@ -537,6 +542,7 @@ function LineLevelBar({ theme, level }: { theme: AppTheme; level: number }) {
    sr-only span, leaving the accessible names exactly as complete as before. */
 function HexaLineRow({
   theme,
+  styles,
   profile,
   idPrefix,
   coreLabel,
@@ -548,6 +554,7 @@ function HexaLineRow({
   onLevelChange,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   profile: ClassDamageProfile;
   idPrefix: string;
   coreLabel: string;
@@ -558,7 +565,6 @@ function HexaLineRow({
   onTypeChange: (t: HexaStatType | "") => void;
   onLevelChange: (v: number) => void;
 }) {
-  const styles = toolStyles(theme);
   const isPrimary = role === "primary";
   const rec = recommended !== undefined && recommended !== "" && recommended !== type && level > 0 ? recommended : null;
   const recBonus = rec ? getHexaStatBonus(rec, level, isPrimary, profile.classId) : "";
@@ -579,7 +585,7 @@ function HexaLineRow({
             <span aria-hidden="true">Lv</span>
             <span className="sr-only">{HEXA_LINE_LABELS[role]} level, {coreLabel}</span>
           </label>
-          <NumberInput theme={theme} id={levelId} value={level} onChange={onLevelChange} max={HEXA_MAX_LINE_LEVEL} width={46} />
+          <NumberInput inputStyle={styles.inputStyle} id={levelId} value={level} onChange={onLevelChange} max={HEXA_MAX_LINE_LEVEL} width={46} />
         </div>
       </div>
       <select
@@ -607,6 +613,7 @@ function HexaLineRow({
 
 function CoreCard({
   theme,
+  styles,
   profile,
   index,
   core,
@@ -615,6 +622,7 @@ function CoreCard({
   onLineChange,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   profile: ClassDamageProfile;
   index: number;
   core: HexaCore;
@@ -667,6 +675,7 @@ function CoreCard({
             >
               <HexaLineRow
                 theme={theme}
+                styles={styles}
                 profile={profile}
                 idPrefix={`hexa-${index}-${role}`}
                 coreLabel={CORE_LABELS[index]}
@@ -687,6 +696,7 @@ function CoreCard({
 
 function HexaPanel({
   theme,
+  styles,
   profile,
   cores,
   result,
@@ -697,6 +707,7 @@ function HexaPanel({
   ready,
 }: {
   theme: AppTheme;
+  styles: ToolStyles;
   profile: ClassDamageProfile;
   cores: HexaCore[];
   result: HexaResult;
@@ -706,7 +717,6 @@ function HexaPanel({
   calibrationNotice: CalibrationNotice | null;
   ready: boolean;
 }) {
-  const styles = toolStyles(theme);
   // result.cores is aligned to the unlocked cores in order; map each core to its recommendation.
   const recByCore: (HexaResult["cores"][number] | undefined)[] = [];
   let recCursor = 0;
@@ -738,6 +748,7 @@ function HexaPanel({
           <CoreCard
             key={CORE_LABELS[i]}
             theme={theme}
+            styles={styles}
             profile={profile}
             index={i}
             core={core}
@@ -780,7 +791,7 @@ const bossPdrChoice = (pct: number): (typeof BOSS_PDR_OPTIONS)[number] => (pct =
 // to their own text rather than splitting the width like the mode switch.
 const BOSS_PDR_TRACK: CSSProperties = { height: 34 };
 
-function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatOptimizerState; styles: ReturnType<typeof toolStyles> }) {
+function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatOptimizerState; styles: ToolStyles }) {
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem 1.5rem", flexWrap: "wrap" }}>
@@ -809,7 +820,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
                 untracked-line spending) comes from the store; only standalone
                 entry edits it, recomputing the budget from the closed form. */}
             <NumberInput
-              theme={theme}
+              inputStyle={styles.inputStyle}
               id="stat-opt-level"
               value={opt.state.inputs.level}
               onChange={opt.setLevel}
@@ -839,8 +850,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
   );
 }
 
-function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimizerState }) {
-  const styles = toolStyles(theme);
+function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles: ToolStyles; opt: StatOptimizerState }) {
   const { state } = opt;
 
   return (
@@ -849,6 +859,7 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
 
       <StatsPanel
         theme={theme}
+        styles={styles}
         profile={state.profile}
         inputs={state.inputs}
         onScalarChange={opt.setScalarInput}
@@ -859,6 +870,7 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
         {opt.result.mode === "hyper" ? (
           <HyperPanel
             theme={theme}
+            styles={styles}
             profile={state.profile}
             result={opt.result.hyper}
             alloc={state.hyperAlloc}
@@ -871,6 +883,7 @@ function StatOptimizerContent({ theme, opt }: { theme: AppTheme; opt: StatOptimi
         ) : (
           <HexaPanel
             theme={theme}
+            styles={styles}
             profile={state.profile}
             cores={state.cores}
             result={opt.result.hexa}
@@ -903,15 +916,22 @@ function LoadingPlaceholder({ styles }: { styles: ToolStyles }) {
   );
 }
 
+/* Concatenated once at module scope, not per render, and passed as a single text
+   child: two children serialize differently on server and client and trip a
+   hydration mismatch. */
+const STAT_OPT_CSS = CORE_GRID_CSS + HYPER_TABLE_CSS + PDR_PICKER_CSS + SKELETON_CSS;
+
 export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
   const opt = useStatOptimizer();
+  // The one `toolStyles` call for the whole tree; every panel and row takes it as
+  // a prop rather than rebuilding six style objects apiece. It used to run ~20-30
+  // times a render (once per input box, stat row and HEXA line), and every
+  // keystroke in a stat field re-renders all of them.
   const styles = toolStyles(theme);
 
   return (
     <div className="page-content">
-      {/* One concatenated string, not two children: two text nodes serialize
-          differently on server and client and trip a hydration mismatch. */}
-      <style>{CORE_GRID_CSS + HYPER_TABLE_CSS + PDR_PICKER_CSS + SKELETON_CSS}</style>
+      <style>{STAT_OPT_CSS}</style>
       <div className="tool-container">
         <ToolHeader
           theme={theme}
@@ -930,7 +950,11 @@ export default function StatOptimizerWorkspace({ theme }: { theme: AppTheme }) {
           sectionPanel={styles.sectionPanel}
         />
 
-        {opt.mounted ? <StatOptimizerContent theme={theme} opt={opt} /> : <LoadingPlaceholder styles={styles} />}
+        {opt.mounted ? (
+          <StatOptimizerContent theme={theme} styles={styles} opt={opt} />
+        ) : (
+          <LoadingPlaceholder styles={styles} />
+        )}
       </div>
     </div>
   );
