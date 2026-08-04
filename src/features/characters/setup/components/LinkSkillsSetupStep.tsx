@@ -234,7 +234,7 @@ function resolveLinkSkillFloors(
  *  characterRoster, if it's already a tracked record) -- the same-world roster is only
  *  used to compute a FLOOR (what mastery the roster proves), never to overwrite this
  *  character's own saved choice of which links it actually has equipped. */
-export function LinkSkillsEditor({
+function LinkSkillsEditor({
   theme, jobName = "", value, onChange,
   characterRoster = [], confirmedWorldId, confirmedCharacterName,
 }: LinkSkillsEditorProps) {

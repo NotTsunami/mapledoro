@@ -208,10 +208,6 @@ export function statBonusValue(statId: LegionArtifactStatId, effectiveLevel: num
   return Math.round(sum * 100) / 100;
 }
 
-export function hasAnyCrystalProgress(crystals: LegionCrystalDraft[] | undefined): boolean {
-  return (crystals ?? []).some((c) => c && (c.level ?? 0) > 0);
-}
-
 /** True if a crystal still holds its untouched-default 3 lines (in original order) —
  *  a crystal starts here in-game the moment it's unlocked, so this alone doesn't mean
  *  "never opened", only "never rerolled". */
