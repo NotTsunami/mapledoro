@@ -1,9 +1,21 @@
 import type { AppTheme } from "../../../components/themes";
 import type { NormalizedCharacterData } from "../model/types";
-import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredLegionArtifact, StoredScouterLegion } from "../model/charactersStore";
 import type { SetupFlowId } from "../setup/flows";
 import type { SetupMode } from "../model/constants";
 import type { RosterRole } from "./useCharacterSetupController";
+
+// A character's directory role -- shared between CharacterProfileScreen's own role
+// chips and WorldImportModeScreen's role-transition labels.
+export type ProfileRole = "main" | "champion" | "mule";
+
+export const ROLE_LABEL: Record<ProfileRole, string> = { main: "Main", champion: "Champion", mule: "Mule" };
+
+// A character can hold both roles at once (Main AND a Champion slot) -- this formats
+// every role that applies, not just one, falling back to "Mule" when the list is empty.
+export function formatRoles(roles: ProfileRole[]): string {
+  return roles.length > 0 ? roles.map((r) => ROLE_LABEL[r]).join(", ") : ROLE_LABEL.mule;
+}
 
 // Lightweight, render-ready view of a resumable setup draft for the search-entry list.
 export interface SetupDraftSummary {
@@ -95,6 +107,13 @@ export interface SearchPaneActions {
     existing: StoredCharacterRecord,
     imported: StoredCharacterRecord,
     choices: Record<ImportSectionId, "mine" | "imported">,
+  ) => void;
+  importWorldBulk: (
+    resolvedCharacters: StoredCharacterRecord[],
+    roleKeys: { mainCharacterKey: string | null; championCharacterKeys: string[] },
+    worldId: number,
+    legionData: { legionArtifact?: StoredLegionArtifact; scouterLegion?: StoredScouterLegion } | null,
+    removedKeys?: string[],
   ) => void;
 }
 
@@ -196,4 +215,10 @@ export interface PreviewPaneActions {
   setHexaStatActivePreset: (nodeIndex: number, presetIndex: number) => void;
   setFamiliarsActivePreset: (presetIndex: number) => void;
   setOverviewLayout: (layout: OverviewSectionId[] | null) => void;
+  /** Cross-pane trigger: the directory (right/preview pane) navigates into world import
+   *  by switching the LEFT search pane's setupMode, same mechanism FirstTimeSetupScreen's
+   *  "Import instead" link already uses for the single-character case -- not a local
+   *  screen swap, so the transition/centered-card treatment matches Add Character exactly
+   *  rather than imitating it with a lookalike CSS class. */
+  runTransitionToMode: (nextMode: SetupMode) => void;
 }

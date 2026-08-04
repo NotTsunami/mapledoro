@@ -101,7 +101,7 @@ export type BoolBuffId =
   | "sayramElixir" | "collectorElixir" | "honorableElixir"
   | "heroEcho" | "legionMight" | "masarayuGift" | "extremePotion" | "extremeGreenPotion"
   | "mvpSuperpower" | "vipBuff" | "brightMoonlight" | "candiedApple"
-  | "caretakerSupport" | "sparklingRedStar" | "maxedSacredSymbol"
+  | "caretakerSupport" | "sparklingRedStar" | "maxedSacredSymbol" | "fishBuff"
   // Group A — pick one
   | "greatHeroBoost" | "legendaryHero" | "advWeaponTempering" | "sparklingBlueStar"
   // Group B — pick one
@@ -116,6 +116,9 @@ export interface BoolBuffEntry {
   name: string;
   icon: BoolBuffIconType;
   secondIcon?: BoolBuffIconType;
+  /** Only set alongside secondIcon, for the rare case of 3 real items sharing one
+   *  effect (fishBuff's 3 renamed event potions) rather than 2. */
+  thirdIcon?: BoolBuffIconType;
   group?: "A" | "B";
 }
 
@@ -150,10 +153,17 @@ export const BOOL_BUFFS: readonly BoolBuffEntry[] = [
   // Group B
   { id: "onyxApple",       name: "Onyx Apple",         icon: { kind: "item", id: "02024278" }, group: "B" },
   { id: "tengusJudgement", name: "Tengu's Judgement",  icon: { kind: "item", id: "02023626" }, group: "B" },
+  // Same +30 ATT/Magic ATT effect under 3 different event-reskinned item names (Tree
+  // Ornament/A Flurry of Snow/Warm and Fuzzy Winter) -- MapleScouter tracks it as one
+  // "fish" buff regardless of which name a player actually has. See fishBuffTooltip
+  // in BuffsSetupStep.tsx for the full name list shown to the player. Warm and Fuzzy
+  // Winter is deliberately the backmost/dimmest layer -- it's a visually busier icon
+  // than the other two and would otherwise dominate the stack.
+  { id: "fishBuff",       name: "Tree Ornament",      icon: { kind: "item", id: "02022119" }, secondIcon: { kind: "item", id: "02022280" }, thirdIcon: { kind: "item", id: "02022434" }, group: "B" },
 ];
 
 export const BUFF_GROUP_A = new Set<BoolBuffId>(["greatHeroBoost","legendaryHero","advWeaponTempering","sparklingBlueStar"]);
-export const BUFF_GROUP_B = new Set<BoolBuffId>(["onyxApple","tengusJudgement"]);
+export const BUFF_GROUP_B = new Set<BoolBuffId>(["onyxApple","tengusJudgement","fishBuff"]);
 
 // Classes whose Echo of Hero equivalent has a unique in-game icon.
 // All others use the generic 0001005. Confirmed via grandislibrary pixel-match against WZ exports.

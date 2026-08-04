@@ -5,8 +5,13 @@ import { useEffect, useRef, useState } from "react";
  *  -- a static CSS mask fades the trailing edge unconditionally, which misreads as "more
  *  to scroll" even when the last item is already fully in view. Re-checks on scroll,
  *  resize, and whenever `deps` changes (e.g. the row's own item count), since content
- *  can grow/shrink without the container itself resizing. */
-export function useScrollEdges<T extends HTMLElement>(deps: readonly unknown[] = []): {
+ *  can grow/shrink without the container itself resizing. `axis` defaults to
+ *  "horizontal" (scrollLeft/clientWidth/scrollWidth) to match every existing caller;
+ *  pass "vertical" for a scrollTop/clientHeight/scrollHeight list. */
+export function useScrollEdges<T extends HTMLElement>(
+  deps: readonly unknown[] = [],
+  axis: "horizontal" | "vertical" = "horizontal",
+): {
   ref: React.RefObject<T | null>;
   atStart: boolean;
   atEnd: boolean;
@@ -21,8 +26,13 @@ export function useScrollEdges<T extends HTMLElement>(deps: readonly unknown[] =
     function measure() {
       if (!el) return;
       // 1px tolerance for sub-pixel rounding at the scroll boundary.
-      setAtStart(el.scrollLeft <= 1);
-      setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+      if (axis === "vertical") {
+        setAtStart(el.scrollTop <= 1);
+        setAtEnd(el.scrollTop + el.clientHeight >= el.scrollHeight - 1);
+      } else {
+        setAtStart(el.scrollLeft <= 1);
+        setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+      }
     }
     measure();
     el.addEventListener("scroll", measure, { passive: true });
@@ -32,18 +42,24 @@ export function useScrollEdges<T extends HTMLElement>(deps: readonly unknown[] =
       window.removeEventListener("resize", measure);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [axis, ...deps]);
 
   return { ref, atStart, atEnd };
 }
 
-/** A horizontal fade mask that only covers whichever edge(s) still have more content to
+/** A directional fade mask that only covers whichever edge(s) still have more content to
  *  scroll to, given useScrollEdges' own atStart/atEnd. `fadeWidth` matches the CSS px
- *  width baked into the gradient stops (28px to match the profile binder spine's
- *  existing fade width by default). */
-export function edgeFadeMask(atStart: boolean, atEnd: boolean, fadeWidth = 28): string {
+ *  size baked into the gradient stops (28px to match the profile binder spine's existing
+ *  fade width by default). `axis` must match the one passed to useScrollEdges. */
+export function edgeFadeMask(
+  atStart: boolean,
+  atEnd: boolean,
+  fadeWidth = 28,
+  axis: "horizontal" | "vertical" = "horizontal",
+): string {
   const stops: string[] = [];
   stops.push(atStart ? "black 0%" : `transparent 0%, black ${fadeWidth}px`);
   stops.push(atEnd ? "black 100%" : `black calc(100% - ${fadeWidth}px), transparent 100%`);
-  return `linear-gradient(to right, ${stops.join(", ")})`;
+  const direction = axis === "vertical" ? "to bottom" : "to right";
+  return `linear-gradient(${direction}, ${stops.join(", ")})`;
 }

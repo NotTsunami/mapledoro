@@ -811,9 +811,20 @@ textarea:focus-visible {
   flex-wrap: wrap;
 }
 
+.settings-data-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
 @media (max-width: 860px) {
   .page-content {
     padding: 1rem;
+  }
+
+  .settings-data-actions {
+    align-items: flex-start;
   }
 }
 

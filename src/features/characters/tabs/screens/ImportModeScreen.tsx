@@ -50,6 +50,14 @@ async function readImportFile(file: File): Promise<ImportState> {
     return { status: "error", message: CHARACTERS_COPY.importCharacter.invalidJsonError };
   }
 
+  // A world export (multiple characters + world-scoped Legion data) belongs in the
+  // directory's own "Import World" button, not here -- this screen only ever handles
+  // one character, and silently redirecting a world file into a totally different bulk
+  // flow from an unrelated entry point would be a confusing surprise, not a convenience.
+  if (typeof parsedJson === "object" && parsedJson !== null && (parsedJson as Record<string, unknown>).kind === "world") {
+    return { status: "error", message: CHARACTERS_COPY.importCharacter.wrongFileTypeWorldError };
+  }
+
   const record = parseImportedCharacterRecord(parsedJson);
   if (!record) {
     return { status: "error", message: CHARACTERS_COPY.importCharacter.invalidShapeError };
@@ -154,27 +162,25 @@ export default function ImportModeScreen({ model, actions }: ImportModeScreenPro
               ? CHARACTERS_COPY.searchEntry.backToCharactersButton
               : CHARACTERS_COPY.importCharacter.backButton}
           </button>
-          {profile.isAddingCharacter && (
-            <button
-              type="button"
-              disabled={shell.isUiLocked}
-              onClick={() => actions.runTransitionToMode("search")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                font: "inherit",
-                fontSize: "0.76rem",
-                fontWeight: 700,
-                color: theme.muted,
-                textDecoration: "underline",
-                textUnderlineOffset: "2px",
-                cursor: shell.isUiLocked ? "not-allowed" : "pointer",
-              }}
-            >
-              {CHARACTERS_COPY.firstTimeSetup.searchButton}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={shell.isUiLocked}
+            onClick={() => actions.runTransitionToMode("search")}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              fontSize: "0.76rem",
+              fontWeight: 700,
+              color: theme.muted,
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+              cursor: shell.isUiLocked ? "not-allowed" : "pointer",
+            }}
+          >
+            {CHARACTERS_COPY.firstTimeSetup.searchButton}
+          </button>
         </div>
         <div>
           <h1 style={titleStyle()}>{CHARACTERS_COPY.importCharacter.title}</h1>

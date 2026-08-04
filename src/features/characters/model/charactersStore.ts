@@ -1,6 +1,7 @@
 import { toCharacterKey } from "./characterKeys";
 import type { NormalizedCharacterData } from "./types";
 import { checkForWipe } from "./wipeTripwire";
+import { MAX_CHARACTERS_PER_WORLD } from "./constants";
 
 const CHARACTERS_STORE_VERSION = 1 as const;
 const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -73,6 +74,7 @@ export interface StoredScouterBuffs {
   sparklingBlueStar?: true;
   onyxApple?: true;
   tengusJudgement?: true;
+  fishBuff?: true;
   renown?: Partial<Record<"allStats" | "atkMagAtk" | "bossDmg" | "ignoreDef" | "critDmg", number>>;
 }
 
@@ -885,6 +887,67 @@ export function mergeImportedCharacterRecord(
       addedAt: existing.meta.addedAt,
       updatedAt: Date.now(),
     },
+  };
+}
+
+/** One world's worth of exportable data -- every character on that world plus the
+ *  world-scoped facts no per-character export can carry (Legion Artifact board,
+ *  its MapleScouter-derived summary, and Main/Champion role assignments). Roles are
+ *  carried as character keys (toCharacterKey, i.e. lowercased IGN), not the internal
+ *  characterID -- see this feature's own CLAUDE.md: characterID is never a stable
+ *  identity. Resolving a role back to a real character happens at apply-time, after
+ *  that character has actually been upserted into the importing account's roster. */
+export interface WorldExportPayload {
+  kind: "world";
+  version: 1;
+  worldID: number;
+  characters: StoredCharacterRecord[];
+  legionArtifact?: StoredLegionArtifact;
+  scouterLegion?: StoredScouterLegion;
+  mainCharacterKey: string | null;
+  championCharacterKeys: string[];
+}
+
+/** Parses/validates an unknown JSON value as an importable WorldExportPayload.
+ *  Each character reuses parseImportedCharacterRecord's exact defensiveness; invalid
+ *  characters are dropped rather than failing the whole import. Role keys are only
+ *  checked for shape here (string / string array) -- whether they actually match one
+ *  of `characters` is a decision for the apply step, not this parser.
+ *
+ *  Rejects the whole payload if `characters` exceeds MAX_CHARACTERS_PER_WORLD, or if any
+ *  two characters share the same IGN (case-insensitive, the same identity toCharacterKey
+ *  uses everywhere) -- exportWorldJson can never produce either (it only ever writes one
+ *  world's own roster, itself capped at MAX_CHARACTERS_PER_WORLD with every IGN unique),
+ *  so a file that violates either was hand-edited or corrupted, not a real MapleDoro
+ *  export. Both are a hard reject, not a silent truncate/dedupe, so nothing is quietly
+ *  dropped without the user knowing the file itself is the problem. */
+export function parseImportedWorldPayload(value: unknown): WorldExportPayload | null {
+  if (!isObject(value) || value.kind !== "world" || typeof value.worldID !== "number") return null;
+  if (!Array.isArray(value.characters)) return null;
+  if (value.characters.length > MAX_CHARACTERS_PER_WORLD) return null;
+  const characters = value.characters
+    .map(parseImportedCharacterRecord)
+    .filter((c): c is StoredCharacterRecord => c !== null);
+  if (characters.length === 0) return null;
+  const characterKeys = characters.map(toCharacterKey);
+  if (new Set(characterKeys).size !== characterKeys.length) return null;
+
+  const legionArtifact = isObject(value.legionArtifact) ? parseLegionArtifactEntry(value.legionArtifact) : undefined;
+  const scouterLegion = isObject(value.scouterLegion) ? parseScouterLegionEntry(value.scouterLegion) : undefined;
+  const mainCharacterKey = typeof value.mainCharacterKey === "string" ? value.mainCharacterKey : null;
+  const championCharacterKeys = Array.isArray(value.championCharacterKeys)
+    ? value.championCharacterKeys.filter((k): k is string => typeof k === "string")
+    : [];
+
+  return {
+    kind: "world",
+    version: 1,
+    worldID: value.worldID,
+    characters,
+    legionArtifact: legionArtifact && !isEmptyLegionArtifactEntry(legionArtifact) ? legionArtifact : undefined,
+    scouterLegion: scouterLegion && !isEmptyScouterLegionEntry(scouterLegion) ? scouterLegion : undefined,
+    mainCharacterKey,
+    championCharacterKeys,
   };
 }
 

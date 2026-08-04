@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { toCharacterKey } from "../../model/characterKeys";
 import { resolveDisplayJobName } from "../../setup/data/nexonJobMapping";
 import { WORLD_NAMES } from "../../model/constants";
-import type { StoredCharacterRecord } from "../../model/charactersStore";
+import { readCharactersStore, type StoredCharacterRecord, type WorldExportPayload } from "../../model/charactersStore";
 import {
   buildDirectoryGroups,
   buildMergedDirectoryGroups,
@@ -19,6 +19,7 @@ import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
 import WarningIcon from "../../../../components/WarningIcon";
 import LegionPanel from "./LegionPanel";
+import { ExportTabIcon } from "./CharacterProfileOverviewScreen";
 
 const rowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, 190px)", justifyContent: "center", alignItems: "start", gap: "0.6rem", width: "100%" };
 
@@ -185,11 +186,14 @@ interface DirectoryControlsProps {
   directorySortBy: DirectorySortBy;
   onWorldChange: (worldId: number | null) => void;
   onSortChange: (sortBy: DirectorySortBy) => void;
+  /** Only rendered when a single world is in view -- export/import are per-world
+   *  actions, meaningless in the All Worlds merged list. */
+  activeWorldExportImport: { worldId: number; worldCharacters: StoredCharacterRecord[]; onImportClick: () => void } | null;
 }
 
 function DirectoryControls({
   theme, isUiLocked, hasMultipleWorlds, showAllWorlds, worldIds, selectedWorldId,
-  directorySortBy, onWorldChange, onSortChange,
+  directorySortBy, onWorldChange, onSortChange, activeWorldExportImport,
 }: DirectoryControlsProps) {
   const selectStyle = {
     border: `1px solid ${theme.border}`,
@@ -259,6 +263,14 @@ function DirectoryControls({
           )}
         </select>
       </div>
+      {activeWorldExportImport && (
+        <WorldExportImportButtons
+          theme={theme}
+          worldId={activeWorldExportImport.worldId}
+          worldCharacters={activeWorldExportImport.worldCharacters}
+          onImportClick={activeWorldExportImport.onImportClick}
+        />
+      )}
     </div>
   );
 }
@@ -280,6 +292,123 @@ function LegionButtonRow({ theme, onOpen }: { theme: AppTheme; onOpen: () => voi
         <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
       </span>
     </button>
+  );
+}
+
+// Bundles every character on this world (full records, same shape as a per-character
+// export) plus the world-scoped facts no per-character export can carry: Legion
+// Artifact board, its MapleScouter-derived summary, and Main/Champion roles. Reads
+// fresh from the store at click-time rather than trusting `worldCharacters`, mirroring
+// exportCharacterJson's own reasoning (CharacterProfileOverviewScreen.tsx).
+function exportWorldJson(worldId: number, worldCharacters: StoredCharacterRecord[]) {
+  if (worldCharacters.length === 0) return;
+  const store = readCharactersStore();
+  const worldIdKey = String(worldId);
+  const payload: WorldExportPayload = {
+    kind: "world",
+    version: 1,
+    worldID: worldId,
+    characters: worldCharacters,
+    legionArtifact: store.legionArtifactByWorld[worldIdKey],
+    scouterLegion: store.scouterLegionByWorld[worldIdKey],
+    mainCharacterKey: store.mainCharacterIdByWorld[worldIdKey] ?? null,
+    championCharacterKeys: store.championCharacterIdsByWorld[worldIdKey] ?? [],
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mapledoro-world-${worldId}-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// All Worlds' merged Main/Champion key sets, gathered across every tracked world --
+// pulled out of the main screen component (same reasoning as useWorldImportFile above)
+// since it's a self-contained loop-then-build step, not something the rest of the
+// component's render logic needs to see the intermediate Sets for.
+function buildAllWorldsMergedGroups(
+  directory: PreviewPaneModel["directory"],
+  filteredCharacters: StoredCharacterRecord[],
+  sortBy: DirectorySortBy,
+) {
+  const mergedMainKeys = new Set<string>();
+  const mergedChampionKeys = new Set<string>();
+  directory.worldIds.forEach((worldId) => {
+    const mainKey = directory.mainCharacterKeyByWorld[String(worldId)];
+    if (mainKey) mergedMainKeys.add(mainKey);
+    (directory.championCharacterKeysByWorld[String(worldId)] ?? []).forEach((key) => mergedChampionKeys.add(key));
+  });
+  return buildMergedDirectoryGroups({
+    allCharacters: filteredCharacters,
+    sortBy,
+    mainCharacterKeys: mergedMainKeys,
+    championCharacterKeys: mergedChampionKeys,
+  });
+}
+
+function labeledIconButtonStyle(theme: AppTheme): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.35rem",
+    height: "2rem",
+    padding: "0 0.6rem",
+    border: `1px solid ${theme.border}`,
+    borderRadius: "8px",
+    background: theme.panel,
+    color: theme.text,
+    fontFamily: "inherit",
+    fontWeight: 700,
+    fontSize: "0.75rem",
+    cursor: "pointer",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  };
+}
+
+function ImportTabIcon() {
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+      <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 16V4m-4 4l4-4 4 4" />
+    </svg>
+  );
+}
+
+// Right-aligned pair on the same World/Sort controls row (not a separate full-width
+// row) -- these are per-world actions, same visual weight as the World/Sort pills
+// beside them, not a headline feature that deserves its own banner.
+function WorldExportImportButtons({
+  theme, worldId, worldCharacters, onImportClick,
+}: {
+  theme: AppTheme;
+  worldId: number;
+  worldCharacters: StoredCharacterRecord[];
+  onImportClick: () => void;
+}) {
+  return (
+    // Desktop: right-aligned, content-sized (marginLeft: auto), reading as visually
+    // separate from World/Sort. Below 480px, the .directory-export-import class
+    // (CharacterSetupFlow.styles.ts) overrides to full-width with no auto margin so it
+    // fills its own wrapped line and splits evenly instead of hugging the right edge.
+    <div className="directory-export-import" style={{ display: "flex", gap: "0.4rem", marginLeft: "auto" }}>
+      <button
+        type="button"
+        onClick={() => exportWorldJson(worldId, worldCharacters)}
+        style={{ ...labeledIconButtonStyle(theme), flex: 1, justifyContent: "center" }}
+      >
+        <ExportTabIcon strokeWidth={2.5} />
+        Export World
+      </button>
+      <button
+        type="button"
+        onClick={onImportClick}
+        style={{ ...labeledIconButtonStyle(theme), flex: 1, justifyContent: "center" }}
+      >
+        <ImportTabIcon />
+        Import World
+      </button>
+    </div>
   );
 }
 
@@ -523,6 +652,13 @@ interface CharacterDirectoryScreenProps {
   directoryRevealPhase: number;
 }
 
+// This screen resolves between 3 mutually exclusive full-screen states (world import,
+// Legion panel, the real directory) and the directory itself branches again on All
+// Worlds vs single-world -- each conditional here is already its own cohesive, single-
+// purpose branch (extracted the merged-groups computation and the world-import file
+// state into buildAllWorldsMergedGroups/useWorldImportFile above); further splitting
+// would just relocate the same branch count into more functions, not remove any.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export default function CharacterDirectoryScreen({
   model, actions, directorySortBy, onDirectorySortByChange,
   directoryWorldFilter, onDirectoryWorldFilterChange, directoryRevealPhase,
@@ -559,19 +695,7 @@ export default function CharacterDirectoryScreen({
     maxCharacters: directory.maxCharacters,
   });
 
-  const mergedMainKeys = new Set<string>();
-  const mergedChampionKeys = new Set<string>();
-  directory.worldIds.forEach((worldId) => {
-    const mainKey = directory.mainCharacterKeyByWorld[String(worldId)];
-    if (mainKey) mergedMainKeys.add(mainKey);
-    (directory.championCharacterKeysByWorld[String(worldId)] ?? []).forEach((key) => mergedChampionKeys.add(key));
-  });
-  const mergedGroups = buildMergedDirectoryGroups({
-    allCharacters: filteredCharacters,
-    sortBy: directorySortBy,
-    mainCharacterKeys: mergedMainKeys,
-    championCharacterKeys: mergedChampionKeys,
-  });
+  const mergedGroups = buildAllWorldsMergedGroups(directory, filteredCharacters, directorySortBy);
 
   const pagerKey = `${showAllWorlds ? "all" : activeWorldId}:${directorySortBy}`;
   const championsPage = championsPagerState.key === pagerKey ? championsPagerState.page : 0;
@@ -579,11 +703,16 @@ export default function CharacterDirectoryScreen({
   const mulesPage = mulesPagerState.key === pagerKey ? mulesPagerState.page : 0;
   const handleMulesPageChange = (page: number) => setMulesPagerState({ key: pagerKey, page });
 
-  if (legionPanelOpen && !showAllWorlds && activeWorldId !== null) {
+  const isSingleWorldView = !showAllWorlds && activeWorldId !== null;
+  const activeWorldExportImport = isSingleWorldView
+    ? { worldId: activeWorldId as number, worldCharacters: filteredCharacters, onImportClick: () => actions.runTransitionToMode("worldImport") }
+    : null;
+
+  if (legionPanelOpen && isSingleWorldView) {
     return (
       <LegionPanel
         theme={theme}
-        worldId={activeWorldId}
+        worldId={activeWorldId as number}
         worldCharacters={filteredCharacters}
         onBack={() => setLegionPanelOpen(false)}
       />
@@ -608,8 +737,9 @@ export default function CharacterDirectoryScreen({
           directorySortBy={directorySortBy}
           onWorldChange={onDirectoryWorldFilterChange}
           onSortChange={onDirectorySortByChange}
+          activeWorldExportImport={activeWorldExportImport}
         />
-        {!showAllWorlds && activeWorldId !== null && (
+        {isSingleWorldView && (
           <LegionButtonRow theme={theme} onOpen={() => setLegionPanelOpen(true)} />
         )}
         <div style={{ borderTop: `1px solid ${theme.border}` }} />

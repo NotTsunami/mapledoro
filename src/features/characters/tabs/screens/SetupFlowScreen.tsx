@@ -82,6 +82,7 @@ export default function SetupFlowScreen({ model, actions }: SetupFlowScreenProps
         onJumpStep={(stepIndex) => actions.setSetupStepWithDirection(stepIndex, "forward")}
         onJumpSubstep={(stepIndex, substepIndex) => actions.jumpToSubstep(stepIndex, substepIndex)}
         onBackToIntro={canBackToIntro ? () => actions.setSetupStepWithDirection(0, "backward") : undefined}
+        onExitToProfile={canBackToIntro ? undefined : () => actions.setSetupStepWithDirection(0, "backward")}
       />
       <StepRenderer
         theme={theme}

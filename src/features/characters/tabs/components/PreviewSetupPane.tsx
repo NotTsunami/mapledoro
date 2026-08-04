@@ -77,12 +77,12 @@ function getActiveScreenClassName(
   return `setup-step-content ${directionClass}`;
 }
 
-function getSetupPanelClassName(setup: PreviewPaneModel["setup"]) {
+function getSetupPanelClassName(setup: PreviewPaneModel["setup"], isModeTransitioning: boolean) {
   return [
     "character-search-panel",
     "setup-panel",
     setup.setupPanelVisible ? "setup-panel-visible" : "",
-    setup.isBackTransitioning ? "setup-panel-fade" : "",
+    setup.isBackTransitioning || isModeTransitioning ? "setup-panel-fade" : "",
     setup.isFinishingSetup ? "setup-finish-fade" : "",
     setup.isSwitchingToDirectory || setup.isSwitchingToProfile ? "profile-to-directory-fade" : "",
     setup.isDeleteTransitioning ? "deleting" : "",
@@ -115,7 +115,7 @@ function getSetupPanelInlineStyle(
 }
 
 export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
-  const { theme, setup, directory } = model;
+  const { theme, setup, directory, preview } = model;
   const [directorySortBy, setDirectorySortBy] = useState<DirectorySortBy>("name");
 
   // "unset" means no explicit user choice yet — resolve to first world during render.
@@ -191,7 +191,7 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     setup.setupStepDirection,
     isInitialReveal,
   );
-  const setupPanelClassName = getSetupPanelClassName(setup);
+  const setupPanelClassName = getSetupPanelClassName(setup, preview.isModeTransitioning);
   const setupPanelStyle = getSetupPanelInlineStyle(
     theme,
     inCharacterDirectoryView,

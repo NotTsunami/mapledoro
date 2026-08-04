@@ -12,6 +12,9 @@ export const LOOKUP_SLOW_NOTICE_MS = 12000;
 export const CHARACTER_CACHE_STORAGE_KEY = `mapledoro_character_cache_${LOOKUP_RESPONSE_SCHEMA_VERSION}`;
 export const SETUP_DRAFT_STORAGE_PREFIX = `mapledoro_character_setup_draft_${LOOKUP_RESPONSE_SCHEMA_VERSION}:`;
 export const MAX_BROWSER_CACHE_ENTRIES = 100;
+// Nexon's own per-world character slot cap. Bump alongside a new class per
+// src/features/characters/CLAUDE.md's "Character slot cap" section.
+export const MAX_CHARACTERS_PER_WORLD = 60;
 
 export const WORLD_NAMES: Record<number, string> = {
   1: "Bera",
@@ -22,4 +25,4 @@ export const WORLD_NAMES: Record<number, string> = {
   70: "Hyperion",
 };
 
-export type SetupMode = "intro" | "search" | "import";
+export type SetupMode = "intro" | "search" | "import" | "worldImport";
