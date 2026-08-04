@@ -121,20 +121,26 @@ export default function HoverTooltip({ label, theme, style, className, children 
       ref={ref}
       className={className ? `hover-tip ${className}` : "hover-tip"}
       style={style}
-      // A click supersedes whatever passive hover/focus state was showing -- important when
-      // the wrapped element's own click handler opens a native <dialog>, which makes the
-      // background (including this trigger) inert and stops delivering further mouse/focus
-      // events to it. Without this, hoverOpen/focusOpen can freeze true from the instant of
-      // the click and the bubble stays stuck floating over the modal until an unrelated
-      // pointerdown inside the dialog happens to close clickOpen via the effect below.
+      // clickOpen only toggles on touch (not hover-capable) devices, where a tap is the only
+      // way to reveal the bubble at all -- on a hover-capable device, hover already shows/
+      // hides it correctly as the pointer moves, so a click on a wrapped <button> (e.g. a
+      // Buffs setup tile) shouldn't touch tooltip visibility at all while the mouse is still
+      // over it. This used to also force-close hoverOpen/focusOpen on every click, added for
+      // the case where the wrapped control's click opens a native <dialog> (which goes inert
+      // and stops delivering further mouse events, so hoverOpen would otherwise freeze true)
+      // -- but that case is already handled precisely by the MODAL_OPENED_EVENT listener
+      // below, and the blanket reset here was firing on every ordinary click too, closing the
+      // bubble even while the mouse was still genuinely hovering.
       onClick={() => {
-        setHoverOpen(false);
-        setFocusOpen(false);
-        setClickOpen((o) => !o);
+        if (!isHoverCapable()) setClickOpen((o) => !o);
       }}
       onMouseEnter={() => { if (isHoverCapable()) setHoverOpen(true); }}
       onMouseLeave={() => { if (isHoverCapable()) setHoverOpen(false); }}
-      onFocus={() => setFocusOpen(true)}
+      // Keyboard-only, via the browser's own focus-visible heuristic -- a mouse click on a
+      // wrapped <button> (e.g. a Buffs setup tile) also fires a native focus event, and
+      // without this check that focus would latch focusOpen true with no mouseleave ever
+      // able to clear it, keeping the bubble stuck open after the pointer moves away.
+      onFocus={(e) => { if (e.target.matches(":focus-visible")) setFocusOpen(true); }}
       onBlur={(e) => {
         if (ref.current && e.relatedTarget instanceof Node && ref.current.contains(e.relatedTarget)) return;
         setFocusOpen(false);
