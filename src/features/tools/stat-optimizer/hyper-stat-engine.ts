@@ -41,6 +41,7 @@ export type HyperAllocation = Record<HyperLineId, number>;
 
 export interface HyperResult {
   allocation: HyperAllocation;
+  /** What `allocation` costs, which is what the panel's counter reports. */
   pointsUsed: number;
   pointsAvailable: number;
   /** True when the current allocation beat the greedy result (kept as-is). */
@@ -227,7 +228,8 @@ export function optimizeHyper({
   if (currentDamage > optimizedDamage) {
     return {
       allocation: currentHyper,
-      pointsUsed: availablePoints - remaining,
+      // The greedy's spend would be a figure for an allocation we just discarded.
+      pointsUsed: hyperAllocationCost(currentHyper),
       pointsAvailable: availablePoints,
       alreadyOptimal: true,
       gainPct: 0,

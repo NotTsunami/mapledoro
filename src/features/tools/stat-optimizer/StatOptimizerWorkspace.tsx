@@ -480,7 +480,6 @@ function HyperPanel({
   onLevelChange,
   tracked,
   calibrationNotice,
-  pointsSpent,
   hasStats,
 }: {
   theme: AppTheme;
@@ -492,20 +491,20 @@ function HyperPanel({
   onLevelChange: (id: HyperLineId, level: number) => void;
   tracked: boolean;
   calibrationNotice: CalibrationNotice | null;
-  pointsSpent: number;
   hasStats: boolean;
 }) {
   const rows = HYPER_DISPLAY_ORDER.filter((id) => id !== "subStat2" || profile.subStat2 !== null);
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
-      {/* Counts what the Now column spends, which is also what the inputs clamp to;
-          the Best column always fits the same budget by construction. */}
+      {/* Counts what the Best column spends, not the Now column: the number belongs
+          to the recommendation the panel is making. The greedy stops once no line's
+          next level is affordable, so a few points can be left over. */}
       <PanelTitle
         theme={theme}
         title="Hyper Stat"
         aside={
           <span style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
-            {pointsSpent} / {result.pointsAvailable} points used
+            {result.pointsUsed} / {result.pointsAvailable} points used
           </span>
         }
       />
@@ -932,7 +931,6 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
             onLevelChange={opt.setHyperLevel}
             tracked={hyperTracked(state.hyperAlloc)}
             calibrationNotice={state.calibrationNotice}
-            pointsSpent={opt.hyperPointsSpent}
             hasStats={opt.hasStats}
           />
         ) : (

@@ -143,9 +143,12 @@ words alone don't say which core they belong to). The recommendation line reads
 ## Point budget
 Typed-in current levels are clamped so an allocation can never cost more than
 `availableHyperPoints(level)` (`capHyperLevelToBudget` against what the other lines
-already spend, in `setHyperLevel`). The panel's counter reports what the **current**
-levels cost (`hyperAllocationCost`), not the recommendation's, so hitting the cap
-reads as "1608 / 1608" rather than an unexplained snap-back.
+already spend, in `setHyperLevel`). The panel's counter reports `result.pointsUsed`,
+which is what the **recommended** allocation costs, so the number belongs to the Best
+column it sits above. It can fall short of the budget: the greedy stops once no line's
+next level is affordable, and the leftover is real. `pointsUsed` must therefore always
+be the cost of the `allocation` actually returned, including in the `alreadyOptimal`
+branch, where the greedy's own spend describes an allocation that was discarded.
 
 HEXA has the same rule per core: `capHexaLineLevel` clamps a typed level against
 what the core's other two lines spend, so the three can't exceed `HEXA_CORE_TOTAL`.

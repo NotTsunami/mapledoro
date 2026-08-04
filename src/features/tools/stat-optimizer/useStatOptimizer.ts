@@ -207,8 +207,6 @@ export function useStatOptimizer() {
     ],
   );
 
-  const hyperPointsSpent = useMemo(() => hyperAllocationCost(state.hyperAlloc), [state.hyperAlloc]);
-
   // Both optimizers return a 0% gain against an empty stat window; that means
   // "nothing to work from", not "already optimal", so the panels gate on it.
   const hasStats = useMemo(
@@ -233,7 +231,6 @@ export function useStatOptimizer() {
     setCoreUnlocked,
     setCoreLine,
     result,
-    hyperPointsSpent,
     hasStats,
   };
 }
