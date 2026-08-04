@@ -65,9 +65,3 @@ export function ErdaSkillIcon({ id, ...rest }: ResourceIconProps) {
 export function MarkIcon({ id, ...rest }: ResourceIconProps) {
   return <ResourceImage src={markIconUrl(id)} {...rest} />;
 }
-
-// Direct familiar sprite only. For mob- or card-backed familiars (manifest
-// `spriteFrom` = "mob" / null), use <MobSprite id={mobId}> or <ItemIcon id={cardId}>.
-export function FamiliarSprite({ id, ...rest }: ResourceIconProps) {
-  return <ResourceImage src={resourceImageUrl("familiar", id, "sprite.png")} {...rest} />;
-}
