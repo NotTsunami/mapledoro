@@ -1,0 +1,891 @@
+import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type Ref } from "react";
+import { useMounted } from "../../../../lib/useMounted";
+import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
+import { WORLD_NAMES } from "../../model/constants";
+import {
+  readCharactersStore,
+  writeLegionArtifactForWorld, writeScouterLegionForWorld,
+  type StoredCharacterRecord, type StoredLegionArtifact,
+} from "../../model/charactersStore";
+import {
+  LEGION_CRYSTALS, MAX_ARTIFACT_LEVEL, MIN_ARTIFACT_LEVEL, MIN_CRYSTAL_LEVEL, MAX_CRYSTAL_LEVEL, MAX_STAT_TOTAL_LEVEL,
+  LEGION_ARTIFACT_STATS, getLegionArtifactStat, isCrystalUnlocked, effectiveCrystal,
+  computeRawStatLevels, effectiveStatLevel, statBonusValue, toStoredLegionCrystals,
+  parseLegionArtifactBoardDraft, deriveLegionArtifactFields,
+  type LegionCrystalDraft, type LegionCrystalDef,
+} from "../../setup/data/legionArtifactData";
+import { LINK_SKILLS, LINK_SKILL_BRANCH_ORDER, computeLinkSkillsFromRoster, type LinkSkillBranch } from "../../setup/data/linkSkillsData";
+import { LinkSkillIcon } from "../../setup/components/LinkSkillsSetupStep";
+import { LegionArtifactsEditor, CrystalIcon } from "../../setup/components/LegionArtifactsSetupStep";
+import type { AppTheme } from "../../../../components/themes";
+import { statusText } from "../../../../components/statusColors";
+import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
+import CharacterAvatar, { FALLBACK_SRC } from "../components/CharacterAvatar";
+
+type LegionSection = "artifact" | "linkSkills";
+
+// Module-level so useSyncExternalStore gets a stable reference: an inline arrow would be a
+// new function every render and make it resubscribe each time.
+const emptySubscribe = () => () => undefined;
+
+// Lets the header's Save button (see LegionPanel) trigger whichever *EditPanel is
+// currently mounted, without lifting its local draft state up out of the component
+// that owns it.
+type EditorHandle = { save: () => void };
+
+interface LegionPanelProps {
+  theme: AppTheme;
+  worldId: number;
+  worldCharacters: StoredCharacterRecord[];
+  onBack: () => void;
+}
+
+function backButtonStyle(theme: AppTheme): CSSProperties {
+  return {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    width: 30, height: 30, flexShrink: 0,
+    color: theme.muted, background: theme.bg, border: `1px solid ${theme.border}`,
+    borderRadius: 8, cursor: "pointer",
+  };
+}
+
+function BackIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function segmentButtonStyle(theme: AppTheme, active: boolean): CSSProperties {
+  return {
+    flex: 1, border: `1px solid ${active ? theme.border : "transparent"}`,
+    background: active ? theme.panel : "transparent",
+    color: active ? theme.accentText : theme.muted,
+    fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
+    padding: "0.45rem 0.6rem", borderRadius: 9, cursor: "pointer",
+  };
+}
+
+// Same pencil affordance as the profile binder's BookmarkPageHeader
+// (CharacterProfileOverviewScreen.tsx), re-declared here since it isn't exported.
+function pencilButtonStyle(theme: AppTheme): CSSProperties {
+  return {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    width: 26, height: 26, flexShrink: 0,
+    color: theme.muted, background: theme.bg, border: `1px solid ${theme.border}`,
+    borderRadius: 8, cursor: "pointer",
+  };
+}
+
+function PencilIcon() {
+  return (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function saveButtonStyle(theme: AppTheme): CSSProperties {
+  return {
+    border: "none", borderRadius: 8,
+    background: theme.accent, color: theme.accentOn,
+    fontFamily: "inherit", fontWeight: 800, fontSize: "0.75rem",
+    padding: "0.4rem 0.7rem", cursor: "pointer",
+  };
+}
+
+function ArtifactStatRow({ theme, label, level, wasted, wastedCrystals, value }: {
+  theme: AppTheme; label: string; level?: number; wasted?: number;
+  wastedCrystals?: string[]; value: string;
+}) {
+  const levelBadge = (
+    <span style={{ fontSize: 12, fontWeight: 700, color: wasted ? statusText(theme, "danger") : theme.muted }}>
+      Lv. {level}{wasted ? ` · +${wasted} wasted` : ""}
+    </span>
+  );
+  const wastedSublabel = wastedCrystals?.length ? (
+    <>
+      {wastedCrystals.map((name, i) => (
+        <span key={name}>
+          {i > 0 && ", "}
+          <strong style={{ color: theme.text, fontWeight: 800 }}>{name}</strong>
+        </span>
+      ))}
+      {" "}have this stat assigned. Reassign these to stop wasting levels.
+    </>
+  ) : undefined;
+  const wastedPlural = wasted === 1 ? "" : "s";
+  const wastedAriaLabel = wastedCrystals?.length
+    ? `${wasted} level${wastedPlural} wasted. ${wastedCrystals.join(", ")} have this stat assigned. Reassign these to stop wasting levels.`
+    : undefined;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${theme.border}` }}>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        {level !== undefined && wasted && wastedCrystals?.length ? (
+          <HoverTooltip
+            theme={theme}
+            label={`${wasted} level${wastedPlural} wasted`}
+            sublabel={wastedSublabel}
+            ariaLabel={wastedAriaLabel}
+            wrapSublabel
+          >
+            {levelBadge}
+          </HoverTooltip>
+        ) : (level !== undefined && levelBadge)}
+        <span style={{ fontSize: 12, color: theme.muted }}>{label}</span>
+      </span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: theme.text }}>{value}</span>
+    </div>
+  );
+}
+
+// Same 5-diamond pip read as the setup step's LevelPipsStatic, just re-declared here
+// since it's a tiny static render and the setup step doesn't export it.
+function CrystalPips({ level, theme }: { level: number; theme: AppTheme }) {
+  return (
+    <div style={{ display: "flex", gap: 3 }}>
+      {Array.from({ length: MAX_CRYSTAL_LEVEL }, (_, i) => (
+        // react-doctor-disable-next-line no-array-index-as-key
+        <span
+          key={i}
+          style={{
+            width: 7, height: 7, borderRadius: 1.5,
+            background: i < level ? theme.accent : "transparent",
+            border: `1.5px solid ${i < level ? theme.accent : theme.border}`,
+            transform: "rotate(45deg)", boxSizing: "border-box", flexShrink: 0, display: "block",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function crystalTileStyle(theme: AppTheme, unlocked: boolean): CSSProperties {
+  return {
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+    width: "100%", aspectRatio: "1", minWidth: 0,
+    borderRadius: 12, border: `2px solid ${theme.border}`,
+    background: unlocked ? theme.bg : `${theme.muted}0d`,
+    opacity: unlocked ? 1 : 0.55, boxSizing: "border-box",
+  };
+}
+
+// Read-only mirror of the setup step's crystal tile: same icon + level-pip look, but a
+// hover tooltip stands in for the setup step's click-to-open stat picker, since there's
+// nothing to edit here.
+function CrystalTile({ theme, index, def, crystal, unlocked }: {
+  theme: AppTheme;
+  index: number;
+  def: LegionCrystalDef;
+  crystal: LegionCrystalDraft;
+  unlocked: boolean;
+}) {
+  const level = crystal.level ?? MIN_CRYSTAL_LEVEL;
+  const iconSrc = legionCrystalIconUrl(index, Math.max(0, level - 1), unlocked ? "icon" : "disabled");
+
+  if (!unlocked) {
+    return (
+      <div className="legion-crystal-tile" style={crystalTileStyle(theme, false)} title={`${def.name}, Lv ${def.requiredArtifactLevel}+ required`}>
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
+        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+          Lv {def.requiredArtifactLevel}+
+        </span>
+      </div>
+    );
+  }
+
+  const statNames = (crystal.stats ?? [])
+    .map((id) => (id ? getLegionArtifactStat(id)?.label : null))
+    .filter((name): name is string => Boolean(name));
+
+  return (
+    <HoverTooltip theme={theme} label={def.name} sublabel={statNames.join(" · ")} wrapperStyle={{ width: "100%" }}>
+      <div className="legion-crystal-tile" style={crystalTileStyle(theme, true)}>
+        <CrystalPips level={level} theme={theme} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
+      </div>
+    </HoverTooltip>
+  );
+}
+
+// Resolves one scouter-facing field against a board edit's before/after derivation:
+// fresh proof always wins; a field the board used to prove (wasProvenBefore) but no
+// longer does gets cleared (a respec correctly un-derives); a field NEITHER the old nor
+// new board ever proved is left alone, since it could be a manual Quick Questions answer
+// this board edit has no bearing on at all. Takes a bool for "was proven before" rather
+// than the before value itself, since the board's derived shape (a string percent) and
+// the stored scouter shape (a number) differ for artifactFinalAttackDmg.
+function resolveResyncedField<T>(wasProvenBefore: boolean, after: T | undefined, existing: T | undefined): T | undefined {
+  if (after !== undefined) return after;
+  if (wasProvenBefore) return undefined;
+  return existing;
+}
+
+// A dedicated component so its local draft state naturally resets each time the user
+// re-enters edit mode (it only mounts while editing=true). The draft is purely local
+// until Save — closing without saving (tab switch, back to Directory) just unmounts
+// this component and discards it, same as backing out of the wizard mid-step.
+function LegionArtifactEditPanel({ theme, worldId, worldLegionArtifact, onSave, ref }: {
+  theme: AppTheme; worldId: number; worldLegionArtifact?: StoredLegionArtifact; onSave: () => void; ref?: Ref<EditorHandle>;
+}) {
+  const [value, setValue] = useState("");
+  function handleSave() {
+    const parsed = parseLegionArtifactBoardDraft(value);
+    // The level input allows a blank mid-typing state (see clampArtifactLevelInput's own
+    // comment), which Number() would otherwise collapse to 0 — a level below the real
+    // minimum that wipes the whole board back to "Not set up yet." A blank field on Save
+    // means "didn't touch this," not "reset to 0," so it falls back to whatever was
+    // already stored (or the real starting level, if this is a first-time setup).
+    const artifactLevel = parsed.artifactLevel
+      ? Number(parsed.artifactLevel)
+      : worldLegionArtifact?.artifactLevel ?? MIN_ARTIFACT_LEVEL;
+    const crystals = toStoredLegionCrystals(parsed.crystals, artifactLevel);
+    writeLegionArtifactForWorld(worldId, { artifactLevel, crystals });
+    // Resync scouterLegionByWorld's 2 derived fields against this edit, per field:
+    // - The fresh board proves a value -> write it (real board evidence always wins).
+    // - The board USED to prove a value (before this edit) but no longer does -> clear
+    //   it (a respec correctly un-derives, doesn't leave a stale value stuck forever —
+    //   this was the original bug: a full reset left artifactExtraTarget/
+    //   artifactFinalAttackDmg stuck at their old board-derived values).
+    // - Neither the old nor the new board ever proved it -> leave whatever's already
+    //   stored completely untouched. That existing value could be a manual Quick
+    //   Questions answer with no board backing at all (e.g. someone typed 20% Final
+    //   Attack Damage with an untouched board) — this edit provides no new evidence
+    //   about it, so it must not be silently erased just by opening this editor and
+    //   hitting Save without customizing anything.
+    const before = deriveLegionArtifactFields({
+      artifactLevel: worldLegionArtifact?.artifactLevel !== undefined ? String(worldLegionArtifact.artifactLevel) : undefined,
+      crystals: worldLegionArtifact?.crystals as LegionCrystalDraft[] | undefined,
+    });
+    const after = deriveLegionArtifactFields({ artifactLevel: String(artifactLevel), crystals: crystals as LegionCrystalDraft[] | undefined });
+    const store = readCharactersStore();
+    const existingScouter = store.scouterLegionByWorld[String(worldId)];
+    const extraTarget = resolveResyncedField(before?.artifactExtraTarget !== undefined, after?.artifactExtraTarget, existingScouter?.artifactExtraTarget);
+    const finalAtk = resolveResyncedField(
+      before?.artifactFinalAttackDmg !== undefined,
+      after?.artifactFinalAttackDmg !== undefined ? Number(after.artifactFinalAttackDmg) : undefined,
+      existingScouter?.artifactFinalAttackDmg,
+    );
+    writeScouterLegionForWorld(worldId, {
+      ...(existingScouter?.wildHunterRank ? { wildHunterRank: existingScouter.wildHunterRank } : {}),
+      ...(extraTarget !== undefined ? { artifactExtraTarget: extraTarget } : {}),
+      ...(finalAtk !== undefined ? { artifactFinalAttackDmg: finalAtk } : {}),
+    });
+    onSave();
+  }
+  useImperativeHandle(ref, () => ({ save: handleSave }));
+  return <LegionArtifactsEditor theme={theme} worldLegionArtifact={worldLegionArtifact} value={value} onChange={setValue} />;
+}
+
+function LegionArtifactSection({ theme, worldId, editing, onEditDone, editorRef }: {
+  theme: AppTheme; worldId: number; editing: boolean; onEditDone: () => void; editorRef: Ref<EditorHandle>;
+}) {
+  const mounted = useMounted();
+  const legion = mounted ? readCharactersStore().legionArtifactByWorld[String(worldId)] : undefined;
+  const artifactLevel = legion?.artifactLevel;
+
+  if (editing) {
+    return <LegionArtifactEditPanel theme={theme} worldId={worldId} worldLegionArtifact={legion} onSave={onEditDone} ref={editorRef} />;
+  }
+
+  if (!artifactLevel) {
+    return <p style={{ margin: 0, fontSize: 13, color: theme.muted, fontWeight: 700 }}>Not set up yet.</p>;
+  }
+
+  // Resolved once so the crystal grid and the total-bonuses list always agree, even when
+  // storage happens to hold a stale locked placeholder for a crystal instead of real data
+  // (see effectiveCrystal's own comment).
+  const resolvedCrystals = LEGION_CRYSTALS.map((_, i) =>
+    effectiveCrystal(legion?.crystals?.[i] as LegionCrystalDraft | undefined, isCrystalUnlocked(i, artifactLevel)));
+
+  // Which unlocked crystals assign a given stat, so a "wasted" warning can point at exactly
+  // which crystals to reassign instead of just naming a number.
+  const crystalsByStat = new Map<string, string[]>();
+  resolvedCrystals.forEach((crystal, i) => {
+    if (!isCrystalUnlocked(i, artifactLevel)) return;
+    (crystal.stats ?? []).forEach((statId) => {
+      if (!statId) return;
+      const list = crystalsByStat.get(statId) ?? [];
+      list.push(LEGION_CRYSTALS[i].name);
+      crystalsByStat.set(statId, list);
+    });
+  });
+
+  const rawTotals = computeRawStatLevels(resolvedCrystals, artifactLevel);
+  // react-doctor-disable-next-line js-combine-iterations -- LEGION_ARTIFACT_STATS is a small fixed 16-item array, extra pass is negligible per the rule's own FP criteria
+  const bonusRows = LEGION_ARTIFACT_STATS
+    .map((stat) => {
+      const raw = rawTotals[stat.id] ?? 0;
+      return { stat, raw, effective: effectiveStatLevel(raw) };
+    })
+    .filter((row) => row.effective > 0)
+    .map(({ stat, raw, effective }) => {
+      const unitSuffix = stat.unit === "percent" ? "%" : "";
+      const flag = stat.flagAtLevelOne ? `, ${stat.flagAtLevelOne}` : "";
+      // In-game itself is inconsistent about naming here: the crystal stat picker calls
+      // these lines "Meso Drop"/"Bonus EXP" (LEGION_ARTIFACT_STATS' shared labels, kept
+      // as-is there), but the Artifact tab's own bonus summary calls them "Mesos Obtained"/
+      // "EXP Obtained". That rename is scoped only to this display, not the shared label,
+      // so the picker stays true to what it actually says in-game.
+      const labelOverrides: Partial<Record<typeof stat.id, string>> = { mesos: "Mesos Obtained", multiTargetExp: "EXP Obtained" };
+      const label = labelOverrides[stat.id] ?? stat.label;
+      // A stat whose per-level steps are all whole numbers can never produce a fractional
+      // total (verified against LEGION_ARTIFACT_STATS' own levelSteps, not hardcoded per
+      // stat), so it's shown as a plain integer instead of a padded "12.00".
+      const isWholeStat = stat.levelSteps.every(Number.isInteger);
+      const rawValue = statBonusValue(stat.id, effective);
+      const formattedValue = isWholeStat ? String(rawValue) : rawValue.toFixed(2);
+      // Assigning the same stat to more crystals than it takes to hit the level 10 cap is a
+      // real, easy-to-make mistake (e.g. 3 crystals at Lv 5 on one stat is only worth 10, not
+      // 15). Flagging the excess here is the whole point of this feature, so the player
+      // notices and can reassign a crystal onto something that isn't already capped.
+      const wasted = Math.max(0, raw - MAX_STAT_TOTAL_LEVEL);
+      const wastedCrystals = wasted > 0 ? crystalsByStat.get(stat.id) : undefined;
+      return { id: stat.id, label, effective, wasted, wastedCrystals, display: `+${formattedValue}${unitSuffix}${flag}` };
+    });
+
+  return (
+    <div className="legion-artifact-root" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <style>{`
+        .legion-artifact-root { container-type: inline-size; }
+        /* minmax(0, 116px) lets each column shrink past its 116px preferred size instead
+           of a fixed px track, which refuses to compress below its own content and forces
+           the whole grid to overflow on narrow phones no matter what breakpoint number a
+           fallback size uses. Tile sizing itself is 100%/aspect-ratio (crystalTileStyle),
+           so this scales fluidly with zero breakpoints needed. */
+        .legion-artifact-crystal-grid { grid-template-columns: repeat(3, minmax(0, 116px)); min-width: 0; }
+        .legion-artifact-layout { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: stretch; }
+        .legion-artifact-crystal-col { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+        @container (max-width: 620px) {
+          .legion-artifact-layout { grid-template-columns: 1fr; }
+        }
+      `}</style>
+      <div className="legion-artifact-layout">
+        {/* Artifact Level travels with the crystal grid as one block, not a separate
+            full-width header, so the two stay visually attached when this column gets
+            vertically centered against a much longer Artifact Bonuses list. */}
+        <div className="legion-artifact-crystal-col">
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0, width: "100%" }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.muted, marginBottom: 4 }}>
+                Artifact Level
+              </div>
+              <div style={{ fontFamily: "var(--font-heading)", fontSize: "1.8rem", fontWeight: 700, color: theme.text, lineHeight: 1 }}>
+                {artifactLevel}
+                <span style={{ fontSize: "1rem", fontWeight: 700, color: theme.muted }}> / {MAX_ARTIFACT_LEVEL}</span>
+              </div>
+            </div>
+            <div className="legion-artifact-crystal-grid" style={{ display: "grid", gap: "0.6rem", maxWidth: 366 }}>
+              {LEGION_CRYSTALS.map((def, index) => (
+                <CrystalTile
+                  key={def.id}
+                  theme={theme}
+                  index={index}
+                  def={def}
+                  crystal={resolvedCrystals[index]}
+                  unlocked={isCrystalUnlocked(index, artifactLevel)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        {bonusRows.length > 0 && (
+          <div>
+            <p style={{ margin: "0 0 0.4rem", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: theme.muted }}>
+              Artifact Bonuses
+            </p>
+            <div>
+              {bonusRows.map((row) => (
+                <ArtifactStatRow
+                  key={row.id}
+                  theme={theme}
+                  label={row.label}
+                  level={row.effective}
+                  wasted={row.wasted}
+                  wastedCrystals={row.wastedCrystals}
+                  value={row.display}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Centered above the trigger and shrink-wrapped to its own text (not the setup wizard's
+// InfoTooltip popup, which is left-anchored and fixed-width for its own "?" button
+// context), nudging sideways via shiftX only when centering would clip past the
+// viewport edge, same idea as InfoTooltip's own edge-avoidance but centered by default.
+function hoverTooltipPopupStyle(theme: AppTheme, shiftX: number, wrapSublabel?: boolean): CSSProperties {
+  return {
+    position: "absolute", bottom: "calc(100% + 0.4rem)", left: "50%",
+    transform: `translateX(calc(-50% + ${shiftX}px))`,
+    zIndex: 200, background: theme.bg, border: `1px solid ${theme.border}`,
+    borderRadius: 10, padding: "0.4rem 0.6rem",
+    width: wrapSublabel ? 220 : "max-content", maxWidth: "calc(100vw - 16px)",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.15)", textAlign: "center",
+  };
+}
+
+function HoverTooltip({ theme, label, sublabel, ariaLabel, wrapSublabel, wrapperStyle, children }: {
+  theme: AppTheme; label: string; sublabel?: ReactNode; ariaLabel?: string; wrapSublabel?: boolean;
+  wrapperStyle?: CSSProperties; children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [shiftX, setShiftX] = useState(0);
+  // Touch devices have no hover at all, so mouseenter/mouseleave never fire there,
+  // so fall back to tap-to-toggle instead. Hover support doesn't change mid-session for
+  // any real device this app needs to support. Read via useSyncExternalStore (not a lazy
+  // useState initializer) since this value feeds an unconditional inline style below —
+  // a plain useState would seed the server's `false` and never reconcile it against the
+  // client's real value, causing a hydration mismatch on hover-capable devices.
+  const supportsHover = useSyncExternalStore(
+    emptySubscribe,
+    () => typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches,
+    () => false,
+  );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const container = containerRef.current;
+    const popup = popupRef.current;
+    if (!container || !popup) return;
+    const margin = 8;
+    const centerX = container.getBoundingClientRect().left + container.offsetWidth / 2;
+    const halfPopup = popup.offsetWidth / 2;
+    if (centerX - halfPopup < margin) {
+      setShiftX(margin - (centerX - halfPopup));
+    } else if (centerX + halfPopup > window.innerWidth - margin) {
+      setShiftX(window.innerWidth - margin - (centerX + halfPopup));
+    } else {
+      setShiftX(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (supportsHover || !open) return;
+    function handleOutsideTap(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideTap);
+    return () => document.removeEventListener("mousedown", handleOutsideTap);
+  }, [supportsHover, open]);
+
+  const triggerProps = supportsHover
+    ? { onMouseEnter: () => setOpen(true), onMouseLeave: () => setOpen(false) }
+    : { onClick: () => setOpen((o) => !o) };
+
+  return (
+    <div
+      ref={containerRef}
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel ?? (typeof sublabel === "string" ? `${label}, ${sublabel}` : label)}
+      style={{ position: "relative", display: "inline-flex", cursor: supportsHover ? "default" : "pointer", minWidth: 0, ...wrapperStyle }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); }
+      }}
+      {...triggerProps}
+    >
+      {children}
+      {open && (
+        <div
+          ref={popupRef}
+          style={hoverTooltipPopupStyle(theme, shiftX, wrapSublabel)}
+        >
+          <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 800, color: theme.text, whiteSpace: "nowrap" }}>{label}</p>
+          {sublabel && (
+            <p style={{ margin: 0, marginTop: "0.1rem", fontSize: "0.75rem", color: theme.muted, whiteSpace: wrapSublabel ? "normal" : "nowrap" }}>{sublabel}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MissingCharacterSlot({ theme, size }: { theme: AppTheme; size: number }) {
+  return (
+    <HoverTooltip theme={theme} label="No tracked character">
+      <div style={{ width: size, height: size, opacity: 0.6 }}>
+        <CharacterAvatar
+          src={FALLBACK_SRC}
+          alt="No tracked character"
+          width={size}
+          height={size}
+          style={{ objectFit: "contain", objectPosition: "center bottom" }}
+        />
+      </div>
+    </HoverTooltip>
+  );
+}
+
+// missingCount fills out the row to the skill's real member-class count -- a multi-class
+// skill (Empirical Knowledge/Thief's Cunning, 3 classes each) showing only 2 real sprites
+// otherwise reads as "why is this 9/9 with only 2 characters," when the 3rd class's
+// contribution is really just an untracked lump baked into the stored total (see
+// computeLinkSkillsFromRoster's own doc comment on that limitation).
+function SpriteRow({ theme, characters, missingCount, size }: {
+  theme: AppTheme; characters: StoredCharacterRecord[]; missingCount: number; size: number;
+}) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 }}>
+      {characters.map((c) => (
+        <HoverTooltip key={c.characterName} theme={theme} label={c.characterName} sublabel={`Lv. ${c.level}`}>
+          <div style={{ width: size, height: size, flexShrink: 0 }}>
+            <CharacterAvatar
+              src={c.characterImgURL}
+              alt={c.characterName}
+              width={size}
+              height={size}
+              style={{ objectFit: "contain", objectPosition: "center bottom" }}
+            />
+          </div>
+        </HoverTooltip>
+      ))}
+      {Array.from({ length: missingCount }, (_, i) => (
+        // react-doctor-disable-next-line no-array-index-as-key -- interchangeable placeholder slots, no identity to key on
+        <MissingCharacterSlot key={`missing-${i}`} theme={theme} size={size} />
+      ))}
+    </div>
+  );
+}
+
+// Only skills a tracked character actually contributes to (or that already have a
+// committed level) earn the full sprite-showcase card, since with 40+ link skills
+// eventually on the roadmap (Cygnus, Resistance, ...) most will be permanently
+// irrelevant to any one account, so giving every skill a full card regardless would
+// turn this into an endless scroll of empty placeholders. Everything else collapses
+// into one compact chip.
+// A named grid (icon | label | sprites), not a flex row with wrap: flex-wrap's "does
+// this all fit on one line" test kept tripping on tiny, inconsistent text-width
+// differences (two similarly-long names could land on opposite sides of the threshold),
+// dropping the sprite to its own line unpredictably even with plenty of room. Grid
+// columns don't have that ambiguity: the sprite column always renders in place, and
+// only its own content (SpriteRow's internal wrap) adapts if the column is tight.
+// `dormant` renders as a muted placeholder (no sprite row), used only as filler to
+// complete a partial row of otherwise-active cards, never for the full backlog of
+// untracked skills (see LinkSkillsSection: that stays a compact chip list, so a future
+// 40+-skill roster still can't turn this into an endless wall of empty cards).
+function LinkSkillCard({ theme, skill, eligible, level, spriteSize, dormant = false }: {
+  theme: AppTheme;
+  skill: (typeof LINK_SKILLS)[number];
+  eligible: StoredCharacterRecord[];
+  level: number | undefined;
+  spriteSize: number;
+  dormant?: boolean;
+}) {
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: dormant ? "44px minmax(0, 1fr)" : `44px minmax(60px, 1fr) minmax(${spriteSize}px, auto)`,
+      alignItems: "center", gap: 16,
+      padding: "0.85rem 1rem", borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.bg,
+      opacity: dormant ? 0.6 : 1,
+    }}>
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={44} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: theme.text, lineHeight: 1.25 }}>
+          {skill.name}
+        </span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>
+          {level ?? 0} / {skill.maxLevel}
+        </span>
+      </div>
+      {!dormant && (
+        <div style={{ justifySelf: "end" }}>
+          <SpriteRow theme={theme} characters={eligible} missingCount={skill.classes.length - eligible.length} size={spriteSize} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DormantSkillChip({ theme, skill }: { theme: AppTheme; skill: (typeof LINK_SKILLS)[number] }) {
+  return (
+    <div
+      title={`${skill.name}: no progress`}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "0.35rem 0.65rem 0.35rem 0.35rem", borderRadius: 999,
+        border: `1px solid ${theme.border}`, background: theme.bg, opacity: 0.6,
+      }}
+    >
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={18} />
+      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>{skill.name}</span>
+    </div>
+  );
+}
+
+// One branch's worth of active cards (single- and multi-class grids) plus its dormant
+// chips. Rendered only for whichever branch tab is currently selected (see
+// LinkSkillsSection) -- with 53+ classes across 11 branches now covered (see
+// linkSkillsData.ts), showing every branch's cards at once would turn this into an
+// endless scroll even for a modest roster.
+function LinkSkillBranchGrids({ theme, active, dormant }: {
+  theme: AppTheme;
+  active: { skill: (typeof LINK_SKILLS)[number]; eligible: StoredCharacterRecord[]; level: number | undefined }[];
+  dormant: { skill: (typeof LINK_SKILLS)[number] }[];
+}) {
+  const activeMulti = active.filter(({ skill }) => skill.classes.length > 1);
+  const activeSingle = active.filter(({ skill }) => skill.classes.length === 1);
+
+  return (
+    <div className="legion-link-skills-root" style={{ display: "grid", gap: 10 }}>
+      <style>{`
+        .legion-link-skills-root { container-type: inline-size; }
+        .legion-single-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .legion-multi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @container (max-width: 900px) {
+          .legion-single-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @container (max-width: 600px) {
+          .legion-multi-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+        @container (max-width: 480px) {
+          .legion-single-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+      `}</style>
+      {activeSingle.length > 0 && (
+        <div className="legion-single-grid" style={{ display: "grid", gap: 10 }}>
+          {activeSingle.map(({ skill, eligible, level }) => (
+            <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} />
+          ))}
+        </div>
+      )}
+      {activeMulti.length > 0 && (
+        <div className="legion-multi-grid" style={{ display: "grid", gap: 10 }}>
+          {activeMulti.map(({ skill, eligible, level }) => (
+            <LinkSkillCard key={skill.id} theme={theme} skill={skill} eligible={eligible} level={level} spriteSize={56} />
+          ))}
+        </div>
+      )}
+      {dormant.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {dormant.map(({ skill }) => (
+            <DormantSkillChip key={skill.id} theme={theme} skill={skill} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Landing/"All" view: one dense row per skill (icon, name, level), no big sprite cards --
+// scannable in a glance across every branch without the vertical weight of the full card
+// grids. Clicking a specific branch pill switches to LinkSkillBranchGrids instead.
+function LinkSkillCompactRow({ theme, skill, level }: {
+  theme: AppTheme; skill: (typeof LINK_SKILLS)[number]; level: number | undefined;
+}) {
+  const hasProgress = Boolean(level);
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "0.4rem 0.6rem", borderRadius: 8,
+      opacity: hasProgress ? 1 : 0.55,
+    }}>
+      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} size={24} />
+      <span style={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {skill.name}
+      </span>
+      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: hasProgress ? theme.text : theme.muted, flexShrink: 0 }}>
+        {level ?? 0} / {skill.maxLevel}
+      </span>
+    </div>
+  );
+}
+
+// Read-only: link skill LEVELS live per-character now (each character's own linkSkills
+// field, see charactersStore.ts's file-header reasoning), not one shared per-world value,
+// so there's no longer a single number this world-level screen could save an edit back
+// to. This section shows what the same-world roster PROVES is mastered (a floor/ceiling
+// on what any one character here could equip), not any specific character's actual
+// choice of which links it runs -- editing that per-character choice happens on each
+// character's own Link Skills setup step instead.
+type LinkSkillTab = "All" | LinkSkillBranch;
+
+function LinkSkillsSection({ theme, worldId, worldCharacters }: {
+  theme: AppTheme; worldId: number; worldCharacters: StoredCharacterRecord[];
+}) {
+  const mounted = useMounted();
+  const { values: levels, winners } = mounted
+    ? computeLinkSkillsFromRoster(worldCharacters, worldId)
+    : { values: {}, winners: {} };
+
+  // "All" lands first: a dense scannable list beats forcing a branch pick before seeing
+  // anything (see LinkSkillCompactRow). Picking a specific branch pill swaps the content
+  // area to that branch's full card grids instead of stacking every branch open at once
+  // (53+ classes across 11 branches -- see linkSkillsData.ts -- would be an endless
+  // scroll if every branch rendered its cards simultaneously).
+  const [tab, setTab] = useState<LinkSkillTab>("All");
+
+  const withEligibility = LINK_SKILLS.map((skill) => ({
+    skill,
+    eligible: winners[skill.id] ?? [],
+    level: levels?.[skill.id],
+  }));
+  // A skill explicitly set to 0 (no progress yet) reads the same as never having been
+  // touched — level 0 with no eligible tracked character still belongs in the dormant
+  // chip list, not the full sprite card (which would otherwise render an empty "no
+  // tracked character" placeholder for a skill that has no real data either way).
+  const active = withEligibility.filter(({ eligible, level }) => eligible.length > 0 || Boolean(level));
+  const dormant = withEligibility.filter(({ eligible, level }) => eligible.length === 0 && !level);
+
+  const branchesWithData = new Set(withEligibility.map(({ skill }) => skill.branch));
+  const tabOptions: LinkSkillTab[] = ["All", ...LINK_SKILL_BRANCH_ORDER.filter((b) => branchesWithData.has(b))];
+
+  // Fades whichever edge actually has more to scroll to (see useScrollEdges/edgeFadeMask)
+  // -- a static fade misreads as "more to scroll" even once fully scrolled to an edge, or
+  // when the row never overflows in the first place (branchesWithData can be short
+  // enough to fit).
+  const { ref: tabsRef, atStart, atEnd } = useScrollEdges<HTMLDivElement>([tabOptions.length]);
+  const tabsMask = edgeFadeMask(atStart, atEnd);
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <style>{`
+        .legion-link-skill-tabs {
+          display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+          scrollbar-width: thin;
+          scrollbar-color: ${theme.border} transparent;
+        }
+        .legion-link-skill-tabs::-webkit-scrollbar { height: 6px; }
+        .legion-link-skill-tabs::-webkit-scrollbar-track { background: transparent; }
+        .legion-link-skill-tabs::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 999px; }
+      `}</style>
+      <div
+        ref={tabsRef}
+        className="legion-link-skill-tabs"
+        style={{ maskImage: tabsMask, WebkitMaskImage: tabsMask }}
+      >
+        {tabOptions.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setTab(option)}
+            style={{
+              flexShrink: 0, padding: "0.4rem 0.85rem", borderRadius: 999,
+              border: `1px solid ${tab === option ? theme.accent : theme.border}`,
+              background: tab === option ? theme.accent : "transparent",
+              color: tab === option ? theme.accentOn : theme.muted,
+              fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+      {tab === "All" ? (
+        <div className="legion-link-skills-all-root">
+          <style>{`
+            .legion-link-skills-all-root { container-type: inline-size; }
+            .legion-link-skills-all-grid { display: grid; gap: 2px 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            @container (max-width: 860px) {
+              .legion-link-skills-all-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            }
+            @container (max-width: 520px) {
+              .legion-link-skills-all-grid { grid-template-columns: minmax(0, 1fr); }
+            }
+          `}</style>
+          <div className="legion-link-skills-all-grid">
+            {withEligibility.map(({ skill, level }) => (
+              <LinkSkillCompactRow key={skill.id} theme={theme} skill={skill} level={level} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <LinkSkillBranchGrids
+          theme={theme}
+          active={active.filter((entry) => entry.skill.branch === tab)}
+          dormant={dormant.filter((entry) => entry.skill.branch === tab)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function LegionPanel({ theme, worldId, worldCharacters, onBack }: LegionPanelProps) {
+  // Link Skills is the landing tab: in-game, the Legion Artifact only unlocks after
+  // accumulating Link Skill levels, so Link Skills is the thing every account has.
+  const [section, setSection] = useState<LegionSection>("linkSkills");
+  const [editing, setEditing] = useState(false);
+  const editorRef = useRef<EditorHandle>(null);
+  const worldName = WORLD_NAMES[worldId] ?? `World ${worldId}`;
+  const sectionLabel = section === "artifact" ? "Legion Artifact" : "Link Skills";
+
+  // The section content remounts on tab switch (key={section} below), which already
+  // discards any in-progress edit draft, so editing must reset here too or the newly
+  // mounted section would open straight into edit mode.
+  function selectSection(next: LegionSection) {
+    setSection(next);
+    setEditing(false);
+  }
+
+  return (
+    <div className="fade-in">
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.75rem" }}>
+        <button type="button" onClick={onBack} aria-label="Back to directory" style={backButtonStyle(theme)}>
+          <BackIcon />
+        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: theme.muted }}>
+            Legion &middot; {worldName}
+          </span>
+          <h2 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.1rem", lineHeight: 1.2, color: theme.text }}>
+            {sectionLabel}
+          </h2>
+        </div>
+        {/* Lives in the header (fixed regardless of tab/edit state) instead of inside each
+            section's own content, so opening the editor (and its Save button replacing
+            this one) never shifts anything below it. Link Skills has no edit affordance
+            at all here -- levels live per-character now, editable only from each
+            character's own Link Skills setup step, not from this world-level screen
+            (see LinkSkillsSection's own comment). */}
+        {section === "artifact" && (editing
+          ? <button type="button" onClick={() => editorRef.current?.save()} style={saveButtonStyle(theme)}>Save</button>
+          : (
+            <HoverTooltip label={`Edit ${sectionLabel}`} theme={theme}>
+              <button type="button" aria-label={`Edit ${sectionLabel}`} onClick={() => setEditing(true)} style={pencilButtonStyle(theme)}>
+                <PencilIcon />
+              </button>
+            </HoverTooltip>
+          ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 3, padding: 3, background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 12, marginBottom: "0.75rem" }} role="tablist" aria-label="Legion sections">
+        <button type="button" role="tab" aria-selected={section === "linkSkills"} onClick={() => selectSection("linkSkills")} style={segmentButtonStyle(theme, section === "linkSkills")}>
+          Link Skills
+        </button>
+        <button type="button" role="tab" aria-selected={section === "artifact"} onClick={() => selectSection("artifact")} style={segmentButtonStyle(theme, section === "artifact")}>
+          Legion Artifact
+        </button>
+      </div>
+
+      {/* Same page-swap read as the profile binder's 0.2s fade-up: the key remount
+          re-runs the entrance whenever the tab changes. Visible state is the default,
+          the keyframes only animate toward it. */}
+      <style>{`
+        @keyframes legion-section-reveal {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .legion-section-content { animation: legion-section-reveal 0.2s ease-out both; }
+        @media (prefers-reduced-motion: reduce) {
+          .legion-section-content { animation: none !important; }
+        }
+      `}</style>
+      <div key={section} className="legion-section-content">
+        {section === "artifact"
+          ? <LegionArtifactSection theme={theme} worldId={worldId} editing={editing} onEditDone={() => setEditing(false)} editorRef={editorRef} />
+          : <LinkSkillsSection theme={theme} worldId={worldId} worldCharacters={worldCharacters} />}
+      </div>
+    </div>
+  );
+}

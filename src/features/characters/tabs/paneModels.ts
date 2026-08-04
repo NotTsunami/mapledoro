@@ -1,8 +1,38 @@
 import type { AppTheme } from "../../../components/themes";
 import type { NormalizedCharacterData } from "../model/types";
-import type { StoredCharacterRecord } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredLegionArtifact, StoredScouterLegion } from "../model/charactersStore";
 import type { SetupFlowId } from "../setup/flows";
 import type { SetupMode } from "../model/constants";
+import type { RosterRole } from "./useCharacterSetupController";
+
+// A character's directory role -- shared between CharacterProfileScreen's own role
+// chips and WorldImportModeScreen's role-transition labels.
+export type ProfileRole = "main" | "champion" | "mule";
+
+export const ROLE_LABEL: Record<ProfileRole, string> = { main: "Main", champion: "Champion", mule: "Mule" };
+
+// A character can hold both roles at once (Main AND a Champion slot) -- this formats
+// every role that applies, not just one, falling back to "Mule" when the list is empty.
+export function formatRoles(roles: ProfileRole[]): string {
+  return roles.length > 0 ? roles.map((r) => ROLE_LABEL[r]).join(", ") : ROLE_LABEL.mule;
+}
+
+// Lightweight, render-ready view of a resumable setup draft for the search-entry list.
+export interface SetupDraftSummary {
+  characterKey: string;
+  characterName: string;
+  jobName: string;
+  imgUrl: string;
+  flowId: SetupFlowId;
+  flowLabel: string;
+  // stepIndex 0 means the user is still on the flow picker and has not chosen a
+  // setup yet, so flowLabel should not be shown as a definitive choice.
+  started: boolean;
+  stepIndex: number;
+  stepCount: number;
+  savedAt: number;
+  expired: boolean;
+}
 
 export interface SearchPaneModel {
   theme: AppTheme;
@@ -14,14 +44,16 @@ export interface SearchPaneModel {
     isSearchFadeIn: boolean;
     isBackTransitioning: boolean;
     isSwitchingToDirectory: boolean;
+    // See PreviewPaneModel["setup"]'s isDeleteTransitioning -- slows this pane's own
+    // profile-to-directory-fade down to match the profile binder's closing animation.
+    isDeleteTransitioning: boolean;
     isUiLocked: boolean;
   };
   search: {
     setupMode: SetupMode;
     setupFlowStarted: boolean;
     hasCompletedRequiredFlow: boolean;
-    canResumeSetup: boolean;
-    resumeSetupCharacterName: string | null;
+    drafts: SetupDraftSummary[];
     query: string;
     queryInvalid: boolean;
     isSearching: boolean;
@@ -37,10 +69,17 @@ export interface SearchPaneModel {
     showCharacterDirectory: boolean;
     canViewCharacterDirectory: boolean;
     isAddingCharacter: boolean;
+    setupStepActive: boolean;
+    // True while the summary card renders inside the active setup flow's narrow
+    // sidebar, vs. the standalone profile view — drives the card's own mobile
+    // layout (compact horizontal row) instead of an ancestor-scoped CSS override.
+    isSetupContext: boolean;
     isCurrentMainCharacter: boolean;
     isCurrentChampionCharacter: boolean;
     canSetCurrentChampion: boolean;
     currentCharacterGender: "male" | "female" | null;
+    currentCharacterMarried: boolean | null;
+    currentCharacterPartnerName: string | null;
     isRefreshing: boolean;
     onRefresh: (() => void) | null;
   };
@@ -52,14 +91,30 @@ export interface SearchPaneActions {
   backFromSetupFlow: () => void;
   backToCharactersDirectory: () => void;
   backFromAddCharacter: () => void;
-  resumeSavedSetup: () => void;
+  resumeDraft: (characterKey: string) => void;
+  clearDraft: (characterKey: string) => void;
   setCurrentAsMain: () => void;
+  removeCurrentAsMain: () => void;
   toggleCurrentChampion: () => void;
   removeCurrentCharacter: () => void;
   searchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   queryChange: (value: string) => void;
   confirmedImageLoaded: () => void;
   toggleCharacterDirectory: () => void;
+  importCharacter: (record: StoredCharacterRecord, role: RosterRole) => void;
+  importCharacterAsChampionSwap: (record: StoredCharacterRecord, swapOutKey: string) => void;
+  importCharacterMerged: (
+    existing: StoredCharacterRecord,
+    imported: StoredCharacterRecord,
+    choices: Record<ImportSectionId, "mine" | "imported">,
+  ) => void;
+  importWorldBulk: (
+    resolvedCharacters: StoredCharacterRecord[],
+    roleKeys: { mainCharacterKey: string | null; championCharacterKeys: string[] },
+    worldId: number,
+    legionData: { legionArtifact?: StoredLegionArtifact; scouterLegion?: StoredScouterLegion } | null,
+    removedKeys?: string[],
+  ) => void;
 }
 
 export interface PreviewPaneModel {
@@ -72,14 +127,25 @@ export interface PreviewPaneModel {
     previewImageLoaded: boolean;
     isConfirmFadeOut: boolean;
     isModeTransitioning: boolean;
+    // True when the searched character already has a started, resumable draft —
+    // the preview then offers Resume / Start fresh instead of a plain confirm.
+    foundCharacterHasResumableDraft: boolean;
+    // True when foundCharacter is a stale draft snapshot shown because a resume's
+    // refresh attempt failed, not a live lookup result.
+    isStaleFallbackPreview: boolean;
   };
   setup: {
     setupFlowStarted: boolean;
     setupPanelVisible: boolean;
+    suppressLayoutTransition: boolean;
     isBackTransitioning: boolean;
     isFinishingSetup: boolean;
     isSwitchingToDirectory: boolean;
     isSwitchingToProfile: boolean;
+    // Drives the profile binder's own "closing" animation when the confirmed character is
+    // being deleted, instead of the plain fade every other isSwitchingToDirectory transition
+    // gets -- see CharacterProfileOverviewScreen's profile-binder-closing class.
+    isDeleteTransitioning: boolean;
     isUiLocked: boolean;
     activeFlowId: SetupFlowId;
     completedFlowIds: SetupFlowId[];
@@ -87,9 +153,27 @@ export interface PreviewPaneModel {
     showCharacterDirectory: boolean;
     hasCompletedRequiredSetupEver: boolean;
     fastDirectoryRevealOnce: boolean;
+    // Which profile bookmark to return to once the profile-overview screen remounts
+    // after an optional flow finishes (that screen's own "active bookmark" state is
+    // local and doesn't survive the unmount) — null means no bookmark to restore.
+    lastActiveBookmarkId: string | null;
+    // Sub-view within lastActiveBookmarkId to restore (e.g. Stats' Hyper Stat/Ability
+    // toggle) — only meaningful alongside a matching lastActiveBookmarkId.
+    lastActiveBookmarkSubView: string | null;
     setupStepIndex: number;
     setupStepDirection: "forward" | "backward";
+    setupTargetSubstep: number | null;
+    // When true, the step currently mounted at setupTargetSubstep should present itself
+    // as if it were the step's only substep (no pips, Back/Finish instead of Prev/Continue
+    // to a sibling substep) — set when a profile bookmark's edit pencil opens straight into
+    // one specific substep, so navigating to its siblings isn't offered.
+    setupConfineToSubstep: boolean;
+    substepJumpNonce: number;
+    stepValidityById: Record<string, boolean>;
     activeSetupStepValue: string;
+    statsRawValue: string;
+    equipmentRawValue: string;
+    legionArtifactsRawValue: string;
   };
   profile: {
     confirmedCharacter: StoredCharacterRecord | null;
@@ -112,10 +196,29 @@ export interface PreviewPaneModel {
 export interface PreviewPaneActions {
   setPreviewImageLoaded: (loaded: boolean) => void;
   confirmFoundCharacter: () => void;
-  setSetupStepWithDirection: (step: number) => void;
+  resumeFoundCharacterDraft: () => void;
+  startFreshSetup: () => void;
+  setSetupStepWithDirection: (step: number, forceDirection?: "forward" | "backward") => void;
+  jumpToSubstep: (step: number, substepIndex: number) => void;
+  onValidityChange: (stepId: string, valid: boolean) => void;
+  reportCurrentSubstep: (substepIndex: number) => void;
   stepValueChange: (value: string) => void;
   finishSetupFlow: () => void;
   openCharacterSearch: () => void;
   openCharacterProfile: (character: StoredCharacterRecord) => void;
-  startOptionalFlow: (flowId: SetupFlowId) => void;
+  startOptionalFlow: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean) => void;
+  skipSetupEntirely: () => void;
+  rememberActiveBookmark: (id: string, subView?: string) => void;
+  clearRestoredBookmark: () => void;
+  setStatsActivePreset: (field: "hyperStat" | "innerAbility", presetIndex: number) => void;
+  setEquipmentActivePreset: (presetIndex: number) => void;
+  setHexaStatActivePreset: (nodeIndex: number, presetIndex: number) => void;
+  setFamiliarsActivePreset: (presetIndex: number) => void;
+  setOverviewLayout: (layout: OverviewSectionId[] | null) => void;
+  /** Cross-pane trigger: the directory (right/preview pane) navigates into world import
+   *  by switching the LEFT search pane's setupMode, same mechanism FirstTimeSetupScreen's
+   *  "Import instead" link already uses for the single-character case -- not a local
+   *  screen swap, so the transition/centered-card treatment matches Add Character exactly
+   *  rather than imitating it with a lookalike CSS class. */
+  runTransitionToMode: (nextMode: SetupMode) => void;
 }

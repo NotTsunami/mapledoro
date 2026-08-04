@@ -20,7 +20,19 @@ export interface SetupDraft {
   showCharacterDirectory: boolean;
   setupStepIndex: number;
   setupStepDirection: "forward" | "backward";
+  /** Which substep of the current step (Stats/Equipment/HEXA Matrix) was active —
+   *  without this, resuming after a full page reload always fell back to substep 0,
+   *  forgetting how far into a multi-screen step the player actually was. Reported up
+   *  via each step's onSubstepChange as it navigates internally; 0 for step types
+   *  without substeps. */
+  setupSubstepIndex: number;
   setupStepTestByStep: SetupStepInputById;
+  /** Last-known Next-button validity per "stepId:substepIndex" (or
+   *  "flowId:stepId:substepIndex" for the few steps whose rule differs by flow) — see
+   *  SetupStepFrame's onValidityChange. Persisted alongside setupStepTestByStep so
+   *  resuming a draft that was left on invalid data doesn't silently forget that and
+   *  ungate the step-jump dropdown until the step happens to be revisited. */
+  stepValidityById: Record<string, boolean>;
   confirmedCharacter: NormalizedCharacterData | null;
   savedAt: number;
 }
@@ -41,6 +53,18 @@ function parseDraftCompletedFlowIds(value: unknown): SetupFlowId[] {
 
 function parseDraftStepTestByStep(value: unknown): SetupStepInputById {
   return value && typeof value === "object" ? (value as SetupStepInputById) : {};
+}
+
+function parseDraftStepValidityById(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== "object") return {};
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean");
+  return Object.fromEntries(entries);
+}
+
+function parseDraftSetupSubstepIndex(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 function parseSetupDraft(raw: string): SetupDraft | null {
@@ -65,7 +89,9 @@ function parseSetupDraft(raw: string): SetupDraft | null {
       showCharacterDirectory: Boolean(parsed.showCharacterDirectory) && completedFlowIds.length > 0,
       setupStepIndex: clampFlowStepIndex(activeFlowId, Number(parsed.setupStepIndex ?? 0)),
       setupStepDirection: parsed.setupStepDirection === "backward" ? "backward" : "forward",
+      setupSubstepIndex: parseDraftSetupSubstepIndex(parsed.setupSubstepIndex),
       setupStepTestByStep: parseDraftStepTestByStep(parsed.setupStepTestByStep),
+      stepValidityById: parseDraftStepValidityById(parsed.stepValidityById),
       confirmedCharacter: parsed.confirmedCharacter,
       savedAt: Number(parsed.savedAt ?? Date.now()),
     };
@@ -78,6 +104,27 @@ function getSetupDraftStorageKey(characterKey: string) {
   return `${SETUP_DRAFT_STORAGE_PREFIX}${characterKey}`;
 }
 
+// Drafts untouched for longer than this are dropped on the next prune: stale base
+// data + clutter, no value. Caps the kept count so a name-masher can't grow storage
+// without bound.
+const SETUP_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SETUP_DRAFTS = 5;
+
+function collectSetupDraftEntries(): { key: string; draft: SetupDraft }[] {
+  if (typeof window === "undefined") return [];
+  const entries: { key: string; draft: SetupDraft }[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (!key || !key.startsWith(SETUP_DRAFT_STORAGE_PREFIX)) continue;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) continue;
+    const draft = parseSetupDraft(raw);
+    if (!draft) continue;
+    entries.push({ key, draft });
+  }
+  return entries;
+}
+
 export function readSetupDraftByCharacter(character: NormalizedCharacterData): SetupDraft | null {
   if (typeof window === "undefined") return null;
   const characterKey = makeDraftCharacterKey(character);
@@ -86,19 +133,33 @@ export function readSetupDraftByCharacter(character: NormalizedCharacterData): S
   return parseSetupDraft(raw);
 }
 
-export function readAllSetupDrafts(): SetupDraft[] {
+// Drops drafts past the TTL and caps the rest to the most-recent MAX, deleting the
+// evicted entries from storage. Returns the survivors sorted newest-first.
+export function pruneAndReadSetupDrafts(): SetupDraft[] {
   if (typeof window === "undefined") return [];
-  const drafts: SetupDraft[] = [];
-  for (let i = 0; i < window.localStorage.length; i += 1) {
-    const key = window.localStorage.key(i);
-    if (!key || !key.startsWith(SETUP_DRAFT_STORAGE_PREFIX)) continue;
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-    const parsed = parseSetupDraft(raw);
-    if (!parsed) continue;
-    drafts.push(parsed);
+  const now = Date.now();
+  const live: { key: string; draft: SetupDraft }[] = [];
+  for (const entry of collectSetupDraftEntries()) {
+    // savedAt === 0 is a freshly-created draft not yet stamped by the persistence
+    // effect — keep it rather than mistaking the epoch for a 56-year-old draft.
+    if (entry.draft.savedAt > 0 && now - entry.draft.savedAt > SETUP_DRAFT_TTL_MS) {
+      window.localStorage.removeItem(entry.key);
+      continue;
+    }
+    live.push(entry);
   }
-  return drafts;
+  live.sort((a, b) => b.draft.savedAt - a.draft.savedAt);
+  for (const evicted of live.slice(MAX_SETUP_DRAFTS)) {
+    window.localStorage.removeItem(evicted.key);
+  }
+  return live.slice(0, MAX_SETUP_DRAFTS).map((entry) => entry.draft);
+}
+
+export function readSetupDraftByKey(characterKey: string): SetupDraft | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(getSetupDraftStorageKey(normalizeCharacterKey(characterKey)));
+  if (!raw) return null;
+  return parseSetupDraft(raw);
 }
 
 export function readLastSetupDraft(): SetupDraft | null {

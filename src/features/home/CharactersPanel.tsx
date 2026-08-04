@@ -95,7 +95,7 @@ function CharacterRow({
 }) {
   return (
     <div className="row-hover char-row" style={charRowStyle}>
-      <Link href="/characters" style={charRowLinkStyle}>
+      <Link href={`/characters?character=${encodeURIComponent(char.characterName)}`} style={charRowLinkStyle}>
         <CharacterChip
           theme={theme}
           characterImgURL={char.characterImgURL}
@@ -187,7 +187,7 @@ export default function CharactersPanel({ theme, characters }: { theme: AppTheme
           <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>
             Add your first character to get started!
           </div>
-          <Link href="/characters" style={addBtnStyle}>+ Add Character</Link>
+          <Link href="/characters?action=add" style={addBtnStyle}>+ Add Character</Link>
         </div>
       ) : (
         <div className="characters-scroll-area" style={{ padding: "0.5rem", maxHeight: 420, overflowY: "auto" }}>
@@ -196,7 +196,7 @@ export default function CharactersPanel({ theme, characters }: { theme: AppTheme
               <CharacterRow key={char.characterName.toLowerCase()} theme={theme} char={char} />
             ))}
           </div>
-          <Link href="/characters" className="add-character-link" style={addDashedStyle}>
+          <Link href="/characters?action=add" className="add-character-link" style={addDashedStyle}>
             + Add Character
           </Link>
         </div>

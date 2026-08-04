@@ -25,10 +25,7 @@ export default function FirstTimeSetupScreen({ model, actions }: IntroModeScreen
         <button
           type="button"
           disabled={shell.isUiLocked}
-          onClick={() => {
-            if (shell.isUiLocked) return;
-            actions.runTransitionToMode("import");
-          }}
+          onClick={() => actions.runTransitionToMode("search")}
           style={{
             ...primaryButtonStyle(theme, "0.9rem 1rem"),
             borderRadius: "12px",
@@ -36,12 +33,15 @@ export default function FirstTimeSetupScreen({ model, actions }: IntroModeScreen
             textAlign: "left",
           }}
         >
-          {CHARACTERS_COPY.firstTimeSetup.importButton}
+          {CHARACTERS_COPY.firstTimeSetup.searchButton}
         </button>
         <button
           type="button"
           disabled={shell.isUiLocked}
-          onClick={() => actions.runTransitionToMode("search")}
+          onClick={() => {
+            if (shell.isUiLocked) return;
+            actions.runTransitionToMode("import");
+          }}
           style={{
             ...secondaryButtonStyle(theme, "0.9rem 1rem"),
             borderRadius: "12px",
@@ -50,7 +50,7 @@ export default function FirstTimeSetupScreen({ model, actions }: IntroModeScreen
             textAlign: "left",
           }}
         >
-          {CHARACTERS_COPY.firstTimeSetup.searchButton}
+          {CHARACTERS_COPY.firstTimeSetup.importButton}
         </button>
       </div>
     </>

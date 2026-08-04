@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type { AppTheme } from "../../../../components/themes";
 
@@ -10,6 +11,19 @@ interface SetupStepFrameProps {
   onBack: () => void;
   onNext: () => void;
   onFinish: () => void;
+  /** When provided, always shows this label and always calls onNext (never Finish). */
+  nextLabel?: string;
+  /** Disables the Next/Finish button, e.g. while required questions are unanswered. */
+  nextDisabled?: boolean;
+  /** Reports this step/substep's own Next-button validity up to the setup controller
+   *  (along with which substep this is, since a step's substeps are gated per-substep,
+   *  not as one lump), so the step-jump dropdown can gate jumping past invalid/
+   *  incomplete data the same way the Next button already does. */
+  onValidityChange?: (valid: boolean, substepIndex?: number) => void;
+  /** Zero-based index of the active substep within this step (for the substep pip row). */
+  substepIndex?: number;
+  /** Total substeps in this step; the pip row only renders when this is > 1. */
+  substepCount?: number;
   children: ReactNode;
 }
 
@@ -22,25 +36,45 @@ export default function SetupStepFrame({
   onBack,
   onNext,
   onFinish,
+  nextLabel,
+  nextDisabled,
+  onValidityChange,
+  substepIndex = 0,
+  substepCount = 0,
   children,
 }: SetupStepFrameProps) {
-  const isLastStep = stepNumber >= totalSteps;
+  const isLastStep = !nextLabel && stepNumber >= totalSteps;
+  // "Prev Step" implies an earlier step to go back to — true from step 2 onward, but
+  // on step 1 of any flow (single-step or not) there's no previous step within the
+  // flow itself; the button still works (it exits back to the profile/intro), it's
+  // just not a "step" it's going back to.
+  const backLabel = stepNumber > 1 ? "← Prev Step" : "← Back";
+
+  useEffect(() => {
+    onValidityChange?.(!nextDisabled, substepIndex);
+  }, [nextDisabled, onValidityChange, substepIndex]);
 
   return (
     <>
-      <p
-        style={{
-          margin: 0,
-          marginBottom: "0.35rem",
-          fontSize: "0.8rem",
-          color: theme.muted,
-          fontWeight: 800,
-          letterSpacing: "0.03em",
-          textTransform: "uppercase",
-        }}
-      >
-        Step {stepNumber} of {totalSteps}
-      </p>
+      {substepCount > 1 && (
+        <div
+          aria-label={`Part ${substepIndex + 1} of ${substepCount}`}
+          style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginBottom: "0.5rem" }}
+        >
+          {Array.from({ length: substepCount }, (_, i) => (
+            <span
+              key={i}
+              style={{
+                height: 7,
+                width: 28,
+                borderRadius: 4,
+                background: i <= substepIndex ? theme.accent : theme.border,
+                transition: "background 0.2s ease",
+              }}
+            />
+          ))}
+        </div>
+      )}
       <h2
         style={{
           margin: 0,
@@ -71,41 +105,45 @@ export default function SetupStepFrame({
           gap: "0.6rem",
           justifyContent: "space-between",
           alignItems: "center",
+          marginTop: "0.9rem",
         }}
       >
         <button
           type="button"
+          className="tap-target-44"
           onClick={onBack}
           style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: "10px",
-            background: theme.bg,
-            color: theme.text,
+            border: "none",
+            background: "none",
+            color: theme.muted,
             fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
+            fontWeight: 700,
+            fontSize: "0.85rem",
+            padding: "0.55rem 0.4rem",
             cursor: "pointer",
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
         >
-          Prev Step
+          {backLabel}
         </button>
         <button
           type="button"
+          disabled={nextDisabled}
           onClick={isLastStep ? onFinish : onNext}
           style={{
             border: "none",
             borderRadius: "10px",
-            background: theme.accent,
-            color: theme.accentOn,
+            background: nextDisabled ? theme.border : theme.accent,
+            color: nextDisabled ? theme.muted : theme.accentOn,
             fontFamily: "inherit",
             fontWeight: 800,
             fontSize: "0.88rem",
             padding: "0.55rem 0.9rem",
-            cursor: "pointer",
+            cursor: nextDisabled ? "not-allowed" : "pointer",
           }}
         >
-          {isLastStep ? "Finish" : "Next Step"}
+          {nextLabel ?? (isLastStep ? "Finish" : "Next Step")}
         </button>
       </div>
     </>

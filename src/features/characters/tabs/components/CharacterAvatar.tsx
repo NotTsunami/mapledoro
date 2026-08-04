@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 const AVATAR_LOAD_TIMEOUT_MS = 8000;
 const AVATAR_MAX_RETRIES = 2;
 const AVATAR_RETRY_DELAY_MS = 350;
-const FALLBACK_SRC =
+export const FALLBACK_SRC =
   "https://haku.network/api/img/avatar/2000/stand1.png";
 
 function appendRetryParam(src: string, attempt: number) {
@@ -47,10 +47,10 @@ function CharacterAvatarImage({
   onReady,
 }: CharacterAvatarProps) {
   const [displaySrc, setDisplaySrc] = useState(src);
-  const [retryAttempt, setRetryAttempt] = useState(0);
   const [settled, setSettled] = useState(() => isCached(src));
   const readySrcRef = useRef<string | null>(null);
   const retryTimeoutRef = useRef<number | null>(null);
+  const retryAttemptRef = useRef(0);
 
   useEffect(() => {
     if (settled) return;
@@ -77,7 +77,7 @@ function CharacterAvatarImage({
   }, [onReady, settled, src]);
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+    /* eslint-disable-next-line @next/next/no-img-element */ /* react-doctor-disable-next-line nextjs-no-img-element -- needs an onError-driven retry/fallback chain (timeout, retry with cache-busting param, then a fallback avatar) that next/image's declarative API can't express */
     <img
       src={displaySrc}
       alt={alt}
@@ -87,10 +87,10 @@ function CharacterAvatarImage({
       decoding="async"
       onLoad={() => setSettled(true)}
       onError={() => {
-        if (retryAttempt < AVATAR_MAX_RETRIES) {
-          const next = retryAttempt + 1;
+        if (retryAttemptRef.current < AVATAR_MAX_RETRIES) {
+          const next = retryAttemptRef.current + 1;
           retryTimeoutRef.current = window.setTimeout(() => {
-            setRetryAttempt(next);
+            retryAttemptRef.current = next;
             setDisplaySrc(appendRetryParam(src, next));
           }, AVATAR_RETRY_DELAY_MS);
           return;

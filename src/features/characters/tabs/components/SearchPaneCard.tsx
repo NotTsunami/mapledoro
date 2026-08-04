@@ -3,6 +3,7 @@ import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
 import ConfirmModal from "../../../../components/ConfirmModal";
 import FirstTimeSetupScreen from "../screens/FirstTimeSetupScreen";
 import ImportModeScreen from "../screens/ImportModeScreen";
+import WorldImportModeScreen from "../screens/WorldImportModeScreen";
 import CharacterProfileActionsScreen from "../screens/CharacterProfileActionsScreen";
 import CharacterProfileScreen from "../screens/CharacterProfileScreen";
 import SearchEntryScreen from "../screens/SearchEntryScreen";
@@ -18,13 +19,13 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
   const searchCardRef = useRef<HTMLElement | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
-  useEffect(() => {
-    if (profile.confirmedCharacter) return;
-    const closeModalTimer = window.setTimeout(() => {
-      setShowRemoveConfirm(false);
-    }, 0);
-    return () => clearTimeout(closeModalTimer);
-  }, [profile.confirmedCharacter]);
+  // Reset the confirm-modal intent synchronously during render (not a watching effect)
+  // whenever there's no confirmed character, so it can't silently resurface if a
+  // different character is confirmed later. Terminates in one extra render since
+  // showRemoveConfirm becomes false, matching the condition that guards it.
+  if (!profile.confirmedCharacter && showRemoveConfirm) {
+    setShowRemoveConfirm(false);
+  }
 
   useEffect(() => {
     const element = searchCardRef.current;
@@ -55,6 +56,7 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
             ? "confirm-fade"
             : "",
           shell.isSwitchingToDirectory ? "profile-to-directory-fade" : "",
+          shell.isDeleteTransitioning ? "deleting" : "",
           !shell.isConfirmFadeOut && !shell.isModeTransitioning && shell.isSearchFadeIn
             ? "search-fade-in"
             : "",
@@ -71,6 +73,9 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
         )}
         {model.search.setupMode === "import" && (
           <ImportModeScreen model={model} actions={actions} />
+        )}
+        {model.search.setupMode === "worldImport" && (
+          <WorldImportModeScreen model={model} actions={actions} />
         )}
         {model.search.setupMode === "search" && !model.search.setupFlowStarted && (
           <SearchEntryScreen model={model} actions={actions} />
@@ -91,6 +96,7 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
           theme={theme}
           title={`Remove ${profile.confirmedCharacter.characterName}?`}
           description="This removes the character and local setup data for this profile."
+          warning="If you haven't exported it, this data cannot be recovered."
           confirmLabel="Remove"
           confirmDanger
           onConfirm={() => {

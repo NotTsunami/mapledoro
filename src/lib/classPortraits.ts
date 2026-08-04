@@ -68,6 +68,7 @@ const CLASS_PORTRAITS: Record<string, string> = {
   "Mo Xuan": "https://g.nexonstatic.com/media/bzvdaysw/mo-xuan-img.png",
   // ── Shine ──
   "Sia Astelle": "https://g.nexonstatic.com/media/birlhe2b/250521_siaastelleassetsforclasses-jobs_characterimage_fullcolor_395x400.png",
+  "Erel Light": "https://g.nexonstatic.com/media/qlplae1y/260617-ms-erel-light-395x400.png",
 };
 
 export function classPortraitUrl(name: string): string {

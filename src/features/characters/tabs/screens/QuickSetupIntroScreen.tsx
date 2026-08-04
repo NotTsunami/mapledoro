@@ -1,10 +1,145 @@
+import type { CSSProperties } from "react";
 import { CHARACTERS_COPY } from "../content";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
-import { primaryButtonStyle } from "../components/uiStyles";
+import { primaryButtonStyle, secondaryButtonStyle } from "../components/uiStyles";
+import { dialogPrimaryBtnColors, type AppTheme } from "../../../../components/themes";
+import { getClassSetupOverrides } from "../../setup/data/nexonJobMapping";
+import { computeEffectiveFlowStart, getFlowStepCount } from "../../setup/flows";
 
 interface SetupIntroScreenProps {
   model: PreviewPaneModel;
   actions: PreviewPaneActions;
+}
+
+interface SetupFlowButtonsProps extends SetupIntroScreenProps {
+  /** True when reused from the profile's "Setup" bookmark rather than the first-run
+   *  intro screen — the character already exists, so the "Skip setup, add character
+   *  and go to profile" copy/action (for classes with nothing for Quick Setup to ask,
+   *  e.g. Zero) doesn't apply and the whole Quick Setup entry is hidden instead. */
+  isProfileBookmark?: boolean;
+}
+
+function skipButtonStyle(theme: AppTheme, disabled: boolean): CSSProperties {
+  return {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    border: "none",
+    background: "none",
+    color: theme.muted,
+    fontFamily: "inherit",
+    fontWeight: 700,
+    fontSize: "0.8rem",
+    padding: "0.3rem 0.4rem",
+    cursor: disabled ? "not-allowed" : "pointer",
+  };
+}
+
+/** The Quick/MapleScouter/Full setup flow picker — shared between the first-run intro
+ *  screen and the profile binder's "Setup" bookmark (re-entering setup later). */
+export function SetupFlowButtons({ model, actions, isProfileBookmark }: SetupFlowButtonsProps) {
+  const { theme, setup } = model;
+  const jobName = model.profile.confirmedCharacter?.jobName ?? "";
+  const overrides = getClassSetupOverrides(jobName);
+  const quickStepCount = getFlowStepCount("quick_setup");
+  const characterLevel = model.profile.confirmedCharacter?.level;
+  const { startStep: quickStartStep } = computeEffectiveFlowStart(
+    "quick_setup", overrides.gender, overrides.skipMarriage, characterLevel, jobName,
+  );
+  const quickSetupAllSkipped = quickStartStep > quickStepCount;
+  const genderSkipped = overrides.gender !== null;
+  let quickSetupSubtitle = "Gender & marriage only";
+  if (genderSkipped) quickSetupSubtitle = "Marriage only";
+  else if (overrides.skipMarriage) quickSetupSubtitle = "Gender only";
+  // In the profile's Setup bookmark, the character already exists — there's nothing
+  // for Quick Setup to do for a quickSetupAllSkipped class (e.g. Zero), so the entry
+  // is hidden entirely rather than showing the intro screen's "add character" copy.
+  const hideQuickSetup = quickSetupAllSkipped && isProfileBookmark;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      {quickSetupAllSkipped && !hideQuickSetup && (
+        <>
+          <p style={{ margin: 0, fontSize: "0.85rem", color: theme.muted, fontWeight: 700 }}>
+            This character has no gender or marriage to configure.
+          </p>
+          <button
+            type="button"
+            disabled={setup.isUiLocked}
+            onClick={() => actions.startOptionalFlow("quick_setup")}
+            style={{
+              ...secondaryButtonStyle(theme, "0.65rem 0.9rem"),
+              textAlign: "left",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.2rem",
+            }}
+          >
+            <span style={{ fontWeight: 900, fontSize: "0.9rem" }}>Skip setup</span>
+            <span style={{ fontWeight: 700, fontSize: "0.8rem", color: theme.muted }}>
+              Add character and go to profile
+            </span>
+          </button>
+        </>
+      )}
+      {!quickSetupAllSkipped && (
+        <button
+          type="button"
+          disabled={setup.isUiLocked}
+          onClick={() => actions.startOptionalFlow("quick_setup")}
+          style={{
+            ...secondaryButtonStyle(theme, "0.65rem 0.9rem"),
+            textAlign: "left",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.2rem",
+          }}
+        >
+          <span style={{ fontWeight: 900, fontSize: "0.9rem" }}>Quick setup</span>
+          <span style={{ fontWeight: 700, fontSize: "0.8rem", color: theme.muted }}>
+            {quickSetupSubtitle}
+          </span>
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={setup.isUiLocked}
+        onClick={() => actions.startOptionalFlow("maplescouter_setup")}
+        style={{
+          ...secondaryButtonStyle(theme, "0.65rem 0.9rem"),
+          ...dialogPrimaryBtnColors(theme),
+          color: theme.text,
+          borderColor: theme.border,
+          textAlign: "left",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.2rem",
+        }}
+      >
+        <span style={{ fontWeight: 900, fontSize: "0.9rem" }}>MapleScouter setup</span>
+        <span style={{ fontWeight: 700, fontSize: "0.8rem", color: theme.muted }}>
+          Stats, buffs, and skill levels, for MapleScouter calculations
+        </span>
+      </button>
+      <button
+        type="button"
+        disabled={setup.isUiLocked}
+        onClick={() => actions.startOptionalFlow("full_setup")}
+        style={{
+          ...primaryButtonStyle(theme, "0.65rem 0.9rem"),
+          textAlign: "left",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.2rem",
+        }}
+      >
+        <span style={{ fontWeight: 900, fontSize: "0.9rem" }}>Full setup</span>
+        <span style={{ fontWeight: 700, fontSize: "0.8rem", opacity: 0.8 }}>
+          Stats, equipment, skills, and more. All steps are optional.
+        </span>
+      </button>
+    </div>
+  );
 }
 
 export default function QuickSetupIntroScreen({ model, actions }: SetupIntroScreenProps) {
@@ -18,8 +153,32 @@ export default function QuickSetupIntroScreen({ model, actions }: SetupIntroScre
     ? CHARACTERS_COPY.quickSetupIntro.additionalSubtitle
     : CHARACTERS_COPY.quickSetupIntro.firstSubtitle;
 
+  const jobName = model.profile.confirmedCharacter?.jobName ?? "";
+  const overrides = getClassSetupOverrides(jobName);
+  const quickStepCount = getFlowStepCount("quick_setup");
+  const characterLevel = model.profile.confirmedCharacter?.level;
+  const { startStep: quickStartStep } = computeEffectiveFlowStart(
+    "quick_setup", overrides.gender, overrides.skipMarriage, characterLevel, jobName,
+  );
+  const quickSetupAllSkipped = quickStartStep > quickStepCount;
+
   return (
     <>
+      {/* Zero-like classes (no gender/marriage to ask) already get an equivalent
+          "Continue" button below in the quickSetupAllSkipped branch — a second skip
+          button here would just be a redundant way to do the same thing. */}
+      {!quickSetupAllSkipped && (
+        <button
+          type="button"
+          disabled={setup.isUiLocked}
+          onClick={() => actions.skipSetupEntirely()}
+          style={skipButtonStyle(theme, setup.isUiLocked)}
+          onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
+        >
+          Skip for now
+        </button>
+      )}
       <h2
         style={{
           margin: 0,
@@ -28,6 +187,9 @@ export default function QuickSetupIntroScreen({ model, actions }: SetupIntroScre
           fontSize: "1.3rem",
           lineHeight: 1.2,
           color: theme.text,
+          // Skip button floats top-right via position:absolute — reserve room so long
+          // titles wrap before reaching its corner instead of rendering underneath it.
+          paddingRight: quickSetupAllSkipped ? 0 : "6.5rem",
         }}
       >
         {title}
@@ -38,21 +200,12 @@ export default function QuickSetupIntroScreen({ model, actions }: SetupIntroScre
           fontSize: "0.9rem",
           color: theme.muted,
           fontWeight: 700,
-          marginBottom: "0.9rem",
+          marginBottom: "1rem",
         }}
       >
         {subtitle}
       </p>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          disabled={setup.isUiLocked}
-          onClick={() => actions.setSetupStepWithDirection(1)}
-          style={primaryButtonStyle(theme, "0.55rem 0.9rem")}
-        >
-          {CHARACTERS_COPY.quickSetupIntro.nextStepButton}
-        </button>
-      </div>
+      <SetupFlowButtons model={model} actions={actions} />
     </>
   );
 }

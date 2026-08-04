@@ -3,6 +3,10 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { AppTheme } from "./themes";
 
+/** Fired on `window` every time a ModalShell-based dialog opens -- see HoverTooltip.tsx,
+ *  which listens for this to force-close a bubble stuck open by its own trigger. */
+export const MODAL_OPENED_EVENT = "mapledoro:modal-opened";
+
 /** Native <dialog>-based modal shell: opens via showModal() on mount, so focus
  *  trapping and Escape come for free; closes on backdrop click or cancel.
  *  Width, padding, and scroll behavior come from `style`; layout CSS that must
@@ -33,6 +37,11 @@ export default function ModalShell({
     const dlg = dialogRef.current;
     if (!dlg) return;
     if (!dlg.open) dlg.showModal();
+    // showModal() makes everything behind this dialog inert, so a HoverTooltip whose trigger
+    // opened this same dialog stops receiving the mouse/focus events it'd normally rely on to
+    // close itself, leaving its bubble stuck floating over the modal. Broadcasting this lets
+    // HoverTooltip force-close on any modal open without ModalShell needing to know it exists.
+    window.dispatchEvent(new Event(MODAL_OPENED_EVENT));
     // showModal() focuses the first focusable descendant, which paints a focus
     // ring on whatever control happens to be first (a character row, a Cancel
     // button) as if the user had tabbed to it. Focus the dialog itself instead:

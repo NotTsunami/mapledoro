@@ -1,0 +1,697 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import Image from "next/image";
+import { numericKeyDown, sanitizeDigitsInput, isStrayClick } from "../../../../lib/inputUtils";
+import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
+import { searchAndRank } from "../../../../lib/searchMatch";
+import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
+import type { AppTheme } from "../../../../components/themes";
+import type { SetupStepDefinition } from "../steps";
+import type { StoredLegionArtifact } from "../../model/charactersStore";
+import { usePickerCoords } from "../hooks/usePickerCoords";
+import {
+  CRYSTAL_STAT_SLOTS,
+  LEGION_ARTIFACT_STATS,
+  LEGION_CRYSTALS,
+  MAX_ARTIFACT_LEVEL,
+  MIN_ARTIFACT_LEVEL,
+  MAX_CRYSTAL_LEVEL,
+  MIN_CRYSTAL_LEVEL,
+  DEFAULT_CRYSTAL_STATS,
+  getLegionArtifactStat,
+  isCrystalUnlocked,
+  isCrystalUntouched,
+  effectiveCrystal,
+  parseLegionArtifactBoardDraft,
+  serializeLegionArtifactBoardDraft,
+  type LegionArtifactStatId,
+  type LegionCrystalDef,
+  type LegionCrystalDraft,
+} from "../data/legionArtifactData";
+import SetupStepFrame from "./SetupStepFrame";
+
+interface LegionArtifactsEditorProps {
+  theme: AppTheme;
+  worldLegionArtifact?: StoredLegionArtifact;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+interface LegionArtifactsSetupStepProps extends LegionArtifactsEditorProps {
+  step: SetupStepDefinition;
+  stepNumber: number;
+  totalSteps: number;
+  onBack: () => void;
+  onNext: () => void;
+  onFinish: () => void;
+}
+
+const PICKER_WIDTH = 230;
+const CARD_POPOVER_WIDTH = 240;
+const CRYSTAL_TILE_SIZE = 116;
+const CRYSTAL_ICON_SIZE = 80;
+// Keeps the value a string (blank until touched) instead of clamping through Number(),
+// which would collapse a typed "0" back to an indistinguishable empty state.
+function clampArtifactLevelInput(raw: string): string {
+  const digits = sanitizeDigitsInput(raw);
+  if (digits === "") return "";
+  return String(Math.min(MAX_ARTIFACT_LEVEL, Math.max(MIN_ARTIFACT_LEVEL, Number(digits))));
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+function sectionLabelStyle(theme: AppTheme): CSSProperties {
+  return {
+    margin: "0 0 0.4rem", fontSize: "0.75rem", fontWeight: 800,
+    textTransform: "uppercase", letterSpacing: "0.05em", color: theme.muted,
+  };
+}
+
+// Padding + matching negative margin grows the actual clickable box toward a 44px
+// touch target without shifting surrounding layout — the button still occupies its
+// original space, it just responds to taps/clicks a bit outside its visible text.
+const sectionBtnStyle: CSSProperties = {
+  background: "none", border: "none", font: "inherit",
+  fontSize: "0.75rem", fontWeight: 800,
+  padding: "15px 6px", margin: "-15px -6px",
+  cursor: "pointer",
+};
+
+function levelInputStyle(theme: AppTheme, width: number): CSSProperties {
+  return {
+    width, textAlign: "center",
+    border: `1px solid ${theme.border}`, borderRadius: 6,
+    background: theme.bg, color: theme.text,
+    fontFamily: "inherit", fontWeight: 700, fontSize: "0.8rem",
+    padding: "0.25rem", boxSizing: "border-box",
+  };
+}
+
+const crystalGridStyle: CSSProperties = {
+  display: "grid", gap: "0.6rem",
+};
+
+const crystalIconImgStyle: CSSProperties = { width: "100%", height: "100%", borderRadius: 8, objectFit: "contain", display: "block" };
+
+// A missing/failed crystal icon falls back to the crystal's name-initial (mirrors
+// VMatrixNodeIcon's treatment) instead of a stray broken-image glyph. The parent tile is
+// already a centered flex column, so this only needs to match the image's own 68% sizing.
+// Exported for reuse by LegionPanel's read-only crystal tile.
+export function CrystalIcon({ src, name, theme }: { src: string; name: string; theme: AppTheme }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ width: "68%", height: "68%" }}>
+        <Image src={src} alt="" width={CRYSTAL_ICON_SIZE} height={CRYSTAL_ICON_SIZE} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={crystalIconImgStyle}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: "68%", height: "68%",
+        borderRadius: 8, fontWeight: 800, fontSize: CRYSTAL_ICON_SIZE * 0.68 * 0.35,
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </div>
+    </>
+  );
+}
+
+function crystalTileStyle(theme: AppTheme, unlocked: boolean, isOpen: boolean): CSSProperties {
+  return {
+    position: "relative",
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+    width: "100%", aspectRatio: "1", minWidth: 0,
+    borderRadius: 12, border: `2px solid ${isOpen ? theme.accent : theme.border}`,
+    background: unlocked ? theme.bg : `${theme.muted}0d`,
+    opacity: unlocked ? 1 : 0.55,
+    padding: 0, boxSizing: "border-box",
+    cursor: unlocked ? "pointer" : "default",
+    fontFamily: "inherit",
+    transition: "border-color 0.12s",
+  };
+}
+
+function CrystalsSectionHeader({ theme, onMaxAll, onClear }: { theme: AppTheme; onMaxAll: () => void; onClear: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+      <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Crystals
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <button type="button" onClick={onClear} style={{ ...sectionBtnStyle, color: theme.muted }}>Min All</button>
+        <span style={{ width: 1, alignSelf: "stretch", background: theme.border, flexShrink: 0 }} />
+        <button type="button" onClick={onMaxAll} style={{ ...sectionBtnStyle, color: theme.accent }}>Max All</button>
+      </div>
+    </div>
+  );
+}
+
+function crystalLockedBadgeStyle(theme: AppTheme): CSSProperties {
+  return {
+    fontSize: "0.75rem", fontWeight: 800, color: theme.muted,
+    textTransform: "uppercase", letterSpacing: "0.03em",
+  };
+}
+
+function pipDiamondStyle(theme: AppTheme, filled: boolean, size: number): CSSProperties {
+  return {
+    width: size, height: size, borderRadius: 1.5,
+    background: filled ? theme.accent : "transparent",
+    border: `1.5px solid ${filled ? theme.accent : theme.border}`,
+    transform: "rotate(45deg)", boxSizing: "border-box", flexShrink: 0, display: "block",
+  };
+}
+
+function statChipStyle(theme: AppTheme, filled: boolean): CSSProperties {
+  return {
+    width: "100%", textAlign: "left",
+    border: `1px solid ${filled ? theme.accent : theme.border}`, borderRadius: 6,
+    background: filled ? `${theme.accent}15` : theme.bg,
+    color: filled ? theme.accent : theme.muted,
+    fontFamily: "inherit", fontWeight: 700, fontSize: "0.75rem",
+    padding: "0.25rem 0.4rem", cursor: "pointer",
+    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+    boxSizing: "border-box",
+  };
+}
+
+const popoverShellStyle: CSSProperties = {
+  position: "absolute", width: PICKER_WIDTH, borderRadius: 10,
+  boxShadow: "0 8px 24px rgba(0,0,0,0.25)", overflow: "hidden", zIndex: 50,
+};
+
+const statSearchInputStyle: CSSProperties = {
+  width: "100%", boxSizing: "border-box", borderRadius: 6,
+  fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600,
+  padding: "0.3rem 0.5rem", outline: "none", border: "1px solid",
+};
+
+const cardPopoverShellStyle: CSSProperties = {
+  position: "absolute", width: CARD_POPOVER_WIDTH, borderRadius: 10,
+  boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 45,
+  padding: "0.6rem 0.6rem 0.7rem", boxSizing: "border-box",
+};
+
+const cardPopoverHeaderRowStyle: CSSProperties = {
+  display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "0.5rem",
+};
+
+function cardPopoverTitleStyle(theme: AppTheme): CSSProperties {
+  return { margin: 0, fontSize: "0.8rem", fontWeight: 800, color: theme.text };
+}
+
+const levelRowStyle: CSSProperties = {
+  display: "flex", alignItems: "center", gap: 8, marginBottom: "0.6rem",
+};
+
+function levelRowLabelStyle(theme: AppTheme): CSSProperties {
+  return { fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.04em" };
+}
+
+function popoverOptionBackground(theme: AppTheme, active: boolean, isHighlighted: boolean): string {
+  if (active) return `${theme.accent}33`;
+  if (isHighlighted) return `${theme.accent}22`;
+  return "transparent";
+}
+
+function popoverOptionStyle(theme: AppTheme, active: boolean, isHighlighted: boolean): CSSProperties {
+  return {
+    display: "block", width: "100%", textAlign: "left",
+    background: popoverOptionBackground(theme, active, isHighlighted), border: "none",
+    color: theme.text, fontFamily: "inherit", fontWeight: 600, fontSize: "0.78rem",
+    padding: "0.4rem 0.6rem", cursor: "pointer",
+  };
+}
+
+function popoverClearRowStyle(theme: AppTheme): CSSProperties {
+  return {
+    display: "block", width: "100%", textAlign: "left",
+    background: "transparent", border: "none", borderBottom: `1px solid ${theme.border}`,
+    color: theme.muted, fontFamily: "inherit", fontWeight: 700, fontSize: "0.75rem",
+    padding: "0.4rem 0.6rem", cursor: "pointer",
+  };
+}
+
+// ── Level pips (5-diamond indicator, mirrors the in-game crystal card) ─────────
+
+function LevelPipsStatic({ level, theme }: { level: number; theme: AppTheme }) {
+  return (
+    <div style={{ display: "flex", gap: 3 }}>
+      {Array.from({ length: MAX_CRYSTAL_LEVEL }, (_, i) => (
+        <span key={i} style={pipDiamondStyle(theme, i < level, 7)} />
+      ))}
+    </div>
+  );
+}
+
+// Hovering previews the level a click would set (star-rating convention), since a bare
+// diamond row otherwise gives no hint that it's clickable.
+function LevelPipsEditable({ level, theme, onSetLevel }: { level: number; theme: AppTheme; onSetLevel: (level: number) => void }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const activeCount = hoverIndex !== null ? hoverIndex + 1 : level;
+  return (
+    <div style={{ display: "flex", gap: 2 }} onMouseLeave={() => setHoverIndex(null)}>
+      {Array.from({ length: MAX_CRYSTAL_LEVEL }, (_, i) => (
+        <button
+          key={i}
+          type="button"
+          aria-label={`Set level to ${i + 1}`}
+          onMouseEnter={() => setHoverIndex(i)}
+          onClick={() => onSetLevel(i + 1)}
+          style={{ background: "none", border: "none", padding: 4, cursor: "pointer" }}
+        >
+          <span style={pipDiamondStyle(theme, i < activeCount, 12)} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Stat slot chip (opens a popover to pick one of the 16 stats) ───────────────
+
+function StatSlotChip({
+  crystalIndex, slotIndex, statId, excludeIds, openId, theme, onToggle, onClose, onAdvance, onPrev, onNext, onPick,
+}: {
+  crystalIndex: number;
+  slotIndex: number;
+  statId: LegionArtifactStatId | null;
+  excludeIds: ReadonlySet<LegionArtifactStatId>;
+  openId: string | null;
+  theme: AppTheme;
+  onToggle: () => void;
+  onClose: () => void;
+  /** Called (instead of onClose) after an actual pick — opens the next stat slot in the
+   *  crystal, or (on the last slot) jumps to the next unlocked crystal's first slot. Lets a
+   *  whole board be filled without re-clicking each chip. viaKeyboard distinguishes an
+   *  Enter-driven pick from a mouse click — only a keyboard pick jumps crystals, since a
+   *  mouse click means the user's cursor is staying local. */
+  onAdvance: (viaKeyboard: boolean) => void;
+  onPrev?: () => void;
+  /** Tab (no pick) — moves to the next slot untouched; on the last slot, jumps to the
+   *  next unlocked crystal's first slot. */
+  onNext?: () => void;
+  onPick: (statId: LegionArtifactStatId | null) => void;
+}) {
+  const pickerId = `${crystalIndex}-${slotIndex}`;
+  const isOpen = openId === pickerId;
+  const { ref, portalRef } = usePickerCoords(isOpen, PICKER_WIDTH);
+  const def = statId ? getLegionArtifactStat(statId) : undefined;
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const options = LEGION_ARTIFACT_STATS.filter((s) => !excludeIds.has(s.id) || s.id === statId);
+  const filtered = useMemo(
+    () => query.trim() ? searchAndRank(options, query, (o) => o.label) : options,
+    [options, query],
+  );
+
+  useEffect(() => {
+    if (isOpen) inputRef.current?.focus();
+  }, [isOpen]);
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: filtered,
+    resetKey: query,
+    onSelect: (opt) => { onPick(opt.id); onAdvance(true); },
+    onClose,
+    onPrev,
+    onNext,
+  });
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    if (e.key === "Backspace" && query === "" && def) {
+      e.preventDefault();
+      onPick(null);
+      onClose();
+      return;
+    }
+    navKeyDown(e);
+  }
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        data-legion-trigger
+        aria-label={`Crystal ${crystalIndex + 1} stat slot ${slotIndex + 1}`}
+        onClick={(e) => { e.stopPropagation(); if (isStrayClick(e)) { return; } if (!isOpen) { setQuery(""); } onToggle(); }}
+        style={statChipStyle(theme, Boolean(def))}
+      >
+        {def ? def.label : "+ Pick stat"}
+      </button>
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{ ...popoverShellStyle, background: theme.panel, border: `1px solid ${theme.accent}` }}
+        >
+          {def && (
+            <button type="button" onClick={() => { onPick(null); onClose(); }} style={popoverClearRowStyle(theme)}>
+              — Clear —
+            </button>
+          )}
+          <div style={{ padding: "0.3rem 0.4rem", borderBottom: `1px solid ${theme.border}` }}>
+            <input
+              ref={inputRef}
+              type="text"
+              aria-label="Search stats"
+              value={query}
+              placeholder="Search…"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              style={{ ...statSearchInputStyle, borderColor: theme.border, background: theme.bg, color: theme.text }}
+            />
+          </div>
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            {filtered.map((opt, i) => {
+              const isCurrent = opt.id === statId;
+              return (
+                <button
+                  key={opt.id}
+                  ref={itemRef(i)}
+                  type="button"
+                  onClick={() => { onPick(opt.id); onAdvance(false); }}
+                  style={popoverOptionStyle(theme, isCurrent, i === highlightedIndex)}
+                  onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = `${theme.accent}22`; }}
+                  onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p style={{ margin: 0, padding: "0.5rem 0.6rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 600 }}>
+                No results
+              </p>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+// ── Crystal tile (icon-only card; click opens the level + stat-lines popover) ──
+
+function CrystalTile({
+  index, def, crystal, unlocked, isCardOpen, nestedOpenId, theme,
+  onToggleCard, onSetLevel, onSetStat, onToggleSlot, onClosePicker, onNextCard, onReset,
+}: {
+  index: number;
+  def: LegionCrystalDef;
+  crystal: LegionCrystalDraft;
+  unlocked: boolean;
+  isCardOpen: boolean;
+  nestedOpenId: string | null;
+  theme: AppTheme;
+  onToggleCard: () => void;
+  onSetLevel: (level: number) => void;
+  onSetStat: (slotIndex: number, statId: LegionArtifactStatId | null) => void;
+  onToggleSlot: (slotIndex: number) => void;
+  onClosePicker: () => void;
+  /** Tab from the last stat slot jumps here — opens the next unlocked crystal's first
+   *  slot directly. */
+  onNextCard: () => void;
+  /** Resets this crystal back to level 1 with the same 3 default lines every crystal
+   *  starts with in-game (see DEFAULT_CRYSTAL_STATS) — not a blank/null state, since a
+   *  crystal is never actually empty once unlocked. */
+  onReset: () => void;
+}) {
+  const level = Math.max(MIN_CRYSTAL_LEVEL, crystal.level ?? MIN_CRYSTAL_LEVEL);
+  const stats = crystal.stats ?? DEFAULT_CRYSTAL_STATS;
+  const usedIds = new Set(stats.filter((s): s is LegionArtifactStatId => Boolean(s)));
+  const { ref, portalRef } = usePickerCoords(isCardOpen, CARD_POPOVER_WIDTH);
+  const iconSrc = legionCrystalIconUrl(index, Math.max(0, level - 1), unlocked ? "icon" : "disabled");
+
+  if (!unlocked) {
+    return (
+      <div className="legion-crystal-tile" style={crystalTileStyle(theme, false, false)} title={`${def.name} — Lv ${def.requiredArtifactLevel}+ required`}>
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
+        <span style={crystalLockedBadgeStyle(theme)}>Lv {def.requiredArtifactLevel}+</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} style={{ position: "relative", width: "100%", minWidth: 0 }}>
+      <button
+        type="button"
+        className="legion-crystal-tile"
+        data-legion-trigger
+        title={def.name}
+        aria-label={`${def.name}, level ${level}`}
+        onClick={(e) => { e.stopPropagation(); if (isStrayClick(e)) { return; } onToggleCard(); }}
+        style={crystalTileStyle(theme, true, isCardOpen)}
+      >
+        <LevelPipsStatic level={level} theme={theme} />
+        <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
+      </button>
+      {isCardOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{ ...cardPopoverShellStyle, background: theme.panel, border: `1px solid ${theme.accent}` }}
+        >
+          <div style={cardPopoverHeaderRowStyle}>
+            <p style={cardPopoverTitleStyle(theme)}>{def.name}</p>
+            <button type="button" onClick={onReset} style={{ ...sectionBtnStyle, color: theme.muted }}>Reset</button>
+          </div>
+          <div style={levelRowStyle}>
+            <span style={levelRowLabelStyle(theme)}>Level</span>
+            <LevelPipsEditable level={level} theme={theme} onSetLevel={onSetLevel} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {Array.from({ length: CRYSTAL_STAT_SLOTS }, (_, slotIndex) => slotIndex).map((slotIndex) => (
+              <StatSlotChip
+                key={slotIndex}
+                crystalIndex={index}
+                slotIndex={slotIndex}
+                statId={stats[slotIndex] ?? null}
+                excludeIds={usedIds}
+                openId={nestedOpenId}
+                theme={theme}
+                onToggle={() => onToggleSlot(slotIndex)}
+                onClose={onClosePicker}
+                // Only a keyboard pick (Enter) advances — a mouse click means the user's
+                // cursor is staying local, so just close for them either way.
+                onAdvance={(viaKeyboard) => {
+                  if (!viaKeyboard) { onClosePicker(); return; }
+                  if (slotIndex < CRYSTAL_STAT_SLOTS - 1) { onToggleSlot(slotIndex + 1); } else { onNextCard(); }
+                }}
+                onPrev={slotIndex > 0 ? () => onToggleSlot(slotIndex - 1) : undefined}
+                onNext={slotIndex < CRYSTAL_STAT_SLOTS - 1 ? () => onToggleSlot(slotIndex + 1) : onNextCard}
+                onPick={(statId) => onSetStat(slotIndex, statId)}
+              />
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+
+/** The Legion Artifact step's actual editable content, with no wizard-frame chrome —
+ *  reused standalone by LegionPanel's edit-in-place view (world-scoped, no confirmed
+ *  character needed) as well as by the wizard step below. */
+export function LegionArtifactsEditor({
+  theme, worldLegionArtifact, value, onChange,
+}: LegionArtifactsEditorProps) {
+  const draft = parseLegionArtifactBoardDraft(value);
+  const artifactLevel = draft.artifactLevel
+    ?? (worldLegionArtifact?.artifactLevel !== undefined ? String(worldLegionArtifact.artifactLevel) : "");
+  const artifactLevelNum = Number(artifactLevel) || 0;
+  const crystals: LegionCrystalDraft[] = draft.crystals
+    ?? (worldLegionArtifact?.crystals as LegionCrystalDraft[] | undefined)
+    ?? [];
+
+  const [openCardIndex, setOpenCardIndex] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  // Closes both the open crystal card and its nested stat picker on outside clicks. Both
+  // popovers are portaled straight to document.body (not nested inside any wrapping "zone"
+  // element here) and already stop propagation on their own onMouseDown, so any mousedown
+  // that reaches this listener is guaranteed to be outside them — no containment check
+  // needed (a zoneRef-based one used to leave dead zones in the grid's blank space, e.g.
+  // past the 3-column grid's fixed width inside its wider flex container). Trigger buttons
+  // (crystal tiles, stat chips) are excluded too — they only stop propagation on `click`,
+  // not `mousedown`, so without this exclusion this listener would force-close things a
+  // moment before the trigger's own onClick runs, breaking its own open/close toggle (the
+  // toggle's functional update would read the just-forced-null state and reopen instead).
+  useEffect(() => {
+    if (openCardIndex === null && !openId) return;
+    function handleMouseDown(e: MouseEvent) {
+      if ((e.target as HTMLElement).closest("[data-legion-trigger]")) return;
+      setOpenCardIndex(null);
+      setOpenId(null);
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [openCardIndex, openId]);
+
+  function updateArtifactLevel(next: string) {
+    onChange(serializeLegionArtifactBoardDraft({ artifactLevel: next, crystals }));
+  }
+
+  function updateCrystal(index: number, patch: Partial<LegionCrystalDraft>) {
+    // Build a dense 9-length array (every slot filled) rather than writing into a
+    // possibly-shorter array — leaving holes would serialize as `null` via
+    // JSON.stringify, which every downstream reader would then have to guard against.
+    const nextCrystals = LEGION_CRYSTALS.map((_, i) => effectiveCrystal(crystals[i], isCrystalUnlocked(i, artifactLevelNum)));
+    nextCrystals[index] = { ...nextCrystals[index], ...patch };
+    onChange(serializeLegionArtifactBoardDraft({ artifactLevel, crystals: nextCrystals }));
+  }
+
+  // Bulk-sets every unlocked crystal's level only — stat picks stay per-crystal untouched,
+  // since the whole point of 9 crystals is deliberately different stats per crystal (totals
+  // sum across crystals, capped at 10 per stat), unlike the flat skill tiles elsewhere that
+  // have nothing but a level to bulk-set.
+  function setAllCrystalLevels(level: number) {
+    const nextCrystals = LEGION_CRYSTALS.map((_, i) => {
+      const unlocked = isCrystalUnlocked(i, artifactLevelNum);
+      const current = effectiveCrystal(crystals[i], unlocked);
+      return unlocked ? { ...current, level } : current;
+    });
+    onChange(serializeLegionArtifactBoardDraft({ artifactLevel, crystals: nextCrystals }));
+  }
+
+  function resetCrystal(index: number) {
+    updateCrystal(index, { level: MIN_CRYSTAL_LEVEL, stats: [...DEFAULT_CRYSTAL_STATS] });
+  }
+
+  function setCrystalStat(index: number, slotIndex: number, statId: LegionArtifactStatId | null) {
+    const current = effectiveCrystal(crystals[index], isCrystalUnlocked(index, artifactLevelNum));
+    const nextStats = [...(current.stats ?? DEFAULT_CRYSTAL_STATS)];
+    nextStats[slotIndex] = statId;
+    updateCrystal(index, { stats: nextStats });
+  }
+
+  function toggleCard(index: number) {
+    setOpenCardIndex((cur) => (cur === index ? null : index));
+    setOpenId(null);
+  }
+
+  function toggleSlot(index: number, slotIndex: number) {
+    const id = `${index}-${slotIndex}`;
+    setOpenId((cur) => (cur === id ? null : id));
+  }
+
+  // Reaching the end of a crystal's 3 stat slots — via Enter-picking the last one or via an
+  // explicit Tab — only ever considers the next crystal in sequence (skipping over locked
+  // placeholders, which aren't real targets), and only jumps in if its stat lines are still
+  // untouched (still the in-game default 3 lines every crystal starts with — a crystal is
+  // never truly "blank" once unlocked, so we can't check for empty/null stats). Level is
+  // deliberately not part of this check: bulk actions like "Max All" only ever change level,
+  // never stat picks (see setAllCrystalLevels), so a maxed crystal can still have fully
+  // unpicked default stats and should still get walked through. Barging into a crystal whose
+  // stats were actually chosen already (e.g. while correcting an earlier one) would be more
+  // surprising than helpful, so it just closes the nested picker instead.
+  function goToNextCrystal(fromIndex: number) {
+    for (let i = fromIndex + 1; i < LEGION_CRYSTALS.length; i++) {
+      if (!isCrystalUnlocked(i, artifactLevelNum)) continue;
+      const candidate = effectiveCrystal(crystals[i], true);
+      if (isCrystalUntouched(candidate)) {
+        setOpenCardIndex(i);
+        setOpenId(`${i}-0`);
+      } else {
+        setOpenId(null);
+      }
+      return;
+    }
+    setOpenId(null);
+  }
+
+  return (
+    <>
+      <p style={{ margin: "0 0 1rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>
+        These are shared across all characters on your world, and inherited automatically by new characters.
+      </p>
+      <div className="legion-artifacts-root" style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 460 }}>
+        <style>{`
+          .legion-artifacts-root { container-type: inline-size; }
+          /* minmax(0, ...) lets each column shrink past its preferred size instead of a
+             fixed px track, which refuses to compress below its own content and forces the
+             whole grid to overflow on narrow phones no matter what breakpoint number a
+             fallback size uses. Tile sizing itself is 100%/aspect-ratio (crystalTileStyle),
+             so this scales fluidly with zero breakpoints needed. */
+          .legion-crystal-grid { grid-template-columns: repeat(3, minmax(0, ${CRYSTAL_TILE_SIZE}px)); min-width: 0; }
+          .legion-crystal-section { max-width: calc((${CRYSTAL_TILE_SIZE}px * 3) + (0.6rem * 2)); width: 100%; min-width: 0; }
+        `}</style>
+        <div>
+          <p style={sectionLabelStyle(theme)}>Artifact Level</p>
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label="Legion Artifact level"
+            value={artifactLevel}
+            placeholder="1"
+            onChange={(e) => updateArtifactLevel(clampArtifactLevelInput(e.target.value))}
+            onKeyDown={numericKeyDown}
+            style={levelInputStyle(theme, 56)}
+          />
+        </div>
+
+        <div className="legion-crystal-section">
+          <CrystalsSectionHeader
+            theme={theme}
+            onMaxAll={() => setAllCrystalLevels(MAX_CRYSTAL_LEVEL)}
+            onClear={() => setAllCrystalLevels(MIN_CRYSTAL_LEVEL)}
+          />
+          <div className="legion-crystal-grid" style={crystalGridStyle}>
+            {LEGION_CRYSTALS.map((def, index) => (
+              <CrystalTile
+                key={def.id}
+                index={index}
+                def={def}
+                crystal={effectiveCrystal(crystals[index], isCrystalUnlocked(index, artifactLevelNum))}
+                unlocked={isCrystalUnlocked(index, artifactLevelNum)}
+                isCardOpen={openCardIndex === index}
+                nestedOpenId={openId}
+                theme={theme}
+                onToggleCard={() => toggleCard(index)}
+                onSetLevel={(level) => updateCrystal(index, { level })}
+                onSetStat={(slotIndex, statId) => setCrystalStat(index, slotIndex, statId)}
+                onToggleSlot={(slotIndex) => toggleSlot(index, slotIndex)}
+                onClosePicker={() => setOpenId(null)}
+                onNextCard={() => goToNextCrystal(index)}
+                onReset={() => resetCrystal(index)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function LegionArtifactsSetupStep({
+  theme, step, stepNumber, totalSteps, onBack, onNext, onFinish, ...editorProps
+}: LegionArtifactsSetupStepProps) {
+  return (
+    <SetupStepFrame
+      theme={theme}
+      stepLabel={step.label}
+      stepNumber={stepNumber}
+      totalSteps={totalSteps}
+      description="Set your Legion Artifact level and crystals."
+      onBack={onBack}
+      onNext={onNext}
+      onFinish={onFinish}
+    >
+      <LegionArtifactsEditor theme={theme} {...editorProps} />
+    </SetupStepFrame>
+  );
+}

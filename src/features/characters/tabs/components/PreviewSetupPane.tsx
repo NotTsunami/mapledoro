@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import type { CSSProperties } from "react";
-import { getDirectoryRevealDelays } from "../charactersDirectory";
+import { buildDirectoryGroups, getDirectoryRevealDelays, type DirectorySortBy } from "../charactersDirectory";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
 import CharacterDirectoryScreen from "../screens/CharacterDirectoryScreen";
 import CharacterProfileOverviewScreen from "../screens/CharacterProfileOverviewScreen";
@@ -61,22 +61,31 @@ function getActiveScreenId(setup: PreviewPaneModel["setup"]): PreviewScreenId {
 function getActiveScreenClassName(
   activeScreenId: PreviewScreenId,
   setupStepDirection: PreviewPaneModel["setup"]["setupStepDirection"],
+  suppressLayoutTransition: boolean,
 ) {
-  if (activeScreenId === "directory" || activeScreenId === "profile-overview" || activeScreenId === "none") {
+  if (activeScreenId === "directory" || activeScreenId === "none") {
     return "setup-step-content directory-step-content";
+  }
+  // Landing straight on the profile-overview panel (refresh, deep link): use the same
+  // simple fade as the profile card beside it instead of the step-forward slide, which
+  // combined with the pane's own width transition (briefly suppressed here too) caused
+  // flex-wrapped rows like the HEXA skill grid to visibly reflow mid-animation.
+  if (activeScreenId === "profile-overview" && suppressLayoutTransition) {
+    return "setup-step-content initial-reveal-fade";
   }
   const directionClass = setupStepDirection === "forward" ? "step-forward" : "step-backward";
   return `setup-step-content ${directionClass}`;
 }
 
-function getSetupPanelClassName(setup: PreviewPaneModel["setup"]) {
+function getSetupPanelClassName(setup: PreviewPaneModel["setup"], isModeTransitioning: boolean) {
   return [
     "character-search-panel",
     "setup-panel",
     setup.setupPanelVisible ? "setup-panel-visible" : "",
-    setup.isBackTransitioning ? "setup-panel-fade" : "",
+    setup.isBackTransitioning || isModeTransitioning ? "setup-panel-fade" : "",
     setup.isFinishingSetup ? "setup-finish-fade" : "",
     setup.isSwitchingToDirectory || setup.isSwitchingToProfile ? "profile-to-directory-fade" : "",
+    setup.isDeleteTransitioning ? "deleting" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -86,12 +95,16 @@ function getSetupPanelInlineStyle(
   theme: PreviewPaneModel["theme"],
   inCharacterDirectoryView: boolean,
   shouldShowDirectoryPanel: boolean,
+  isProfileOverview: boolean,
 ): CSSProperties {
   const visibility: CSSProperties["visibility"] =
     inCharacterDirectoryView && !shouldShowDirectoryPanel ? "hidden" : "visible";
 
   return {
-    ...panelCardStyle(theme, "1rem"),
+    // The binder's spine fills flush to the card edges (see CharacterSetupFlow.styles.ts),
+    // so it supplies its own inset via profile-binder-page's padding instead of relying on
+    // the card's outer padding, which would leave a gap around the spine's background.
+    ...panelCardStyle(theme, isProfileOverview ? "0" : "1rem"),
     position: "relative" as const,
     opacity: inCharacterDirectoryView && !shouldShowDirectoryPanel ? 0 : 1,
     transform:
@@ -102,8 +115,8 @@ function getSetupPanelInlineStyle(
 }
 
 export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
-  const { theme, setup, directory } = model;
-  const [directorySortBy, setDirectorySortBy] = useState<"name" | "level" | "class">("name");
+  const { theme, setup, directory, preview } = model;
+  const [directorySortBy, setDirectorySortBy] = useState<DirectorySortBy>("name");
 
   // "unset" means no explicit user choice yet — resolve to first world during render.
   // null means user explicitly chose "All worlds".
@@ -126,6 +139,32 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
       ? (directory.worldIds[0] ?? null)
       : directoryWorldFilterRaw;
 
+  // Mirrors CharacterDirectoryScreen's own world-scoping so the reveal-phase delay below
+  // matches whether the directory view it's about to animate actually has a champions
+  // section (an "all worlds" view has no such section, but hasChampionSection is false
+  // there too since mainCharacterKey/championCharacterKeys resolve to null/[]).
+  const showAllDirectoryWorlds = directoryWorldFilter === null && directory.worldIds.length > 1;
+  const activeDirectoryWorldId = directoryWorldFilter ?? directory.worldIds[0] ?? null;
+  const activeDirectoryMainKey =
+    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
+      ? (directory.mainCharacterKeyByWorld[String(activeDirectoryWorldId)] ?? null)
+      : null;
+  const activeDirectoryChampionKeys =
+    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
+      ? (directory.championCharacterKeysByWorld[String(activeDirectoryWorldId)] ?? [])
+      : [];
+  const hasChampionSection = buildDirectoryGroups({
+    allCharacters: directory.allCharacters,
+    sortBy: "name",
+    mainCharacterKey: activeDirectoryMainKey,
+    championCharacterKeys: activeDirectoryChampionKeys,
+    maxCharacters: directory.maxCharacters,
+  }).hasChampionSection;
+
+  const getRevealDelays = useEffectEvent(() =>
+    getDirectoryRevealDelays(setup.fastDirectoryRevealOnce, hasChampionSection),
+  );
+
   const [directoryRevealPhase, setDirectoryRevealPhase] = useState(0);
   const inCharacterDirectoryView = setup.showFlowOverview && setup.showCharacterDirectory;
   const shouldShowDirectoryPanel =
@@ -133,15 +172,31 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     !setup.isSwitchingToDirectory &&
     directoryRevealPhase > 0;
   const activeScreenId = getActiveScreenId(setup);
+  const contentKey = `preview-screen-${activeScreenId}-${setup.activeFlowId}-${setup.setupStepIndex}-${setup.substepJumpNonce}-${setup.showCharacterDirectory ? "directory" : "profile"}`;
+  // Locks the initial-reveal-fade decision to whichever content key was showing the moment
+  // suppressLayoutTransition was first observed true, instead of re-reading that flag live.
+  // suppressLayoutTransition clears itself ~220ms after hydration regardless of whether this
+  // same profile-overview content is still on screen; reading it live would flip the content
+  // class back to step-forward mid-animation (or after), restarting a second, different
+  // animation on top of one that had already played. Setting state during render (rather
+  // than a ref) is the React-sanctioned way to derive a value once and hold it across
+  // renders — see "adjusting state when a prop changes" in the React docs.
+  const [lockedInitialRevealKey, setLockedInitialRevealKey] = useState<string | null>(null);
+  if (lockedInitialRevealKey === null && setup.suppressLayoutTransition) {
+    setLockedInitialRevealKey(contentKey);
+  }
+  const isInitialReveal = activeScreenId === "profile-overview" && lockedInitialRevealKey === contentKey;
   const activeScreenClassName = getActiveScreenClassName(
     activeScreenId,
     setup.setupStepDirection,
+    isInitialReveal,
   );
-  const setupPanelClassName = getSetupPanelClassName(setup);
+  const setupPanelClassName = getSetupPanelClassName(setup, preview.isModeTransitioning);
   const setupPanelStyle = getSetupPanelInlineStyle(
     theme,
     inCharacterDirectoryView,
     shouldShowDirectoryPanel,
+    activeScreenId === "profile-overview",
   );
 
   // Persist world filter changes — stores the explicit user choice
@@ -157,6 +212,7 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
       }, 0);
       return () => clearTimeout(resetPhaseTimer);
     }
+  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on the narrowed `setup.isSwitchingToDirectory` primitive, not the whole `setup` object, to avoid re-running when unrelated fields change
   }, [inCharacterDirectoryView, setup.isSwitchingToDirectory]);
 
   useEffect(() => {
@@ -164,10 +220,7 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     const startPhaseTimer = window.setTimeout(() => {
       setDirectoryRevealPhase(0);
     }, 0);
-    const { mainDelay, championDelay, mulesDelay } = getDirectoryRevealDelays(
-      setup.fastDirectoryRevealOnce,
-      true,
-    );
+    const { mainDelay, championDelay, mulesDelay } = getRevealDelays();
     const mainTimer = window.setTimeout(() => setDirectoryRevealPhase(1), mainDelay);
     const championsTimer = window.setTimeout(() => setDirectoryRevealPhase(2), championDelay);
     const mulesTimer = window.setTimeout(() => setDirectoryRevealPhase(3), mulesDelay);
@@ -177,6 +230,7 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
       clearTimeout(championsTimer);
       clearTimeout(mulesTimer);
     };
+  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on narrowed `setup.*` primitives, not the whole `setup` object, to avoid re-running when unrelated fields change
   }, [
     inCharacterDirectoryView,
     setup.fastDirectoryRevealOnce,
@@ -193,7 +247,7 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
           style={setupPanelStyle}
         >
           <div
-            key={`preview-screen-${activeScreenId}-${setup.activeFlowId}-${setup.setupStepIndex}-${setup.showCharacterDirectory ? "directory" : "profile"}`}
+            key={contentKey}
             className={activeScreenClassName}
           >
             {activeScreenId === "directory" && (

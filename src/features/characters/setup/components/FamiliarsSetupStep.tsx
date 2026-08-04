@@ -1,0 +1,1279 @@
+"use client";
+
+import { useMemo, useRef, useState, useEffect, type CSSProperties } from "react";
+import Image from "next/image";
+import { createPortal } from "react-dom";
+import { usePickerCoords } from "../hooks/usePickerCoords";
+import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
+import { searchAndRank } from "../../../../lib/searchMatch";
+import { isStrayClick } from "../../../../lib/inputUtils";
+import HoverTooltip from "../../../../components/HoverTooltip";
+import { NavChevron } from "../../DropdownChevron";
+import type { AppTheme } from "../../../../components/themes";
+import type { SetupStepDefinition } from "../steps";
+import { readCharactersStore, selectCharacterByIgn, type StoredFamiliarSlot } from "../../model/charactersStore";
+import {
+  TIER_LABELS, TIER_ORDER, TIER_COLORS, getLinesForTier, BADGE_NAMES, BADGE_ID_MAP,
+  FAMILIARS, getFamiliarDisplayLabel,
+  type FamiliarTier, type FamiliarEntry,
+} from "../data/familiarsData";
+import { resourceImageUrl, familiarBadgeUrl } from "../../../../lib/mapleResource";
+import SetupStepFrame from "./SetupStepFrame";
+import { CopyFromPreset } from "./CopyFromPreset";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface FamiliarSlot {
+  familiarId: number | null;
+  mobId: string;
+  name: string;
+  tier: FamiliarTier | "";
+  line1: string;
+  line2: string;
+}
+
+interface FamiliarPreset {
+  familiars: FamiliarSlot[];
+  badges: string[];
+}
+
+interface FamiliarsValue {
+  presets: FamiliarPreset[];
+}
+
+interface FamiliarsSetupStepProps {
+  theme: AppTheme;
+  step: SetupStepDefinition;
+  stepNumber: number;
+  totalSteps: number;
+  confirmedCharacterName?: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+  onFinish: () => void;
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+export const PRESET_COUNT = 5;
+export const SLOT_COUNT = 3;
+export const BADGE_COUNT = 8;
+const VALID_TIERS = new Set<string>(TIER_ORDER);
+
+export const FAM_CARD_SIZE = 64;
+// Bigger than the editable setup-step card's sprite -- the profile bookmark's read-only card
+// has no search picker to leave room for, so it can afford a taller card and a larger sprite.
+const FAM_CARD_SIZE_READONLY = 96;
+const FAM_LIST_SIZE = 32;
+export const BADGE_SIZE = 52;
+export const BADGE_BORDER = 4;
+export const PENTAGON = "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)";
+
+// ── Parse / patch helpers ──────────────────────────────────────────────────
+
+function emptySlot(): FamiliarSlot {
+  return { familiarId: null, mobId: "", name: "", tier: "", line1: "", line2: "" };
+}
+
+function emptyPreset(): FamiliarPreset {
+  return {
+    familiars: Array.from({ length: SLOT_COUNT }, emptySlot),
+    badges: Array<string>(BADGE_COUNT).fill(""),
+  };
+}
+
+function emptyValue(): FamiliarsValue {
+  return { presets: Array.from({ length: PRESET_COUNT }, emptyPreset) };
+}
+
+function parseSlot(raw: unknown): FamiliarSlot {
+  if (!raw || typeof raw !== "object") return emptySlot();
+  const r = raw as Record<string, unknown>;
+  const tier = typeof r.tier === "string" && VALID_TIERS.has(r.tier) ? (r.tier as FamiliarTier) : "";
+  const familiarId = typeof r.familiarId === "number" ? r.familiarId : null;
+  const storedMobId = typeof r.mobId === "string" ? r.mobId : "";
+  const mobId = storedMobId || (familiarId !== null ? (FAMILIARS.find((f) => f.id === familiarId)?.mobId ?? "") : "");
+  return {
+    familiarId,
+    mobId,
+    name: typeof r.name === "string" ? r.name : "",
+    tier,
+    line1: typeof r.line1 === "string" ? r.line1 : "",
+    line2: typeof r.line2 === "string" ? r.line2 : "",
+  };
+}
+
+function parsePreset(raw: unknown): FamiliarPreset {
+  if (!raw || typeof raw !== "object") return emptyPreset();
+  const r = raw as Record<string, unknown>;
+  const rawFamiliars = Array.isArray(r.familiars) ? (r.familiars as unknown[]) : [];
+  const rawBadges = Array.isArray(r.badges) ? (r.badges as unknown[]) : [];
+  return {
+    familiars: Array.from({ length: SLOT_COUNT }, (_, i) => parseSlot(rawFamiliars[i])),
+    badges: Array.from({ length: BADGE_COUNT }, (_, i) =>
+      typeof rawBadges[i] === "string" ? (rawBadges[i] as string) : "",
+    ),
+  };
+}
+
+function parseValue(raw: string): FamiliarsValue {
+  if (!raw) return emptyValue();
+  try {
+    const parsed = JSON.parse(raw) as { presets?: unknown[] };
+    if (!parsed?.presets || !Array.isArray(parsed.presets)) return emptyValue();
+    return { presets: Array.from({ length: PRESET_COUNT }, (_, i) => parsePreset(parsed.presets![i])) };
+  } catch { return emptyValue(); }
+}
+
+function patchSlot(value: FamiliarsValue, pi: number, si: number, patch: Partial<FamiliarSlot>): FamiliarsValue {
+  return {
+    presets: value.presets.map((preset, pIdx) => pIdx !== pi ? preset : {
+      ...preset,
+      familiars: preset.familiars.map((slot, sIdx) => sIdx !== si ? slot : { ...slot, ...patch }),
+    }),
+  };
+}
+
+function patchBadge(value: FamiliarsValue, pi: number, bi: number, val: string): FamiliarsValue {
+  return {
+    presets: value.presets.map((preset, pIdx) => pIdx !== pi ? preset : {
+      ...preset,
+      badges: preset.badges.map((b, bIdx) => bIdx !== bi ? b : val),
+    }),
+  };
+}
+
+const FAM_PICKER_WIDTH = 220;
+const BADGE_PICKER_WIDTH = 200;
+const LINE_PICKER_WIDTH = 240;
+
+// ── Shared styles ──────────────────────────────────────────────────────────
+
+const searchInputStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 6,
+  fontFamily: "inherit",
+  fontSize: "0.78rem",
+  fontWeight: 600,
+  padding: "0.3rem 0.5rem",
+  outline: "none",
+  border: "1px solid",
+};
+
+const lineSelectStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 6,
+  fontFamily: "inherit",
+  fontSize: "0.75rem",
+  fontWeight: 600,
+  padding: "0.25rem 0.4rem",
+  border: "1px solid",
+};
+
+const popoverVisualStyle: CSSProperties = {
+  borderRadius: 10,
+  boxShadow: "0 6px 24px rgba(0,0,0,0.28)",
+  overflow: "hidden",
+};
+
+type TierColor = { bg: string; border: string; text: string };
+
+const clearRowStyle = (theme: AppTheme): CSSProperties => ({
+  display: "block", width: "100%", padding: "0.3rem 0.6rem",
+  background: "transparent", border: "none", borderBottom: `1px solid ${theme.border}`,
+  cursor: "pointer", fontFamily: "inherit",
+  fontSize: "0.75rem", fontWeight: 600, color: theme.muted, textAlign: "left",
+});
+
+const lineOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
+  display: "block", width: "100%", padding: "0.3rem 0.5rem",
+  background: isHighlighted ? `${theme.accent}22` : "transparent",
+  border: "none", borderBottom: `1px solid ${theme.border}`,
+  cursor: "pointer", fontFamily: "inherit",
+  fontSize: "0.75rem", fontWeight: 600, color: theme.text, textAlign: "left",
+});
+
+const tierBackButtonStyle = (theme: AppTheme): CSSProperties => ({
+  display: "flex", alignItems: "center", gap: 6,
+  background: "transparent", border: "none", cursor: "pointer",
+  color: theme.muted, fontFamily: "inherit", fontSize: "0.75rem",
+  fontWeight: 700, padding: "0.1rem 0", marginBottom: 2,
+});
+
+const tierOptionStyle = (theme: AppTheme, c: TierColor, isHighlighted: boolean): CSSProperties => ({
+  background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+  borderRadius: 6, padding: "0.3rem 0.6rem",
+  fontWeight: 700, fontSize: "0.8rem", fontFamily: "inherit",
+  cursor: "pointer", textAlign: "left",
+  boxShadow: isHighlighted ? `0 0 0 2px ${theme.accent}` : "none",
+});
+
+const selectedFamiliarRowStyle = (theme: AppTheme): CSSProperties => ({
+  display: "flex", alignItems: "center", gap: 8, width: "100%",
+  padding: "0.4rem 0.6rem", border: "none", borderBottom: `1px solid ${theme.border}`,
+  background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+});
+
+const tierBadgeStyle = (c: TierColor): CSSProperties => ({
+  flexShrink: 0, padding: "0.1rem 0.4rem", borderRadius: 4,
+  fontSize: "0.75rem", fontWeight: 800,
+  background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+});
+
+const familiarOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
+  display: "flex", alignItems: "center", gap: 8,
+  width: "100%", padding: "0.3rem 0.6rem",
+  background: isHighlighted ? `${theme.accent}22` : "transparent", border: "none",
+  borderBottom: `1px solid ${theme.border}`,
+  cursor: "pointer", fontFamily: "inherit",
+});
+
+const badgeOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
+  display: "flex", alignItems: "center", gap: 6,
+  width: "100%", padding: "0.3rem 0.6rem",
+  background: isHighlighted ? `${theme.accent}22` : "transparent", border: "none",
+  borderBottom: `1px solid ${theme.border}`,
+  cursor: "pointer", fontFamily: "inherit",
+  textAlign: "left",
+  fontSize: "0.75rem", fontWeight: 600, color: theme.text,
+});
+
+const presetSquareStyle = (theme: AppTheme, active: boolean): CSSProperties => ({
+  width: 32, height: 32, borderRadius: 7, padding: 0,
+  border: `2px solid ${active ? theme.accent : theme.border}`,
+  background: active ? theme.accent : "transparent",
+  color: active ? "#fff" : theme.muted,
+  fontFamily: "inherit", fontWeight: 800, fontSize: "0.8rem",
+  cursor: "pointer",
+});
+
+// Familiar sprite: sequential source fallback (mob → familiar → card), swapped via onError.
+// Exported for the profile Familiars bookmark's read-only cards.
+
+export function FamiliarCardSprite({ mobId, familiarId, cardId, name, size, theme, fill }: { mobId: string; familiarId: number | null; cardId: string; name: string; size: number; theme: AppTheme; fill?: boolean }) {
+  const sources = [
+    resourceImageUrl("mob", mobId, "sprite.png"),
+    // "familiar" sprites are keyed by the familiar's OWN id, not mobId — these are
+    // "direct sprite" familiars (spriteFrom: "familiar") with no real monster to
+    // borrow a mob sprite from.
+    ...(familiarId !== null ? [resourceImageUrl("familiar", String(familiarId), "sprite.png")] : []),
+    ...(cardId ? [resourceImageUrl("item", cardId, "icon.png")] : []),
+  ];
+  // `fill` sizes the sprite off its (flex-grown) container instead of a fixed px square --
+  // used by the read-only profile card so the sprite expands to soak up whatever vertical
+  // space the card has left over, rather than sitting at a fixed size with dead space around it.
+  const dims: CSSProperties = fill ? { width: "100%", height: "100%" } : { width: size, height: size };
+  return (
+    <span style={{ ...dims, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}{/* react-doctor-disable-next-line nextjs-no-img-element -- needs a sequential onError fallback chain (mob -> familiar -> card) that next/image's declarative API can't express */}
+      <img
+        key={`${mobId}/${familiarId}/${cardId}`}
+        src={sources[0]}
+        alt=""
+        width={fill ? undefined : size}
+        height={fill ? undefined : size}
+        style={{ objectFit: "contain", ...dims, display: "block" }}
+        onError={(e) => {
+          const img = e.currentTarget;
+          const next = Number(img.dataset.step ?? "0") + 1;
+          if (next < sources.length) {
+            img.dataset.step = String(next);
+            img.src = sources[next];
+          } else {
+            img.style.display = "none";
+            const ph = img.nextElementSibling as HTMLElement | null;
+            if (ph) ph.style.display = "flex";
+          }
+        }}
+      />
+      <span aria-hidden style={{
+        display: "none", alignItems: "center", justifyContent: "center", ...dims,
+        borderRadius: 6, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+      </span>
+    </span>
+  );
+}
+
+// A missing/failed badge icon falls back to the badge's name-initial (mirrors
+// FamiliarCardSprite's treatment above) instead of a stray broken-image glyph. Used both
+// as a plain square (currently-selected header, picker rows) and inside a pentagon-clipped
+// tile (BadgeSlot/ReadOnlyBadgeSlot) — the parent's own clip-path handles the pentagon
+// shape either way, so this stays a plain rounded box. `pentagon` nudges the letter down
+// ~5.5% of the box (PENTAGON's own centroid, not the geometric center of its bounding box,
+// since the shape's point-up tip leaves the top third empty) so it reads as centered inside
+// the visible pentagon outline instead of the invisible square it's clipped from.
+function FamiliarBadgeImage({ badge, size, theme, style, pentagon }: { badge: string; size: number; theme: AppTheme; style?: CSSProperties; pentagon?: boolean }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <div ref={wrapperRef} style={{ width: size, height: size, flexShrink: 0 }}>
+        <Image src={familiarBadgeUrl(BADGE_ID_MAP[badge])} alt={badge} width={size} height={size} unoptimized
+          onError={() => {
+            if (wrapperRef.current) wrapperRef.current.style.display = "none";
+            if (fallbackRef.current) fallbackRef.current.style.display = "flex";
+          }}
+          style={{ objectFit: "cover", display: "block", ...style }}
+        />
+      </div>
+      <div ref={fallbackRef} style={{
+        display: "none", alignItems: "center", justifyContent: "center", width: size, height: size,
+        borderRadius: 6, flexShrink: 0, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
+        background: "rgba(127,127,127,0.18)", color: theme.muted,
+      }}>
+        <span style={{ transform: pentagon ? `translateY(${size * 0.055}px)` : undefined }}>
+          {badge.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
+        </span>
+      </div>
+    </>
+  );
+}
+
+// ── Line picker ───────────────────────────────────────────────────────────
+
+function LinePicker({ id, openId, onToggle, onClose, onPrev, onNext, value, tier, placeholder, theme, onChange }: {
+  id: string;
+  openId: string | null;
+  onToggle: () => void;
+  onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  value: string;
+  tier: FamiliarTier;
+  placeholder: string;
+  theme: AppTheme;
+  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click — only a keyboard
+   *  pick should be allowed to jump to the next card, since a mouse click means the user's
+   *  cursor (and attention) is staying local, and teleporting the popover elsewhere would
+   *  just make them go hunt for it. */
+  onChange: (val: string, viaKeyboard: boolean) => void;
+}) {
+  const isOpen = openId === id;
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, LINE_PICKER_WIDTH);
+  const lines = getLinesForTier(tier);
+  const options = lines.filter((l) => l !== value);
+  const filtered = query ? searchAndRank(options, query, (l) => l) : options;
+
+  useEffect(() => {
+    if (isOpen) inputRef.current?.focus();
+  }, [isOpen]);
+
+  // Doesn't call onClose itself — the caller's onChange decides whether picking this
+  // value should advance to the next field in the group (e.g. Line 1 → Line 2) or close
+  // outright, so a real pick and an explicit close aren't conflated.
+  function select(line: string, viaKeyboard: boolean) {
+    onChange(line, viaKeyboard);
+  }
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: filtered,
+    resetKey: query,
+    onSelect: (line) => select(line, true),
+    onClose,
+    onPrev,
+    onNext,
+  });
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    if (e.key === "Backspace" && query === "" && value) {
+      e.preventDefault();
+      select("", true);
+      return;
+    }
+    navKeyDown(e);
+  }
+
+  const triggerStyle: CSSProperties = {
+    ...lineSelectStyle,
+    borderColor: theme.border,
+    background: theme.bg,
+    color: value ? theme.text : theme.muted,
+    textAlign: "left",
+    cursor: "pointer",
+    display: "block",
+  };
+
+  const pickerStyle: CSSProperties = {
+    ...popoverVisualStyle,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: LINE_PICKER_WIDTH,
+    zIndex: 310,
+    background: theme.panel,
+    border: `1px solid ${theme.accent}`,
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
+      <button
+        type="button"
+        className="tap-target-44"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isOpen) setQuery("");
+          onToggle();
+        }}
+        title={value || placeholder}
+        style={triggerStyle}
+      >
+        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {value || placeholder}
+        </span>
+      </button>
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={pickerStyle}
+        >
+          {value && (
+            <div style={{ padding: "0.4rem 0.6rem", borderBottom: `1px solid ${theme.border}` }}>
+              <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: theme.muted }}>Currently Selected</p>
+              <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text }}>{value}</p>
+            </div>
+          )}
+          {value && (
+            <button
+              type="button"
+              className="tap-target-44"
+              onClick={() => select("", false)}
+              style={clearRowStyle(theme)}
+            >
+              — Clear —
+            </button>
+          )}
+          <div style={{ padding: "0.3rem 0.4rem", borderBottom: `1px solid ${theme.border}` }}>
+            <input
+              ref={inputRef}
+              type="text"
+              aria-label="Search potential lines"
+              value={query}
+              placeholder="Search…"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              style={{ ...searchInputStyle, borderColor: theme.border, background: theme.bg, color: theme.text }}
+            />
+          </div>
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            {filtered.map((line, i) => (
+              <button
+                key={line}
+                ref={itemRef(i)}
+                type="button"
+                onClick={() => select(line, false)}
+                style={lineOptionStyle(theme, i === highlightedIndex)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                {line}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p style={{ margin: 0, padding: "0.4rem 0.5rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 600 }}>
+                No results
+              </p>
+            )}
+          </div>
+        </div>,
+        document.body!
+      )}
+    </div>
+  );
+}
+
+// ── Familiar slot card ─────────────────────────────────────────────────────
+
+// Same-name entries that render a pixel-identical sprite (e.g. periodic card
+// reissues) are excluded from search — they'd otherwise show as two indistinguishable
+// results. The "duplicate" entry stays in FAMILIARS itself so an already-saved
+// character that picked one still resolves correctly via FAMILIARS.find().
+const SELECTABLE_FAMILIARS = FAMILIARS.filter((f) => f.duplicateOf === undefined);
+
+// Empty query: nothing (this catalog is too large to browse unfiltered, matching
+// Equipment's ItemPicker "huge catalogs require a search" convention).
+function filterFamiliars(query: string, excludeId: number | null): FamiliarEntry[] {
+  if (!query.trim()) return [];
+  const pool = excludeId == null ? SELECTABLE_FAMILIARS : SELECTABLE_FAMILIARS.filter((f) => f.id !== excludeId);
+  return searchAndRank(pool, query, getFamiliarDisplayLabel).slice(0, 50);
+}
+
+const slotCardBase: CSSProperties = {
+  borderRadius: 12,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "0.75rem 0.5rem 0.6rem",
+  gap: "0.4rem",
+  cursor: "pointer",
+  minHeight: 140,
+  transition: "border-color 0.12s",
+  userSelect: "none",
+};
+
+function TierPickerView({ entry, theme, onBack, onSelect }: {
+  entry: FamiliarEntry;
+  theme: AppTheme;
+  onBack: () => void;
+  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click — only a keyboard
+   *  pick jumps to Line 1, since a mouse click means the user's cursor is staying local. */
+  onSelect: (tier: FamiliarTier, viaKeyboard: boolean) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { containerRef.current?.focus(); }, []);
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: TIER_ORDER,
+    resetKey: entry.id,
+    onSelect: (t) => onSelect(t, true),
+    onPrev: onBack,
+  });
+
+  function handleContainerKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { onBack(); return; }
+    navKeyDown(e);
+  }
+
+  return (
+    <div ref={containerRef} tabIndex={-1} role="group" aria-label="Pick rarity" onKeyDown={handleContainerKeyDown}
+      style={{ padding: "0.65rem 0.7rem", display: "flex", flexDirection: "column", gap: 5, outline: "none" }}>
+      <button
+        type="button"
+        className="tap-target-44"
+        onClick={onBack}
+        style={tierBackButtonStyle(theme)}
+      >
+        ← {getFamiliarDisplayLabel(entry)}
+      </button>
+      <p style={{ margin: "0 0 2px", fontSize: "0.75rem", color: theme.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        Pick rarity
+      </p>
+      {TIER_ORDER.map((t, i) => {
+        const c = TIER_COLORS[t];
+        return (
+          <button
+            key={t}
+            ref={itemRef(i)}
+            type="button"
+            onClick={() => onSelect(t, false)}
+            style={tierOptionStyle(theme, c, i === highlightedIndex)}
+          >
+            {TIER_LABELS[t]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FamiliarSlotCard({
+  slot, slotId, openId, query, pendingEntry, theme,
+  onOpen, onQueryChange, onSelect, onClear, onLineChange, onSetPending,
+  onTogglePicker, onClosePicker, onNextCard,
+}: {
+  slot: FamiliarSlot;
+  slotId: string;
+  openId: string | null;
+  query: string;
+  pendingEntry: FamiliarEntry | null;
+  theme: AppTheme;
+  onOpen: () => void;
+  onQueryChange: (q: string) => void;
+  onSelect: (entry: FamiliarEntry, tier: FamiliarTier, viaKeyboard: boolean) => void;
+  onClear: () => void;
+  onLineChange: (field: "line1" | "line2", val: string, viaKeyboard: boolean) => void;
+  onSetPending: (entry: FamiliarEntry | null) => void;
+  onTogglePicker: (id: string) => void;
+  onClosePicker: () => void;
+  /** Tab from Line 2 jumps here — opens the next familiar slot's search picker. Undefined
+   *  for the last slot, so Tab there just falls through to native focus movement. */
+  onNextCard?: () => void;
+}) {
+  const isOpen = openId === slotId;
+  const isEmpty = !slot.name;
+  const displayName = slot.name.replace(/ Familiar$/i, "");
+  const matchedEntry = FAMILIARS.find((f) => f.id === slot.familiarId);
+  const cardId = matchedEntry?.cardId ?? "";
+  const spriteMobId = matchedEntry?.spriteMobId ?? slot.mobId;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, FAM_PICKER_WIDTH);
+  const filtered = useMemo(() => isOpen ? filterFamiliars(query, slot.familiarId) : [], [isOpen, query, slot.familiarId]);
+  useEffect(() => {
+    if (isOpen && !pendingEntry) inputRef.current?.focus();
+  }, [isOpen, pendingEntry]);
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: filtered,
+    resetKey: query,
+    onSelect: (entry) => onSetPending(entry),
+    onClose: onClosePicker,
+  });
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    if (e.key === "Backspace" && query === "" && !isEmpty) {
+      e.preventDefault();
+      onClear();
+      return;
+    }
+    navKeyDown(e);
+  }
+
+  // Shift+Tab from Line 1 steps back to the tier picker for this same familiar, reopening
+  // the main popover directly on the tier-select step instead of the search list.
+  function backToTierPicker() {
+    if (matchedEntry) {
+      onOpen();
+      onSetPending(matchedEntry);
+    }
+  }
+
+  const tierBorderColor = slot.tier ? TIER_COLORS[slot.tier].border : null;
+  const cardStyle: CSSProperties = {
+    ...slotCardBase,
+    borderWidth: isOpen ? 2 : 1,
+    borderColor: isOpen ? theme.accent : (tierBorderColor ?? theme.border),
+    borderStyle: isEmpty && !isOpen ? "dashed" : "solid",
+    background: isEmpty ? "transparent" : theme.panel,
+    justifyContent: isEmpty ? "center" : "flex-start",
+  };
+
+
+  const pickerStyle: CSSProperties = {
+    ...popoverVisualStyle,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: FAM_PICKER_WIDTH,
+    zIndex: 300,
+    background: theme.panel,
+    border: `1px solid ${theme.accent}`,
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ flex: 1, minWidth: 0, position: "relative" }}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { if (isStrayClick(e)) { return; } onOpen(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
+        style={cardStyle}
+      >
+        {isEmpty ? (
+          <span style={{ fontSize: 24, color: theme.muted, lineHeight: 1, fontWeight: 300 }}>+</span>
+        ) : (
+          <>
+            <HoverTooltip label={displayName} theme={theme}>
+              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE} theme={theme} />
+            </HoverTooltip>
+            {slot.tier && (
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
+                <LinePicker
+                  id={`${slotId}-line1`}
+                  openId={openId}
+                  onToggle={() => onTogglePicker(`${slotId}-line1`)}
+                  onClose={onClosePicker}
+                  onPrev={backToTierPicker}
+                  onNext={() => onTogglePicker(`${slotId}-line2`)}
+                  value={slot.line1}
+                  tier={slot.tier}
+                  placeholder="Line 1…"
+                  theme={theme}
+                  onChange={(v, viaKeyboard) => onLineChange("line1", v, viaKeyboard)}
+                />
+                <LinePicker
+                  id={`${slotId}-line2`}
+                  openId={openId}
+                  onToggle={() => onTogglePicker(`${slotId}-line2`)}
+                  onClose={onClosePicker}
+                  onPrev={() => onTogglePicker(`${slotId}-line1`)}
+                  onNext={onNextCard}
+                  value={slot.line2}
+                  tier={slot.tier}
+                  placeholder="Line 2…"
+                  theme={theme}
+                  onChange={(v, viaKeyboard) => onLineChange("line2", v, viaKeyboard)}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={pickerStyle}
+        >
+          {!isEmpty && !pendingEntry && (
+            <button
+              type="button"
+              onClick={() => {
+                const entry = FAMILIARS.find((f) => f.id === slot.familiarId);
+                if (entry) onSetPending(entry);
+              }}
+              style={selectedFamiliarRowStyle(theme)}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={28} theme={theme} />
+              <div style={{ overflow: "hidden", flex: 1 }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: theme.muted }}>Currently Selected</p>
+                <p title={displayName} style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</p>
+              </div>
+              {slot.tier && (
+                <span style={tierBadgeStyle(TIER_COLORS[slot.tier])}>
+                  {TIER_LABELS[slot.tier]}
+                </span>
+              )}
+              <span style={{ flexShrink: 0, color: theme.muted, display: "flex" }}><NavChevron direction="next" size={14} /></span>
+            </button>
+          )}
+          {!isEmpty && !pendingEntry && (
+            <button
+              type="button"
+              className="tap-target-44"
+              onClick={onClear}
+              style={clearRowStyle(theme)}
+            >
+              — Clear slot —
+            </button>
+          )}
+          {pendingEntry ? (
+            <TierPickerView
+              entry={pendingEntry}
+              theme={theme}
+              onBack={() => onSetPending(null)}
+              onSelect={(tier, viaKeyboard) => { onSelect(pendingEntry, tier, viaKeyboard); }}
+            />
+          ) : (
+            <>
+              <div style={{ padding: "0.4rem 0.5rem", borderBottom: `1px solid ${theme.border}` }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  aria-label="Search familiars"
+                  value={query}
+                  placeholder="Search familiars…"
+                  onChange={(e) => onQueryChange(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={handleSearchKeyDown}
+                  style={{ ...searchInputStyle, borderColor: theme.border, background: theme.bg, color: theme.text }}
+                />
+              </div>
+              {query && <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                {filtered.length === 0 && (
+                  <p style={{ margin: 0, padding: "0.5rem 0.75rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 600 }}>
+                    No results
+                  </p>
+                )}
+                {filtered.map((entry, i) => (
+                  <button
+                    key={entry.id}
+                    ref={itemRef(i)}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSetPending(entry); }}
+                    title={getFamiliarDisplayLabel(entry)}
+                    style={familiarOptionStyle(theme, i === highlightedIndex)}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <FamiliarCardSprite mobId={entry.spriteMobId ?? entry.mobId} familiarId={entry.id} cardId={entry.cardId} name={getFamiliarDisplayLabel(entry)} size={FAM_LIST_SIZE} theme={theme} />
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {getFamiliarDisplayLabel(entry)}
+                    </span>
+                  </button>
+                ))}
+              </div>}
+            </>
+          )}
+        </div>,
+        document.body!
+      )}
+    </div>
+  );
+}
+
+// Wrapped in HoverTooltip (only once a line is actually set) so a truncated potential line
+// can still be read in full on hover/tap, matching the sprite/badge tooltips already on this card.
+function ReadOnlyLineChip({ value, theme }: { value: string; theme: AppTheme }) {
+  const chip = (
+    <div style={{ ...lineSelectStyle, borderColor: theme.border, background: theme.bg, color: value ? theme.text : theme.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {value || "—"}
+    </div>
+  );
+  return value ? <HoverTooltip label={value} theme={theme}>{chip}</HoverTooltip> : chip;
+}
+
+/** Read-only counterpart to FamiliarSlotCard for the profile Familiars bookmark — same
+ *  sprite/tier-border card and Line 1/Line 2 chips, no search picker or interactivity. */
+export function ReadOnlyFamiliarSlotCard({ slot, theme }: { slot: StoredFamiliarSlot; theme: AppTheme }) {
+  const isEmpty = !slot.name;
+  const displayName = slot.name.replace(/ Familiar$/i, "");
+  const matchedEntry = FAMILIARS.find((f) => f.id === slot.familiarId);
+  const cardId = matchedEntry?.cardId ?? "";
+  const spriteMobId = matchedEntry?.spriteMobId ?? slot.mobId;
+  const tier = VALID_TIERS.has(slot.tier) ? (slot.tier as FamiliarTier) : null;
+  const cardStyle: CSSProperties = {
+    ...slotCardBase,
+    borderWidth: 1,
+    borderColor: tier ? TIER_COLORS[tier].border : theme.border,
+    borderStyle: isEmpty ? "dashed" : "solid",
+    background: isEmpty ? "transparent" : theme.panel,
+    justifyContent: isEmpty ? "center" : "flex-start",
+    cursor: "default",
+    // Taller than the editable card (slotCardBase's 140) -- gives the enlarged sprite below
+    // room to breathe instead of cramming it against the Line 1/Line 2 chips.
+    minHeight: 200,
+  };
+  const sprite = tier ? (
+    // flex: 1 so the sprite grows to fill whatever vertical room the card has past the chips
+    // below it, instead of sitting at a fixed size with dead space under it. position: relative
+    // + the HoverTooltip wrapper below pinned via inset: 0 (not width/height: 100%) -- .hover-tip
+    // is inline-flex and shrink-wraps its own box by default, so percentage sizing chained
+    // through it is circular (it and FamiliarCardSprite's fill mode would each be waiting on
+    // the other's size). Absolute positioning sidesteps that: inset: 0 sizes directly off this
+    // div's real box regardless of how that box's own size was determined.
+    <div style={{ flex: 1, minHeight: 0, width: "100%", position: "relative" }}>
+      <HoverTooltip label={displayName} theme={theme} style={{ position: "absolute", inset: 0 }}>
+        <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} fill theme={theme} />
+      </HoverTooltip>
+    </div>
+  ) : (
+    <HoverTooltip label={displayName} theme={theme}>
+      <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} theme={theme} />
+    </HoverTooltip>
+  );
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={cardStyle}>
+        {isEmpty ? (
+          // No "+" here, unlike the editable FamiliarSlotCard above -- this card isn't
+          // clickable, and a "+" reads as an invitation to tap it. The dashed border alone
+          // already signals "empty" (matches ReadOnlyBadgeSlot's empty pentagon, which has
+          // no glyph either).
+          <span style={{ fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>Empty</span>
+        ) : (
+          <>
+            {sprite}
+            {tier && (
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
+                <ReadOnlyLineChip value={slot.line1} theme={theme} />
+                <ReadOnlyLineChip value={slot.line2} theme={theme} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Badge slot (pentagon) ──────────────────────────────────────────────────
+
+function filterBadges(query: string, excluded: ReadonlySet<string>): readonly string[] {
+  const available = BADGE_NAMES.filter((n) => !excluded.has(n));
+  if (!query.trim()) return available;
+  return searchAndRank(available, query, (n) => n);
+}
+
+function BadgeSlot({
+  badge, slotId, openId, query, theme, usedBadges,
+  onOpen, onQueryChange, onPick, onAdvance, onClear, onPrev, onNext, onClosePicker,
+}: {
+  badge: string;
+  slotId: string;
+  openId: string | null;
+  query: string;
+  theme: AppTheme;
+  usedBadges: ReadonlySet<string>;
+  onOpen: () => void;
+  onQueryChange: (q: string) => void;
+  onPick: (name: string) => void;
+  /** Called (instead of onClose) after an actual pick — opens the next badge slot, if it's
+   *  still empty. viaKeyboard distinguishes an Enter-driven pick from a mouse click — only
+   *  a keyboard pick jumps slots, since a mouse click means the user's cursor is staying
+   *  local. */
+  onAdvance: (viaKeyboard: boolean) => void;
+  onClear: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  onClosePicker: () => void;
+}) {
+  const isOpen = openId === slotId;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, BADGE_PICKER_WIDTH);
+  const filtered = useMemo(() => isOpen ? filterBadges(query, usedBadges) : [], [isOpen, query, usedBadges]);
+  const outerSize = BADGE_SIZE + BADGE_BORDER * 2;
+
+  useEffect(() => {
+    if (isOpen) inputRef.current?.focus();
+  }, [isOpen]);
+
+  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
+    items: filtered,
+    resetKey: query,
+    onSelect: (name) => { onPick(name); onAdvance(true); },
+    onClose: onClosePicker,
+    onPrev,
+    onNext,
+  });
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && query === "" && badge) {
+      e.preventDefault();
+      onClear();
+      return;
+    }
+    navKeyDown(e);
+  }
+
+  const emptyBg = isOpen ? theme.accent : `${theme.muted}28`;
+  const badgePickerStyle: CSSProperties = {
+    ...popoverVisualStyle,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: BADGE_PICKER_WIDTH,
+    zIndex: 300,
+    background: theme.panel,
+    border: `1px solid ${theme.accent}`,
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        title={badge || "Add badge"}
+        aria-label={badge || "Add badge"}
+        onClick={(e) => { if (isStrayClick(e)) { return; } onOpen(); }}
+        style={{ cursor: "pointer", background: "none", border: "none", padding: 0 }}
+      >
+        <div style={{ width: outerSize, height: outerSize, clipPath: PENTAGON, background: emptyBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {badge ? (
+            <FamiliarBadgeImage badge={badge} size={outerSize} theme={theme} pentagon />
+          ) : (
+            <span style={{ fontSize: 18, color: theme.muted, lineHeight: 1 }}>+</span>
+          )}
+        </div>
+      </button>
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={portalRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={badgePickerStyle}
+        >
+          {badge && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${theme.border}` }}>
+              <FamiliarBadgeImage badge={badge} size={28} theme={theme} style={{ objectFit: "contain" }} />
+              <div style={{ overflow: "hidden", flex: 1 }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: theme.muted }}>Currently Selected</p>
+                <p title={badge} style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{badge}</p>
+              </div>
+            </div>
+          )}
+          {badge && (
+            <button
+              type="button"
+              className="tap-target-44"
+              onClick={onClear}
+              style={clearRowStyle(theme)}
+            >
+              — Clear slot —
+            </button>
+          )}
+          <div style={{ padding: "0.4rem 0.5rem", borderBottom: `1px solid ${theme.border}` }}>
+            <input
+              ref={inputRef}
+              type="text"
+              aria-label="Search badges"
+              value={query}
+              placeholder="Search badges…"
+              onChange={(e) => onQueryChange(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              style={{ ...searchInputStyle, borderColor: theme.border, background: theme.bg, color: theme.text }}
+            />
+          </div>
+          <div style={{ maxHeight: 180, overflowY: "auto" }}>
+            {filtered.length === 0 && (
+              <p style={{ margin: 0, padding: "0.5rem 0.75rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 600 }}>
+                No results
+              </p>
+            )}
+            {filtered.map((name, i) => (
+              <button
+                key={name}
+                ref={itemRef(i)}
+                type="button"
+                onClick={() => { onPick(name); onAdvance(false); }}
+                style={badgeOptionStyle(theme, i === highlightedIndex)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <FamiliarBadgeImage badge={name} size={20} theme={theme} style={{ objectFit: "contain" }} />
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body!
+      )}
+    </div>
+  );
+}
+
+/** Read-only counterpart to BadgeSlot for the profile Familiars bookmark — same pentagon
+ *  tile, no picker or interactivity. */
+export function ReadOnlyBadgeSlot({ badge, theme }: { badge: string; theme: AppTheme }) {
+  const outerSize = BADGE_SIZE + BADGE_BORDER * 2;
+  const pentagon = (
+    <div style={{ width: outerSize, height: outerSize, clipPath: PENTAGON, background: badge ? undefined : `${theme.muted}28` }}>
+      {badge && (
+        <FamiliarBadgeImage badge={badge} size={outerSize} theme={theme} pentagon />
+      )}
+    </div>
+  );
+  return badge ? <HoverTooltip label={badge} theme={theme}>{pentagon}</HoverTooltip> : pentagon;
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
+export default function FamiliarsSetupStep({
+  theme, step, stepNumber, totalSteps, confirmedCharacterName, value, onChange, onBack, onNext, onFinish,
+}: FamiliarsSetupStepProps) {
+  const [activePreset, setActivePreset] = useState(0);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pendingFamiliar, setPendingFamiliar] = useState<FamiliarEntry | null>(null);
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const initialValueRef = useRef(value);
+
+  // One-shot mount-time backfill from the character's saved tools data (only when this
+  // step lands blank) — can't run during render since it depends on a client-only
+  // localStorage read. Not worth lifting into the parent controller (which owns none of
+  // this step's domain logic) for a fetch that only ever fires once, at mount.
+  useEffect(() => {
+    if (initialValueRef.current) return;
+    if (!confirmedCharacterName) return;
+    const saved = selectCharacterByIgn(readCharactersStore(), confirmedCharacterName)?.familiars as FamiliarsValue | undefined;
+    // react-doctor-disable-next-line no-pass-data-to-parent
+    if (saved) onChange(JSON.stringify(saved));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!openId) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (zoneRef.current && !zoneRef.current.contains(e.target as Node)) {
+        setOpenId(null);
+        setPickerQuery("");
+        setPendingFamiliar(null);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [openId]);
+
+  const parsed = parseValue(value);
+  const preset = parsed.presets[activePreset];
+
+  function openPicker(id: string) {
+    setPickerQuery("");
+    setPendingFamiliar(null);
+    setOpenId((prev) => prev === id ? null : id);
+  }
+
+  function closePicker() {
+    setOpenId(null);
+    setPickerQuery("");
+    setPendingFamiliar(null);
+  }
+
+  function copyPreset(from: number) {
+    onChange(JSON.stringify({
+      presets: parsed.presets.map((p, i) => i === activePreset ? parsed.presets[from] : p),
+    }));
+    closePicker();
+  }
+
+  function clearPreset() {
+    onChange(JSON.stringify({
+      presets: parsed.presets.map((p, i) => i === activePreset ? emptyPreset() : p),
+    }));
+    closePicker();
+  }
+
+  const badgeRowOffset = (BADGE_SIZE + BADGE_BORDER * 2 + 8) / 2;
+
+  return (
+    <SetupStepFrame
+      theme={theme}
+      stepLabel={step.label}
+      stepNumber={stepNumber}
+      totalSteps={totalSteps}
+      description="Choose your familiars and badges."
+      onBack={onBack}
+      onNext={onNext}
+      onFinish={onFinish}
+    >
+      {/* Preset tabs */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "0.65rem" }}>
+        <span style={{ fontSize: "0.8rem", fontWeight: 700, color: theme.muted }}>Preset</span>
+        {Array.from({ length: PRESET_COUNT }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            className="tap-target-44"
+            onClick={() => { setActivePreset(i); closePicker(); }}
+            style={presetSquareStyle(theme, i === activePreset)}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </div>
+      <div style={{ marginBottom: "0.75rem" }}>
+        <CopyFromPreset theme={theme} count={PRESET_COUNT} active={activePreset} onCopy={copyPreset} onClear={clearPreset} />
+      </div>
+
+      <div>
+        {/* 3 familiar cards */}
+        <div ref={zoneRef} style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+          {preset.familiars.map((slot, i) => {
+            const slotId = `f${i}`;
+            // Reaching the end of this card's chain — via Enter-picking Line 2 or via an
+            // explicit Tab — always lands here, so both paths behave identically. Only
+            // considers the immediately adjacent slot, and only jumps in if it's still
+            // empty; barging into a card someone already finished (e.g. while correcting
+            // an earlier one) would be more surprising than helpful, so it just closes.
+            const nextSlot = i < SLOT_COUNT - 1 ? preset.familiars[i + 1] : null;
+            const goToNextCard = nextSlot && !nextSlot.name ? () => openPicker(`f${i + 1}`) : closePicker;
+            return (
+              // react-doctor-disable-next-line no-array-index-as-key
+              <FamiliarSlotCard
+                key={`${activePreset}-${i}`}
+                slot={slot}
+                slotId={slotId}
+                openId={openId}
+                query={openId === slotId ? pickerQuery : ""}
+                pendingEntry={openId === slotId ? pendingFamiliar : null}
+                theme={theme}
+                onOpen={() => openPicker(slotId)}
+                onQueryChange={setPickerQuery}
+                onSetPending={setPendingFamiliar}
+                onSelect={(entry, tier, viaKeyboard) => {
+                  onChange(JSON.stringify(patchSlot(parsed, activePreset, i, { familiarId: entry.id, mobId: entry.mobId, name: entry.name, tier, line1: "", line2: "" })));
+                  // Only a keyboard pick (Enter) jumps to Line 1 — a mouse click means the
+                  // user's cursor is staying local, so just close for them.
+                  if (viaKeyboard) { openPicker(`${slotId}-line1`); } else { closePicker(); }
+                }}
+                onClear={() => { onChange(JSON.stringify(patchSlot(parsed, activePreset, i, emptySlot()))); closePicker(); }}
+                onLineChange={(field, val, viaKeyboard) => {
+                  onChange(JSON.stringify(patchSlot(parsed, activePreset, i, { [field]: val })));
+                  if (val === "") { closePicker(); return; }
+                  // Only a keyboard pick (Enter) jumps to the next line/card — a mouse click
+                  // means the user's cursor is staying local, so just close for them.
+                  if (!viaKeyboard) { closePicker(); return; }
+                  if (field === "line1") { openPicker(`${slotId}-line2`); return; }
+                  goToNextCard();
+                }}
+                onTogglePicker={openPicker}
+                onClosePicker={closePicker}
+                onNextCard={goToNextCard}
+              />
+            );
+          })}
+        </div>
+
+        {/* Badge slots — staggered 4+4 like in-game */}
+        <div>
+          <p style={{ margin: "0 0 0.5rem", fontSize: "0.75rem", fontWeight: 800, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Equipped Badges
+          </p>
+          {(() => {
+            const usedBadges = new Set(preset.badges.filter(Boolean));
+            // Reaching the end of a badge's picker — via Enter-picking a badge or via an
+            // explicit Tab — only ever considers the immediately adjacent badge slot, and
+            // only jumps in if it's still empty; barging into a slot someone already filled
+            // (e.g. while correcting an earlier one) would be more surprising than helpful,
+            // so it just closes instead.
+            function goToNextBadge(bi: number): () => void {
+              const nextBadge = bi < BADGE_COUNT - 1 ? preset.badges[bi + 1] : null;
+              return nextBadge !== null && !nextBadge ? () => openPicker(`b${bi + 1}`) : closePicker;
+            }
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                <div className="familiar-badge-row" style={{ display: "flex", gap: 8 }}>
+                  {preset.badges.slice(0, 4).map((badge, i) => {
+                    const slotId = `b${i}`;
+                    const goNext = goToNextBadge(i);
+                    return (
+                      // react-doctor-disable-next-line no-array-index-as-key
+                      <BadgeSlot
+                        key={i}
+                        badge={badge}
+                        slotId={slotId}
+                        openId={openId}
+                        query={openId === slotId ? pickerQuery : ""}
+                        theme={theme}
+                        usedBadges={usedBadges}
+                        onOpen={() => openPicker(slotId)}
+                        onQueryChange={setPickerQuery}
+                        onPick={(name) => onChange(JSON.stringify(patchBadge(parsed, activePreset, i, name)))}
+                        onAdvance={(viaKeyboard) => { if (viaKeyboard) goNext(); else closePicker(); }}
+                        onClear={() => { onChange(JSON.stringify(patchBadge(parsed, activePreset, i, ""))); closePicker(); }}
+                        onPrev={i > 0 ? () => openPicker(`b${i - 1}`) : undefined}
+                        onNext={goNext}
+                        onClosePicker={closePicker}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="familiar-badge-row familiar-badge-row-offset" style={{ display: "flex", gap: 8, marginLeft: badgeRowOffset }}>
+                  {preset.badges.slice(4).map((badge, i) => {
+                    const bi = i + 4;
+                    const slotId = `b${bi}`;
+                    const goNext = goToNextBadge(bi);
+                    return (
+                      // react-doctor-disable-next-line no-array-index-as-key
+                      <BadgeSlot
+                        key={bi}
+                        badge={badge}
+                        slotId={slotId}
+                        openId={openId}
+                        query={openId === slotId ? pickerQuery : ""}
+                        theme={theme}
+                        usedBadges={usedBadges}
+                        onOpen={() => openPicker(slotId)}
+                        onQueryChange={setPickerQuery}
+                        onPick={(name) => onChange(JSON.stringify(patchBadge(parsed, activePreset, bi, name)))}
+                        onAdvance={(viaKeyboard) => { if (viaKeyboard) goNext(); else closePicker(); }}
+                        onClear={() => { onChange(JSON.stringify(patchBadge(parsed, activePreset, bi, ""))); closePicker(); }}
+                        onPrev={() => openPicker(`b${bi - 1}`)}
+                        onNext={goNext}
+                        onClosePicker={closePicker}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+    </SetupStepFrame>
+  );
+}

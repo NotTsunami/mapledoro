@@ -16,17 +16,41 @@
 import type { StatFieldId } from "./statFields";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 
+// Skill icon by id from the haku.network `skill` resource (ids in manifests/v268/skill.json).
+const sk = (id: string): string => resourceImageUrl("skill", id, "icon.png");
+
 export interface BuffSkill {
-  skillIconUrl: string;
+  skillIconUrl?: string;
   skillName: string;
-  /** Job advancement label for display in tooltip (e.g. "3", "Hyper Skills (140)", "Beginner", "Transcendent") */
+  /** Job advancement label for display in tooltip (e.g. "3", "Hyper Skills (140)", "Beginner") */
   jobAdvancement: string;
 }
+
+/** Buffs every class must have active, shown before class-specific skills in the buff guide. */
+export const UNIVERSAL_BUFF_SKILLS: BuffSkill[] = [
+  { skillIconUrl: sk("80011951"), skillName: "Summon Familiars", jobAdvancement: "Beginner" },
+];
+
+/** Warnings shown for every class on the stats step. */
+export const UNIVERSAL_WARNINGS: ClassWarning[] = [
+  { message: "Soul Gauge must be 0/1000", tooltip: { title: "Soul Gauge", description: "A full gauge increases ATT/MATT passively." } },
+];
 
 export interface ClassWarning {
   message: string;
   /** If this warning is about a specific skill (e.g. "do not use"), show its icon */
   skill?: BuffSkill;
+  /** Optional explanation shown via a "?" tooltip next to the warning. */
+  tooltip?: { title: string; description: string };
+}
+
+export interface ClassSetupOptionsDef {
+  /** Hero, Paladin, Dawn Warrior: 1H vs 2H weapon affects attack power */
+  weaponType?: true;
+  /** Demon Slayer, Demon Avenger: optional equipment slot */
+  ruinForceShield?: true;
+  /** Demon Avenger only: replaces universal Mu Gong toggle with Ephinea (Lv 1/2) vs Mu Gong selector */
+  epheniaSoul?: true;
 }
 
 export interface ClassSkillData {
@@ -34,11 +58,25 @@ export interface ClassSkillData {
   nexonJobName: string;
   /** Override display name when Nexon's jobName differs from what players call the class (e.g. "Dual Blade" vs Nexon's "Blade Master") */
   displayName?: string;
+  /** Auto-fill gender and skip the gender setup step (class has a fixed gender) */
+  fixedGender?: "male" | "female";
+  /** Skip the gender setup step with no auto-fill (class has no gender, e.g. Zero) */
+  skipGender?: true;
+  /** Skip the marriage setup step (class cannot participate in marriage, e.g. Zero) */
+  skipMarriage?: true;
+  /** Override the "MP" label for classes with their own resource bar instead of MP:
+   *  Demon Avenger/Demon Slayer (Demon Fury "DF"), Zero (Time Force "TF"), Kinesis
+   *  (Psychic Points "PP"). */
+  resourceLabel?: string;
   /** Warnings shown before the buff guide. Use skill for "do not use X" entries. */
   warnings?: ClassWarning[];
+  /** Class-specific setup option toggles shown on the stats step. */
+  setupOptionsDef?: ClassSetupOptionsDef;
   buffSkills: BuffSkill[];
   /** Class-specific required stats, ordered by importance (primary first). Universal stats are added automatically. */
   requiredStats: StatFieldId[];
+  /** Legacy classes (lower job advancements) — no V Matrix or HEXA Matrix. */
+  isLegacy?: true;
 }
 
 // Stats required for every class regardless of type
@@ -64,9 +102,6 @@ export function getRequiredStatsForClass(classData: ClassSkillData): StatFieldId
 }
 
 // ── Commonly reused buff skills ────────────────────────────────────────────────
-
-// Skill icon by id from the haku.network `skill` resource (ids in manifests/v268/skill.json).
-const sk = (id: string): string => resourceImageUrl("skill", id, "icon.png");
 
 const DSE: BuffSkill = {
   skillIconUrl: sk("0008002"),
@@ -136,6 +171,11 @@ const LUCENT_BRAND: BuffSkill = {
   skillName: "Lucent Brand",
   jobAdvancement: "1",
 };
+const TIDE_OF_BATTLE: BuffSkill = {
+  skillIconUrl: sk("150000017"),
+  skillName: "Tide of Battle",
+  jobAdvancement: "1",
+};
 const IGNIS_ROAR: BuffSkill = {
   skillIconUrl: sk("23110004"),
   skillName: "Ignis Roar",
@@ -156,6 +196,26 @@ const COMBO_TRAINING: BuffSkill = {
   skillName: "Combo Training",
   jobAdvancement: "3",
 };
+const ADVANCED_COMBO: BuffSkill = {
+  skillIconUrl: sk("1120003"),
+  skillName: "Advanced Combo",
+  jobAdvancement: "4",
+};
+const GREATER_VESSEL_OF_LIGHT: BuffSkill = {
+  skillIconUrl: sk("1220010"),
+  skillName: "Greater Vessel of Light",
+  jobAdvancement: "4",
+};
+const MANIFESTATION_WIND_SWING: BuffSkill = {
+  skillIconUrl: sk("162111000"),
+  skillName: "Manifestation: Wind Swing",
+  jobAdvancement: "3",
+};
+const MANIFESTATION_SUNLIGHT_FILLED_GROUND: BuffSkill = {
+  skillIconUrl: sk("162111003"),
+  skillName: "Manifestation: Sunlight-Filled Ground",
+  jobAdvancement: "3",
+};
 
 // ── Class data ────────────────────────────────────────────────────────────────
 
@@ -171,6 +231,10 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "lara",
     nexonJobName: "Lara",
+    warnings: [
+      { message: "Do not use", skill: MANIFESTATION_WIND_SWING },
+      { message: "Do not use", skill: MANIFESTATION_SUNLIGHT_FILLED_GROUND },
+    ],
     buffSkills: [DSE, DCO],
     requiredStats: ["int", "luk", "magicAtt"],
   },
@@ -193,18 +257,15 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "dawn_warrior",
     nexonJobName: "Dawn Warrior",
-    // TODO: setup option — One-Handed Weapon or Two-Handed Weapon
-    buffSkills: [
-      DSE,
-      DCO,
-      { skillIconUrl: sk("11100031"), skillName: "Equinox Cycle", jobAdvancement: "2" },
-    ],
+    setupOptionsDef: { weaponType: true },
+    buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
   {
     id: "mihile",
     nexonJobName: "Mihile",
-    warnings: [{ message: "Solo party only for Soul Link (3rd job)" }],
+    fixedGender: "male",
+    warnings: [{ message: "Solo party only (for Soul Link)" }],
     buffSkills: [
       DSE,
       DCO,
@@ -222,7 +283,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "thunder_breaker",
     nexonJobName: "Thunder Breaker",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
@@ -238,8 +299,9 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "demon_avenger",
     nexonJobName: "Demon Avenger",
-    warnings: [{ message: "Do not use Overload Release (1st job)", skill: OVERLOAD_RELEASE }],
-    // TODO: setup options — Ephinea Soul (up to Lv. 2) or Mu Gong Soul; optional Ruin Force Shield
+    warnings: [{ message: "Do not use", skill: OVERLOAD_RELEASE }],
+    setupOptionsDef: { ruinForceShield: true, epheniaSoul: true },
+    resourceLabel: "DF",
     buffSkills: [
       DSE,
       DCO,
@@ -250,7 +312,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "demon_slayer",
     nexonJobName: "Demon Slayer",
-    // TODO: setup option — optional Ruin Force Shield
+    setupOptionsDef: { ruinForceShield: true },
+    resourceLabel: "DF",
     buffSkills: [
       DSE,
       DCO,
@@ -295,7 +358,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     id: "blade_master",
     nexonJobName: "Blade Master",
     displayName: "Dual Blade",
-    warnings: [{ message: "Do not use Final Cut (4th job)", skill: FINAL_CUT }],
+    warnings: [{ message: "Do not use", skill: FINAL_CUT }],
     buffSkills: [
       DSE,
       DCO,
@@ -315,7 +378,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "buccaneer",
     nexonJobName: "Buccaneer",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [
       DSE,
       DCO,
@@ -326,8 +389,9 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   },
   {
     id: "cannoneer",
-    nexonJobName: "Cannoneer",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    nexonJobName: "Cannon Master",
+    displayName: "Cannoneer",
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [
       DSE,
       DCO,
@@ -338,7 +402,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "corsair",
     nexonJobName: "Corsair",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [
       DSE,
       DCO,
@@ -361,8 +425,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "hero",
     nexonJobName: "Hero",
-    warnings: [{ message: "Must have 10 combo orb" }],
-    // TODO: setup option — One-Handed Weapon or Two-Handed Weapon
+    warnings: [{ message: "Must have 10 combo orb", skill: ADVANCED_COMBO }],
+    setupOptionsDef: { weaponType: true },
     buffSkills: [
       DSE,
       DCO,
@@ -392,8 +456,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "paladin",
     nexonJobName: "Paladin",
-    warnings: [{ message: "Must have 0 charge" }],
-    // TODO: setup option — One-Handed Weapon or Two-Handed Weapon
+    warnings: [{ message: "Must have 0 charge", skill: GREATER_VESSEL_OF_LIGHT }],
+    setupOptionsDef: { weaponType: true },
     buffSkills: [
       DSE,
       { skillIconUrl: sk("0008004"), skillName: "Combat Orders", jobAdvancement: "3" },
@@ -414,14 +478,14 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "shadower",
     nexonJobName: "Shadower",
-    warnings: [{ message: "Must have 0 stacks for Flip of the Coin (Hyper Skill)", skill: FLIP_OF_THE_COIN }],
+    warnings: [{ message: "Must have 0 stacks", skill: FLIP_OF_THE_COIN }],
     buffSkills: [DSE, DCO],
     requiredStats: ["luk", "dex", "str", "attackPower"],
   },
   {
     id: "adele",
     nexonJobName: "Adele",
-    warnings: [{ message: "Must have 0 stacks for Resonance Rush (2nd job)", skill: RESONANCE_RUSH }],
+    warnings: [{ message: "Must have 0 stacks", skill: RESONANCE_RUSH }],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
@@ -430,8 +494,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     nexonJobName: "Ark",
     warnings: [
       { message: "Must be in Flora form (not Specter)" },
-      { message: "Must have 0 Spell Bullets (1st job)", skill: SPELL_BULLETS },
-      { message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE },
+      { message: "Must have 0 stacks", skill: SPELL_BULLETS },
+      { message: "Do not use", skill: LOADED_DICE },
     ],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
@@ -439,7 +503,10 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "illium",
     nexonJobName: "Illium",
-    warnings: [{ message: "Must have 0 stacks (moving, Lucent Brand 1st job)", skill: LUCENT_BRAND }],
+    warnings: [
+      { message: "Must have 0 stacks", skill: LUCENT_BRAND },
+      { message: "Must have 0 stacks (do not move)", skill: TIDE_OF_BATTLE },
+    ],
     buffSkills: [DSE, DCO],
     requiredStats: ["int", "luk", "magicAtt"],
   },
@@ -452,6 +519,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "kinesis",
     nexonJobName: "Kinesis",
+    resourceLabel: "PP",
     buffSkills: [DSE, DCO],
     requiredStats: ["int", "luk", "magicAtt"],
   },
@@ -489,7 +557,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "mercedes",
     nexonJobName: "Mercedes",
-    warnings: [{ message: "Must have 0 stacks (Ignis Roar, 3rd job)", skill: IGNIS_ROAR }],
+    warnings: [{ message: "Must have 0 stacks", skill: IGNIS_ROAR }],
     buffSkills: [
       DSE,
       DCO,
@@ -502,9 +570,9 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     id: "phantom",
     nexonJobName: "Phantom",
     warnings: [
-      { message: "Do not use Final Cut (4th job)", skill: FINAL_CUT },
-      { message: "Do not use Cross Surge (3rd job)", skill: CROSS_SURGE },
-      { message: "Do not use Spirit Blade (2nd job)", skill: SPIRIT_BLADE },
+      { message: "Do not use", skill: FINAL_CUT },
+      { message: "Do not use", skill: CROSS_SURGE },
+      { message: "Do not use", skill: SPIRIT_BLADE },
     ],
     buffSkills: [DSE, DCO],
     requiredStats: ["luk", "dex", "attackPower"],
@@ -512,7 +580,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "shade",
     nexonJobName: "Shade",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
@@ -530,8 +598,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     id: "mo_xuan",
     nexonJobName: "Mo Xuan",
     warnings: [
-      { message: "Must have 5 stacks for Heir of the Divine (4th job)", skill: HEIR_OF_THE_DIVINE },
-      { message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE },
+      { message: "Must have 5 stacks", skill: HEIR_OF_THE_DIVINE },
+      { message: "Do not use", skill: LOADED_DICE },
     ],
     buffSkills: [DSE, DCO],
     requiredStats: ["dex", "str", "attackPower"],
@@ -539,7 +607,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "angelic_buster",
     nexonJobName: "Angelic Buster",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    fixedGender: "female",
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [
       DSE,
       DCO,
@@ -550,7 +619,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "cadena",
     nexonJobName: "Cadena",
-    warnings: [{ message: "Must have 0 stacks for Muscle Memory (2nd job)", skill: MUSCLE_MEMORY }],
+    warnings: [{ message: "Must have 0 stacks", skill: MUSCLE_MEMORY }],
     buffSkills: [DSE, DCO],
     requiredStats: ["luk", "dex", "str", "attackPower"],
   },
@@ -588,14 +657,14 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "blaster",
     nexonJobName: "Blaster",
-    warnings: [{ message: "Must have 0 stacks for Combo Training (3rd job)", skill: COMBO_TRAINING }],
+    warnings: [{ message: "Must have 0 stacks", skill: COMBO_TRAINING }],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
   {
     id: "mechanic",
     nexonJobName: "Mechanic",
-    warnings: [{ message: "Do not use Loaded Dice (5th job)", skill: LOADED_DICE }],
+    warnings: [{ message: "Do not use", skill: LOADED_DICE }],
     buffSkills: [
       DSE,
       DCO,
@@ -607,6 +676,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     id: "wild_hunter",
     nexonJobName: "Wild Hunter",
     buffSkills: [
+      { skillIconUrl: sk("33101004"), skillName: "Call of the Wild", jobAdvancement: "2" },
       { skillIconUrl: sk("3121002"), skillName: "Sharp Eyes", jobAdvancement: "4" },
       DCO,
     ],
@@ -617,8 +687,8 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     nexonJobName: "Xenon",
     warnings: [
       { message: "Supply Surplus must be 20/20 (Beginner)" },
-      { message: "Do not use Circuit Surge (1st job)", skill: CIRCUIT_SURGE },
-      { message: "Do not use OOPArts Code (4th job)", skill: OOPARTS_CODE },
+      { message: "Do not use", skill: CIRCUIT_SURGE },
+      { message: "Do not use", skill: OOPARTS_CODE },
     ],
     buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "luk", "attackPower"],
@@ -638,6 +708,7 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
   {
     id: "sia_astelle",
     nexonJobName: "Sia Astelle",
+    fixedGender: "female",
     buffSkills: [
       DSE,
       DCO,
@@ -646,64 +717,102 @@ export const CLASS_SKILL_DATA: ClassSkillData[] = [
     requiredStats: ["int", "luk", "magicAtt"],
   },
   {
+    id: "erel_light",
+    nexonJobName: "Erel Light",
+    // STR warrior (Shine). Gram weapon / Keir secondary — see classBranch.ts.
+    // No fixed gender. buffSkills are the universal decent skills only for now:
+    // Erel is too new for MapleScouter to list its buffs yet, so we can't confirm
+    // which always-on skills raise stat-window values. TODO: revisit once MapleScouter
+    // adds Erel Light and add the class-specific buff(s) (candidates: Light Enchant,
+    // Helian Blessing, and the other no-cooldown actives — see new-class-checklist memory).
+    buffSkills: [DSE, DCO],
+    requiredStats: ["str", "dex", "attackPower"],
+  },
+  {
     id: "zero",
     nexonJobName: "Zero",
+    skipGender: true,
+    skipMarriage: true,
+    resourceLabel: "TF",
     warnings: [{ message: "Must be in Beta status" }],
-    buffSkills: [
-      DSE,
-      DCO,
-      { skillIconUrl: sk("100000263"), skillName: "Divine Aura", jobAdvancement: "Transcendent" },
-    ],
+    buffSkills: [DSE, DCO],
     requiredStats: ["str", "dex", "attackPower"],
   },
 
   // ── Legacy classes (no buff guide, shows all stat fields) ───────────────────
 
-  { id: "ancient_archer", nexonJobName: "Ancient Archer", buffSkills: [], requiredStats: [] },
-  { id: "archer", nexonJobName: "Archer", buffSkills: [], requiredStats: [] },
-  { id: "assassin", nexonJobName: "Assassin", buffSkills: [], requiredStats: [] },
-  { id: "bandit", nexonJobName: "Bandit", buffSkills: [], requiredStats: [] },
-  { id: "beginner", nexonJobName: "Beginner", buffSkills: [], requiredStats: [] },
-  { id: "berserker", nexonJobName: "Berserker", buffSkills: [], requiredStats: [] },
-  { id: "blade_acolyte", nexonJobName: "Blade Acolyte", buffSkills: [], requiredStats: [] },
-  { id: "blade_lord", nexonJobName: "Blade Lord", buffSkills: [], requiredStats: [] },
-  { id: "blade_recruit", nexonJobName: "Blade Recruit", buffSkills: [], requiredStats: [] },
-  { id: "blade_specialist", nexonJobName: "Blade Specialist", buffSkills: [], requiredStats: [] },
-  { id: "brawler", nexonJobName: "Brawler", buffSkills: [], requiredStats: [] },
-  { id: "cannon_master", nexonJobName: "Cannon Master", buffSkills: [], requiredStats: [] },
-  { id: "cannon_trooper", nexonJobName: "Cannon Trooper", buffSkills: [], requiredStats: [] },
-  { id: "chief_bandit", nexonJobName: "Chief Bandit", buffSkills: [], requiredStats: [] },
-  { id: "citizen", nexonJobName: "Citizen", buffSkills: [], requiredStats: [] },
-  { id: "cleric", nexonJobName: "Cleric", buffSkills: [], requiredStats: [] },
-  { id: "crossbowman", nexonJobName: "Crossbowman", buffSkills: [], requiredStats: [] },
-  { id: "crusader", nexonJobName: "Crusader", buffSkills: [], requiredStats: [] },
-  { id: "fighter", nexonJobName: "Fighter", buffSkills: [], requiredStats: [] },
-  { id: "gunslinger", nexonJobName: "Gunslinger", buffSkills: [], requiredStats: [] },
-  { id: "hermit", nexonJobName: "Hermit", buffSkills: [], requiredStats: [] },
-  { id: "hunter", nexonJobName: "Hunter", buffSkills: [], requiredStats: [] },
-  { id: "mage_f_p", nexonJobName: "Mage (F/P)", displayName: "Mage (Fire/Poison)", buffSkills: [], requiredStats: [] },
-  { id: "mage_i_l", nexonJobName: "Mage (I/L)", displayName: "Mage (Ice/Lightning)", buffSkills: [], requiredStats: [] },
-  { id: "magician", nexonJobName: "Magician", buffSkills: [], requiredStats: [] },
-  { id: "marauder", nexonJobName: "Marauder", buffSkills: [], requiredStats: [] },
-  { id: "outlaw", nexonJobName: "Outlaw", buffSkills: [], requiredStats: [] },
-  { id: "page", nexonJobName: "Page", buffSkills: [], requiredStats: [] },
-  { id: "pirate", nexonJobName: "Pirate", buffSkills: [], requiredStats: [] },
-  { id: "priest", nexonJobName: "Priest", buffSkills: [], requiredStats: [] },
-  { id: "ranger", nexonJobName: "Ranger", buffSkills: [], requiredStats: [] },
-  { id: "rogue", nexonJobName: "Rogue", buffSkills: [], requiredStats: [] },
-  { id: "sniper", nexonJobName: "Sniper", buffSkills: [], requiredStats: [] },
-  { id: "soulchaser", nexonJobName: "Soulchaser", buffSkills: [], requiredStats: [] },
-  { id: "spearman", nexonJobName: "Spearman", buffSkills: [], requiredStats: [] },
-  { id: "swordman", nexonJobName: "Swordman", buffSkills: [], requiredStats: [] },
-  { id: "white_knight", nexonJobName: "White Knight", buffSkills: [], requiredStats: [] },
-  { id: "wizard_f_p", nexonJobName: "Wizard (F/P)", displayName: "Wizard (Fire/Poison)", buffSkills: [], requiredStats: [] },
-  { id: "wizard_i_l", nexonJobName: "Wizard (I/L)", displayName: "Wizard (Ice/Lightning)", buffSkills: [], requiredStats: [] },
+  // requiredStats below are populated per classBranch.ts's own EQUIP_BRANCH mapping (already
+  // vetted against grandislibrary) for the branches that are internally stat-uniform
+  // (warrior/magician/bowman are the same main stat regardless of which sub-job), cross-
+  // checked against each branch's real 4th-job analog entry above (Hero/Bishop/Marksman) for
+  // the exact primary/secondary order. Thief and Pirate are NOT internally uniform, so those
+  // needed the real job-tree lineage, not just classBranch.ts's coarser 5-way bucket:
+  //   Thief: Rogue(1st) -> Assassin/Hermit -> Night Lord (claw, simple luk/dex) is a DIFFERENT
+  //   lineage from Bandit/Chief Bandit -> Shadower (dagger, tri-stat luk/dex/str) -- these were
+  //   all wrongly assigned the Night Lord shape on the first pass, since classBranch.ts groups
+  //   both lineages under one "thief" bucket for equip-filtering purposes only.
+  //   Pirate: Brawler/Marauder->Buccaneer (STR) and Gunslinger/Outlaw->Corsair (DEX) are
+  //   genuinely different primary stats with no shared lineage-wide default the way Rogue has
+  //   (LUK/DEX either way) -- Yuki confirmed dormant "Pirate"-jobName characters observed in
+  //   practice consistently land DEX/STR (Corsair), so that's what's assigned below.
+  // beginner/citizen/noblesse stay empty: no real job/branch to derive a stat from (Noblesse
+  // precedes Cygnus Knights' own 5-way branch split, which spans all 4 main stats with no
+  // overlap) -- Overview/Stats fall back to showing all 4 main stats for these.
+  // ancient_archer/soulchaser are Pathfinder's 2nd/3rd job (bowman), confirmed by Yuki.
+  { id: "ancient_archer", nexonJobName: "Ancient Archer", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "archer", nexonJobName: "Archer", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "assassin", nexonJobName: "Assassin", buffSkills: [], requiredStats: ["luk", "dex", "attackPower"], isLegacy: true },
+  // Bandit -> Chief Bandit -> Shadower lineage (dagger), NOT the Assassin/Hermit -> Night Lord
+  // lineage (claw) -- tri-stat like Shadower/Dual Blade/Cadena, not simple luk/dex.
+  { id: "bandit", nexonJobName: "Bandit", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "beginner", nexonJobName: "Beginner", buffSkills: [], requiredStats: [], isLegacy: true },
+  { id: "berserker", nexonJobName: "Berserker", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "blade_acolyte", nexonJobName: "Blade Acolyte", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "blade_lord", nexonJobName: "Blade Lord", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "blade_recruit", nexonJobName: "Blade Recruit", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "blade_specialist", nexonJobName: "Blade Specialist", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "brawler", nexonJobName: "Brawler", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  // id kept as "cannon_master" for classBranch.ts continuity, but this is the OLD, pre-revamp jobName.
+  // The modern, currently-played Cannoneer's live jobName is actually "Cannon Master" (see the "cannoneer" entry above).
+  { id: "cannon_master", nexonJobName: "Cannoneer", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "cannon_trooper", nexonJobName: "Cannon Trooper", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  // Same Shadower lineage as Bandit above -- tri-stat, not simple luk/dex.
+  { id: "chief_bandit", nexonJobName: "Chief Bandit", buffSkills: [], requiredStats: ["luk", "dex", "str", "attackPower"], isLegacy: true },
+  { id: "citizen", nexonJobName: "Citizen", buffSkills: [], requiredStats: [], isLegacy: true },
+  { id: "cleric", nexonJobName: "Cleric", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "crossbowman", nexonJobName: "Crossbowman", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "crusader", nexonJobName: "Crusader", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "fighter", nexonJobName: "Fighter", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "gunslinger", nexonJobName: "Gunslinger", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "hermit", nexonJobName: "Hermit", buffSkills: [], requiredStats: ["luk", "dex", "attackPower"], isLegacy: true },
+  { id: "hunter", nexonJobName: "Hunter", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "mage_f_p", nexonJobName: "Mage (F/P)", displayName: "Mage (Fire/Poison)", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "mage_i_l", nexonJobName: "Mage (I/L)", displayName: "Mage (Ice/Lightning)", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "magician", nexonJobName: "Magician", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "marauder", nexonJobName: "Marauder", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "noblesse", nexonJobName: "Noblesse", buffSkills: [], requiredStats: [], isLegacy: true },
+  { id: "outlaw", nexonJobName: "Outlaw", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "page", nexonJobName: "Page", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  // Yuki: dormant "Pirate"-jobName characters observed in practice are consistently
+  // DEX/STR (Corsair lineage), not the STR/DEX Buccaneer side.
+  { id: "pirate", nexonJobName: "Pirate", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "priest", nexonJobName: "Priest", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "ranger", nexonJobName: "Ranger", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "rogue", nexonJobName: "Rogue", buffSkills: [], requiredStats: ["luk", "dex", "attackPower"], isLegacy: true },
+  { id: "sniper", nexonJobName: "Sniper", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  // Pathfinder's 3rd job (bowman), same lineage as ancient_archer below it.
+  { id: "soulchaser", nexonJobName: "Soulchaser", buffSkills: [], requiredStats: ["dex", "str", "attackPower"], isLegacy: true },
+  { id: "spearman", nexonJobName: "Spearman", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "swordman", nexonJobName: "Swordman", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "white_knight", nexonJobName: "White Knight", buffSkills: [], requiredStats: ["str", "dex", "attackPower"], isLegacy: true },
+  { id: "wizard_f_p", nexonJobName: "Wizard (F/P)", displayName: "Wizard (Fire/Poison)", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
+  { id: "wizard_i_l", nexonJobName: "Wizard (I/L)", displayName: "Wizard (Ice/Lightning)", buffSkills: [], requiredStats: ["int", "luk", "magicAtt"], isLegacy: true },
 ];
 
 export function getClassDataByNexonJobName(jobName: string): ClassSkillData | undefined {
   return CLASS_SKILL_DATA.find((c) => c.nexonJobName === jobName);
 }
 
-export function getClassDataById(id: string): ClassSkillData | undefined {
-  return CLASS_SKILL_DATA.find((c) => c.id === id);
+export function isLegacyClass(jobName: string): boolean {
+  return CLASS_SKILL_DATA.find((c) => c.nexonJobName === jobName)?.isLegacy === true;
 }

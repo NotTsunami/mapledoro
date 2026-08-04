@@ -24,7 +24,15 @@ export type SingleStatFieldId =
   | "additionalStatusDamage"
   | "summonDuration"
   | "arcanePower"
-  | "sacredPower";
+  | "sacredPower"
+  // Resource bar shown alongside HP — a raw number, not a percentage. Labeled "MP" by
+  // default; some classes replace MP with their own resource entirely (Demon Fury,
+  // Time Force, Psychic Points) via ClassSkillData.resourceLabel. Profile-pencil only
+  // (stats_flow) — never asked in the guided Setup flows, see StatsSetupStep's
+  // showAllStats.
+  | "mp"
+  // In-game Character Info window stat, profile-pencil only (same reasoning as mp).
+  | "normalEnemyDamage";
 
 export type StatFieldId = TripleStatFieldId | "cooldownReduction" | SingleStatFieldId;
 
@@ -33,23 +41,6 @@ export interface TripleStatFieldDef {
   label: string;
   type: "triple";
 }
-
-export interface CooldownReductionStatFieldDef {
-  id: "cooldownReduction";
-  label: string;
-  type: "cooldown_reduction";
-}
-
-export interface SingleStatFieldDef {
-  id: SingleStatFieldId;
-  label: string;
-  type: "single";
-}
-
-export type StatFieldDef =
-  | TripleStatFieldDef
-  | CooldownReductionStatFieldDef
-  | SingleStatFieldDef;
 
 // Triple stats: Base value, % value, % value not applied (3 separate screenshots)
 export const TRIPLE_STAT_FIELDS: TripleStatFieldDef[] = [
@@ -62,34 +53,24 @@ export const TRIPLE_STAT_FIELDS: TripleStatFieldDef[] = [
   { id: "magicAtt", label: "Magic ATT", type: "triple" },
 ];
 
-// Single-value stats
-export const SINGLE_STAT_FIELDS: SingleStatFieldDef[] = [
-  { id: "damage", label: "Damage", type: "single" },
-  { id: "bossDamage", label: "Boss Damage", type: "single" },
-  { id: "ignoreDefense", label: "Ignore Enemy DEF", type: "single" },
-  { id: "criticalRate", label: "Critical Rate", type: "single" },
-  { id: "criticalDamage", label: "Critical Damage", type: "single" },
-  { id: "buffDuration", label: "Buff Duration", type: "single" },
-  { id: "cooldownSkip", label: "Cooldown Skip Chance", type: "single" },
-  { id: "ignoreElementalResistance", label: "Ignore Elemental Resistance", type: "single" },
-  { id: "additionalStatusDamage", label: "Additional Status Damage", type: "single" },
-  { id: "summonDuration", label: "Summons Duration Increase", type: "single" },
-  { id: "arcanePower", label: "Arcane Force", type: "single" },
-  { id: "sacredPower", label: "Sacred Power", type: "single" },
-];
-
-export const COOLDOWN_REDUCTION_STAT_FIELD: CooldownReductionStatFieldDef = {
-  id: "cooldownReduction",
-  label: "Cooldown Reduction",
-  type: "cooldown_reduction",
+// Labels for the single-value combat/symbol fields, shared between the setup step's own
+// question labels and the profile's read-only Stats bookmark.
+export const STAT_LABELS: Partial<Record<StatFieldId, string>> = {
+  damage: "Damage",
+  bossDamage: "Boss Damage",
+  ignoreDefense: "Ignore DEF",
+  criticalRate: "Critical Rate",
+  criticalDamage: "Critical Damage",
+  buffDuration: "Buff Duration",
+  cooldownReduction: "Cooldown Reduction",
+  cooldownSkip: "Cooldown Not Applied",
+  ignoreElementalResistance: "Ignore Elem. Resist.",
+  additionalStatusDamage: "Addl. Status Damage",
+  summonDuration: "Summons Duration Inc.",
+  arcanePower: "Arcane Power",
+  sacredPower: "Sacred Power",
+  // Default label; ClassSkillData.resourceLabel overrides this per class (DF/TF/PP).
+  mp: "MP",
+  normalEnemyDamage: "Normal Enemy Damage",
 };
 
-export const ALL_STAT_FIELDS: StatFieldDef[] = [
-  ...TRIPLE_STAT_FIELDS,
-  COOLDOWN_REDUCTION_STAT_FIELD,
-  ...SINGLE_STAT_FIELDS,
-];
-
-export function getStatFieldById(id: StatFieldId): StatFieldDef | undefined {
-  return ALL_STAT_FIELDS.find((f) => f.id === id);
-}

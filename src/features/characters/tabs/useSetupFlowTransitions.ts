@@ -10,8 +10,6 @@ export const CHARACTERS_TRANSITION_MS = {
   slow: 320,
   searchFadeIn: 260,
   setupPanelRevealDelay: 80,
-  deleteNoticeVisible: 1000,
-  deleteNoticeTotal: 1500,
 } as const;
 
 interface SetupTransitionSetters {
@@ -25,7 +23,11 @@ interface SetupTransitionSetters {
   setShowCharacterDirectory: (value: boolean) => void;
   setSetupStepIndex: (value: number) => void;
   setSetupStepDirection: (value: "forward" | "backward") => void;
+  setSetupTargetSubstep: (value: number | null) => void;
+  setSetupConfineToSubstep: (value: boolean) => void;
+  setSetupSubstepIndex: (value: number) => void;
   setSetupStepTestByStep: (value: SetupStepInputById) => void;
+  setStepValidityById: (value: Record<string, boolean>) => void;
 }
 
 interface CommonTransitionCallbacks extends SetupTransitionSetters {
@@ -41,7 +43,11 @@ interface SetupFlowTransitionArgs {
   showCharacterDirectory: boolean;
   stepIndex: number;
   stepDirection: "forward" | "backward";
+  /** Which substep of stepIndex (if any) to land on — see setupSubstepIndex in
+   *  setupDraftStorage.ts for why this exists. */
+  substepIndex: number;
   stepData: SetupStepInputById;
+  stepValidityById: Record<string, boolean>;
 }
 
 interface TransitionSequenceOptions {
@@ -155,7 +161,11 @@ export function useSetupFlowTransitions() {
           callbacks.setShowCharacterDirectory(false);
           setSetupPanelVisible(false);
           callbacks.setSetupStepIndex(0);
+          callbacks.setSetupTargetSubstep(null);
+          callbacks.setSetupConfineToSubstep(false);
+          callbacks.setSetupSubstepIndex(0);
           callbacks.setSetupStepTestByStep({});
+          callbacks.setStepValidityById({});
           callbacks.resetSearchStateMessage();
         },
       });
@@ -179,7 +189,11 @@ export function useSetupFlowTransitions() {
           callbacks.setShowCharacterDirectory(false);
           setSetupPanelVisible(false);
           callbacks.setSetupStepIndex(0);
+          callbacks.setSetupTargetSubstep(null);
+          callbacks.setSetupConfineToSubstep(false);
+          callbacks.setSetupSubstepIndex(0);
           callbacks.setSetupStepTestByStep({});
+          callbacks.setStepValidityById({});
           if (nextMode === "search") {
             callbacks.resetSearchStateMessage();
           }
@@ -204,7 +218,15 @@ export function useSetupFlowTransitions() {
           setters.setShowCharacterDirectory(args.showCharacterDirectory);
           setters.setSetupStepDirection(args.stepDirection);
           setters.setSetupStepIndex(args.stepIndex);
+          // Safe to always set (not just when non-zero) — any subsequent normal
+          // navigation already clears setSetupTargetSubstep back to null (see
+          // setSetupStepWithDirection in useCharacterSetupController.ts), so it can't
+          // linger and force a stale substep later.
+          setters.setSetupTargetSubstep(args.substepIndex);
+          setters.setSetupConfineToSubstep(false);
+          setters.setSetupSubstepIndex(args.substepIndex);
           setters.setSetupStepTestByStep(args.stepData);
+          setters.setStepValidityById(args.stepValidityById);
           setSetupPanelVisible(false);
         },
         onCommit: () => {
@@ -237,6 +259,16 @@ export function useSetupFlowTransitions() {
     [runTransitionSequence],
   );
 
+  // Play the search-card entrance fade on its own, for flows that commit state
+  // outside runTransitionSequence (e.g. removing the last character lands on the
+  // first-time setup screen and should ease in, not snap).
+  const playSearchFadeIn = useCallback(() => {
+    setIsSearchFadeIn(true);
+    queueTransitionTimer(() => {
+      setIsSearchFadeIn(false);
+    }, CHARACTERS_TRANSITION_MS.searchFadeIn);
+  }, [queueTransitionTimer]);
+
   return {
     isConfirmFadeOut,
     confirmTransitionSource,
@@ -253,5 +285,6 @@ export function useSetupFlowTransitions() {
     runTransitionToMode,
     beginSetupFlowTransition,
     runBackTransition,
+    playSearchFadeIn,
   };
 }

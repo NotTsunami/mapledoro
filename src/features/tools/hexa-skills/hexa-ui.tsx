@@ -82,7 +82,7 @@ export function SkillIcon({ iconId, iconUrl, name, theme, size = 32 }: { iconId:
           color: theme.accentText,
         }}
       >
-        {name.charAt(0)}
+        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
       </div>
     </>
   );

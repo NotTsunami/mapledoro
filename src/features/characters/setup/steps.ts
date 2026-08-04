@@ -4,14 +4,16 @@
 */
 const SETUP_STEPS = [
   { id: "gender", label: "Gender" },
+  { id: "marriage", label: "Marriage" },
   { id: "stats", label: "Stats" },
-  { id: "equipment_core", label: "Equipment Core" },
-  { id: "inventory", label: "Inventory" },
+  { id: "equipment", label: "Gear" },
   { id: "v_matrix", label: "V Matrix" },
-  { id: "hexa_matrix", label: "Hexa Matrix" },
+  { id: "hexa_matrix", label: "HEXA Matrix" },
   { id: "familiars", label: "Familiars" },
   { id: "link_skills", label: "Link Skills" },
-  { id: "legion", label: "Legion" },
+  { id: "oz_rings", label: "Oz Rings" },
+  { id: "buffs", label: "Buffs" },
+  { id: "legion_artifacts", label: "Legion Artifacts" },
 ] as const;
 
 export type SetupStepDefinition = (typeof SETUP_STEPS)[number];

@@ -3,7 +3,8 @@
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { AppTheme } from "./themes";
-import { STATUS } from "./statusColors";
+import { STATUS, statusText } from "./statusColors";
+import WarningIcon from "./WarningIcon";
 
 function modalPanelStyle(theme: AppTheme): CSSProperties {
   return {
@@ -35,7 +36,7 @@ function cancelButtonStyle(theme: AppTheme): CSSProperties {
 
 function confirmButtonStyle(theme: AppTheme, danger: boolean): CSSProperties {
   return {
-    border: danger ? "1px solid #fca5a5" : `1px solid ${theme.accent}`,
+    border: `1px solid ${danger ? STATUS.danger.fill : theme.accent}`,
     borderRadius: "10px",
     background: danger ? STATUS.danger.fill : theme.accent,
     color: danger ? STATUS.danger.on : theme.accentOn,
@@ -51,6 +52,9 @@ interface ConfirmModalProps {
   theme: AppTheme;
   title: string;
   description: string;
+  /** Optional standalone callout below the description for a consequence worth calling out
+   *  on its own line (e.g. data loss) rather than folding into the plain description text. */
+  warning?: string;
   confirmLabel: string;
   confirmDanger?: boolean;
   onConfirm: () => void;
@@ -61,11 +65,13 @@ export default function ConfirmModal({
   theme,
   title,
   description,
+  warning,
   confirmLabel,
   confirmDanger = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  if (typeof document === "undefined") return null;
   return createPortal(
     <div
       style={{
@@ -85,6 +91,12 @@ export default function ConfirmModal({
         <p style={{ margin: 0, color: theme.muted, fontSize: "0.86rem", fontWeight: 700 }}>
           {description}
         </p>
+        {warning && (
+          <p style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.4rem", color: statusText(theme, "warning"), fontSize: "0.86rem", fontWeight: 800 }}>
+            <WarningIcon color={statusText(theme, "warning")} />
+            {warning}
+          </p>
+        )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.55rem" }}>
           <button
             type="button"

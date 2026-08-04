@@ -24,6 +24,11 @@ import {
 } from "../model/browserCharacterCache";
 import type { LookupResponse, NormalizedCharacterData } from "../model/types";
 
+function clearLookupTimers(slowTimer: ReturnType<typeof setTimeout>, timeoutTimer: ReturnType<typeof setTimeout>) {
+  clearTimeout(slowTimer);
+  clearTimeout(timeoutTimer);
+}
+
 interface UseCharacterLookupArgs {
   query: string;
   onFoundCharacterChange: (character: NormalizedCharacterData | null) => void;
@@ -39,16 +44,35 @@ export function useCharacterLookup({
   const [degradedCode, setDegradedCode] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(0);
   const [lastRequestAtMs, setLastRequestAtMs] = useState(0);
-  const cacheRef = useRef<Map<string, CharacterCacheEntry>>(new Map());
+  const cacheRef = useRef<Map<string, CharacterCacheEntry> | null>(null);
+  // react-doctor false positive: matches its own documented lazy-init exception, flags anyway.
+  // react-doctor-disable-next-line react-doctor/no-ref-current-in-render
+  if (cacheRef.current === null) cacheRef.current = new Map();
 
   useEffect(() => {
     cacheRef.current = loadBrowserCharacterCache();
   }, []);
 
+  // Only ticks while an actual cooldown is counting down, not for the hook's whole
+  // lifetime — a fresh interval starts per lookup and self-clears once that lookup's
+  // cooldown window ends, instead of re-rendering every second indefinitely.
   useEffect(() => {
+    if (lastRequestAtMs === 0) return;
+    const remaining = COOLDOWN_MS - (Date.now() - lastRequestAtMs);
+    if (remaining <= 0) return;
     const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const stopId = setTimeout(() => {
+      clearInterval(id);
+      // One last update at the true end time — the interval's own ticks land on
+      // 1000ms boundaries from effect start, not on the cooldown's exact end, so
+      // without this the final render is stuck showing ~1s remaining forever.
+      setNowMs(Date.now());
+    }, remaining);
+    return () => {
+      clearInterval(id);
+      clearTimeout(stopId);
+    };
+  }, [lastRequestAtMs]);
 
   const cooldownRemainingMs =
     lastRequestAtMs === 0 ? 0 : Math.max(0, COOLDOWN_MS - (nowMs - lastRequestAtMs));
@@ -56,12 +80,7 @@ export function useCharacterLookup({
   const queryInvalid = !CHARACTER_NAME_REGEX.test(trimmedQuery);
 
   const persistCache = () => {
-    cacheRef.current = persistBrowserCharacterCache(cacheRef.current, MAX_BROWSER_CACHE_ENTRIES);
-  };
-
-  const clearLookupTimers = (slowTimer: ReturnType<typeof setTimeout>, timeoutTimer: ReturnType<typeof setTimeout>) => {
-    clearTimeout(slowTimer);
-    clearTimeout(timeoutTimer);
+    cacheRef.current = persistBrowserCharacterCache(cacheRef.current!, MAX_BROWSER_CACHE_ENTRIES);
   };
 
   const resetSearchStateMessage = () => {
@@ -73,12 +92,13 @@ export function useCharacterLookup({
     onFoundCharacterChange(cached.found && cached.data ? cached.data : null);
     setStatusTone(cached.found ? "neutral" : "error");
     setStatusMessage(cached.found ? getFoundMessage() : getNotFoundMessage());
+    return cached.found;
   };
 
   const applyLookupResult = (name: string, normalized: string, result: LookupResponse) => {
     const found = result.found;
     const resolvedName = found ? result.data.characterName : result.characterName || name;
-    cacheRef.current.set(normalized, {
+    cacheRef.current!.set(normalized, {
       characterName: resolvedName,
       found: result.found,
       expiresAt: result.expiresAt,
@@ -91,38 +111,40 @@ export function useCharacterLookup({
       setStatusTone("neutral");
       onFoundCharacterChange(result.data);
       setStatusMessage(getFoundMessage());
-      return;
+      return true;
     }
     setStatusTone("error");
     onFoundCharacterChange(null);
     setStatusMessage(getNotFoundMessage());
+    return false;
   };
 
+  // Returns whether the character was found, so callers (e.g. a stale-draft
+  // resume re-fetch) can fall back to other data when a lookup fails.
   // eslint-disable-next-line sonarjs/cognitive-complexity
-  const runLookup = async (name: string) => {
+  const runLookup = async (name: string): Promise<boolean> => {
     const normalized = name.toLowerCase();
     if (!CHARACTER_NAME_REGEX.test(name)) {
       setStatusTone("error");
       setStatusMessage(getInvalidIgnMessage(MIN_QUERY_LENGTH, MAX_QUERY_LENGTH));
-      return;
+      return false;
     }
 
-    const cached = cacheRef.current.get(normalized);
+    const cached = cacheRef.current!.get(normalized);
     if (cached && Date.now() < cached.expiresAt) {
-      applyCachedLookupResult(cached);
-      return;
+      return applyCachedLookupResult(cached);
     }
     if (cached && Date.now() >= cached.expiresAt) {
-      cacheRef.current.delete(normalized);
+      cacheRef.current!.delete(normalized);
       persistCache();
     }
 
     if (cooldownRemainingMs > 0) {
       setStatusTone("error");
       setStatusMessage(getCooldownMessage(cooldownRemainingMs));
-      return;
+      return false;
     }
-    if (isSearching) return;
+    if (isSearching) return false;
 
     setIsSearching(true);
     setStatusTone("neutral");
@@ -151,16 +173,17 @@ export function useCharacterLookup({
         throw new Error(errorPayload?.error ?? `Lookup failed with status ${response.status}`);
       }
       const result = (await response.json()) as LookupResponse;
-      applyLookupResult(name, normalized, result);
+      return applyLookupResult(name, normalized, result);
     } catch (error) {
       clearLookupTimers(slowTimer, timeoutTimer);
       setStatusTone("error");
       onFoundCharacterChange(null);
       if (error instanceof Error && error.name === "AbortError") {
         setStatusMessage(LOOKUP_MESSAGES.timeout);
-        return;
+        return false;
       }
       setStatusMessage(error instanceof Error ? error.message : LOOKUP_MESSAGES.failed);
+      return false;
     } finally {
       setIsSearching(false);
     }

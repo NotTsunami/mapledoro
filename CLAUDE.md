@@ -84,10 +84,17 @@ Themes live in `src/components/themes.ts` (12 accent themes x light/dark, compos
 
 Game art comes from the self-hosted **MapleResource API** (`haku.network`), via pure id→URL components in `src/components/ResourceImage.tsx` (`src/lib/mapleResource.ts`): `<ItemIcon>`, `<MobSprite>`, `<SkillIcon>`, `<HexaSkillIcon>`, `<ErdaSkillIcon>`, `<FamiliarSprite>`. Host = `NEXT_PUBLIC_RESOURCE_BASE`; new hosts go in `next.config.mjs` `remotePatterns`.
 
-- **Item icons** default to shadowless `iconRaw.png`; pass `shadow` for framed `icon.png` (inventory only).
+- **Item icons** default to shadowless `iconRaw.png`; pass `shadow` for framed `icon.png` (inventory only). Some items (e.g. androids) also have a `revealed` variant (`iconD`/`iconRawD`) for their actual appearance once equipped, vs. the default pre-equip icon (e.g. an android's egg form); check the manifest's `hasIconD`/`hasIconRawD` flags before assuming it exists for a given item.
 - **Boss icons** have no component — use `bossIconUrl(id)` (`ui/boss` URL); stored as `icon` strings in boss data (`bosses.ts`, `liberation-data.ts`, `astra-data.ts`, `trace-restoration-data.ts`).
 - **Familiars:** `<FamiliarSprite>` is direct-sprite only; mob/card-backed ones use `<MobSprite>`/`<ItemIcon>` per manifest `spriteFrom`.
 - **Finding IDs:** grep `manifests/v270/<type>.json` for the exact `name` (see Context Discipline), then hardcode the id with a name comment. There is no name→ID map; manifests are dev-only and never bundled. Current game version is **v270**. Older features whose generated data was built from an earlier manifest (and says so) are correct as-is.
+- **Bumping the version:** every `scripts/gen-*.mjs`/`generate-*.mjs` has its own hardcoded manifest path. Grep `scripts/` for the old version string and update every hit together, or a generator silently keeps reading the old manifest and masks real data drift.
+
+## External Data Scrapers
+
+Some generated data comes from live external sites rather than WZ manifests, and needs re-running on its own trigger, not the game-version bump above:
+
+- `scripts/scrape-bosscut.mjs` → `src/features/characters/scouter/bosscut-data.generated.ts`. MapleScouter's crowdsourced Boss Clear (Cut) thresholds and boss requirement physics. Re-run whenever a MapleStory version drops — MapleScouter tends to add new bosses ahead of the official patch, so this both picks up new content and re-syncs any community-revised numbers. It scrapes by content-fingerprinting the data's object shape rather than any hardcoded module ID or chunk filename, since both reshuffle on every MapleScouter deploy — if a run fails to find either fingerprint, or its output stops matching real in-game results, that means MapleScouter changed the shape of the data or the underlying formula itself, not just an ID, and needs investigation before trusting the output.
 
 ## Feature Docs
 

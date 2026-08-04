@@ -1,6 +1,17 @@
 import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
 import { CHARACTERS_COPY } from "../content";
-import { secondaryButtonStyle } from "../components/uiStyles";
+import { secondaryButtonStyle, dangerButtonStyle } from "../components/uiStyles";
+
+function TrashIcon() {
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
 
 interface CharacterProfileActionsScreenProps {
   model: SearchPaneModel;
@@ -17,7 +28,8 @@ export default function CharacterProfileActionsScreen({
   const canShow =
     profile.confirmedCharacter &&
     profile.canViewCharacterDirectory &&
-    !profile.showCharacterDirectory;
+    !profile.showCharacterDirectory &&
+    !profile.setupStepActive;
   if (!canShow) return null;
 
   return (
@@ -36,6 +48,7 @@ export default function CharacterProfileActionsScreen({
           "profile-actions-card",
           !shell.isSwitchingToDirectory ? "profile-actions-fade-in" : "",
           shell.isSwitchingToDirectory ? "profile-to-directory-fade" : "",
+          shell.isDeleteTransitioning ? "deleting" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -54,25 +67,25 @@ export default function CharacterProfileActionsScreen({
             boxShadow: "0 8px 20px rgba(0,0,0,0.10)",
           }}
         >
-          {!profile.isCurrentMainCharacter && (
-            <button
-              className="profile-action-button"
-              type="button"
-              disabled={shell.isUiLocked}
-              onClick={actions.setCurrentAsMain}
-              style={{
-                ...secondaryButtonStyle(theme, "0.28rem 0.62rem"),
-                borderRadius: "999px",
-                width: "fit-content",
-                fontSize: "0.78rem",
-              }}
-            >
-              {CHARACTERS_COPY.characterProfileActions.setMainButton}
-            </button>
-          )}
+          <button
+            className="profile-action-button tap-target-44"
+            type="button"
+            disabled={shell.isUiLocked}
+            onClick={profile.isCurrentMainCharacter ? actions.removeCurrentAsMain : actions.setCurrentAsMain}
+            style={{
+              ...secondaryButtonStyle(theme, "0.28rem 0.62rem"),
+              borderRadius: "999px",
+              width: "fit-content",
+              fontSize: "0.78rem",
+            }}
+          >
+            {profile.isCurrentMainCharacter
+              ? CHARACTERS_COPY.characterProfileActions.removeMainButton
+              : CHARACTERS_COPY.characterProfileActions.setMainButton}
+          </button>
           {(profile.isCurrentChampionCharacter || profile.canSetCurrentChampion) && (
             <button
-              className="profile-action-button"
+              className="profile-action-button tap-target-44"
               type="button"
               disabled={shell.isUiLocked}
               onClick={actions.toggleCurrentChampion}
@@ -88,26 +101,17 @@ export default function CharacterProfileActionsScreen({
                 : CHARACTERS_COPY.characterProfileActions.setChampionButton}
             </button>
           )}
+          <div className="profile-actions-divider" aria-hidden="true" />
           <button
-            className="profile-action-button profile-action-danger"
+            className="profile-action-button profile-action-danger tap-target-44"
             type="button"
             disabled={shell.isUiLocked}
             onClick={onRequestRemove}
             aria-label="Remove character"
-            style={{
-              border: "1px solid #ef4444",
-              borderRadius: "999px",
-              background: "#fef2f2",
-              color: "#991b1b",
-              fontFamily: "inherit",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-              padding: "0.28rem 0.62rem",
-              width: "fit-content",
-              cursor: "pointer",
-            }}
+            style={{ ...dangerButtonStyle(theme), display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
             >
-            {`🗑 ${CHARACTERS_COPY.characterProfileActions.removeCharacterButton}`}
+            <TrashIcon />
+            {CHARACTERS_COPY.characterProfileActions.removeCharacterButton}
           </button>
         </div>
       </div>
