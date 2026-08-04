@@ -18,6 +18,23 @@ const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-08-03",
+    changes: [
+      { type: "fixed", text: "The Stat Optimizer now values your Hyper Stats and HEXA Stats against your buffed bossing stats, using your character's Scouter data, so its recommendation matches MapleScouter." },
+      { type: "fixed", text: "The Stat Optimizer no longer says your stats are already optimized before you have entered anything." },
+      { type: "fixed", text: "The Stat Optimizer no longer lets you enter Hyper Stat or HEXA Stat levels your character could not actually have." },
+      { type: "fixed", text: "The Stat Optimizer no longer resets the Hyper Stat levels you type when no character is selected." },
+      { type: "changed", text: "The Stat Optimizer now points you to Scouter setup when a character is missing the data it needs for the most accurate recommendation." },
+      { type: "fixed", text: "Fixed tool inputs zooming the page in on iPhone when you tapped them." },
+    ],
+  },
+  {
+    date: "2026-08-02",
+    changes: [
+      { type: "added", text: "Character profiles now have a Stat Efficiency bookmark showing what a point of each stat is actually worth for that character, and how stats like Boss Damage, ATT and Ignore DEF trade off against each other." },
+    ],
+  },
+  {
     date: "2026-07-31",
     changes: [
       { type: "fixed", text: "Fixed the HEXA Skill Tracker refusing to take levels like 10 and 11 in the Origin skill boxes." },
@@ -88,6 +105,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-07-13",
     changes: [
+      { type: "added", text: "Added the Stat Optimizer, a bossing-focused tool that recommends your optimal Hyper Stat allocation and HEXA Stat core line setup based on your tracked character's stats." },
       { type: "added", text: "The EXP Calculator Daily / Weekly Calculator now takes Luxe Sauna / MVP Resort hours, with the sauna's EXP table in the Resources tab." },
     ],
   },

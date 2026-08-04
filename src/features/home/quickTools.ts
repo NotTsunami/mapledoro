@@ -6,7 +6,11 @@ export type QuickLink = {
   title: string;
   desc: string;
   href: Route;
-} & ({ iconType: "emoji"; icon: string } | { iconType: "item"; itemId: string });
+} & (
+  | { iconType: "emoji"; icon: string }
+  | { iconType: "item"; itemId: string }
+  | { iconType: "skill"; skillId: string }
+);
 
 // Full catalog of dashboard-launchable tools. `href` doubles as the stable id
 // used to persist the user's chosen subset.
@@ -45,6 +49,13 @@ export const ALL_QUICK_TOOLS: QuickLink[] = [
     itemId: "04009613", // Sol Erda Fragment
     iconType: "item",
     href: "/tools/hexa-skills",
+  },
+  {
+    title: "Stat Optimizer",
+    desc: "Hyper & HEXA Stats",
+    skillId: "500071000", // HEXA Stats
+    iconType: "skill",
+    href: "/tools/stat-optimizer",
   },
   {
     title: "Liberation",

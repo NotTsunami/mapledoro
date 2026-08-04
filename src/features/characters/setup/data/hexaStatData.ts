@@ -118,3 +118,14 @@ export function getHexaStatBonus(type: string, level: number, isPrimary: boolean
 
   return IS_PERCENT.has(type as HexaStatType) ? `+${value.toFixed(2)}%` : `+${value}`;
 }
+
+/**
+ * Raw numeric value a HEXA Stat line grants (no class adjustment), for damage
+ * computation. Returns 0 for an unset type or non-positive level. Callers apply
+ * the Xenon All-Stat / Demon Avenger Max-HP scaling themselves where relevant.
+ */
+export function getHexaStatValue(type: string, level: number, isPrimary: boolean): number {
+  if (!type || level <= 0) return 0;
+  const values = (isPrimary ? PRIMARY : ADDITIONAL)[type as HexaStatType];
+  return values?.[level - 1] ?? 0;
+}

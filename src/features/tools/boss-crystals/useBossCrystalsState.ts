@@ -70,7 +70,7 @@ function toggleClearedAt(
 export function useBossCrystalsState(mounted: boolean) {
   const [server, setServer] = useState("heroic");
   const [characters, setCharacters] = useState<CharacterEntry[]>([]);
-  const loadedRef = useRef<true | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const weekRef = useRef<string | null>(null);
   const monthRef = useRef<string | null>(null);
 
@@ -81,25 +81,25 @@ export function useBossCrystalsState(mounted: boolean) {
   const [selectedStoreChar, setSelectedStoreChar] = useState<StoredCharacterRecord | null>(null);
   const [dialogBosses, setDialogBosses] = useState<BossRow[]>(() => createBosses(""));
 
-  // Load from localStorage
-  if (loadedRef.current == null) {
-    if (mounted) {
-      loadedRef.current = true;
-      const saved = loadState();
-      if (saved) {
-        // If every saved character shares one world, open on that world so the
-        // view is never empty and interactive-only rosters default to Interactive.
-        const worlds = new Set(saved.characters.map((c) => c.world));
-        setServer(worlds.size === 1 ? [...worlds][0] : saved.server);
-        setCharacters(saved.characters);
-      }
+  // Load from localStorage. A render-phase update (not a ref write, which would
+  // survive a render React discards and leave `loaded` true with no state) so
+  // the first painted frame already has the saved roster.
+  if (mounted && !loaded) {
+    setLoaded(true);
+    const saved = loadState();
+    if (saved) {
+      // If every saved character shares one world, open on that world so the
+      // view is never empty and interactive-only rosters default to Interactive.
+      const worlds = new Set(saved.characters.map((c) => c.world));
+      setServer(worlds.size === 1 ? [...worlds][0] : saved.server);
+      setCharacters(saved.characters);
     }
   }
 
   // Persist on change
   useEffect(() => {
-    if (loadedRef.current != null) saveState(server, characters);
-  }, [server, characters]);
+    if (loaded) saveState(server, characters);
+  }, [loaded, server, characters]);
 
   // Period resets while the page stays open: weekly bosses on Thursday 00:00 UTC,
   // monthly bosses (Black Mage) on the 1st at 00:00 UTC.
@@ -245,19 +245,15 @@ export function useBossCrystalsState(mounted: boolean) {
   }, []);
 
   const toggleDialogBoss = useCallback((bi: number) => {
-    setDialogBosses((prev) => {
-      const next = prev.map((b) => ({ ...b }));
-      next[bi].checked = !next[bi].checked;
-      return next;
-    });
+    setDialogBosses((prev) =>
+      prev.map((b, i) => (i === bi ? { ...b, checked: !b.checked } : b)),
+    );
   }, []);
 
   const setDialogParty = useCallback((bi: number, val: number) => {
-    setDialogBosses((prev) => {
-      const next = prev.map((b) => ({ ...b }));
-      next[bi].partySize = val;
-      return next;
-    });
+    setDialogBosses((prev) =>
+      prev.map((b, i) => (i === bi ? { ...b, partySize: val } : b)),
+    );
   }, []);
 
   const applyPreset = useCallback((key: string) => {

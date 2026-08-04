@@ -432,6 +432,7 @@ export default function CubingWorkspace({ theme }: { theme: AppTheme }) {
                 aria-describedby={levelValid ? undefined : levelErrorId}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={replaceZeroOnDigit}
+                // react-doctor-disable-next-line no-unguarded-numeric-input-parse -- an out-of-range value here is meaningful, not a bug: a cleared field reads 0 and surfaces the `levelValid` error below, which is how a level typed one digit at a time is allowed through (see the cubing CLAUDE.md). A number input never yields NaN, only "".
                 onChange={(e) => dispatch({ type: "setItemLevel", value: Number(e.target.value) })}
                 style={controlStyle}
               />

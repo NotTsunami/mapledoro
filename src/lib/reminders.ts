@@ -60,6 +60,7 @@ function loadRemindersState(): RemindersState {
 
 function saveRemindersState(state: RemindersState) {
   try {
+    // react-doctor-disable-next-line no-side-effect-in-state-updater-function -- called from inside the setState updater by project convention (see root CLAUDE.md), so the write stays atomic with the state change rather than trailing it in an effect. Writing the derived state twice on a replay is idempotent.
     localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(state));
   } catch {
     /* ignore */

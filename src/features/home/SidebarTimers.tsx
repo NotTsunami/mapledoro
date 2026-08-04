@@ -41,9 +41,11 @@ export function UrsusPanel({ theme, now }: { theme: AppTheme; now: Date | null }
     if (!now) return "";
     const d = new Date(now);
     d.setUTCHours(utcHour, 0, 0, 0);
+    // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: `now` is null until useClock() ticks post-mount, guarded both here and at the call site
     return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   };
   const tzLabel = now
+    // react-doctor-disable-next-line no-locale-format-in-render -- same post-mount `now` gate as fmtLocal above
     ? (tzFormatter.formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "")
     : "";
 

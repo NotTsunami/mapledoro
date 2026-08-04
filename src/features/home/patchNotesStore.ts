@@ -28,7 +28,12 @@ export function subscribePatchNotes(listener: () => void) {
     patchFetched = true;
     const cached = readCachedPatchNotes();
     fetch("/api/patch-notes")
-      .then((res) => res.json())
+      .then((res) => {
+        // fetch resolves on 4xx/5xx, so an error payload would otherwise be
+        // parsed as data; throwing routes it to the cached/fallback branch.
+        if (!res.ok) throw new Error(`patch notes ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           patchNotesData = data as PatchNote[];

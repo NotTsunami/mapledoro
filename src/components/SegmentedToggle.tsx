@@ -8,6 +8,10 @@ interface SegmentedToggleProps<T extends string> {
   /** Names the group of choices ("Symbol type"). Without it the buttons are
    *  announced as loose toggles with no indication of what they switch. */
   ariaLabel: string;
+  /** `id` of the region the toggle swaps. Set it when picking an option
+   *  replaces a whole panel rather than restyling what's already on screen, so
+   *  a screen reader can follow the switch to what actually changed. */
+  ariaControls?: string;
   /** Panel chrome around the track. Omit to render the bare track for
    *  embedding in an existing panel or row. */
   sectionPanel?: React.CSSProperties;
@@ -23,6 +27,7 @@ export function SegmentedToggle<T extends string>({
   value,
   labels,
   ariaLabel,
+  ariaControls,
   sectionPanel,
   trackStyle,
   btnClassName,
@@ -45,6 +50,7 @@ export function SegmentedToggle<T extends string>({
           type="button"
           className={["segmented-toggle-option", btnClassName].filter(Boolean).join(" ")}
           aria-pressed={value === t}
+          aria-controls={ariaControls}
           onClick={() => onChange(t)}
           style={{
             color: value === t ? theme.accentText : theme.muted,

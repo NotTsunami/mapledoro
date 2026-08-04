@@ -417,6 +417,7 @@ function StatsPanel({
           {stats.distribution.map((count, i) => {
             const label = i < MAX_GUESSES ? String(i + 1) : "X";
             return (
+              // react-doctor-disable-next-line no-array-index-as-key -- `label` is the row's identity, not its position: a fixed-length guess histogram (1..MAX_GUESSES then X) that never reorders or filters
               <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span style={{ width: 14, fontSize: "0.75rem", fontWeight: 800, color: theme.muted }}>{label}</span>
                 <div
@@ -616,6 +617,7 @@ export default function SkillGuesserWorkspace({ theme }: { theme: AppTheme }) {
 
   const canPrev = puzzleNumber > 1;
   const canNext = puzzleNumber < today;
+  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: sits below the `if (!mounted) return null` gate above
   const dateLabel = PUZZLE_DATE_FMT.format(puzzleDateMs(puzzleNumber));
   const arrowStyle = (enabled: boolean): CSSProperties => ({
     display: "inline-flex",

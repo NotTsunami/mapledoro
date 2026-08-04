@@ -55,6 +55,7 @@ function getEventEnd(iso: string) {
 
 function formatLocalDate(iso: string) {
   const d = new Date(iso);
+  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: the only caller needs `upcoming`, which needs both the post-mount fetch and a non-null `useClock()`, so the server always renders the "Loading..." branch instead
   return d.toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",
@@ -190,6 +191,7 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
   const [showOther, setShowOther] = useState(false);
   const fetchedRef = useRef(false);
 
+  // react-doctor-disable-next-line no-fetch-in-effect -- one-shot fetch with proper AbortController cleanup; this project hasn't adopted a data-fetching library, matches the rule's own documented FP criteria
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
