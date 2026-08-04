@@ -8,6 +8,7 @@ import { statusText } from "../../../components/statusColors";
 import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
 import { searchAndRank } from "../../../lib/searchMatch";
 import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
+import { useScrollEdges, edgeFadeMask } from "../../../lib/useScrollEdges";
 import HoverTooltip from "../../../components/HoverTooltip";
 import { PillGroup } from "../../tools/shared-ui";
 import { usePickerCoords } from "../setup/hooks/usePickerCoords";
@@ -539,6 +540,12 @@ function BossQuickView({
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onSelectBoss: (boss: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Fades whichever edge actually has more to scroll to (see useScrollEdges/edgeFadeMask)
+  // -- the previous static bottom fade stayed visible even once fully scrolled to the end,
+  // or when grouped was short enough to never overflow the 506px cap in the first place.
+  const { ref: quickViewListRef, atStart: quickViewAtStart, atEnd: quickViewAtEnd } =
+    useScrollEdges<HTMLDivElement>([grouped.length, expanded], "vertical");
+  const quickViewListMask = edgeFadeMask(quickViewAtStart, quickViewAtEnd, 28, "vertical");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <PowerStrip theme={theme} entry={entry} />
@@ -565,6 +572,7 @@ function BossQuickView({
           changes. Dropped entirely (maxHeight/overflow/fade) when expanded -- see this
           component's own top comment. */}
       <div
+        ref={quickViewListRef}
         className="boss-quick-row-list tool-dialog-scroll"
         style={{
           display: "flex", flexDirection: "column", border: `1px solid ${theme.border}`, borderRadius: 12, padding: "0 8px",
@@ -572,8 +580,8 @@ function BossQuickView({
             ? {}
             : {
               maxHeight: 506, overflowY: "auto",
-              maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
-              WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+              maskImage: quickViewListMask,
+              WebkitMaskImage: quickViewListMask,
             }),
         }}
       >

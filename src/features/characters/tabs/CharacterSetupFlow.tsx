@@ -11,7 +11,7 @@ import { getCharacterSetupFlowStyles } from "./CharacterSetupFlow.styles";
 import PreviewSetupPane from "./components/PreviewSetupPane";
 import SearchPaneCard from "./components/SearchPaneCard";
 import type { PreviewPaneActions, PreviewPaneModel, SearchPaneActions, SearchPaneModel } from "./paneModels";
-import { useCharacterSetupController, MAX_CHAMPIONS } from "./useCharacterSetupController";
+import { useCharacterSetupController, MAX_CHAMPIONS, MAX_CHARACTERS_PER_WORLD } from "./useCharacterSetupController";
 import { toCharacterKey } from "../model/characterKeys";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 
@@ -20,8 +20,6 @@ interface CharacterSetupFlowProps {
   initialCharacterName?: string;
   initialAction?: string;
 }
-
-const MAX_ACCOUNT_CHARACTERS = 60;
 
 export default function CharacterSetupFlow({ theme, initialCharacterName, initialAction }: CharacterSetupFlowProps) {
   // initialCharacterName/initialAction (URL search params read once in page.tsx) are resolved
@@ -177,6 +175,7 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
     importCharacter: actions.importCharacter,
     importCharacterAsChampionSwap: actions.importCharacterAsChampionSwap,
     importCharacterMerged: actions.importCharacterMerged,
+    importWorldBulk: actions.importWorldBulk,
   };
 
   const previewPaneModel: PreviewPaneModel = {
@@ -228,7 +227,7 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
       mainCharacterKeyByWorld: state.mainCharacterKeyByWorld,
       championCharacterKeysByWorld: state.championCharacterKeysByWorld,
       worldIds: state.worldIds,
-      maxCharacters: MAX_ACCOUNT_CHARACTERS,
+      maxCharacters: MAX_CHARACTERS_PER_WORLD,
       maxChampions: MAX_CHAMPIONS,
       refreshingKeys: state.refreshingKeys,
     },
@@ -256,6 +255,7 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
     setHexaStatActivePreset: actions.setHexaStatActivePreset,
     setFamiliarsActivePreset: actions.setFamiliarsActivePreset,
     setOverviewLayout: actions.setOverviewLayout,
+    runTransitionToMode: actions.runTransitionToMode,
   };
 
   return (

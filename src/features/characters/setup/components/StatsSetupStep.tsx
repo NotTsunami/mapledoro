@@ -936,7 +936,7 @@ function LegionArtifactQuestions({ sq, worldLegion, board, onUpdate, theme }: {
   return (
     <>
       <ChecklistCheckbox
-        label="Increases Bonus EXP stat?"
+        label="Increases Bonus EXP assigned to a crystal?"
         checked={extraTargetLocked ? extraTargetDerived : (sq.artifactExtraTarget ?? worldLegion?.artifactExtraTarget)}
         onToggle={(v) => onUpdate({ artifactExtraTarget: v })}
         theme={theme}

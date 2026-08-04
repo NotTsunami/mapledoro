@@ -3,6 +3,7 @@ import { useAutoRefresh } from "./useAutoRefresh";
 import {
   CHARACTER_NAME_INPUT_FILTER_REGEX,
   MAX_QUERY_LENGTH,
+  MAX_CHARACTERS_PER_WORLD,
   type SetupMode,
 } from "../model/constants";
 import { findRosterCharacterByName, normalizeCharacterName, toCharacterKey } from "../model/characterKeys";
@@ -46,7 +47,7 @@ import {
   type SetupDraft,
   writeSetupDraft,
 } from "../model/setupDraftStorage";
-import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredCharacterStats } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredCharacterStats, StoredLegionArtifact, StoredScouterLegion } from "../model/charactersStore";
 import {
   convertStatsStepDraftToStored, deriveHasRuinForceShield, deriveIsLiberatedFromWeapon, marriageDraftToStored,
   parseStatsStepDraft, serializeStatsStepDraft, storedStatsToStatsStepDraft,
@@ -94,6 +95,7 @@ import {
 } from "./useSetupFlowTransitions";
 
 export const MAX_CHAMPIONS = 5;
+export { MAX_CHARACTERS_PER_WORLD };
 
 // Role chosen on ImportModeScreen's role picker for a freshly-imported character.
 export type RosterRole = "mule" | "main" | "champion";
@@ -2023,14 +2025,28 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   }, [confirmedCharacter, lookup, transitions]);
 
   const backToCharactersDirectory = useCallback(() => {
-    setIsAddingCharacter(false);
-    setSetupMode("search");
-    setSetupFlowStarted(true);
-    transitions.setSetupPanelVisible(true);
-    setShowFlowOverview(true);
-    setShowCharacterDirectory(true);
-    setSetupStepIndex(0);
-    setSetupStepDirection("backward");
+    if (immediateUiLockRef.current) return;
+    immediateUiLockRef.current = true;
+    setIsSwitchingToDirectory(true);
+
+    transitions.runBackTransition(
+      () => {
+        setFastDirectoryRevealOnce(true);
+        setIsAddingCharacter(false);
+        setSetupMode("search");
+        setSetupFlowStarted(true);
+        transitions.setSetupPanelVisible(true);
+        setShowFlowOverview(true);
+        setShowCharacterDirectory(true);
+        setSetupStepIndex(0);
+        setSetupStepDirection("backward");
+      },
+      { enableSearchFadeIn: false },
+    );
+
+    transitions.queueTransitionTimer(() => {
+      setIsSwitchingToDirectory(false);
+    }, CHARACTERS_TRANSITION_MS.slow);
   }, [transitions]);
 
   const setSetupStepWithDirection = useCallback(
@@ -2551,6 +2567,9 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     // its own Link Skills field was ever exported/filled in, so a same-world sibling's
     // stored value can still go stale the moment this import lands.
     propagateLinkSkillFloorsAfterUpsert(record, characterRoster, upsertRosterCharacter);
+    // Import is as valid an entry path as search-based setup -- see
+    // ensureLegionArtifactDefaultForWorld's own comment ("regardless of entry path").
+    ensureLegionArtifactDefaultForWorld(record.worldID);
     if (role === "main") setMainCharacter(record);
     if (role === "champion") toggleChampionCharacter(record);
     switchToCharacterProfile(record);
@@ -2563,6 +2582,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   const importCharacterAsChampionSwap = useCallback((record: StoredCharacterRecord, swapOutKey: string) => {
     upsertRosterCharacter(record);
     propagateLinkSkillFloorsAfterUpsert(record, characterRoster, upsertRosterCharacter);
+    ensureLegionArtifactDefaultForWorld(record.worldID);
     setChampionCharacterKeysByWorld((prev) => {
       const worldId = record.worldID;
       const cur = getChampionKeysForWorld(prev, worldId).filter((k) => k !== swapOutKey);
@@ -2583,8 +2603,93 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
     const merged = mergeImportedCharacterRecord(existing, imported, choices);
     upsertRosterCharacter(merged);
     propagateLinkSkillFloorsAfterUpsert(merged, characterRoster, upsertRosterCharacter);
+    ensureLegionArtifactDefaultForWorld(merged.worldID);
     switchToCharacterProfile(merged);
   }, [characterRoster, switchToCharacterProfile, upsertRosterCharacter]);
+
+  // World-import bulk apply: `resolvedCharacters` is already the caller's final answer
+  // per character (straight new adds plus any conflicts already merged via
+  // mergeImportedCharacterRecord) -- this just commits all of them in ONE setCharacterRoster
+  // update, same "already building the array" pattern as applyLinkSkillFloorsInPlace/
+  // handleRefreshed use, rather than N sequential upsertRosterCharacter calls. Looping
+  // upsertRosterCharacter here would be wrong, not just slow: it reads characterRoster from
+  // this closure to decide "is this world empty -> auto-assign main", and every call in a
+  // tight loop would see the SAME stale pre-import snapshot, misfiring that auto-assign for
+  // every character in a brand-new world. Applying roleKeys afterward overwrites whatever
+  // upsertRosterCharacter would have guessed anyway, but building the roster in one shot
+  // avoids relying on that overwrite to paper over N-1 wrong intermediate states.
+  // Link Skill floor propagation intentionally runs once, after every character in the
+  // world is already in the roster array (effectiveRoster), so a floor raised by character
+  // #40 can still reach character #3 -- propagating one-at-a-time per upsert would miss
+  // that depending on file order.
+  const importWorldBulk = useCallback((
+    resolvedCharacters: StoredCharacterRecord[],
+    roleKeys: { mainCharacterKey: string | null; championCharacterKeys: string[] },
+    worldId: number,
+    legionData: { legionArtifact?: StoredLegionArtifact; scouterLegion?: StoredScouterLegion } | null,
+    // Existing residents the user explicitly unchecked on the conflict-resolution screen
+    // to free up room under MAX_CHARACTERS_PER_WORLD -- removed in the SAME roster update
+    // as the upserts below, not a separate pass, so there's never an intermediate state
+    // that's still over cap or briefly missing a character mid-import.
+    removedKeys: string[] = [],
+  ) => {
+    setCharacterRoster((prev) => {
+      const removedSet = new Set(removedKeys);
+      const byKey = new Map<string, StoredCharacterRecord>();
+      for (const character of prev) {
+        const key = toCharacterKey(character);
+        if (!removedSet.has(key)) byKey.set(key, character);
+      }
+      for (const character of resolvedCharacters) byKey.set(toCharacterKey(character), character);
+      const next = Array.from(byKey.values());
+      for (const character of resolvedCharacters) applyLinkSkillFloorsInPlace(next, character.worldID);
+      return next;
+    });
+
+    const worldKey = String(worldId);
+    // Role keys can point at an untouched resident (kept, not imported/customized this
+    // pass) -- resolvedCharacters alone only covers what THIS import actively upserted,
+    // so validKeys has to be the real post-import roster on this world, not just that
+    // subset, or an untouched resident's role assignment gets silently rejected as
+    // "invalid" even though they're staying right where they are.
+    const removedSet = new Set(removedKeys);
+    const validKeys = new Set<string>();
+    for (const character of characterRoster) {
+      const key = toCharacterKey(character);
+      if (character.worldID === worldId && !removedSet.has(key)) validKeys.add(key);
+    }
+    for (const character of resolvedCharacters) validKeys.add(toCharacterKey(character));
+    setMainCharacterKeyByWorld((prev) => {
+      const base = removedSet.has(prev[worldKey])
+        ? Object.fromEntries(Object.entries(prev).filter(([k]) => k !== worldKey))
+        : prev;
+      if (roleKeys.mainCharacterKey === null || !validKeys.has(roleKeys.mainCharacterKey)) return base;
+      return { ...base, [worldKey]: roleKeys.mainCharacterKey };
+    });
+    setChampionCharacterKeysByWorld((prev) => {
+      const survivingChampions = (prev[worldKey] ?? []).filter((key) => !removedSet.has(key));
+      const validChampions = roleKeys.championCharacterKeys.filter((key) => validKeys.has(key));
+      const merged = validChampions.length > 0 ? validChampions : survivingChampions;
+      if (merged.length === 0) {
+        if (!(worldKey in prev)) return prev;
+        const next = { ...prev };
+        delete next[worldKey];
+        return next;
+      }
+      return { ...prev, [worldKey]: merged.slice(0, MAX_CHAMPIONS) };
+    });
+
+    if (legionData) {
+      if (legionData.legionArtifact) writeLegionArtifactForWorld(worldId, legionData.legionArtifact);
+      if (legionData.scouterLegion) writeScouterLegionForWorld(worldId, legionData.scouterLegion);
+    }
+    // Existence-checked, so this is a no-op whenever legionData above already wrote real
+    // data (or the world already had some) -- same "regardless of entry path" reasoning as
+    // every other import callback here.
+    ensureLegionArtifactDefaultForWorld(worldId);
+
+    backToCharactersDirectory();
+  }, [backToCharactersDirectory, characterRoster]);
 
   const backFromAddCharacter = useCallback(() => {
     if (immediateUiLockRef.current) return;
@@ -2831,6 +2936,7 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       importCharacter,
       importCharacterAsChampionSwap,
       importCharacterMerged,
+      importWorldBulk,
       refreshSingle,
       handleQueryInput,
       handleSearchSubmit,

@@ -9,6 +9,7 @@ import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
 import { linkSkillsStoredToDraftString, type StoredCharacterRecord, type LinkSkillId, type LinkSkillsData } from "../../model/charactersStore";
 import { LINK_SKILLS, computeLinkSkillsFromRoster, linkSkillFloorsForCharacter, bestKnownLinkSkillFloors, type LinkSkillDef } from "../data/linkSkillsData";
+import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
 import SetupStepFrame from "./SetupStepFrame";
 import InfoTooltip, { type TooltipContent } from "./InfoTooltip";
 
@@ -233,7 +234,7 @@ function resolveLinkSkillFloors(
  *  characterRoster, if it's already a tracked record) -- the same-world roster is only
  *  used to compute a FLOOR (what mastery the roster proves), never to overwrite this
  *  character's own saved choice of which links it actually has equipped. */
-export function LinkSkillsEditor({
+function LinkSkillsEditor({
   theme, jobName = "", value, onChange,
   characterRoster = [], confirmedWorldId, confirmedCharacterName,
 }: LinkSkillsEditorProps) {
@@ -245,8 +246,16 @@ export function LinkSkillsEditor({
   // Empirical Knowledge just because a same-world Bishop is tracked). Falls back to just
   // jobName/worldID when the character isn't in characterRoster yet (still mid-setup, not
   // yet a real persisted record) -- linkSkillFloorsForCharacter only needs those two.
+  // Filtered to only the hand-picked skills MapleScouter's payload reads (see
+  // scouterLinkSkills.ts) -- this step must never render, suggest, or silently save a
+  // value for any of the newer LINK_SKILLS entries added for the Legion panel's own
+  // read-only display, since this step never asks the player about them at all.
   const confirmedRecord = characterRoster.find((c) => c.characterName === confirmedCharacterName);
-  const floors = resolveLinkSkillFloors(confirmedRecord, jobName, confirmedWorldId, characterRoster);
+  const rawFloors = resolveLinkSkillFloors(confirmedRecord, jobName, confirmedWorldId, characterRoster);
+  const floors: LinkSkillsData = {};
+  for (const skillId of Object.keys(rawFloors) as LinkSkillId[]) {
+    if (skillId in LINK_SKILL_TO_SCOUTER_KEY) floors[skillId] = rawFloors[skillId];
+  }
 
   // "from X, Y" provenance text: scoped to ONLY the skill(s) `floors` already proved this
   // character is eligible for (never every skill the world roster happens to have data
@@ -279,16 +288,28 @@ export function LinkSkillsEditor({
   // logic) for a fetch that only ever fires once, at mount.
   useEffect(() => {
     if (initialValueRef.current) return;
-    const rawSuggestion = confirmedRecord?.linkSkills
-      ?? (confirmedWorldId !== undefined ? bestKnownLinkSkillFloors(characterRoster, confirmedWorldId) : {});
-    // Scoped to only the skill(s) `floors` already narrowed to this character's own
-    // class -- bestKnownLinkSkillFloors covers every skill the WHOLE world roster has
-    // evidence for, so without this an untracked F/P's blank Bravado/Elementalism/etc.
-    // rows would get seeded from a totally unrelated Hoyoung/Kanna just because they
-    // happen to also be tracked on the same world.
+    // Two different scopes on purpose: `confirmedRecord.linkSkills` is this character's
+    // OWN already-saved choice of which links it runs -- e.g. a Kanna's own record can
+    // legitimately have a manually-entered Unfair Advantage value even though Cadena's
+    // link has nothing to do with Kanna's own class, because this step shows every
+    // scouter-relevant row to every character regardless of class (see "Only enter the
+    // levels for the links that this character actually has equipped" above) -- so a
+    // stored value must be re-suggested for ANY of those rows, not just the row(s)
+    // matching this character's own class. `bestKnownLinkSkillFloors` (the untracked-
+    // character fallback) is the opposite: it has no per-character record to trust yet,
+    // so it's still scoped to `floors` (this character's own class) to avoid seeding an
+    // untracked F/P's blank Bravado/Elementalism/etc. rows from an unrelated same-world
+    // Hoyoung/Kanna.
     const suggestion: LinkSkillsData = {};
-    for (const skillId of Object.keys(floors) as LinkSkillId[]) {
-      if (rawSuggestion[skillId] !== undefined) suggestion[skillId] = rawSuggestion[skillId];
+    if (confirmedRecord?.linkSkills) {
+      for (const skillId of Object.keys(confirmedRecord.linkSkills) as LinkSkillId[]) {
+        if (skillId in LINK_SKILL_TO_SCOUTER_KEY) suggestion[skillId] = confirmedRecord.linkSkills[skillId];
+      }
+    } else if (confirmedWorldId !== undefined) {
+      const rawSuggestion = bestKnownLinkSkillFloors(characterRoster, confirmedWorldId);
+      for (const skillId of Object.keys(floors) as LinkSkillId[]) {
+        if (rawSuggestion[skillId] !== undefined) suggestion[skillId] = rawSuggestion[skillId];
+      }
     }
     const reconciled: LinkSkillsData = { ...suggestion };
     for (const [skillId, floor] of Object.entries(floors)) {
@@ -306,8 +327,13 @@ export function LinkSkillsEditor({
     onChange(JSON.stringify({ ...draft, [id]: val }));
   }
 
-  const singleSkills = LINK_SKILLS.filter((s) => s.maxLevel === 3);
-  const multiSkills  = LINK_SKILLS.filter((s) => s.maxLevel > 3);
+  // This step only ever asks about the hand-picked link skills MapleScouter's own payload
+  // accepts (see scouterLinkSkills.ts) -- LINK_SKILLS grew far beyond that for the
+  // Legion panel's own read-only display (see linkSkillsData.ts), but none of those newer
+  // entries have anywhere to go once saved, so showing them here would just be noise.
+  const scouterRelevantSkills = LINK_SKILLS.filter((s) => s.id in LINK_SKILL_TO_SCOUTER_KEY);
+  const singleSkills = scouterRelevantSkills.filter((s) => s.maxLevel === 3);
+  const multiSkills  = scouterRelevantSkills.filter((s) => s.maxLevel > 3);
 
   return (
     <div className="link-skills-root">

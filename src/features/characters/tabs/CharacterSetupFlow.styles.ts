@@ -773,7 +773,10 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           flex-direction: column;
           gap: 3px;
           flex-shrink: 0;
-          padding: 10px 6px;
+          /* No left padding/gap: the active tab's highlight (border-radius flush on
+             that side) is meant to reach the spine's own left edge, like a real
+             binder tab, rather than floating with a gap on both sides. */
+          padding: 10px 6px 10px 0;
           width: 108px;
           background: ${theme.bg};
         }
@@ -792,11 +795,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           text-align: left;
           cursor: pointer;
           font-family: inherit;
-          transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
-        }
-
-        .profile-bookmark-tab--active {
-          transform: translateX(4px);
+          transition: background 0.15s ease, color 0.15s ease;
         }
 
         /* Sits at the end of the list already (last in ALL_BOOKMARKS); this pushes it to
@@ -884,13 +883,13 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
                render first visually, so a resize expands downward from the spine instead
                of moving it. */
             order: -1;
-            /* Fades the trailing edge so the row reads as swipeable at a glance instead of
-               looking like a fixed row of pills that happens to get cut off -- there's no
-               visible scrollbar on mobile otherwise. Static (not scroll-position-aware): it
-               keeps fading even once fully scrolled to the end, a small tradeoff against the
-               cost of tracking scroll position just to toggle it off. */
-            mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-            -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+            /* --edge-fade-mask is set inline via useScrollEdges/edgeFadeMask
+               (CharacterProfileOverviewScreen.tsx) -- only consumed into a real mask HERE,
+               inside this mobile-only media query, never as a literal inline style, since
+               the desktop vertical column has no horizontal overflow and would otherwise
+               get an incorrect fade clipping its content. */
+            mask-image: var(--edge-fade-mask);
+            -webkit-mask-image: var(--edge-fade-mask);
             /* This row layout also kicks in on a narrowed desktop browser window, not just
                real mobile -- there it gets a real (visible, non-overlay) OS scrollbar, which
                reads as chunky next to the pill/fade treatment above. Kept visible rather than
@@ -929,10 +928,6 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
 
           .profile-bookmark-divider {
             display: none;
-          }
-
-          .profile-bookmark-tab--active {
-            transform: none;
           }
 
           .profile-binder-page {
@@ -1131,6 +1126,23 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           .spotlight-tile-cell-adjusted {
             grid-column: 3 !important;
             grid-row: 2 !important;
+          }
+        }
+
+        /* CharacterDirectoryScreen's World/Sort controls row: the Export/Import button
+           pair (.directory-export-import) stays right-aligned and content-sized on
+           desktop (margin-left: auto keeps it visually separate from World/Sort without
+           stretching). Below 480px it wraps onto its own line -- there, overriding to
+           width:100% with no auto margin makes it fill that line and split evenly
+           between the two buttons, instead of the marginLeft:auto still pulling it to
+           hug the right edge with stray empty space under Sort (flex-basis alone can't
+           express "full width once wrapped, content-sized otherwise" without a real
+           breakpoint, since flex-grow:0 needed for the desktop case never lets it fill
+           the wrapped line either). */
+        @media (max-width: 480px) {
+          .directory-export-import {
+            width: 100%;
+            margin-left: 0 !important;
           }
         }
 

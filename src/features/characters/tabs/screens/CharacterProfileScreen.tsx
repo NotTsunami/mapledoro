@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { CHARACTERS_COPY } from "../content";
 import { resolveDisplayJobName } from "../../setup/data/nexonJobMapping";
-import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
+import type { ProfileRole, SearchPaneActions, SearchPaneModel } from "../paneModels";
 import { secondaryButtonStyle } from "../components/uiStyles";
 import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
@@ -14,8 +14,6 @@ function navBackButtonColorStyle(theme: SearchPaneModel["theme"]): CSSProperties
   const { border, background, color } = secondaryButtonStyle(theme);
   return { border, background, color };
 }
-
-type ProfileRole = "main" | "champion" | "mule";
 
 function isCharacterStale(expiresAt: number): boolean {
   return Date.now() > expiresAt;

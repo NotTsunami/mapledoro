@@ -9,6 +9,7 @@ import {
   type StoredCharacterRecord,
 } from "../../model/charactersStore";
 import { CHARACTERS_COPY } from "../content";
+import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 
 type Choice = "mine" | "imported";
 
@@ -73,9 +74,14 @@ function ChoiceRow({
   );
 }
 
-function initialChoices(): Record<ImportSectionId, Choice> {
+// Expands a bulk choice (or an existing per-section map) into a full per-section map --
+// shared by the dialog's own default (all "mine") and by a caller that already has a
+// row-level bulk choice (Keep existing/Use imported) selected before Customize is
+// opened, so the dialog starts reflecting what's already chosen instead of always
+// resetting to Keep existing regardless of the row's own visible state.
+function expandInitialChoices(initial: Choice | Record<ImportSectionId, Choice> | undefined): Record<ImportSectionId, Choice> {
   return IMPORT_SECTION_DEFS.reduce((acc, section) => {
-    acc[section.id] = "mine";
+    acc[section.id] = typeof initial === "object" ? initial[section.id] : (initial ?? "mine");
     return acc;
   }, {} as Record<ImportSectionId, Choice>);
 }
@@ -83,15 +89,48 @@ function initialChoices(): Record<ImportSectionId, Choice> {
 export default function ImportConflictDialog({
   theme,
   existing,
+  initialChoice,
+  roleControl,
   onClose,
   onConfirm,
 }: {
   theme: AppTheme;
   existing: StoredCharacterRecord;
+  /** The row's current bulk choice ("mine"/"imported") or an already-customized
+   *  per-section map, if one exists -- omit to start every section at "mine" (the
+   *  single-character import flow's own behavior, which has no outer bulk toggle). */
+  initialChoice?: Choice | Record<ImportSectionId, Choice>;
+  /** Only present for World Import's Customize usage -- a single-character export has
+   *  no role data at all (Main/Champion is world-scoped state, not a character-record
+   *  field), so ImportModeScreen's own usage omits this and the role row doesn't render.
+   *  The role's own current/file values are already shown on the outer conflict row's
+   *  transition label, so this dialog only needs the starting choice, not the values. */
+  roleControl?: {
+    initialUseFileRole: boolean;
+  };
   onClose: () => void;
-  onConfirm: (choices: Record<ImportSectionId, Choice>) => void;
+  onConfirm: (choices: Record<ImportSectionId, Choice>, useFileRole?: boolean) => void;
 }) {
-  const [choices, setChoices] = useState<Record<ImportSectionId, Choice>>(initialChoices);
+  const [choices, setChoices] = useState<Record<ImportSectionId, Choice>>(() => expandInitialChoices(initialChoice));
+  const [useFileRole, setUseFileRole] = useState(() => roleControl?.initialUseFileRole ?? false);
+
+  // Fades whichever edge actually has more to scroll to (see useScrollEdges/edgeFadeMask)
+  // -- same treatment as every other scrollable list in the import flows.
+  const { ref: sectionsRef, atStart: sectionsAtStart, atEnd: sectionsAtEnd } =
+    useScrollEdges<HTMLDivElement>([Boolean(roleControl)], "vertical");
+  const sectionsMask = edgeFadeMask(sectionsAtStart, sectionsAtEnd, 28, "vertical");
+
+  function applyToAllSections(choice: Choice) {
+    setChoices(
+      IMPORT_SECTION_DEFS.reduce((acc, section) => {
+        acc[section.id] = choice;
+        return acc;
+      }, {} as Record<ImportSectionId, Choice>),
+    );
+    // Role now renders as the first row in the same list (see the return below), so a
+    // bulk "Keep all existing"/"Use all imported" reads as "every row here," including it.
+    if (roleControl) setUseFileRole(choice === "imported");
+  }
 
   return (
     <ModalShell
@@ -119,7 +158,45 @@ export default function ImportConflictDialog({
         </div>
       </div>
 
-      <div style={{ padding: "0.2rem 1.1rem", overflowY: "auto", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", gap: "0.5rem", padding: "0.75rem 1.1rem 0" }}>
+        <button
+          type="button"
+          onClick={() => applyToAllSections("mine")}
+          className="tool-btn tool-dialog-btn"
+          style={{ ...dialogBtnColors(theme), color: theme.text }}
+        >
+          {CHARACTERS_COPY.importConflict.keepAllMine}
+        </button>
+        <button
+          type="button"
+          onClick={() => applyToAllSections("imported")}
+          className="tool-btn tool-dialog-btn"
+          style={{ ...dialogBtnColors(theme), color: theme.text }}
+        >
+          {CHARACTERS_COPY.importConflict.useAllImported}
+        </button>
+      </div>
+
+      <div
+        ref={sectionsRef}
+        style={{
+          padding: "0.2rem 1.1rem",
+          overflowY: "auto",
+          flex: 1,
+          minHeight: 0,
+          WebkitMaskImage: sectionsMask,
+          maskImage: sectionsMask,
+        }}
+      >
+        {roleControl && (
+          <ChoiceRow
+            theme={theme}
+            label={CHARACTERS_COPY.importConflict.roleLabel}
+            value={useFileRole ? "imported" : "mine"}
+            onChange={(next) => setUseFileRole(next === "imported")}
+            isLast={false}
+          />
+        )}
         {IMPORT_SECTION_DEFS.map((section, index) => (
           <ChoiceRow
             key={section.id}
@@ -138,7 +215,7 @@ export default function ImportConflictDialog({
         </button>
         <button
           type="button"
-          onClick={() => onConfirm(choices)}
+          onClick={() => onConfirm(choices, roleControl ? useFileRole : undefined)}
           className="tool-btn tool-dialog-btn"
           style={dialogPrimaryBtnColors(theme)}
         >

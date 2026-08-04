@@ -146,6 +146,50 @@ function renderIcon(icon: BoolBuffEntry["icon"], size: number, active: boolean, 
   );
 }
 
+// Icon composite for a buff backed by 2-3 real items sharing one effect (e.g. Sparkling
+// Red Star's potion/pill, fishBuff's 3 renamed event potions). Two layouts:
+//  - 2 icons: back icon fades in behind, primary (frontmost, bottom-left) stays opaque.
+//  - 3 icons: primary stays full-size/opaque and front-and-center; secondIcon/thirdIcon
+//    shrink to a smaller corner badge each (top-left/top-right) instead of competing at
+//    full size. fishBuff's 3 items (a round snowman, a tall off-center potion, a small
+//    ornament) all have their visual weight centered rather than tucked into a corner,
+//    so any full-size diagonal overlap just collides two dense shapes -- shrinking the
+//    back two avoids that regardless of their individual silhouettes.
+function StackedBuffIcon({ icon, secondIcon, thirdIcon, active, name, theme }: {
+  icon: BoolBuffIconType;
+  secondIcon: BoolBuffIconType;
+  thirdIcon: BoolBuffIconType | undefined;
+  active: boolean;
+  name: string;
+  theme: AppTheme;
+}) {
+  if (thirdIcon) {
+    return (
+      <div style={{ position: "relative", width: 40, height: 40, flexShrink: 0, filter: active ? "none" : "grayscale(1)" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, lineHeight: 0, opacity: active ? 0.55 : 0.18 }}>
+          <BuffIconImage icon={thirdIcon} name={name} theme={theme} size={18} />
+        </div>
+        <div style={{ position: "absolute", top: 0, right: 0, lineHeight: 0, opacity: active ? 0.55 : 0.18 }}>
+          <BuffIconImage icon={secondIcon} name={name} theme={theme} size={18} />
+        </div>
+        <div style={{ position: "absolute", bottom: 4, left: 4, lineHeight: 0, opacity: active ? 1 : 0.32 }}>
+          <BuffIconImage icon={icon} name={name} theme={theme} size={32} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ position: "relative", width: 42, height: 40, flexShrink: 0, filter: active ? "none" : "grayscale(1)" }}>
+      <div style={{ position: "absolute", top: 0, left: 10, lineHeight: 0, opacity: active ? 0.5 : 0.16 }}>
+        <BuffIconImage icon={secondIcon} name={name} theme={theme} size={32} />
+      </div>
+      <div style={{ position: "absolute", top: 8, left: 0, lineHeight: 0, opacity: active ? 1 : 0.32 }}>
+        <BuffIconImage icon={icon} name={name} theme={theme} size={32} />
+      </div>
+    </div>
+  );
+}
+
 function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, secondIconOverride, label, ariaLabel }: {
   entry: BoolBuffEntry;
   active: boolean;
@@ -162,16 +206,9 @@ function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, secondIcon
   return (
     <HoverTooltip label={label ?? entry.name} theme={theme}>
       <button type="button" onClick={onToggle} aria-label={resolvedAriaLabel} aria-pressed={active} style={boolTileStyle(active, theme)}>
-        {secondIcon ? (
-          <div style={{ position: "relative", width: 42, height: 40, flexShrink: 0, filter: active ? "none" : "grayscale(1)" }}>
-            <div style={{ position: "absolute", top: 0, left: 10, lineHeight: 0, opacity: active ? 0.5 : 0.16 }}>
-              <BuffIconImage icon={secondIcon} name={entry.name} theme={theme} size={32} />
-            </div>
-            <div style={{ position: "absolute", top: 8, left: 0, lineHeight: 0, opacity: active ? 1 : 0.32 }}>
-              <BuffIconImage icon={icon} name={entry.name} theme={theme} size={32} />
-            </div>
-          </div>
-        ) : renderIcon(icon, 32, active, entry.name, theme)}
+        {secondIcon
+          ? <StackedBuffIcon icon={icon} secondIcon={secondIcon} thirdIcon={entry.thirdIcon} active={active} name={entry.name} theme={theme} />
+          : renderIcon(icon, 32, active, entry.name, theme)}
       </button>
     </HoverTooltip>
   );
@@ -215,7 +252,20 @@ function sparklingRedStarTooltip(theme: AppTheme): ReactNode {
       <span style={{ color: statusText(theme, "danger"), paddingLeft: "0.6em", fontStyle: "italic" }}>cannot be used with Blue Star Potion</span>
       <span style={{ opacity: 0.6, color: theme.muted }}>or</span>
       <span>Advanced Boss Rush Boost Potion</span>
-      <span style={{ opacity: 0.7, color: theme.muted }}>+20% Boss DMG</span>
+      <span style={{ opacity: 0.7 }}>+20% Boss DMG</span>
+    </div>
+  );
+}
+
+function fishBuffTooltip(theme: AppTheme): ReactNode {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span>Tree Ornament</span>
+      <span style={{ opacity: 0.6, color: theme.muted }}>or</span>
+      <span>A Flurry of Snow</span>
+      <span style={{ opacity: 0.6, color: theme.muted }}>or</span>
+      <span>Warm and Fuzzy Winter</span>
+      <span style={{ opacity: 0.7 }}>+30 ATT/Magic ATT</span>
     </div>
   );
 }
@@ -234,6 +284,7 @@ function boolBuffLabel(id: BoolBuffEntry["id"], primaryStat: ReturnType<typeof p
   if (id === "heroEcho") return heroEchoName(jobName);
   if (id === "extremePotion") return isHurricaneClass(jobName) ? extremePotionLabel(primaryStat) : extremePotionMergedTooltip(theme, primaryStat);
   if (id === "sparklingRedStar") return sparklingRedStarTooltip(theme);
+  if (id === "fishBuff") return fishBuffTooltip(theme);
   if (id === "maxedSacredSymbol") return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <span>Lv. 11 Sacred Symbols</span>
@@ -420,6 +471,7 @@ export default function BuffsSetupStep({
                     entry={b}
                     active={draft.bools[b.id] ?? false}
                     onToggle={() => toggleBool(b.id)}
+                    label={boolBuffLabel(b.id, primaryStat, theme, jobName)}
                     theme={theme}
                   />
                 ))}

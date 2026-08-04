@@ -392,6 +392,12 @@ interface StepJumpMenuProps {
    *  (e.g. this character already has required setup completed, so step 0 would show
    *  its profile instead) — showing this entry there would be a misleading label. */
   onBackToIntro?: () => void;
+  /** The other side of that omission: shown instead of onBackToIntro when this step
+   *  was reached by editing an already-set-up character (a profile bookmark), where
+   *  step 0 lands back on that character's profile rather than a setup-selection
+   *  screen. Mutually exclusive with onBackToIntro in practice, since both are gated
+   *  on the same completed-required-flow check from opposite sides. */
+  onExitToProfile?: () => void;
 }
 
 export default function StepJumpMenu({
@@ -402,6 +408,7 @@ export default function StepJumpMenu({
   onJumpStep,
   onJumpSubstep,
   onBackToIntro,
+  onExitToProfile,
 }: StepJumpMenuProps) {
   const [open, setOpen] = useState(false);
   const [openAbove, setOpenAbove] = useState(false);
@@ -435,7 +442,7 @@ export default function StepJumpMenu({
   // unmount the flyout before the mouse ever reaches it. Close on a short delay
   // instead, canceled if the row or the flyout itself is re-entered in time.
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canJump = steps.length > 1 || Boolean(onBackToIntro);
+  const canJump = steps.length > 1 || Boolean(onBackToIntro) || Boolean(onExitToProfile);
 
   function cancelFlyoutClose() {
     if (closeTimerRef.current !== null) {
@@ -593,6 +600,22 @@ export default function StepJumpMenu({
               data-jump-row="true"
             >
               ← Setup selection
+            </button>
+          )}
+          {onExitToProfile && (
+            <button
+              type="button"
+              onClick={() => {
+                onExitToProfile();
+                setOpen(false);
+              }}
+              style={backToIntroItemStyle(theme)}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}18`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+              onKeyDown={handleBackToIntroKeyDown}
+              data-jump-row="true"
+            >
+              ← Exit setup
             </button>
           )}
           {steps.map((step) => {

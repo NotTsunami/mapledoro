@@ -64,24 +64,33 @@ function SettingsContent({ theme }: { theme: AppTheme }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
+      let data: unknown;
       try {
-        const data = JSON.parse(reader.result as string);
-        if (typeof data !== "object" || data === null) {
-          setImportStatus("Invalid file format.");
-          return;
-        }
-        let count = 0;
-        for (const [key, value] of Object.entries(data)) {
-          if (key.startsWith("mapledoro") && typeof value === "string") {
-            localStorage.setItem(key, value);
-            count++;
-          }
-        }
-        setImportStatus(`Imported ${count} item${count === 1 ? "" : "s"}. Reloading...`);
-        setTimeout(() => window.location.reload(), 800);
+        data = JSON.parse(reader.result as string);
       } catch {
-        setImportStatus("Failed to parse file.");
+        setImportStatus("That file isn't valid JSON.");
+        return;
       }
+      if (typeof data !== "object" || data === null || Array.isArray(data)) {
+        setImportStatus("That file doesn't look like a MapleDoro backup.");
+        return;
+      }
+      const entries = Object.entries(data);
+      // Whole-file reject, not a silent per-entry skip: exportData() can only ever
+      // produce mapledoro-prefixed string values, so anything else (a wrong key, a
+      // non-string value) means the file was hand-edited or corrupted, not a real
+      // backup -- same "reject, don't quietly drop what's wrong" reasoning as world
+      // import's own cap/shape checks.
+      const isValid = entries.every(([key, value]) => key.startsWith("mapledoro") && typeof value === "string");
+      if (!isValid) {
+        setImportStatus("That file doesn't look like a MapleDoro backup.");
+        return;
+      }
+      for (const [key, value] of entries) {
+        localStorage.setItem(key, value as string);
+      }
+      setImportStatus(`Imported ${entries.length} item${entries.length === 1 ? "" : "s"}. Reloading...`);
+      setTimeout(() => window.location.reload(), 800);
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -224,31 +233,33 @@ function SettingsContent({ theme }: { theme: AppTheme }) {
             <p style={labelStyle}>Data management</p>
             <p style={descStyle}>Export your data as a backup, or import a previous backup.</p>
           </div>
-          <div className="settings-actions">
-            <button
-              type="button"
-              onClick={exportData}
-              className="tool-btn tool-dialog-btn"
-              style={dialogPrimaryBtnColors(theme)}
-            >
-              Export data
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="tool-btn tool-dialog-btn"
-              style={dialogBtnColors(theme)}
-            >
-              Import data
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              aria-label="Import data file"
-              onChange={handleImport}
-              style={{ display: "none" }}
-            />
+          <div className="settings-data-actions">
+            <div className="settings-actions">
+              <button
+                type="button"
+                onClick={exportData}
+                className="tool-btn tool-dialog-btn"
+                style={dialogPrimaryBtnColors(theme)}
+              >
+                Export data
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="tool-btn tool-dialog-btn"
+                style={dialogBtnColors(theme)}
+              >
+                Import data
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                aria-label="Import data file"
+                onChange={handleImport}
+                style={{ display: "none" }}
+              />
+            </div>
             {importStatus && (
               <span style={{ fontSize: "0.8rem", fontWeight: 700, color: theme.muted }}>
                 {importStatus}

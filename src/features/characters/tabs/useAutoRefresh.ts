@@ -41,7 +41,7 @@ export function useAutoRefresh({
   const onRefreshedRef = useRef(onRefreshed);
   useEffect(() => { onRefreshedRef.current = onRefreshed; });
 
-  // react-doctor-disable-next-line no-fetch-in-effect, no-set-state-after-await-in-effect -- one-shot fetch with proper AbortController cleanup; this project hasn't adopted a data-fetching library, matches the rule's own documented FP criteria. Every post-await setter is already gated on `signal.aborted`, which the cleanup trips.
+  // react-doctor-disable-next-line no-fetch-in-effect -- one-shot fetch with proper AbortController cleanup; this project hasn't adopted a data-fetching library, matches the rule's own documented FP criteria, react-doctor/no-set-state-after-await-in-effect -- every post-await setter (setRefreshingKeys, onRefreshedRef.current) is already gated behind !signal.aborted, and cleanup calls controller.abort() synchronously; matches the rule's own candidate-corrected pattern
   useEffect(() => {
     if (queue.length === 0) return;
     const controller = new AbortController();

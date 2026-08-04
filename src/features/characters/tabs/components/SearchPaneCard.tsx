@@ -3,6 +3,7 @@ import type { SearchPaneActions, SearchPaneModel } from "../paneModels";
 import ConfirmModal from "../../../../components/ConfirmModal";
 import FirstTimeSetupScreen from "../screens/FirstTimeSetupScreen";
 import ImportModeScreen from "../screens/ImportModeScreen";
+import WorldImportModeScreen from "../screens/WorldImportModeScreen";
 import CharacterProfileActionsScreen from "../screens/CharacterProfileActionsScreen";
 import CharacterProfileScreen from "../screens/CharacterProfileScreen";
 import SearchEntryScreen from "../screens/SearchEntryScreen";
@@ -72,6 +73,9 @@ export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) 
         )}
         {model.search.setupMode === "import" && (
           <ImportModeScreen model={model} actions={actions} />
+        )}
+        {model.search.setupMode === "worldImport" && (
+          <WorldImportModeScreen model={model} actions={actions} />
         )}
         {model.search.setupMode === "search" && !model.search.setupFlowStarted && (
           <SearchEntryScreen model={model} actions={actions} />

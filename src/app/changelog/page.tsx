@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-04",
+    changes: [
+      { type: "added", text: "Added Characters, a full character tracker: guided setup for Stats, Equipment, Link Skills, Familiars, V Matrix, HEXA Matrix, Hyper Stats, and Legion Artifact, a profile bringing all of it together alongside MapleScouter, and JSON import/export for a single character or a whole world." },
+    ],
+  },
+  {
     date: "2026-08-03",
     changes: [
       { type: "fixed", text: "The Stat Optimizer now values your Hyper Stats and HEXA Stats against your buffed bossing stats, using your character's Scouter data, so its recommendation matches MapleScouter." },
