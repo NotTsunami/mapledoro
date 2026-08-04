@@ -18,6 +18,13 @@ const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-07-31",
+    changes: [
+      { type: "fixed", text: "Fixed the HEXA Skill Tracker refusing to take levels like 10 and 11 in the Origin skill boxes." },
+      { type: "changed", text: "The HEXA Skill Tracker no longer lets a skill's goal level sit below its current level." },
+    ],
+  },
+  {
     date: "2026-07-27",
     changes: [
       { type: "fixed", text: "Fixed the Daily Tracker cutting off longer task names like Normal Crimson Queen on some browsers." },
