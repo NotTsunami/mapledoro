@@ -152,7 +152,6 @@ export const BOOL_BUFFS: readonly BoolBuffEntry[] = [
   { id: "advWeaponTempering",  name: "Advanced Weapon Tempering",        icon: { kind: "skill", id: "80002363" }, group: "A" },
   // Group B
   { id: "onyxApple",       name: "Onyx Apple",         icon: { kind: "item", id: "02024278" }, group: "B" },
-  { id: "tengusJudgement", name: "Tengu's Judgement",  icon: { kind: "item", id: "02023626" }, group: "B" },
   // Same +30 ATT/Magic ATT effect under 3 different event-reskinned item names (Tree
   // Ornament/A Flurry of Snow/Warm and Fuzzy Winter) -- MapleScouter tracks it as one
   // "fish" buff regardless of which name a player actually has. See fishBuffTooltip
@@ -160,6 +159,7 @@ export const BOOL_BUFFS: readonly BoolBuffEntry[] = [
   // Winter is deliberately the backmost/dimmest layer -- it's a visually busier icon
   // than the other two and would otherwise dominate the stack.
   { id: "fishBuff",       name: "Tree Ornament",      icon: { kind: "item", id: "02022119" }, secondIcon: { kind: "item", id: "02022280" }, thirdIcon: { kind: "item", id: "02022434" }, group: "B" },
+  { id: "tengusJudgement", name: "Tengu's Judgement",  icon: { kind: "item", id: "02023626" }, group: "B" },
 ];
 
 export const BUFF_GROUP_A = new Set<BoolBuffId>(["greatHeroBoost","legendaryHero","advWeaponTempering","sparklingBlueStar"]);

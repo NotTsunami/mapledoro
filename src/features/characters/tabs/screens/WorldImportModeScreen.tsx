@@ -5,9 +5,7 @@ import {
   readCharactersStore,
   selectCharacterByIgn,
   selectCharactersList,
-  mergeImportedCharacterRecord,
   parseImportedWorldPayload,
-  type ImportSectionId,
   type StoredCharacterRecord,
   type StoredLegionArtifact,
   type StoredScouterLegion,
@@ -15,6 +13,14 @@ import {
 } from "../../model/charactersStore";
 import { toCharacterKey } from "../../model/characterKeys";
 import { MAX_CHAMPIONS, MAX_CHARACTERS_PER_WORLD } from "../useCharacterSetupController";
+import {
+  useWorldImportConflictState,
+  collapseUniformChoiceMap,
+  type Choice,
+  type ConflictResolution,
+  type ConflictEntry,
+  type ResidentEntry,
+} from "../useWorldImportConflictState";
 import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import { resolveDisplayJobName } from "../../setup/data/nexonJobMapping";
 import { statusText } from "../../../../components/statusColors";
@@ -31,82 +37,8 @@ import {
   titleStyle,
 } from "../components/uiStyles";
 
-type Choice = "mine" | "imported";
-
-interface ConflictEntry {
-  existing: StoredCharacterRecord;
-  imported: StoredCharacterRecord;
-  // Existing's role on whichever world it's CURRENTLY on -- not the import's target
-  // world, which can differ (e.g. importing a world file while the same IGN is Main
-  // somewhere else entirely).
-  currentRoles: ProfileRole[];
-}
-
-interface ResidentEntry {
-  character: StoredCharacterRecord;
-  currentRoles: ProfileRole[];
-}
-
-// One resolution per conflicting character: "mine"/"imported" from the bulk default
-// buttons, or a full per-section choice map once someone customizes that one character
-// via the same ImportConflictDialog the single-character flow already uses.
-type ConflictResolution = Choice | Record<ImportSectionId, Choice>;
-
-function isSectionChoiceMap(value: ConflictResolution): value is Record<ImportSectionId, Choice> {
+function isSectionChoiceMap(value: ConflictResolution): value is Record<string, Choice> {
   return typeof value === "object";
-}
-
-// Main is a single world-level slot -- unlike a data section, one character's role
-// choice can silently bump ANOTHER character's role, including someone never even shown
-// a choice (an untouched resident who's currently Main but not mentioned in the file at
-// all). Detects that clash before commit instead of letting importWorldBulk's own
-// unconditional overwrite happen invisibly. Extracted out of the component body purely
-// to stay under the cognitive-complexity cap -- this is otherwise inline logic with no
-// reuse elsewhere.
-//
-// Only a KEPT conflict's current Main status counts as a real clash -- a conflict
-// resolved "Use imported"/customized is deliberately giving up whatever role they
-// currently hold (that's what usesFileRole means), so finding them as "currently Main"
-// is not a conflict, it's the expected outcome of their own choice. Residents have no
-// choice mechanism at all (they either stay untouched or get removed), so their current
-// Main status is always effectively "kept."
-function resolveMainConflict(
-  keptConflicts: ConflictEntry[],
-  worldResidents: ResidentEntry[],
-  effectiveMainCharacterKey: string | null,
-  removedSet: Set<string>,
-  rosterByKey: Map<string, StoredCharacterRecord>,
-): { currentMainName: string; fileMainName: string } | null {
-  const currentMainConflictEntry = keptConflicts.find((entry) => entry.currentRoles.includes("main"));
-  const currentMainResidentEntry = worldResidents.find((r) => r.currentRoles.includes("main"));
-  let currentMainKey: string | null = null;
-  if (currentMainConflictEntry) {
-    currentMainKey = toCharacterKey(currentMainConflictEntry.existing);
-  } else if (currentMainResidentEntry) {
-    currentMainKey = toCharacterKey(currentMainResidentEntry.character);
-  }
-  if (
-    !currentMainKey ||
-    !effectiveMainCharacterKey ||
-    currentMainKey === effectiveMainCharacterKey ||
-    removedSet.has(currentMainKey)
-  ) {
-    return null;
-  }
-  return {
-    currentMainName: rosterByKey.get(currentMainKey)?.characterName ?? currentMainKey,
-    fileMainName: rosterByKey.get(effectiveMainCharacterKey)?.characterName ?? effectiveMainCharacterKey,
-  };
-}
-
-// Collapses a per-section map back into a plain bulk Choice when every section actually
-// agrees -- Customize's own "Keep all existing"/"Use all imported" buttons produce a map
-// that's uniform in exactly this way, and without this it reads as "Customized" even
-// though nothing about the outcome differs from clicking the row's own Keep/Use pill.
-function collapseUniformChoiceMap(choices: Record<ImportSectionId, Choice>): ConflictResolution {
-  const values = Object.values(choices);
-  const first = values[0];
-  return values.every((v) => v === first) ? first : choices;
 }
 
 // A character can hold both roles at once (Main AND a Champion slot), so this returns
@@ -362,231 +294,344 @@ interface WorldImportConflictViewProps {
 // Rendered by WorldImportModeScreen below once a file has actually been chosen and
 // parsed -- this component itself has no "pick a file" step and no back button of its
 // own (the outer screen owns navigation across both its idle and loaded states).
+
+// Extracted purely to keep WorldImportConflictView's own render body short -- each of
+// these four sections is only ever rendered from there, one call site each.
+function ConflictsSection({
+  theme,
+  payload,
+  conflicts,
+  resolutions,
+  setResolutions,
+  setRoleOverrides,
+  setCustomizingKey,
+  applyBulkChoiceToAll,
+}: {
+  theme: AppTheme;
+  payload: WorldExportPayload;
+  conflicts: ConflictEntry[];
+  resolutions: Record<string, ConflictResolution>;
+  setResolutions: React.Dispatch<React.SetStateAction<Record<string, ConflictResolution>>>;
+  setRoleOverrides: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  setCustomizingKey: (key: string) => void;
+  applyBulkChoiceToAll: (choice: Choice) => void;
+}) {
+  const { ref: conflictsRef, atStart: conflictsAtStart, atEnd: conflictsAtEnd } =
+    useScrollEdges<HTMLDivElement>([conflicts.length], "vertical");
+  const conflictsMask = edgeFadeMask(conflictsAtStart, conflictsAtEnd, 28, "vertical");
+
+  if (conflicts.length === 0) return null;
+  return (
+    <div style={{ marginBottom: "0.9rem" }}>
+      <p style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text, margin: "0 0 0.5rem" }}>
+        {conflicts.length} {CHARACTERS_COPY.worldImport.conflictSummaryPrefix} {payload.characters.length} {CHARACTERS_COPY.worldImport.conflictSummarySuffix}
+      </p>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <button type="button" onClick={() => applyBulkChoiceToAll("mine")} style={secondaryButtonStyle(theme, "0.5rem 0.8rem")}>
+          {CHARACTERS_COPY.worldImport.keepAllMine}
+        </button>
+        <button type="button" onClick={() => applyBulkChoiceToAll("imported")} style={secondaryButtonStyle(theme, "0.5rem 0.8rem")}>
+          {CHARACTERS_COPY.worldImport.useAllImported}
+        </button>
+      </div>
+      <div
+        ref={conflictsRef}
+        style={{
+          border: `1px solid ${theme.border}`,
+          borderRadius: "12px",
+          padding: "0 0.7rem",
+          maxHeight: "260px",
+          overflowY: "auto",
+          WebkitMaskImage: conflictsMask,
+          maskImage: conflictsMask,
+        }}
+      >
+        {conflicts.map((entry) => {
+          const key = toCharacterKey(entry.existing);
+          return (
+            <ConflictRow
+              key={key}
+              theme={theme}
+              entry={entry}
+              resolution={resolutions[key] ?? "mine"}
+              currentRoles={entry.currentRoles}
+              newRoles={resolveRoles(key, payload.mainCharacterKey, payload.championCharacterKeys)}
+              onSetBulkChoice={(choice) => {
+                setResolutions((prev) => ({ ...prev, [key]: choice }));
+                // Clicking Keep/Use directly on the row is also a reset for that one
+                // character -- drops any role override a prior Customize visit set, so
+                // role goes back to following this new data choice.
+                setRoleOverrides((prev) => {
+                  if (!(key in prev)) return prev;
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                });
+              }}
+              onCustomize={() => setCustomizingKey(key)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NewCharactersSection({
+  theme,
+  payload,
+  newCharacters,
+  selectedNewCharacterKeys,
+  droppedNewCharacterRoleKeys,
+  toggleNewCharacter,
+  toggleNewCharacterRole,
+}: {
+  theme: AppTheme;
+  payload: WorldExportPayload;
+  newCharacters: StoredCharacterRecord[];
+  selectedNewCharacterKeys: Set<string>;
+  droppedNewCharacterRoleKeys: Set<string>;
+  toggleNewCharacter: (key: string) => void;
+  toggleNewCharacterRole: (key: string) => void;
+}) {
+  const { ref: newCharactersRef, atStart: newCharactersAtStart, atEnd: newCharactersAtEnd } =
+    useScrollEdges<HTMLDivElement>([newCharacters.length], "vertical");
+  const newCharactersMask = edgeFadeMask(newCharactersAtStart, newCharactersAtEnd, 28, "vertical");
+
+  if (newCharacters.length === 0) return null;
+  return (
+    <div style={{ marginBottom: "0.9rem" }}>
+      <p style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted, margin: "0 0 0.5rem" }}>
+        {newCharacters.length} {CHARACTERS_COPY.worldImport.newCharacterCountSuffix}
+      </p>
+      <div
+        ref={newCharactersRef}
+        style={{
+          border: `1px solid ${theme.border}`,
+          borderRadius: "12px",
+          padding: "0 0.7rem",
+          maxHeight: "180px",
+          overflowY: "auto",
+          WebkitMaskImage: newCharactersMask,
+          maskImage: newCharactersMask,
+        }}
+      >
+        {newCharacters.map((character) => {
+          const key = toCharacterKey(character);
+          const fileRoles = resolveRoles(key, payload.mainCharacterKey, payload.championCharacterKeys);
+          const roleDropped = droppedNewCharacterRoleKeys.has(key);
+          return (
+            <NewCharacterRow
+              key={key}
+              theme={theme}
+              character={character}
+              newRoles={roleDropped ? [] : fileRoles}
+              checked={selectedNewCharacterKeys.has(key)}
+              onToggle={() => toggleNewCharacter(key)}
+              fileRoles={fileRoles}
+              roleDropped={roleDropped}
+              onToggleDropRole={() => toggleNewCharacterRole(key)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ResidentsSection({
+  theme,
+  worldResidents,
+  deselectedResidentKeys,
+  toggleResident,
+}: {
+  theme: AppTheme;
+  worldResidents: ResidentEntry[];
+  deselectedResidentKeys: Set<string>;
+  toggleResident: (key: string) => void;
+}) {
+  const { ref: residentsRef, atStart: residentsAtStart, atEnd: residentsAtEnd } =
+    useScrollEdges<HTMLDivElement>([worldResidents.length], "vertical");
+  const residentsMask = edgeFadeMask(residentsAtStart, residentsAtEnd, 28, "vertical");
+
+  if (worldResidents.length === 0) return null;
+  return (
+    <div style={{ marginBottom: "0.9rem" }}>
+      <p style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted, margin: "0 0 0.5rem" }}>
+        {worldResidents.length} {CHARACTERS_COPY.worldImport.residentCountSuffix}
+      </p>
+      <div
+        ref={residentsRef}
+        style={{
+          border: `1px solid ${theme.border}`,
+          borderRadius: "12px",
+          padding: "0 0.7rem",
+          maxHeight: "180px",
+          overflowY: "auto",
+          WebkitMaskImage: residentsMask,
+          maskImage: residentsMask,
+        }}
+      >
+        {worldResidents.map((resident) => {
+          const key = toCharacterKey(resident.character);
+          return (
+            <NewCharacterRow
+              key={key}
+              theme={theme}
+              character={resident.character}
+              newRoles={resident.currentRoles}
+              checked={!deselectedResidentKeys.has(key)}
+              onToggle={() => toggleResident(key)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CapSummarySection({
+  theme,
+  projectedWorldCount,
+  isOverCap,
+  effectiveChampionCharacterKeys,
+  championOverflowCount,
+  mainConflict,
+}: {
+  theme: AppTheme;
+  projectedWorldCount: number;
+  isOverCap: boolean;
+  effectiveChampionCharacterKeys: string[];
+  championOverflowCount: number;
+  mainConflict: { currentMainName: string; fileMainName: string } | null;
+}) {
+  return (
+    <div style={{ marginBottom: "0.9rem" }}>
+      <p style={{ fontSize: "0.8rem", fontWeight: 700, color: isOverCap ? statusText(theme, "danger") : theme.muted, margin: 0 }}>
+        {projectedWorldCount}/{MAX_CHARACTERS_PER_WORLD} {CHARACTERS_COPY.worldImport.characterCapSuffix}
+      </p>
+      {effectiveChampionCharacterKeys.length > 0 && (
+        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: championOverflowCount > 0 ? statusText(theme, "danger") : theme.muted, margin: "0.15rem 0 0" }}>
+          {effectiveChampionCharacterKeys.length}/{MAX_CHAMPIONS} {CHARACTERS_COPY.worldImport.championCountSuffix}
+        </p>
+      )}
+      {isOverCap && (
+        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
+          {CHARACTERS_COPY.worldImport.characterCapErrorPrefix} {MAX_CHARACTERS_PER_WORLD} {CHARACTERS_COPY.worldImport.characterCapErrorSuffix}
+        </p>
+      )}
+      {mainConflict && (
+        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
+          {mainConflict.currentMainName} {CHARACTERS_COPY.worldImport.mainConflictPrefix} {mainConflict.fileMainName} {CHARACTERS_COPY.worldImport.mainConflictSuffix}
+        </p>
+      )}
+      {championOverflowCount > 0 && (
+        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
+          {CHARACTERS_COPY.worldImport.championOverflowPrefix} {MAX_CHAMPIONS} {CHARACTERS_COPY.worldImport.championOverflowMiddle} {effectiveChampionCharacterKeys.length} {CHARACTERS_COPY.worldImport.championOverflowSuffix}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Splits a loaded file's characters into new-vs-conflicting against the live roster, and
+// finds this world's residents (characters the file doesn't mention at all). Extracted
+// out of WorldImportConflictView's own render body purely to stay under the
+// cognitive-complexity cap -- called once from that component's useMemo, no other caller.
+function partitionWorldImportPayload(payload: WorldExportPayload): {
+  newCharacters: StoredCharacterRecord[];
+  conflicts: ConflictEntry[];
+  worldDataConflict: boolean;
+  worldResidents: ResidentEntry[];
+} {
+  const store = readCharactersStore();
+  const newChars: StoredCharacterRecord[] = [];
+  const conflictEntries: ConflictEntry[] = [];
+  const conflictKeys = new Set<string>();
+  for (const imported of payload.characters) {
+    const existing = selectCharacterByIgn(store, imported.characterName);
+    if (existing) {
+      const existingKey = toCharacterKey(existing);
+      const currentRoles = resolveRoles(
+        existingKey,
+        store.mainCharacterIdByWorld[String(existing.worldID)] ?? null,
+        store.championCharacterIdsByWorld[String(existing.worldID)] ?? [],
+      );
+      conflictEntries.push({ existing, imported, currentRoles });
+      conflictKeys.add(existingKey);
+    } else {
+      newChars.push(imported);
+    }
+  }
+  const hasWorldData = Boolean(
+    store.legionArtifactByWorld[String(payload.worldID)] || store.scouterLegionByWorld[String(payload.worldID)],
+  );
+  // Characters already on the target world that the FILE doesn't mention at all -- not a
+  // conflict (that IGN already has a resolution above), just existing residents who may
+  // need to be dropped to make room if the import would otherwise go over cap.
+  const residents: ResidentEntry[] = [];
+  for (const character of selectCharactersList(store)) {
+    if (character.worldID !== payload.worldID || conflictKeys.has(toCharacterKey(character))) continue;
+    residents.push({
+      character,
+      currentRoles: resolveRoles(
+        toCharacterKey(character),
+        store.mainCharacterIdByWorld[String(payload.worldID)] ?? null,
+        store.championCharacterIdsByWorld[String(payload.worldID)] ?? [],
+      ),
+    });
+  }
+  return { newCharacters: newChars, conflicts: conflictEntries, worldDataConflict: hasWorldData, worldResidents: residents };
+}
+
 function WorldImportConflictView({ theme, isUiLocked, payload, onImportWorldBulk, onChooseDifferentFile }: WorldImportConflictViewProps) {
 
   // Partitioned once per loaded file, not on every render -- selectCharacterByIgn reads
   // the roster fresh from storage, and the conflict set this screen operates on should
   // stay fixed for the duration of resolving it, not shift under the user's feet if
   // something else in the app happened to touch storage mid-review.
-  const { newCharacters, conflicts, worldDataConflict, worldResidents } = useMemo(() => {
-    const store = readCharactersStore();
-    const newChars: StoredCharacterRecord[] = [];
-    const conflictEntries: ConflictEntry[] = [];
-    const conflictKeys = new Set<string>();
-    for (const imported of payload.characters) {
-      const existing = selectCharacterByIgn(store, imported.characterName);
-      if (existing) {
-        const existingKey = toCharacterKey(existing);
-        const currentRoles = resolveRoles(
-          existingKey,
-          store.mainCharacterIdByWorld[String(existing.worldID)] ?? null,
-          store.championCharacterIdsByWorld[String(existing.worldID)] ?? [],
-        );
-        conflictEntries.push({ existing, imported, currentRoles });
-        conflictKeys.add(existingKey);
-      } else {
-        newChars.push(imported);
-      }
-    }
-    const hasWorldData = Boolean(
-      store.legionArtifactByWorld[String(payload.worldID)] || store.scouterLegionByWorld[String(payload.worldID)],
-    );
-    // Characters already on the target world that the FILE doesn't mention at all --
-    // not a conflict (that IGN already has a resolution above), just existing residents
-    // who may need to be dropped to make room if the import would otherwise go over cap.
-    const residents: ResidentEntry[] = selectCharactersList(store)
-      .filter((c) => c.worldID === payload.worldID && !conflictKeys.has(toCharacterKey(c)))
-      .map((character) => ({
-        character,
-        currentRoles: resolveRoles(
-          toCharacterKey(character),
-          store.mainCharacterIdByWorld[String(payload.worldID)] ?? null,
-          store.championCharacterIdsByWorld[String(payload.worldID)] ?? [],
-        ),
-      }));
-    return { newCharacters: newChars, conflicts: conflictEntries, worldDataConflict: hasWorldData, worldResidents: residents };
-  }, [payload]);
-
-  const [resolutions, setResolutions] = useState<Record<string, ConflictResolution>>(() => {
-    const initial: Record<string, ConflictResolution> = {};
-    for (const entry of conflicts) initial[toCharacterKey(entry.existing)] = "mine";
-    return initial;
-  });
-  const [keepMyWorldData, setKeepMyWorldData] = useState(true);
-  const [customizingKey, setCustomizingKey] = useState<string | null>(null);
-  // Explicit per-conflict role overrides set via Customize's role row -- absent means the
-  // default (role follows the data resolution: "mine" keeps the current role, "imported"/
-  // customized applies the file's role), present means the user explicitly chose
-  // independent of their data choice (e.g. keep existing data but still take the file's
-  // role, or the reverse).
-  const [roleOverrides, setRoleOverrides] = useState<Record<string, boolean>>({});
-  // Every new character starts checked -- unchecking is how someone stays under the
-  // per-world cap (MAX_CHARACTERS_PER_WORLD) when the file would otherwise push them over
-  // it, since conflicts never add a NET-NEW slot (they replace/keep an existing IGN) and
-  // can't be the cause of going over.
-  const [selectedNewCharacterKeys, setSelectedNewCharacterKeys] = useState<Set<string>>(
-    () => new Set(newCharacters.map(toCharacterKey)),
-  );
-  // Existing residents default to KEPT (checked) -- storing the deselected set rather
-  // than the selected one, since "keep everyone" is the common case and residents is
-  // usually large (up to MAX_CHARACTERS_PER_WORLD), so tracking exceptions is cheaper
-  // to reason about than tracking the whole default-true set.
-  const [deselectedResidentKeys, setDeselectedResidentKeys] = useState<Set<string>>(() => new Set());
-  // A new character can be added WITHOUT taking the file's Main/Champion assignment for
-  // them -- e.g. they'd push Champion count over cap, but there's no reason a Champion
-  // conflict should force dropping the character entirely when they'd otherwise fit fine
-  // as a plain mule. Keyed independently of selectedNewCharacterKeys since "add them" and
-  // "give them this role" are separate decisions.
-  const [droppedNewCharacterRoleKeys, setDroppedNewCharacterRoleKeys] = useState<Set<string>>(() => new Set());
-
-  // Fades whichever edge actually has more to scroll to (see useScrollEdges/edgeFadeMask)
-  // -- a static fade misreads as "more to scroll" even once fully scrolled to the bottom,
-  // or when a list is short enough to never overflow its own cap in the first place.
-  const { ref: conflictsRef, atStart: conflictsAtStart, atEnd: conflictsAtEnd } =
-    useScrollEdges<HTMLDivElement>([conflicts.length], "vertical");
-  const conflictsMask = edgeFadeMask(conflictsAtStart, conflictsAtEnd, 28, "vertical");
-  const { ref: residentsRef, atStart: residentsAtStart, atEnd: residentsAtEnd } =
-    useScrollEdges<HTMLDivElement>([worldResidents.length], "vertical");
-  const residentsMask = edgeFadeMask(residentsAtStart, residentsAtEnd, 28, "vertical");
-  const { ref: newCharactersRef, atStart: newCharactersAtStart, atEnd: newCharactersAtEnd } =
-    useScrollEdges<HTMLDivElement>([newCharacters.length], "vertical");
-  const newCharactersMask = edgeFadeMask(newCharactersAtStart, newCharactersAtEnd, 28, "vertical");
-
-  function applyBulkChoiceToAll(choice: Choice) {
-    const next: Record<string, ConflictResolution> = {};
-    for (const entry of conflicts) next[toCharacterKey(entry.existing)] = choice;
-    setResolutions(next);
-    setKeepMyWorldData(choice === "mine");
-    // Clears any explicit per-character role override set via a previous Customize visit
-    // -- a bulk choice is a full reset, so a stale override from before shouldn't keep
-    // pinning that one character's role against what the bulk buttons now say.
-    setRoleOverrides({});
-  }
-
-  // Conflicts resolved "imported"/customized land ON payload.worldID (that's what
-  // entry.imported's own worldID already is); "mine" keeps entry.existing wherever it
-  // already lives, which can be a different world entirely -- so this is NOT simply
-  // "current count + selected new characters", it's the real post-import membership.
-  const resolvedConflicts: StoredCharacterRecord[] = conflicts.map((entry) => {
-    const key = toCharacterKey(entry.existing);
-    const resolution = resolutions[key] ?? "mine";
-    if (isSectionChoiceMap(resolution)) {
-      return mergeImportedCharacterRecord(entry.existing, entry.imported, resolution);
-    }
-    return resolution === "imported" ? entry.imported : entry.existing;
-  });
-  const selectedNewCharacters = newCharacters.filter((c) => selectedNewCharacterKeys.has(toCharacterKey(c)));
-  const resolvedCharacters = [...selectedNewCharacters, ...resolvedConflicts];
-  const removedResidentKeys = Array.from(deselectedResidentKeys);
-
-  // Same "upsert by key, then drop removed" merge importWorldBulk itself performs (see
-  // useCharacterSetupController.ts), mirrored here purely to preview the resulting
-  // per-world count before committing -- every resolved character's worldID already
-  // reflects where it will actually end up (payload.worldID for imported/customized
-  // conflicts and new characters, wherever it already was for "keep mine" conflicts).
-  const removedSet = new Set(removedResidentKeys);
-  const rosterByKey = new Map(
-    selectCharactersList(readCharactersStore())
-      .filter((c) => !removedSet.has(toCharacterKey(c)))
-      .map((c) => [toCharacterKey(c), c]),
-  );
-  for (const character of resolvedCharacters) rosterByKey.set(toCharacterKey(character), character);
-  const projectedWorldCount = Array.from(rosterByKey.values()).filter((c) => c.worldID === payload.worldID).length;
-  const isOverCap = projectedWorldCount > MAX_CHARACTERS_PER_WORLD;
-
-  function toggleNewCharacter(key: string) {
-    setSelectedNewCharacterKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function toggleResident(key: string) {
-    setDeselectedResidentKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function toggleNewCharacterRole(key: string) {
-    setDroppedNewCharacterRoleKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  // A conflicting character resolved "mine" (Keep existing) keeps their real current
-  // role untouched, same as their data -- the file's role assignment for that specific
-  // key is dropped rather than applied, so "Keep existing" actually means keep
-  // everything about them, not just their stats/equipment/etc. New characters have no
-  // current role to preserve, so the file's assignment always applies to them.
-  // roleOverrides (set via Customize's own role row) lets someone decouple role from
-  // data entirely -- e.g. keep existing data but still take the file's role, or the
-  // reverse -- overriding the data-resolution default when present.
-  function usesFileRole(key: string): boolean {
-    if (key in roleOverrides) return roleOverrides[key];
-    return (resolutions[key] ?? "mine") !== "mine";
-  }
-  const keptConflicts = conflicts.filter((entry) => !usesFileRole(toCharacterKey(entry.existing)));
-  const keptConflictKeys = new Set(keptConflicts.map((entry) => toCharacterKey(entry.existing)));
-  // The file's role assignment for a key only actually applies if that key is NOT a kept
-  // conflict (their current role stays untouched, per usesFileRole above), IS actually
-  // going to exist on this world after import (a deselected new character can't hold a
-  // role for a character that was never added), and hasn't had its role explicitly
-  // dropped via a new character's own "add without role" toggle.
-  const resolvedCharacterKeys = new Set(resolvedCharacters.map(toCharacterKey));
-  const fileRoleApplies = (key: string) =>
-    !keptConflictKeys.has(key) && resolvedCharacterKeys.has(key) && !droppedNewCharacterRoleKeys.has(key);
-  const effectiveMainCharacterKey =
-    payload.mainCharacterKey && fileRoleApplies(payload.mainCharacterKey) ? payload.mainCharacterKey : null;
-  // importWorldBulk's champion merge is "replace with this list if non-empty, else keep
-  // whatever's already stored" -- not a union -- so a kept conflict's (or a kept, not-
-  // removed resident's) real current champion status has to be folded into THIS list
-  // explicitly, or it would be silently dropped whenever the file assigns anyone else as
-  // champion. Residents were previously missing here entirely -- their current champion
-  // status never counted toward the total at all, so unchecking overflow new characters
-  // never actually resolved a real overflow that residents' own status was causing.
-  const keptCurrentChampionKeys = keptConflicts
-    .filter((entry) => entry.currentRoles.includes("champion"))
-    .map((entry) => toCharacterKey(entry.existing));
-  const keptResidentChampionKeys = worldResidents
-    .filter((r) => r.currentRoles.includes("champion") && !removedSet.has(toCharacterKey(r.character)))
-    .map((r) => toCharacterKey(r.character));
-  const effectiveChampionCharacterKeys = Array.from(
-    new Set([
-      ...payload.championCharacterKeys.filter(fileRoleApplies),
-      ...keptCurrentChampionKeys,
-      ...keptResidentChampionKeys,
-    ]),
+  const { newCharacters, conflicts, worldDataConflict, worldResidents } = useMemo(
+    () => partitionWorldImportPayload(payload),
+    [payload],
   );
 
-  // Champion overflow gets the same "surface before commit" treatment -- see
-  // resolveMainConflict's own comment for why this can't just be left to
-  // importWorldBulk's silent MAX_CHAMPIONS truncation.
-  const mainConflict = resolveMainConflict(keptConflicts, worldResidents, effectiveMainCharacterKey, removedSet, rosterByKey);
-  const championOverflowCount = Math.max(0, effectiveChampionCharacterKeys.length - MAX_CHAMPIONS);
+  const {
+    resolutions,
+    setResolutions,
+    keepMyWorldData,
+    setKeepMyWorldData,
+    setCustomizingKey,
+    setRoleOverrides,
+    selectedNewCharacterKeys,
+    deselectedResidentKeys,
+    droppedNewCharacterRoleKeys,
+    applyBulkChoiceToAll,
+    resolvedCharacters,
+    removedResidentKeys,
+    projectedWorldCount,
+    isOverCap,
+    toggleNewCharacter,
+    toggleResident,
+    toggleNewCharacterRole,
+    usesFileRole,
+    effectiveMainCharacterKey,
+    effectiveChampionCharacterKeys,
+    mainConflict,
+    championOverflowCount,
+    customizingEntry,
+    buildLegionDataForCommit,
+  } = useWorldImportConflictState(payload, conflicts, newCharacters, worldResidents);
 
   function handleConfirm() {
     if (isOverCap || mainConflict || championOverflowCount > 0) return;
-    const legionData = keepMyWorldData
-      ? null
-      : { legionArtifact: payload.legionArtifact, scouterLegion: payload.scouterLegion };
     onImportWorldBulk(
       resolvedCharacters,
       { mainCharacterKey: effectiveMainCharacterKey, championCharacterKeys: effectiveChampionCharacterKeys },
       payload.worldID,
-      legionData,
+      buildLegionDataForCommit(),
       removedResidentKeys,
     );
   }
-
-  const customizingEntry = customizingKey !== null ? conflicts.find((e) => toCharacterKey(e.existing) === customizingKey) : undefined;
 
   return (
     <>
@@ -598,159 +643,42 @@ function WorldImportConflictView({ theme, isUiLocked, payload, onImportWorldBulk
           .world-import-conflict-actions { padding-left: 0; margin-top: 0; margin-left: auto; flex-wrap: nowrap; }
         }
       `}</style>
-      {conflicts.length > 0 && (
-        <div style={{ marginBottom: "0.9rem" }}>
-          <p style={{ fontSize: "0.85rem", fontWeight: 700, color: theme.text, margin: "0 0 0.5rem" }}>
-            {conflicts.length} {CHARACTERS_COPY.worldImport.conflictSummaryPrefix} {payload.characters.length} {CHARACTERS_COPY.worldImport.conflictSummarySuffix}
-          </p>
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
-            <button type="button" onClick={() => applyBulkChoiceToAll("mine")} style={secondaryButtonStyle(theme, "0.5rem 0.8rem")}>
-              {CHARACTERS_COPY.worldImport.keepAllMine}
-            </button>
-            <button type="button" onClick={() => applyBulkChoiceToAll("imported")} style={secondaryButtonStyle(theme, "0.5rem 0.8rem")}>
-              {CHARACTERS_COPY.worldImport.useAllImported}
-            </button>
-          </div>
-          <div
-            ref={conflictsRef}
-            style={{
-              border: `1px solid ${theme.border}`,
-              borderRadius: "12px",
-              padding: "0 0.7rem",
-              maxHeight: "260px",
-              overflowY: "auto",
-              WebkitMaskImage: conflictsMask,
-              maskImage: conflictsMask,
-            }}
-          >
-            {conflicts.map((entry) => {
-              const key = toCharacterKey(entry.existing);
-              return (
-                <ConflictRow
-                  key={key}
-                  theme={theme}
-                  entry={entry}
-                  resolution={resolutions[key] ?? "mine"}
-                  currentRoles={entry.currentRoles}
-                  newRoles={resolveRoles(key, payload.mainCharacterKey, payload.championCharacterKeys)}
-                  onSetBulkChoice={(choice) => {
-                    setResolutions((prev) => ({ ...prev, [key]: choice }));
-                    // Clicking Keep/Use directly on the row is also a reset for that one
-                    // character -- drops any role override a prior Customize visit set,
-                    // so role goes back to following this new data choice.
-                    setRoleOverrides((prev) => {
-                      if (!(key in prev)) return prev;
-                      const next = { ...prev };
-                      delete next[key];
-                      return next;
-                    });
-                  }}
-                  onCustomize={() => setCustomizingKey(key)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <ConflictsSection
+        theme={theme}
+        payload={payload}
+        conflicts={conflicts}
+        resolutions={resolutions}
+        setResolutions={setResolutions}
+        setRoleOverrides={setRoleOverrides}
+        setCustomizingKey={setCustomizingKey}
+        applyBulkChoiceToAll={applyBulkChoiceToAll}
+      />
 
-      {newCharacters.length > 0 && (
-        <div style={{ marginBottom: "0.9rem" }}>
-          <p style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted, margin: "0 0 0.5rem" }}>
-            {newCharacters.length} {CHARACTERS_COPY.worldImport.newCharacterCountSuffix}
-          </p>
-          <div
-            ref={newCharactersRef}
-            style={{
-              border: `1px solid ${theme.border}`,
-              borderRadius: "12px",
-              padding: "0 0.7rem",
-              maxHeight: "180px",
-              overflowY: "auto",
-              WebkitMaskImage: newCharactersMask,
-              maskImage: newCharactersMask,
-            }}
-          >
-            {newCharacters.map((character) => {
-              const key = toCharacterKey(character);
-              const fileRoles = resolveRoles(key, payload.mainCharacterKey, payload.championCharacterKeys);
-              const roleDropped = droppedNewCharacterRoleKeys.has(key);
-              return (
-                <NewCharacterRow
-                  key={key}
-                  theme={theme}
-                  character={character}
-                  newRoles={roleDropped ? [] : fileRoles}
-                  checked={selectedNewCharacterKeys.has(key)}
-                  onToggle={() => toggleNewCharacter(key)}
-                  fileRoles={fileRoles}
-                  roleDropped={roleDropped}
-                  onToggleDropRole={() => toggleNewCharacterRole(key)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <NewCharactersSection
+        theme={theme}
+        payload={payload}
+        newCharacters={newCharacters}
+        selectedNewCharacterKeys={selectedNewCharacterKeys}
+        droppedNewCharacterRoleKeys={droppedNewCharacterRoleKeys}
+        toggleNewCharacter={toggleNewCharacter}
+        toggleNewCharacterRole={toggleNewCharacterRole}
+      />
 
-      {worldResidents.length > 0 && (
-        <div style={{ marginBottom: "0.9rem" }}>
-          <p style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted, margin: "0 0 0.5rem" }}>
-            {worldResidents.length} {CHARACTERS_COPY.worldImport.residentCountSuffix}
-          </p>
-          <div
-            ref={residentsRef}
-            style={{
-              border: `1px solid ${theme.border}`,
-              borderRadius: "12px",
-              padding: "0 0.7rem",
-              maxHeight: "180px",
-              overflowY: "auto",
-              WebkitMaskImage: residentsMask,
-              maskImage: residentsMask,
-            }}
-          >
-            {worldResidents.map((resident) => {
-              const key = toCharacterKey(resident.character);
-              return (
-                <NewCharacterRow
-                  key={key}
-                  theme={theme}
-                  character={resident.character}
-                  newRoles={resident.currentRoles}
-                  checked={!deselectedResidentKeys.has(key)}
-                  onToggle={() => toggleResident(key)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <ResidentsSection
+        theme={theme}
+        worldResidents={worldResidents}
+        deselectedResidentKeys={deselectedResidentKeys}
+        toggleResident={toggleResident}
+      />
 
-      <div style={{ marginBottom: "0.9rem" }}>
-        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: isOverCap ? statusText(theme, "danger") : theme.muted, margin: 0 }}>
-          {projectedWorldCount}/{MAX_CHARACTERS_PER_WORLD} {CHARACTERS_COPY.worldImport.characterCapSuffix}
-        </p>
-        {effectiveChampionCharacterKeys.length > 0 && (
-          <p style={{ fontSize: "0.8rem", fontWeight: 700, color: championOverflowCount > 0 ? statusText(theme, "danger") : theme.muted, margin: "0.15rem 0 0" }}>
-            {effectiveChampionCharacterKeys.length}/{MAX_CHAMPIONS} {CHARACTERS_COPY.worldImport.championCountSuffix}
-          </p>
-        )}
-        {isOverCap && (
-          <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
-            {CHARACTERS_COPY.worldImport.characterCapErrorPrefix} {MAX_CHARACTERS_PER_WORLD} {CHARACTERS_COPY.worldImport.characterCapErrorSuffix}
-          </p>
-        )}
-        {mainConflict && (
-          <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
-            {mainConflict.currentMainName} {CHARACTERS_COPY.worldImport.mainConflictPrefix} {mainConflict.fileMainName} {CHARACTERS_COPY.worldImport.mainConflictSuffix}
-          </p>
-        )}
-        {championOverflowCount > 0 && (
-          <p style={{ fontSize: "0.78rem", fontWeight: 600, color: statusText(theme, "danger"), margin: "0.25rem 0 0" }}>
-            {CHARACTERS_COPY.worldImport.championOverflowPrefix} {MAX_CHAMPIONS} {CHARACTERS_COPY.worldImport.championOverflowMiddle} {effectiveChampionCharacterKeys.length} {CHARACTERS_COPY.worldImport.championOverflowSuffix}
-          </p>
-        )}
-      </div>
+      <CapSummarySection
+        theme={theme}
+        projectedWorldCount={projectedWorldCount}
+        isOverCap={isOverCap}
+        effectiveChampionCharacterKeys={effectiveChampionCharacterKeys}
+        championOverflowCount={championOverflowCount}
+        mainConflict={mainConflict}
+      />
 
       {(payload.legionArtifact || payload.scouterLegion) && worldDataConflict && (
         <div style={{ marginBottom: "0.9rem" }}>
