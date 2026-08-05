@@ -25,7 +25,9 @@ marginal values and therefore recommendations.
   lands inside the multiplied base. Added main/sub stat lands in the flat bucket
   (the game puts it in "% Not Applied").
 - **critBucket** `(1-cr) + cr*(1.35 + critDmg%)`, **rounded to 4 decimals** like
-  the site; `cr = min(1, critRate/100)`. HEXA evaluations force `cr = 1`.
+  the site; `cr = min(1, critRate/100)`. HEXA evaluations force `cr = 1`. Crit rate
+  past 100% is not discarded for archers, it converts into crit damage instead
+  (`excessCritDamage`) -- see "Excess crit rate" below.
 - **dmgBucket** `1 + (dmg% + boss% + dpmBossDmg + Δ)/100`.
 - **iedBucket** `1 - PDR%*(1 - ied)/100`; sources stack multiplicatively with
   scouter's exact stack/un-stack arithmetic (`stackIedSources`/`applyIed`,
@@ -79,9 +81,43 @@ dpm constants); unlisted classes fall back to `classSkillData` requiredStats and
 zero constants. Xenon: STR main / DEX sub / LUK sub2, tri-stat hyper lines.
 Demon Avenger: HP main / STR sub.
 
+## Excess crit rate (the one deliberate divergence)
+Seven archer classes convert crit rate above the 100% cap into crit damage
+(Vicious Shot and equivalents). `excessCritDamage` folds
+`critRateToDmg * max(0, critRate - 100)` into the kernel's crit damage term, so the
+rate still caps at 100 but the overflow keeps paying. Everyone else has a
+`critRateToDmg` of 0 and is unaffected, byte for byte.
+
+**Scouter does not do this, and that is not an oversight on their part we're
+correcting blindly.** They carry the same per-class rate (`criInP`, vendored into
+`CRIT_RATE_TO_CRIT_DMG`) and apply it as `pct * cridmgeff1 * criInP` in their
+link-skill ranking, gated on exactly those seven classes. Their *optimizer* can't
+reach it for two structural reasons: the crit rate input is capped at 100 in their
+UI (typing more fires a toast and rewrites the field), and `specEfficiency` has no
+crit rate bucket at all, only `cridmgeff1` to translate into. So a live cross-check
+of an archer will now legitimately disagree with us on the crit rate line. Verify
+against scouter with a non-archer, or with an archer under the cap.
+
+Three consequences to keep in mind:
+- **`forceFullCrit` does not gate it.** That flag pins the rate for HEXA
+  evaluations (scouter's convention); the overflow is a property of the character's
+  stat line, so it applies in both modes. In HEXA it moves only the crit damage
+  baseline (there is no crit rate line to assign), which slightly lowers what more
+  crit damage is worth. That is the correct direction.
+- **The calibration must subtract it.** `calibrateFromSpecEfficiency` solves
+  `cal.critDmgPct` as "whatever the scouter bucket has that our inputs don't", so
+  the seeded conversion comes off there or the kernel double-counts it.
+- **It fires on the crit rate in the input field, which is unbuffed for a seeded
+  character.** An endgame archer's stat window often reads well under 100 even
+  though they are over it buffed, and the buffed value is not recoverable from
+  `specEfficiency` (`cridmgeff1` alone leaves two unknowns). So on a seeded
+  character this usually only bites at the boundary, where hyper levels push a
+  70-90% window past the cap. Type the real buffed rate in to model it properly.
+
 ## Matching maplescouter exactly
-Given identical inputs, recommendations match the live site. The `dpm*` class
-constants must be refreshed if scouter rebalances its class data.
+Given identical inputs, recommendations match the live site, with the single
+documented exception above. The `dpm*` class constants must be refreshed if scouter
+rebalances its class data.
 
 Both modes need this equally. Scouter's HEXA optimizer (`async function G` in the
 optimizer chunk) is called as `G(userStat, calculatedData.myClassData, ...)` and

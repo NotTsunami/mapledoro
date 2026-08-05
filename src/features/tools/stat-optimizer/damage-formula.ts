@@ -22,6 +22,7 @@ import type { StoredCharacterStats, StoredTripleStatField } from "../../characte
 import { getClassDataByNexonJobName } from "../../characters/setup/data/classSkillData";
 import { resolveClassId } from "../../characters/setup/data/nexonJobMapping";
 import {
+  critRateToCritDmg,
   SCOUTER_CLASS_CONSTANTS,
   ZERO_CLASS_CONSTANTS,
   type ScouterClassConstants,
@@ -49,6 +50,9 @@ export interface ClassDamageProfile {
   isXenon: boolean;
   /** Scouter class-passive constants baked into the kernel's buckets. */
   constants: Omit<ScouterClassConstants, "main" | "sub" | "sub2">;
+  /** Critical damage one point of critical rate past 100% converts into (archers
+   *  only, see CRIT_RATE_TO_CRIT_DMG); 0 for every class without such a passive. */
+  critRateToDmg: number;
 }
 
 /** One tooltip stat field: base value, % value, and flat "% not applied" value. */
@@ -194,6 +198,7 @@ export function resolveClassDamageProfile(
       isHpBased: scouter.main === "hp",
       isXenon: classId === "xenon",
       constants: scouter,
+      critRateToDmg: critRateToCritDmg(classId),
     };
   }
 
@@ -209,6 +214,7 @@ export function resolveClassDamageProfile(
     isHpBased: primary === "hp",
     isXenon: false,
     constants: ZERO_CLASS_CONSTANTS,
+    critRateToDmg: critRateToCritDmg(classId),
   };
 }
 
@@ -338,6 +344,20 @@ function statFactorHpBased(s: OptimizerStatInputs, d: KernelDelta): number {
 }
 
 /**
+ * Critical damage an archer's critical rate past the 100% cap converts into.
+ * Zero for every other class, and for any crit rate at or below the cap.
+ *
+ * This is the one place the kernel knowingly leaves maplescouter: theirs can't
+ * reach the mechanic (crit rate input capped at 100, no crit rate bucket in the
+ * efficiency table), so past the cap they value crit rate at nothing. Scouter
+ * does carry the per-class rate, though, and applies it in their link-skill
+ * ranking, which is where `CRIT_RATE_TO_CRIT_DMG` comes from.
+ */
+export function excessCritDamage(profile: ClassDamageProfile, critRatePct: number): number {
+  return profile.critRateToDmg * Math.max(0, critRatePct - 100);
+}
+
+/**
  * Relative bossing damage for a stat allocation delta. Only meaningful as a
  * ratio between two evaluations of the same character.
  */
@@ -361,9 +381,20 @@ export function computeScouterDamage(
       (1 + Math.max(0, inputs.attack.pct + c.dpmAtkPer + cal.atkPct) / 100) +
     inputs.attack.flat;
 
-  // Crit bucket, rounded to 4 decimals like the live site.
-  const critRate = opts.forceFullCrit ? 1 : Math.min(1, (inputs.critRatePct + delta.critRate) / 100);
-  const critDmg = inputs.critDamagePct + c.dpmCritDmg + cal.critDmgPct + delta.critDmg;
+  // Crit bucket, rounded to 4 decimals like the live site. The rate itself still
+  // caps at 100%, but for archers the part above the cap is not thrown away: it
+  // rides into the crit damage term instead, which is what keeps crit rate worth
+  // buying past the cap. `forceFullCrit` only pins the rate (scouter's HEXA
+  // convention) and so leaves the conversion alone -- the excess is a property of
+  // the character's stat line, not of which mode is being optimized.
+  const rawCritRatePct = inputs.critRatePct + delta.critRate;
+  const critRate = opts.forceFullCrit ? 1 : Math.min(1, rawCritRatePct / 100);
+  const critDmg =
+    inputs.critDamagePct +
+    c.dpmCritDmg +
+    cal.critDmgPct +
+    delta.critDmg +
+    excessCritDamage(profile, rawCritRatePct);
   const critBucket = Math.round(((1 - critRate) * 1 + (critRate * (135 + critDmg)) / 100) * 1e4) / 1e4;
 
   const dmgBucket =
