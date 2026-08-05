@@ -52,12 +52,62 @@ results stay in source order**.
   pirates); selecting a non-pirate zeroes and saves the buff so a stale value can't survive.
 
 **EXP tables:** `BASE_MONSTER_EXP_ARCANE` / `BASE_MONSTER_EXP_GRANDIS` are base monster EXP per character
-level (200-259, 260-299). Champion Double Up (3.5x), Haste Fever Time (7x), and Express Booster all
-derive from them, so keep them as one shared pair. Express Booster steps by level band off Grandis
-and stops scaling past Lv. 294; the Lv. 265 value is measured, not band-fit, and the post-294 flatten
-is real. These event resources take no EXP buffs, which is why they live in `RESOURCE_TABLES` and
-apply through `applyResourceUnits`. Haste Fever Time is reference-only, with no Daily/Weekly input
-yet.
+level (200-259, 260-299), read through `baseMonsterExpForLevel`. Champion Double Up (3.5x), Haste
+Fever Time (7x), Express Booster, and the Treasure Boxes all derive from them, so keep them as one
+shared pair. Express Booster steps by level band off Grandis and stops scaling past Lv. 294; the
+Lv. 265 value is measured, not band-fit, and the post-294 flatten is real. These event resources
+take no EXP buffs, which is why they live in `RESOURCE_TABLES` (per-unit EXP by level, keyed by id)
+and apply through `applyResourceUnits`. Haste Fever Time has no Daily/Weekly input yet.
+`HIGH_MOUNTAIN_BASE` is the only Epic Dungeon table: Angler Company and Nightmare Paradise are exact
+1.5x / 2x multiples of it.
+
+**Resources tab** renders `buildResourceBreakdown(input)`, one `BreakdownSection` per content type,
+each holding `BreakdownGroup`s (one source, one icon, one name) whose `values` stack every figure
+that source produces: Epic Dungeon reward tiers, treasure box grades, Monster Park days.
+
+Formulas are ported from the whackybeanz Contents Breakdown bundle and the figures match it exactly
+at equal inputs. The one shape they all share is `withBonus`: a percent bonus **adds to** the base
+multiplier rather than compounding with it, so 5x rewards at +20% pays 5.2x, not 6x. The simulator's
+Monster Park and MPE math now goes through the same helper.
+
+**Sections declare their own controls.** A section lists `BreakdownControlId`s; the tab owns the
+`ResourceBreakdownInput` state and `BREAKDOWN_CONTROLS` in the workspace supplies each one's label
+and range. Adding a knob means adding it to the id union, the input interface,
+`defaultBreakdownInput`, and `BREAKDOWN_CONTROLS`, and naming it on a section. **Changing Level
+re-seeds the three monster-level fields** (treasure, Express Booster, Haste) from the event handler,
+never an effect, since `react-hooks/set-state-in-effect` forbids the effect version.
+
+Cards lay out two per row (`.exp-breakdown-cards`); a section with **more than one group** spans the
+full row instead, so multi-source sections keep their own multi-column grid. That is derived from
+`groups.length`, not declared, so a section that gains or loses a group re-flows on its own. Card
+headers stack title over note so they read the same at either width, which is why the notes are kept
+to one short line and none of them repeat the "before EXP buffs" caveat the tab states once up top.
+
+A group's `heading` opens a labelled band that spans the grid and forces a fresh row; Dailies sets it
+on the first entry of each region. It is only a divider: the bonus percents stay Arcane River and
+Grandis, with Tenebris riding the Arcane River one, exactly as the simulator does.
+
+**Monster Park Extreme lives inside the Monster Park section** because it shares that section's EXP
+bonus stat. Only the bonus reaches it, never the dungeon pick or run count: Extreme is one fixed
+dungeon cleared **once a week**, and `MPE_CLEAR_FACTOR` is part of what that single clear pays, not a
+count of runs.
+
+It is **GMS-only and unbuffed**: no Singapore, Malaysia, Blood Moon Forest, or Sunday Maple, and no
+EXP buffs (every source here either ignores them or is quoted before them). Sources the level cannot
+enter are dropped rather than shown as zero, and a section left with no groups is dropped whole.
+Treasure Boxes are flat multiples of the *monster's* base EXP, not the character's; their icons are
+the EXP Gem the box drops, since the boxes have no item icon.
+
+**Punch King per-point EXP comes from the `punch-king` table, never from base monster EXP x 900.**
+The two agree at 85 of the 100 levels, which makes the shortcut look safe, but the table drifts at
+Lv. 214-215 and 270-272 and **plateaus flat from Lv. 290 up**, where computing it overpays by up to
+39%. A run caps at `PUNCH_KING_MAX_POINTS` (1150), which is what the breakdown opens on.
+
+The Daily / Weekly simulator instead prices a banked score through `PUNCH_KING_TIERS`, and at a full
+1150 it lands around a fifth of table x 1150. That gap is unexplained and predates the breakdown.
+
+Note the tab shares `EXP_TO_NEXT_LEVEL_VALUES` with the rest of the calculator, which is the KMS
+CROWN table: GMS needs more EXP per level between 210 and 259, so percentages in that band read low.
 
 **Monster Park / Epic Dungeon:** `MONSTER_PARK_OPTIONS` is ordered by EXP, so the dungeon a player
 would actually run is the last entry whose `minLevel` they meet. `monsterParkId` is a pin and `""`
