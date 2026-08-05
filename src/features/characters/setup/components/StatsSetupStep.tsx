@@ -413,14 +413,13 @@ function TripleStatRow({
         </div>
         <div style={{ gridColumn: 2 }}>
           <div style={{ position: "relative" }}>
-            <input type="text" inputMode="numeric" aria-label={`${label} percent value`} value={d.percent} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
+            <input type="text" inputMode="numeric" aria-label={`${label} percent value`} value={d.percent} placeholder="0" style={sub}
               data-flagged-field={requireFilled && !d.percent.trim() ? "true" : undefined}
               onChange={(e) => onUpdate(id, "percent", sanitizeDigitsInput(e.target.value))}
               onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
               onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
               onKeyDown={numericKeyDown}
             />
-            <span style={inputSuffixStyle(theme)}>%</span>
           </div>
           <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>% Value</p>
         </div>
@@ -428,14 +427,13 @@ function TripleStatRow({
           <div style={{ gridColumn: 3 }}>
             <div style={{ position: "relative" }}>
               {showPercentUnappliedWarning && <InputWarningBubble message={`That % looks too large, enter your % Value Not Applied for ${label}.`} theme={theme} />}
-              <input type="text" inputMode="numeric" aria-label={`${label} percent not applied`} value={d.percentUnapplied} placeholder="0" style={{ ...sub, paddingRight: "1.15rem" }}
+              <input type="text" inputMode="numeric" aria-label={`${label} percent not applied`} value={d.percentUnapplied} placeholder="0" style={sub}
                 data-flagged-field={showPercentUnappliedWarning || (requireFilled && !d.percentUnapplied.trim()) ? "true" : undefined}
                 onChange={(e) => onUpdate(id, "percentUnapplied", sanitizeDigitsInput(e.target.value))}
                 onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
                 onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
                 onKeyDown={numericKeyDown}
               />
-              <span style={inputSuffixStyle(theme)}>%</span>
             </div>
             <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>% Not Applied</p>
           </div>
