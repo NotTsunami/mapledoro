@@ -173,6 +173,8 @@ export function emptyCharacterSeed(): CharacterSeed {
       isHpBased: false,
       isXenon: false,
       constants: { dpmMainStat: 0, dpmAtk: 0, dpmAtkPer: 0, dpmBossDmg: 0, dpmIgnoreGuard: 0, dpmCritDmg: 0 },
+      // No class behind the numbers, so no archer conversion to claim either.
+      critRateToDmg: 0,
     },
     inputs: {
       level: STANDALONE_LEVEL,

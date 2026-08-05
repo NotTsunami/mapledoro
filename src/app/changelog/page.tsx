@@ -12,6 +12,13 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-05",
+    changes: [
+      { type: "changed", text: "The Stat Optimizer now knows that archers turn Critical Rate above 100% into Critical Damage, so it keeps recommending Critical Rate for them past the cap instead of treating it as wasted." },
+      { type: "added", text: "Added a Critical Rate row to the Stat Efficiency panel for archers, showing what a Critical Rate line past 100% is worth to them." },
+    ],
+  },
+  {
     date: "2026-08-04",
     changes: [
       { type: "added", text: "Added Characters, a full character tracker: guided setup for Stats, Equipment, Link Skills, Familiars, V Matrix, HEXA Matrix, Hyper Stats, and Legion Artifact, a profile bringing all of it together alongside MapleScouter, and JSON import/export for a single character or a whole world." },
