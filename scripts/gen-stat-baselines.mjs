@@ -498,7 +498,7 @@ const WEAPON_MULTIPLIER = {
   night_lord: 1.75, night_walker: 1.75, mo_xuan: 1.75,
   buccaneer: 1.7, thunder_breaker: 1.7, shade: 1.7, blaster: 1.7, angelic_buster: 1.7, ark: 1.7,
   corsair: 1.5, cannoneer: 1.5, mechanic: 1.5,
-  dark_knight: 1.49, aran: 1.49, zero: 1.49, // Beta, see comment above
+  dark_knight: 1.49, aran: 1.49, zero: 1.49, erel_light: 1.49, // Beta, see comment above
   marksman: 1.35, wild_hunter: 1.35, kanna: 1.35,
   kaiser: 1.34, lynn: 1.34,
   xenon: 1.3125,
@@ -508,7 +508,7 @@ const WEAPON_MULTIPLIER = {
   hayato: 1.25,
   mihile: 1.24,
   arch_mage_f_p: 1.2, arch_mage_i_l: 1.2, bishop: 1.2, blaze_wizard: 1.2, illium: 1.2,
-  kinesis: 1.2, evan: 1.2, luminous: 1.2, battle_mage: 1.2, sia_astelle: 1.2, erel_light: 1.2,
+  kinesis: 1.2, evan: 1.2, luminous: 1.2, battle_mage: 1.2, sia_astelle: 1.2,
   lara: 1.2, demon_slayer: 1.2,
   // hero, paladin, dawn_warrior omitted here — see WEAPON_MULTIPLIER_BY_HAND below.
 };
@@ -526,7 +526,7 @@ const WEAPON_MULTIPLIER_BY_HAND = {
 // (this script only reads JSON, matching every other gen-*.mjs script's convention).
 const MAGIC_ATT_CLASSES = new Set([
   "lara", "blaze_wizard", "arch_mage_f_p", "arch_mage_i_l", "bishop", "illium", "kinesis",
-  "evan", "luminous", "lynn", "battle_mage", "kanna", "sia_astelle", "erel_light",
+  "evan", "luminous", "lynn", "battle_mage", "kanna", "sia_astelle",
 ]);
 
 // ---------------------------------------------------------------------------------------------
