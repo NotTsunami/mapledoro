@@ -113,7 +113,19 @@ const SYMBOL_TABS: { key: SymbolTabKey; label: string }[] = [
   { key: "sacred", label: "Sacred" },
 ];
 
-const SEARCH_LIMIT = 60;
+// Search results are relevance-ranked before this cut, so the tail it drops is the loosest
+// matches; narrowing the query is the natural way to reach anything past it.
+const SEARCH_LIMIT = 30;
+// The unsearched showAllWhenEmpty list is raw catalog order, not ranked, so a cut here is
+// arbitrary rather than "the worst ones". Sized to clear the real worst case (the 48 pets that
+// can wear the most widely-compatible pet equip), so it acts purely as a ceiling against a slot
+// whose filter turns out to match hundreds, not as a display limit anything is expected to hit.
+const FULL_LIST_LIMIT = 60;
+// Every result row loads a remote item icon, so committing a fresh result set on each
+// keystroke fires a burst of image requests for rows that are scrolled out of sight and
+// superseded by the next character anyway. The search box stays instant; only the
+// filtering it drives waits for a pause.
+const SEARCH_DEBOUNCE_MS = 150;
 // A symbol group's 3-column tile grid — used to align its Max All/Clear header to the
 // same width so those buttons can right-align against the actual last tile.
 const SYMBOL_GRID_WIDTH = 3 * SYMBOL_TILE_SIZE + 2 * 4;
@@ -411,6 +423,9 @@ function ItemPicker({
 }) {
   const [loadedItems, setLoadedItems] = useState<CatalogItem[] | null>(null);
   const [query, setQuery] = useState("");
+  // Trails `query` by SEARCH_DEBOUNCE_MS; drives the result list (and everything that has to
+  // stay in sync with it) so the icon requests land once per pause, not once per keystroke.
+  const [searchQuery, setSearchQuery] = useState("");
   const [pendingItem, setPendingItem] = useState<EquipmentItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isAndroid = slot === "android";
@@ -429,6 +444,11 @@ function ItemPicker({
   useEffect(() => {
     if (!pendingItem) inputRef.current?.focus();
   }, [pendingItem]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     if (cachedSlotItems[cacheKey]) return;
@@ -455,8 +475,10 @@ function ItemPicker({
         !(it.onlyEquip && excludeIds?.has(it.id)))
     : null;
   // With a query: search results. Empty query: the full list when showAllWhenEmpty, else nothing (huge catalogs require a search).
-  const emptyQueryList = showAllWhenEmpty ? sourceItems : null;
-  const displayed = sourceItems && query ? filterItems(sourceItems, query) : emptyQueryList;
+  // Capped: "already small" holds for a pet paired with a chosen equip, but not for every
+  // showAllWhenEmpty case, and an uncapped list is hundreds of remote icons on slot open.
+  const emptyQueryList = showAllWhenEmpty ? sourceItems?.slice(0, FULL_LIST_LIMIT) ?? null : null;
+  const displayed = sourceItems && searchQuery ? filterItems(sourceItems, searchQuery) : emptyQueryList;
   // Suppress the "revert to preset 1" shortcut if that item is onlyEquip and already placed in a sibling slot.
   const presetBaseConflicts = !!(
     presetBaseItem &&
@@ -466,7 +488,7 @@ function ItemPicker({
 
   const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
     items: displayed ?? [],
-    resetKey: query,
+    resetKey: searchQuery,
     onSelect: (item) => selectItem({ id: item.id, name: item.name }, true),
     onClose,
     onPrev,
@@ -555,9 +577,9 @@ function ItemPicker({
         placeholder={`Search ${SLOT_LABELS[slot]}…`}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleSearchKeyDown}
-        style={pickerSearchInputStyle(theme, Boolean(query))}
+        style={pickerSearchInputStyle(theme, Boolean(searchQuery))}
       />
-      {(query || showAllWhenEmpty) && (
+      {(searchQuery || showAllWhenEmpty) && (
         <div style={{ maxHeight: 220, overflowY: "auto" }}>
           {items === null && (
             <p style={{ margin: 0, padding: "0.5rem 0.6rem", fontSize: "0.8rem", color: theme.muted, fontWeight: 600 }}>
