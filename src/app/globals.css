@@ -224,12 +224,32 @@ html.scroll-locked body {
    select and an input to line up opts into `.tool-control-row` below. */
 .tool-input,
 .tool-select {
-  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 700;
   border-radius: 8px;
   border: 1px solid; /* color supplied inline via borderColor */
   padding: 7px 10px;
+}
+
+.tool-input {
+  font-family: var(--font-body);
+}
+
+/* Every <select> in the app, not just `.tool-select`, and deliberately not
+   folded into the rule above: Firefox paints an open dropdown's option list in
+   the parent process, which can't see @font-face fonts, so it skips every
+   downloadable family in the list and falls through to its default font --
+   Times New Roman. Both families in --font-body are @font-face (Nunito and
+   next/font's metric-adjusted fallback), so naming real system families here is
+   what gives Firefox a sans-serif to land on. Nunito itself is not achievable
+   in a native Firefox dropdown; that would take a custom menu.
+
+   Appending these to --font-body itself instead would work, but next/font drops
+   its metric-adjusted fallback as soon as you pass `fallback`, and that fallback
+   is what limits layout shift while Nunito loads on every page. `option`
+   inherits this from its <select>. */
+select {
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
 .tool-select {
