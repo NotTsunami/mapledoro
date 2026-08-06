@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { StoredCharacterRecord } from "../model/charactersStore";
-import { hasMinimalScouterSetup, isScouterSupportedClass } from "./scouterApi";
+import { findScouterSetupGap, isScouterSupportedClass, type ScouterSetupGap } from "./scouterApi";
 import {
   autoRefreshScouterResultIfNeeded, peekScouterCache, refreshScouterResult,
   type ScouterErrorReason, type ScouterRefreshResult, type ScouterResultEntry,
@@ -13,7 +13,7 @@ export type { ScouterErrorReason };
 
 export type ScouterFigureStatus =
   | { kind: "unsupported" }
-  | { kind: "incomplete" }
+  | { kind: "incomplete"; gap: ScouterSetupGap }
   | { kind: "empty" }
   | { kind: "ready"; entry: ScouterResultEntry; stale: false }
   // stale is only ever reached via a failed refresh, so the reason is always known.
@@ -44,7 +44,8 @@ function resultToStatus(result: ScouterRefreshResult): ScouterFigureStatus {
 
 function initialStatus(character: StoredCharacterRecord): ScouterFigureStatus {
   if (!isScouterSupportedClass(character.jobName)) return { kind: "unsupported" };
-  if (!hasMinimalScouterSetup(character)) return { kind: "incomplete" };
+  const gap = findScouterSetupGap(character);
+  if (gap) return { kind: "incomplete", gap };
   const cached = peekScouterCache(character);
   return cached ? { kind: "ready", entry: cached, stale: false } : { kind: "empty" };
 }

@@ -599,23 +599,43 @@ function buildLinkSkill(linkSkills: LinkSkillsData | undefined): Record<string, 
 
 // ── Setup completeness gate ──────────────────────────────────────────────────
 
-/** Whether this character has answered everything MapleScouter Setup's own live flow
- *  actually requires before letting you click Continue -- re-derived against the
- *  PERSISTED record (this runs outside the flow's own draft state): the Stats step's
- *  Character Info substep (isStatsSubstepComplete) and its Quick Questions substep
- *  (isScouterQuestionnaireComplete in StatsSetupStep.tsx -- soul type, weapon hand if
- *  the class asks, Wild Hunter Legion rank, Inner Ability line). Oz Rings/Link Skills/
- *  Buffs are deliberately NOT required here -- those steps have no full-completeness
- *  gate even in the live flow, just sanity checks (Yuki, 2026-07-27: "they could have
- *  no oz rings or no links or no buffs which are fine, if they want an accurate calc
- *  they can go there to set that"). */
-export function hasMinimalScouterSetup(character: StoredCharacterRecord): boolean {
+/** Which part of MapleScouter Setup's own completeness requirements this character is
+ *  still missing, or null if it's fully satisfied -- see hasMinimalScouterSetup below,
+ *  which reduces this to a plain boolean for callers that don't need to say WHERE the
+ *  gap is (e.g. "Erel Light isn't a supported class" doesn't have a location).
+ *  "quickQuestions" covers everything Quick Questions asks (soul type, weapon hand if
+ *  the class asks, Wild Hunter Legion rank, Inner Ability line) -- full_setup's own
+ *  Quick Questions stays permanently optional (see isScouterQuestionnaireComplete's doc
+ *  comment), so this is the one place that data ever gets required at all.
+ *  "characterInfo" points at Stats' Character Info substep (STR/DEX/etc, Combat Stats,
+ *  Weapon ATT -- the numeric fields Full Setup can silently skip past, see
+ *  isStatsSubstepAnyFieldFilled). Checked in the same order the live flow's own substeps
+ *  appear (Quick Questions is substep 0, Character Info is substep 1) so a character
+ *  missing BOTH reports the one the player would actually hit first, not whichever
+ *  happened to be checked first in code -- a totally blank character used to report
+ *  "characterInfo" here even though Quick Questions is the earlier, more fundamental gap. */
+export type ScouterSetupGap = "characterInfo" | "quickQuestions";
+
+export function findScouterSetupGap(character: StoredCharacterRecord): ScouterSetupGap | null {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName);
-  if (!classData) return false;
+  if (!classData) return "quickQuestions";
+
+  const stats = character.stats;
+  const soulComplete = character.soul !== null;
+  const weaponHandComplete = !classData.setupOptionsDef?.weaponType
+    || character.weaponHand !== null
+    || deriveWeaponHandFromWeapon(character.equipment) !== undefined;
+  const iaComplete = innerAbilityHasData(stats.innerAbility) || character.scouter?.innerAbilityLine !== undefined;
+
+  const store = readCharactersStore();
+  const worldRoster = selectCharactersList(store).filter((c) => c.worldID === character.worldID);
+  const whComplete = whAutofillSourceFromRoster(worldRoster) !== null
+    || store.scouterLegionByWorld[String(character.worldID)]?.wildHunterRank !== undefined;
+
+  if (!(soulComplete && weaponHandComplete && iaComplete && whComplete)) return "quickQuestions";
 
   const tripleIds = getRequiredStatsForClass(classData).filter((id): id is TripleStatFieldId => TRIPLE_IDS.has(id));
   const primaryStat = classData.requiredStats.find((s): s is TripleStatFieldId => MAIN_STAT_IDS.has(s));
-  const stats = character.stats;
   const draft: StatsStepDraft = {
     str: stats.str, dex: stats.dex, int: stats.int, luk: stats.luk, hp: stats.hp,
     attackPower: stats.attackPower, magicAtt: stats.magicAtt,
@@ -631,20 +651,18 @@ export function hasMinimalScouterSetup(character: StoredCharacterRecord): boolea
     isArcaneEligible(character.level, classData.isLegacy),
     isSacredEligible(character.level, classData.isLegacy),
   );
-  if (!characterInfoComplete) return false;
+  return characterInfoComplete ? null : "characterInfo";
+}
 
-  const soulComplete = character.soul !== null;
-  const weaponHandComplete = !classData.setupOptionsDef?.weaponType
-    || character.weaponHand !== null
-    || deriveWeaponHandFromWeapon(character.equipment) !== undefined;
-  const iaComplete = innerAbilityHasData(stats.innerAbility) || character.scouter?.innerAbilityLine !== undefined;
-
-  const store = readCharactersStore();
-  const worldRoster = selectCharactersList(store).filter((c) => c.worldID === character.worldID);
-  const whComplete = whAutofillSourceFromRoster(worldRoster) !== null
-    || store.scouterLegionByWorld[String(character.worldID)]?.wildHunterRank !== undefined;
-
-  return soulComplete && weaponHandComplete && iaComplete && whComplete;
+/** Whether this character has answered everything MapleScouter Setup's own live flow
+ *  actually requires before letting you click Continue -- re-derived against the
+ *  PERSISTED record (this runs outside the flow's own draft state). See
+ *  findScouterSetupGap for what's actually checked and why Oz Rings/Link Skills/Buffs
+ *  are deliberately NOT required here (Yuki, 2026-07-27: "they could have no oz rings or
+ *  no links or no buffs which are fine, if they want an accurate calc they can go there
+ *  to set that"). */
+export function hasMinimalScouterSetup(character: StoredCharacterRecord): boolean {
+  return findScouterSetupGap(character) === null;
 }
 
 /** Whether MapleScouter supports this character's class at all, currently only

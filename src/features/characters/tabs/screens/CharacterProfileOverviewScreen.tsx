@@ -43,6 +43,7 @@ import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
 import ScouterFigure from "../../scouter/ScouterFigure";
 import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
+import type { ScouterSetupGap } from "../../scouter/scouterApi";
 import BossClearGrid, { type ScouterBookmarkView } from "../../scouter/BossClearGrid";
 import StatEfficiencyPanel from "../../scouter/StatEfficiencyPanel";
 import type { ScouterResultEntry } from "../../scouter/scouterCache";
@@ -2329,12 +2330,13 @@ function gatedFeatureNoticeStyle(theme: Theme): CSSProperties {
 // Mirrors the Bio bookmark's own empty-state language (dashed border + centered icon/label/
 // caption) rather than a bare line of text under the header, so an entirely-gated bookmark
 // still reads as a deliberate, full-size state instead of an empty panel with a stray caption.
-function GatedFeatureNotice({ theme, title, description }: { theme: Theme; title: string; description: string }) {
+function GatedFeatureNotice({ theme, title, description, action }: { theme: Theme; title: string; description: string; action?: ReactNode }) {
   return (
     <div style={gatedFeatureNoticeStyle(theme)}>
       <div style={{ color: theme.muted }}><LockIcon /></div>
       <div style={{ fontSize: 14, fontWeight: 800, color: theme.text }}>{title}</div>
       <div style={{ fontSize: 13, color: theme.muted, maxWidth: 280, whiteSpace: "pre-line" }}>{description}</div>
+      {action}
     </div>
   );
 }
@@ -3218,8 +3220,10 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
  *  setup incomplete, never calculated, last refresh failed) plus the stale-result banner,
  *  in one place so Scouter and Stat Efficiency can't drift apart on what they say when
  *  there's nothing to show. */
-function ScouterResultGate({ theme, character, children }: {
-  theme: Theme; character: StoredCharacterRecord; children: (entry: ScouterResultEntry) => ReactNode;
+function ScouterResultGate({ theme, character, onEditStep, children }: {
+  theme: Theme; character: StoredCharacterRecord;
+  onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
+  children: (entry: ScouterResultEntry) => ReactNode;
 }) {
   const { status } = useScouterResult(character);
 
@@ -3227,7 +3231,31 @@ function ScouterResultGate({ theme, character, children }: {
     return <GatedFeatureNotice theme={theme} title="Not Available" description="MapleScouter doesn't support this class yet." />;
   }
   if (status.kind === "incomplete") {
-    return <GatedFeatureNotice theme={theme} title="Not Available" description={"Fill out MapleScouter Setup\nbefore viewing this."} />;
+    const gapLabel = status.gap === "quickQuestions" ? "Quick Questions" : "Character Info";
+    // Not confined — a character that never ran MapleScouter Setup at all (e.g. "Skip
+    // for now" at the character-intro screen) is typically missing more than just this
+    // one substep (Oz Rings/Link Skills/HEXA/Buffs aren't gated here, but still worth
+    // filling in), so this opens straight onto the substep that's actually blocking the
+    // calculation, with normal Back/Next into the rest of the flow. Someone who already
+    // ran Full Setup just clicks through the already-filled steps to get here — a few
+    // extra clicks, not a real cost.
+    return (
+      <GatedFeatureNotice
+        theme={theme}
+        title="Not Available"
+        description={"Fill out MapleScouter Setup\nbefore viewing this."}
+        action={(
+          <button
+            type="button"
+            className="tool-dialog-btn"
+            style={scouterGapButtonStyle(theme)}
+            onClick={() => onEditStep("maplescouter_setup", scouterGapTargetSubstep(status.gap))}
+          >
+            Go to {gapLabel}
+          </button>
+        )}
+      />
+    );
   }
   if (status.kind === "empty") {
     return <ScouterBookmarkNotice theme={theme}>Not calculated yet. Refresh the Scouter figure on Overview to see these numbers.</ScouterBookmarkNotice>;
@@ -3261,12 +3289,13 @@ function ScouterResultGate({ theme, character, children }: {
 // banner or the Quick View dropdown (3 ways to do the same thing), and once that got removed
 // the back-only button didn't earn its own dedicated row anymore either, so it moved into
 // BossSpotlight's own header instead.
-function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange }: {
+function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange, onEditStep }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
   selectedBossIndex: number; onSelectedBossIndexChange: (i: number) => void;
+  onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
 }) {
   return (
-    <ScouterResultGate theme={theme} character={character}>
+    <ScouterResultGate theme={theme} character={character} onEditStep={onEditStep}>
       {(entry) => (
         <BossClearGrid
           theme={theme}
@@ -3290,9 +3319,12 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
 // Scouter's own figures are all present in that same entry.
 // Keyed by character so the per-stat table's typed amounts and unit choice don't carry over
 // onto the next character the way EquipmentBookmark's own key guards against.
-function StatEfficiencyBookmark({ theme, character }: { theme: Theme; character: StoredCharacterRecord }) {
+function StatEfficiencyBookmark({ theme, character, onEditStep }: {
+  theme: Theme; character: StoredCharacterRecord;
+  onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
+}) {
   return (
-    <ScouterResultGate theme={theme} character={character}>
+    <ScouterResultGate theme={theme} character={character} onEditStep={onEditStep}>
       {(entry) => (entry.specEfficiency ? (
         <StatEfficiencyPanel key={character.characterName} theme={theme} character={character} eff={entry.specEfficiency} />
       ) : (
@@ -3351,6 +3383,25 @@ function SetupBookmark({ model, actions }: { model: PreviewPaneModel; actions: P
       <SetupFlowButtons model={model} actions={actions} isProfileBookmark />
     </div>
   );
+}
+
+// Same substep numbering as statsTargetSubstep below (0: quick questions, 1: Character
+// Info), but for MapleScouter Setup specifically rather than the stats_flow bookmark —
+// maplescouter_setup never shows Hyper Stat/Inner Ability's own substeps (see
+// StatsSetupStep's showHyperStat/showInnerAbility, both flowId !== "maplescouter_setup"),
+// so its stats step is always exactly these two, unlike statsTargetSubstep's
+// eligibility-shifted indices.
+function scouterGapTargetSubstep(gap: ScouterSetupGap): number {
+  return gap === "quickQuestions" ? 0 : 1;
+}
+
+function scouterGapButtonStyle(theme: Theme): CSSProperties {
+  return {
+    marginTop: 4,
+    background: theme.accent,
+    borderColor: theme.accent,
+    color: theme.accentOn,
+  };
 }
 
 // The Stats step's substeps are 0: quick questions, 1: Character Info (Basic/Combat/
@@ -3562,6 +3613,7 @@ function BookmarkPageBody({
             onViewChange={setScouterView}
             selectedBossIndex={scouterSelectedBossIndex}
             onSelectedBossIndexChange={setScouterSelectedBossIndex}
+            onEditStep={onEditStep}
           />
         )}
       </>
@@ -3572,7 +3624,7 @@ function BookmarkPageBody({
     return (
       <>
         <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={null} disabled={setup.isUiLocked} />
-        {character && <StatEfficiencyBookmark theme={theme} character={character} />}
+        {character && <StatEfficiencyBookmark theme={theme} character={character} onEditStep={onEditStep} />}
       </>
     );
   }

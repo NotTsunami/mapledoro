@@ -44,7 +44,8 @@ function buildExampleStatuses(): Record<string, ScouterFigureStatus> {
   const staleEntry = placeholderEntry(now - 3600_000);
   return {
     unsupported: { kind: "unsupported" },
-    incomplete: { kind: "incomplete" },
+    incomplete_character_info: { kind: "incomplete", gap: "characterInfo" },
+    incomplete_quick_questions: { kind: "incomplete", gap: "quickQuestions" },
     empty: { kind: "empty" },
     ready: { kind: "ready", entry: placeholderEntry(now), stale: false },
     ready_stale_rate_limited: { kind: "ready", entry: staleEntry, stale: true, reason: "rate_limited" },

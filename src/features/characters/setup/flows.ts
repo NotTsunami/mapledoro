@@ -256,8 +256,11 @@ function isSubstepKnownInvalid(
   characterLevel: number | undefined,
 ): boolean {
   if (stepId === "stats" && substepIndex === STATS_WINDOW_SUBSTEP_INDEX) {
-    const requireComplete = flowId === "maplescouter_setup";
-    return !isStatsWindowSubstepValid(statsRawValue, jobName, characterLevel, requireComplete);
+    const forceComplete = flowId === "maplescouter_setup";
+    // stats_flow always opens pre-seeded from already-saved data (see
+    // isStatsWindowSubstepValid's doc comment), so it never checks any-field-filled.
+    const checkAnyFieldFilled = flowId !== "stats_flow";
+    return !isStatsWindowSubstepValid(statsRawValue, jobName, characterLevel, forceComplete, checkAnyFieldFilled);
   }
   const ownValue = stepValidityById[getStepValidityKey(stepId, substepIndex, flowId)];
   if (ownValue !== undefined) return ownValue === false;
