@@ -18,6 +18,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "added", text: "Added a Hyper Preset picker to the Stat Optimizer, so you can optimize against any of your three in-game Hyper Stat presets." },
       { type: "changed", text: "The Stat Optimizer now knows that archers turn Critical Rate above 100% into Critical Damage, so it keeps recommending Critical Rate for them past the cap instead of treating it as wasted." },
       { type: "added", text: "Added a Critical Rate row to the Stat Efficiency panel for archers, showing what a Critical Rate line past 100% is worth to them." },
+      { type: "fixed", text: "Fixed the World and Sort dropdowns in Characters being unreadable when opened in dark mode." },
     ],
   },
   {
