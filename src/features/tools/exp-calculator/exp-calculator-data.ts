@@ -560,7 +560,7 @@ const TREASURE_BOXES: TreasureBox[] = [
 
 export const DAILY_EXP_CONTENT: ExpContentOption[] = [
   { id: "rte", label: "Vanishing Journey", region: "Arcane River", minLevel: 200, exp: 0x2ba373a2, icon: { type: "item", id: "01712001" } },
-  { id: "cci", label: "Chew Chew Island", region: "Arcane River", minLevel: 210, exp: 0x7fa71c86, icon: { type: "item", id: "01712002" } },
+  { id: "cci", label: "Chu Chu Island", region: "Arcane River", minLevel: 210, exp: 0x7fa71c86, icon: { type: "item", id: "01712002" } },
   { id: "lach", label: "Lachelein", region: "Arcane River", minLevel: 220, exp: 0xbe15c70a, icon: { type: "item", id: "01712003" } },
   { id: "arcana", label: "Arcana", region: "Arcane River", minLevel: 225, exp: 0xc5012937, icon: { type: "item", id: "01712004" } },
   { id: "moras", label: "Morass", region: "Arcane River", minLevel: 230, exp: 0x106283735, icon: { type: "item", id: "01712005" } },
