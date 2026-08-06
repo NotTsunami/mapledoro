@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-06",
+    changes: [
+      { type: "changed", text: "Rebuilt the EXP Calculator's Resources tab: pick a resource from the dropdown and see what every source in it pays at your level, in EXP and as a share of the level, instead of reading a raw table." },
+    ],
+  },
+  {
     date: "2026-08-05",
     changes: [
       { type: "changed", text: "The Stat Optimizer now knows that archers turn Critical Rate above 100% into Critical Damage, so it keeps recommending Critical Rate for them past the cap instead of treating it as wasted." },

@@ -74,7 +74,13 @@ and apply through `applyResourceUnits`. Haste Fever Time has no Daily/Weekly inp
 
 **Resources tab** renders `buildResourceBreakdown(input)`, one `BreakdownSection` per content type,
 each holding `BreakdownGroup`s (one source, one icon, one name) whose `values` stack every figure
-that source produces: Epic Dungeon reward tiers, treasure box grades, Monster Park days.
+that source produces: Epic Dungeon reward tiers, treasure box grades, Monster Park days. **Only the
+section the Resource dropdown picks is rendered**, so it gets the full panel width; the dropdown is
+built from the same list, which is why `title` stays on the section even though nothing prints it as
+a heading any more. The pick is a plain id in state, resolved through
+`sections.find(...) ?? sections[0]` on every render (`""` means unpicked). Never correct that state
+in an effect: level gates which sections exist, and holding the id lets a section the level dropped
+come back on its own when the level does.
 
 Formulas are ported from the whackybeanz Contents Breakdown bundle and the figures match it exactly
 at equal inputs. The one shape they all share is `withBonus`: a percent bonus **adds to** the base
@@ -82,17 +88,19 @@ multiplier rather than compounding with it, so 5x rewards at +20% pays 5.2x, not
 Monster Park and MPE math now goes through the same helper.
 
 **Sections declare their own controls.** A section lists `BreakdownControlId`s; the tab owns the
-`ResourceBreakdownInput` state and `BREAKDOWN_CONTROLS` in the workspace supplies each one's label
+`ResourceBreakdownInput` state (one object shared by every section, so a knob keeps its value while
+you look at another resource) and `BREAKDOWN_CONTROLS` in the workspace supplies each one's label
 and range. Adding a knob means adding it to the id union, the input interface,
 `defaultBreakdownInput`, and `BREAKDOWN_CONTROLS`, and naming it on a section. **Changing Level
 re-seeds the three monster-level fields** (treasure, Express Booster, Haste) from the event handler,
 never an effect, since `react-hooks/set-state-in-effect` forbids the effect version.
 
-Cards lay out two per row (`.exp-breakdown-cards`); a section with **more than one group** spans the
-full row instead, so multi-source sections keep their own multi-column grid. That is derived from
-`groups.length`, not declared, so a section that gains or loses a group re-flows on its own. Card
-headers stack title over note so they read the same at either width, which is why the notes are kept
-to one short line and none of them repeat the "before EXP buffs" caveat the tab states once up top.
+The tab is three bands: the Resource picker beside Level (both persist across resources), the picked
+section's `note` under them, then the body. The body is one `innerCardStyle` surface holding that
+section's controls in a `panel`-filled band over `.exp-breakdown-grid`, which auto-fills 280px
+columns across the whole panel. A `note` is now the picked resource's description rather than a card
+subtitle, so keep it to one line that reads on its own. The body is keyed by section id so switching
+resources replays the site-wide `.fade-in`.
 
 A group's `heading` opens a labelled band that spans the grid and forces a fresh row; Dailies sets it
 on the first entry of each region. It is only a divider: the bonus percents stay Arcane River and

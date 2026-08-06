@@ -1145,7 +1145,7 @@ function dailySection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "dailies",
     title: "Dailies",
-    note: "Breakdown table of Arcane River, Tenebris and Grandis symbol daily EXP obtained.",
+    note: "Arcane River, Tenebris and Grandis symbol dailies, per clear.",
     controls: ["arcaneRiverBonus", "grandisBonus"],
     groups: DAILY_EXP_CONTENT.filter((daily) => input.level >= daily.minLevel).map((daily) => {
       // Dailies run in region order, so the first of each region opens that region's row band.
@@ -1165,7 +1165,7 @@ function dailySection(input: ResourceBreakdownInput): BreakdownSection {
 function weeklySection(level: number): BreakdownSection {
   return {
     id: "weeklies",
-    title: "Weeklies",
+    title: "Arcane River Weeklies",
     note: "Per run, up to three runs a week.",
     controls: [],
     groups: WEEKLY_EXP_CONTENT.filter((weekly) => level >= weekly.minLevel).map((weekly) => ({

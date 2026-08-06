@@ -52,7 +52,6 @@ import {
   type AllInOneInput,
   type BreakdownControlId,
   type BreakdownGroup,
-  type BreakdownSection,
   type ResourceBreakdownInput,
   type BuffState,
   type CheckBuff,
@@ -476,12 +475,9 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
         .exp-select-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px; }
         .exp-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
         .exp-overview-grid { display: grid; grid-template-columns: minmax(240px, 1.1fr) minmax(260px, 1fr); gap: 14px; }
-        /* Two lines per entry across as many columns as fit, which is the whackybeanz breakdown
-           layout with the cards' padding tightened. */
+        /* Two lines per entry across as many columns as fit. Only one resource shows at a time, so
+           this runs the full panel width and lands three columns instead of the old card's one. */
         .exp-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2px 22px; padding: 6px 14px 12px; align-items: start; }
-        /* Single-source cards pair up so the short ones at the bottom stop stacking into a scroll;
-           cards holding more than one source span the row instead, via breakdownWideCardStyle. */
-        .exp-breakdown-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; margin-top: 0.9rem; }
         .exp-buff-card { min-height: 48px; }
         .exp-monster-dropdown { scrollbar-width: thin; scrollbar-color: ${theme.muted} transparent; }
         .exp-monster-dropdown::-webkit-scrollbar { width: 8px; }
@@ -497,7 +493,6 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
         @media (max-width: 760px) {
           .exp-grid { grid-template-columns: 1fr; }
           .exp-breakdown-grid { grid-template-columns: 1fr; }
-          .exp-breakdown-cards { grid-template-columns: 1fr; }
           .exp-select-grid { grid-template-columns: 1fr; }
           .exp-overview-grid { grid-template-columns: 1fr; }
           .segmented-toggle-track { flex-wrap: wrap; }
@@ -1475,7 +1470,12 @@ function ResourcesTab({ theme }: { theme: AppTheme }) {
   const selectStyle = fullWidthControl(styles.selectStyle);
   const panelStyle = expPanelStyle(styles);
   const [input, setInput] = useState(initialBreakdownInput);
+  // `""` is "not picked yet", which resolves to the first resource the level can reach.
+  const [sectionId, setSectionId] = useState("");
   const sections = useMemo(() => buildResourceBreakdown(input), [input]);
+  // Level also gates which resources exist, so a pick can drop out of the list. Falling back on
+  // read rather than correcting the state hands the pick back if the level climbs to it again.
+  const section = sections.find((entry) => entry.id === sectionId) ?? sections[0];
 
   // Changing the character level re-seeds the monster-level fields with it, since "what is this
   // worth at Lv. X" almost always means fighting Lv. X monsters. They stay editable after.
@@ -1496,86 +1496,59 @@ function ResourcesTab({ theme }: { theme: AppTheme }) {
 
   return (
     <div style={panelStyle}>
+      {/* The picker is the tab's navigation, so it leads and takes the width; Level frames every
+          figure under it and rides alongside. Both persist across resources. */}
       <div style={breakdownControlRowStyle}>
-        <div style={breakdownFieldStyle}>
+        <div style={resourcePickerFieldStyle}>
+          <Field label="Resource" style={styles.labelStyle}>
+            <select className="tool-select" value={section.id} style={selectStyle} onChange={(e) => setSectionId(e.target.value)}>
+              {sections.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div style={levelFieldStyle}>
           <NumberField label="Level" min={MIN_EXP_LEVEL} max={MAX_EXP_LEVEL} value={input.level} labelStyle={styles.labelStyle} inputStyle={inputStyle} onChange={changeLevel} />
         </div>
       </div>
-      <div className="exp-breakdown-cards">
-        {sections.map((section) => (
-          <BreakdownCard
-            key={section.id}
-            theme={theme}
-            section={section}
-            input={input}
-            styles={styles}
-            inputStyle={inputStyle}
-            selectStyle={selectStyle}
-            onChangeNumber={updateNumber}
-            onSelectMonsterPark={selectMonsterPark}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BreakdownCard({
-  theme,
-  section,
-  input,
-  styles,
-  inputStyle,
-  selectStyle,
-  onChangeNumber,
-  onSelectMonsterPark,
-}: {
-  theme: AppTheme;
-  section: BreakdownSection;
-  input: ResourceBreakdownInput;
-  styles: ReturnType<typeof toolStyles>;
-  inputStyle: React.CSSProperties;
-  selectStyle: React.CSSProperties;
-  onChangeNumber: (key: NumericBreakdownControlId, value: number) => void;
-  onSelectMonsterPark: (parkId: string) => void;
-}) {
-  return (
-    <section style={section.groups.length > 1 ? breakdownWideCardStyle(theme) : breakdownCardStyle(theme)}>
-      {/* The card fill is `timerBg`, so the header band is the lighter `panel` fill. */}
-      <header style={{ ...breakdownHeaderStyle, background: theme.panel, borderBottom: `1px solid ${theme.border}` }}>
-        <h3 style={{ ...breakdownTitleStyle, color: theme.text }}>{section.title}</h3>
-        {section.note && <span style={{ ...breakdownNoteStyle, color: theme.muted }}>{section.note}</span>}
-      </header>
-      {section.controls.length > 0 && (
-        <div style={{ ...breakdownControlRowStyle, borderBottom: `1px solid ${theme.border}`, padding: "10px 14px" }}>
-          {section.controls.map((control) => (
-            <BreakdownControl
-              key={control}
-              id={control}
-              input={input}
-              styles={styles}
-              inputStyle={inputStyle}
-              selectStyle={selectStyle}
-              onChangeNumber={onChangeNumber}
-              onSelectMonsterPark={onSelectMonsterPark}
-            />
+      {section.note && <p style={{ ...breakdownNoteStyle, color: theme.muted }}>{section.note}</p>}
+      {/* Keyed so switching resources replays the site-wide fade on the body that swapped. */}
+      <div key={section.id} className="fade-in" style={breakdownBodyStyle(theme)}>
+        {section.controls.length > 0 && (
+          // The body fill is `timerBg`, so the knob band is the lighter `panel` fill.
+          <div style={{ ...breakdownControlRowStyle, background: theme.panel, borderBottom: `1px solid ${theme.border}`, padding: "10px 14px" }}>
+            {section.controls.map((control) => (
+              <BreakdownControl
+                key={control}
+                id={control}
+                input={input}
+                styles={styles}
+                inputStyle={inputStyle}
+                selectStyle={selectStyle}
+                onChangeNumber={updateNumber}
+                onSelectMonsterPark={selectMonsterPark}
+              />
+            ))}
+          </div>
+        )}
+        <div className="exp-breakdown-grid">
+          {section.groups.map((group) => (
+            <Fragment key={group.id}>
+              {group.heading && (
+                <div style={{ ...breakdownHeadingStyle, color: theme.muted }}>
+                  <span>{group.heading}</span>
+                  <span style={{ ...breakdownHeadingRuleStyle, background: theme.border }} />
+                </div>
+              )}
+              <BreakdownGroupBlock theme={theme} group={group} level={input.level} />
+            </Fragment>
           ))}
         </div>
-      )}
-      <div className="exp-breakdown-grid">
-        {section.groups.map((group) => (
-          <Fragment key={group.id}>
-            {group.heading && (
-              <div style={{ ...breakdownHeadingStyle, color: theme.muted }}>
-                <span>{group.heading}</span>
-                <span style={{ ...breakdownHeadingRuleStyle, background: theme.border }} />
-              </div>
-            )}
-            <BreakdownGroupBlock theme={theme} group={group} level={input.level} />
-          </Fragment>
-        ))}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -1660,28 +1633,21 @@ const breakdownControlRowStyle: React.CSSProperties = { display: "flex", flexWra
 /** Wide enough that the longest control label ("Arcane River Bonus %") stays on one line. */
 const breakdownFieldStyle: React.CSSProperties = { width: 178 };
 
-function breakdownCardStyle(theme: AppTheme): React.CSSProperties {
-  return { ...innerCardStyle(theme), overflow: "hidden" };
-}
-
-function breakdownWideCardStyle(theme: AppTheme): React.CSSProperties {
-  return { ...breakdownCardStyle(theme), gridColumn: "1 / -1" };
-}
-
 const breakdownSelectFieldStyle: React.CSSProperties = { width: 210 };
 
-/** Title over note rather than beside it, so every card header is the same two-line shape however
- *  long the note runs and however wide the card sits. */
-const breakdownHeaderStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-  padding: "9px 14px",
-};
+/** The tab's navigation, so it outsizes every knob under it and takes the room a resource name
+ *  ("Golden Strawberry Farm") needs, without stretching across a width no select wants. */
+const resourcePickerFieldStyle: React.CSSProperties = { flex: "1 1 240px", maxWidth: 340 };
 
-const breakdownTitleStyle: React.CSSProperties = { margin: 0, fontSize: "0.9rem", fontWeight: 800 };
+/** Three digits, so it gives back the width the picker takes. */
+const levelFieldStyle: React.CSSProperties = { width: 116 };
 
-const breakdownNoteStyle: React.CSSProperties = { fontSize: "0.78rem", fontWeight: 700 };
+function breakdownBodyStyle(theme: AppTheme): React.CSSProperties {
+  return { ...innerCardStyle(theme), overflow: "hidden", marginTop: "1rem" };
+}
+
+/** Describes the picked resource, so it sits under the picker rather than in the body. */
+const breakdownNoteStyle: React.CSSProperties = { margin: "8px 0 0", fontSize: "0.78rem", fontWeight: 700, lineHeight: 1.45 };
 
 const breakdownGroupStyle: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 0" };
 
