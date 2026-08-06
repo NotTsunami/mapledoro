@@ -48,7 +48,6 @@ import {
   calculateAllInOne,
   calculateMonsterExp,
   defaultBreakdownInput,
-  expForLevel,
   percentOfLevel,
   type AllInOneInput,
   type BreakdownControlId,
@@ -71,6 +70,7 @@ import {
 } from "../../characters/model/charactersStore";
 import { worldServerType } from "../boss-crystals/boss-crystals-types";
 import { readCharacterToolData, writeCharacterToolData } from "../characterToolStorage";
+import { readToolProgress, writeToolLevel } from "../toolLevel";
 
 type ExpTab = "buffs" | "all-in-one" | "resources";
 type AllInOneNumberKey =
@@ -105,6 +105,10 @@ const TAB_LABELS: Record<ExpTab, string> = {
 
 const FARMING_TOOL_KEY = "expFarming";
 
+/** The player's level and EXP percent, saved for the calculator as a whole rather than per tab:
+ *  they are one fact about the character, so the two tabs must not disagree about them. */
+const EXP_LEVEL_TOOL_KEY = "expLevel";
+
 const DEFAULT_MONSTER: MonsterExpInput = {
   playerLevel: 260,
   targetLevel: 270,
@@ -114,9 +118,9 @@ const DEFAULT_MONSTER: MonsterExpInput = {
   hourlyKillCount: 18000,
 };
 
-/** Farming Calculator state saved per-character. Level/percent come from the character record and
- *  monster level/EXP come from the selected monster, so none of those are saved: only the monster's
- *  key, which is enough to reproduce the hourly rate on the next visit. */
+/** Farming Calculator state saved per-character. Percent comes from the character record, level
+ *  from `EXP_LEVEL_TOOL_KEY`, and monster level/EXP from the selected monster, so none of those are
+ *  saved here: only the monster's key, which is enough to reproduce the hourly rate next visit. */
 interface SavedExpState {
   buffs: BuffState;
   targetLevel: number;
@@ -147,19 +151,32 @@ function characterPercent(character: StoredCharacterRecord): number {
   return roundToThree(Math.min(99.999, Math.max(0, percentOfLevel(character.level, character.exp))));
 }
 
+/** Where the character is right now: the record's own figures, unless the player has typed a level
+ *  the record hasn't caught up to yet, in which case what they typed stands in. A typed-ahead level
+ *  with no percent alongside it keeps showing the record's, which is what the field showed when
+ *  they typed the level and left it alone. */
+function characterProgress(character: StoredCharacterRecord): { level: number; percent: number } {
+  const ahead = readToolProgress(character, EXP_LEVEL_TOOL_KEY);
+  return {
+    level: ahead?.level ?? character.level,
+    percent: ahead?.percent ?? characterPercent(character),
+  };
+}
+
 /** Buffs + monster inputs for a character, from their saved state merged over the defaults. */
 function loadCharacterState(character: StoredCharacterRecord, monster: MonsterExpInput) {
   const saved = mergeSavedExpState(
     readCharacterToolData<Partial<SavedExpState>>(character.characterName, FARMING_TOOL_KEY),
   );
   const selectedMonster = EXP_MONSTERS.find((option) => option.key === saved.monsterKey) ?? null;
+  const progress = characterProgress(character);
   return {
     buffs: applyJobBuffRules(saved.buffs, character.jobName),
     selectedMonster,
     monster: {
       ...monster,
-      playerLevel: character.level,
-      currentPercent: characterPercent(character),
+      playerLevel: progress.level,
+      currentPercent: progress.percent,
       targetLevel: saved.targetLevel,
       hourlyKillCount: saved.hourlyKillCount,
       monsterLevel: selectedMonster?.level ?? monster.monsterLevel,
@@ -240,8 +257,9 @@ interface ImportedFarmingRate {
 }
 
 /** Daily / Weekly plan saved per-character: the Daily Content, Weekly Content, Monster Park, and
- *  Epic Dungeon panels plus target level, burning, and the date window. Current level and percent
- *  come from the character record; event tickets and growth potions stay in memory by design. */
+ *  Epic Dungeon panels plus target level, burning, and the date window. Current percent comes from
+ *  the character record and the current level from `EXP_LEVEL_TOOL_KEY`; event tickets and growth
+ *  potions stay in memory by design. */
 type SavedAllInOne = Pick<
   AllInOneInput,
   | "targetLevel"
@@ -311,7 +329,8 @@ function loadCharacterAllInOne(character: StoredCharacterRecord): AllInOneInput 
   const saved = mergeSavedAllInOne(
     readCharacterToolData<Partial<SavedAllInOne>>(character.characterName, DAILY_WEEKLY_TOOL_KEY),
   );
-  return { ...saved, startLevel: character.level, startPercent: characterPercent(character) };
+  const progress = characterProgress(character);
+  return { ...saved, startLevel: progress.level, startPercent: progress.percent };
 }
 
 /** Writes the imported rate into the character's saved plan at import time. The Daily / Weekly seed
@@ -552,6 +571,18 @@ function BuffsTab({
       return next;
     });
   };
+  /** The character record only refreshes on a lookup, so level and EXP percent stay editable and
+   *  save under the calculator's own key (see `EXP_LEVEL_TOOL_KEY`), not the Farming state. Both
+   *  are written together: they describe one position, and the save holds them as a pair. */
+  const updateProgress = (patch: Partial<Pick<MonsterExpInput, "playerLevel" | "currentPercent">>) => {
+    setMonster((state) => {
+      const next = { ...state, ...patch };
+      if (selectedCharName) {
+        writeToolLevel(selectedCharName, EXP_LEVEL_TOOL_KEY, next.playerLevel, next.currentPercent);
+      }
+      return next;
+    });
+  };
   /** Only for the persisted monster fields (target level, hourly kill count). */
   const updateSavedMonsterField = (field: "targetLevel" | "hourlyKillCount", value: number) => {
     setMonster((state) => {
@@ -627,8 +658,8 @@ function BuffsTab({
             />
           </Field>
           <div className="exp-grid" style={{ marginTop: 12 }}>
-            <NumberField label="Character Level" min={MIN_EXP_LEVEL} max={MAX_EXP_LEVEL - 1} value={monster.playerLevel} labelStyle={labelStyle} inputStyle={inputStyle} disabled={selectedCharName !== null} onChange={(value) => setMonster((state) => ({ ...state, playerLevel: value }))} />
-            <NumberField label="Current EXP %" min={0} max={99.999} decimal value={monster.currentPercent} labelStyle={labelStyle} inputStyle={inputStyle} disabled={selectedCharName !== null} onChange={(value) => setMonster((state) => ({ ...state, currentPercent: value }))} />
+            <NumberField label="Character Level" min={MIN_EXP_LEVEL} max={MAX_EXP_LEVEL - 1} value={monster.playerLevel} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateProgress({ playerLevel: value })} />
+            <NumberField label="Current EXP %" min={0} max={99.999} decimal value={monster.currentPercent} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateProgress({ currentPercent: value })} />
             <NumberField label="Target Level" min={MIN_EXP_LEVEL + 1} max={MAX_EXP_LEVEL} value={monster.targetLevel} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateSavedMonsterField("targetLevel", value)} />
             <NumberField label="Hourly Kill Count" min={0} value={monster.hourlyKillCount} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateSavedMonsterField("hourlyKillCount", value)} />
           </div>
@@ -1134,6 +1165,17 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
       dailyIds: state.dailyIds.includes(id) ? state.dailyIds.filter((dailyId) => dailyId !== id) : [...state.dailyIds, id],
     }));
   };
+  /** Same deal as the Farming tab's level and percent: editable, and saved under the calculator's
+   *  own key rather than the plan, so both tabs read the one position back. */
+  const updateProgress = (patch: Partial<Pick<AllInOneInput, "startLevel" | "startPercent">>) => {
+    updateInput((state) => {
+      const next = { ...state, ...patch };
+      if (selectedCharName) {
+        writeToolLevel(selectedCharName, EXP_LEVEL_TOOL_KEY, next.startLevel, next.startPercent);
+      }
+      return next;
+    });
+  };
   const updateWeeklyRun = (id: string, runs: number) => {
     updateInput((state) => ({ ...state, weeklyRuns: { ...state.weeklyRuns, [id]: runs } }));
   };
@@ -1164,8 +1206,8 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
           />
         </Field>
         <div className="exp-grid" style={{ marginTop: 12 }}>
-          <NumberField label="Current Level" min={MIN_EXP_LEVEL} max={MAX_EXP_LEVEL - 1} value={input.startLevel} labelStyle={labelStyle} inputStyle={inputStyle} disabled={selectedCharName !== null} onChange={(value) => updateNumber("startLevel", value)} />
-          <NumberField label="Current EXP %" min={0} max={99.999} decimal value={input.startPercent} labelStyle={labelStyle} inputStyle={inputStyle} disabled={selectedCharName !== null} onChange={(value) => updateNumber("startPercent", value)} />
+          <NumberField label="Current Level" min={MIN_EXP_LEVEL} max={MAX_EXP_LEVEL - 1} value={input.startLevel} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateProgress({ startLevel: value })} />
+          <NumberField label="Current EXP %" min={0} max={99.999} decimal value={input.startPercent} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateProgress({ startPercent: value })} />
           <NumberField label="Target Level" min={MIN_EXP_LEVEL + 1} max={MAX_EXP_LEVEL} value={input.targetLevel} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("targetLevel", value)} />
           <Field label="Burning" style={labelStyle}>
             <select
@@ -1612,8 +1654,6 @@ function BreakdownGroupBlock({ theme, group, level }: { theme: AppTheme; group: 
     </div>
   );
 }
-
-const breakdownHintStyle: React.CSSProperties = { fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.45, margin: "12px 0 0" };
 
 const breakdownControlRowStyle: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12 };
 

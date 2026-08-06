@@ -6,22 +6,33 @@ stays in memory.
 - `expFarming` (`SavedExpState`): buff selections, target level, hourly kill count.
 - `expDailyWeekly` (`SavedAllInOne`): the Daily / Weekly / Monster Park / Epic Dungeon panels, plus
   target level, burning, and the date window.
+- `expLevel`: the character's current level and EXP percent. Deliberately **not** per tab, since
+  they are one fact about the character and the two tabs must not disagree about them.
 
-**Never persist derived values.** Character level and current EXP percent come from the character
-record; monster level and base EXP come from the monster. `expFarming` saves the monster's `key`
+**Never persist derived values.** Monster level and base EXP come from the monster.
+
+**Level and EXP percent are editable even with a character selected**, because the record only
+refreshes on a lookup and a player who levelled since still needs the tool. `readToolProgress`
+(`tools/toolLevel.ts`) returns the save only while its level is *ahead* of the record's, so a
+refresh that catches up re-syncs both tabs and discards the typed figures in one step
+(`characterProgress`). A typed-ahead level with no percent saved alongside it keeps showing the
+record's percent, matching what the field showed when the player typed the level and left the
+percent alone. The pair is always written together, so a save can't hold a percent from one level
+and a level from another. `expFarming` saves the monster's `key`
 only (`monsterKey`) and rehydrates level/EXP from `EXP_MONSTERS`. Event tickets, growth potions,
 Punch King, and Double Up reset each visit by design.
 
-**Writes go through the `updateBuffs` / `updateSavedMonsterField` / `updateInput` wrappers**, which
-write inside the state updater and no-op with no character selected (Manual Level is never saved).
-Calling raw `setBuffs` / `setMonster` / `setInput` from a handler silently skips the write.
+**Writes go through the `updateBuffs` / `updateSavedMonsterField` / `updateInput` wrappers** (plus
+each tab's `updateProgress` for the `expLevel` key), which write inside the state updater and no-op
+with no character selected (Manual Level is never saved). Calling raw `setBuffs` / `setMonster` /
+`setInput` from a handler silently skips the write.
 
 **Character selection** flushes the outgoing character, then loads the incoming one through
 `mergeSavedExpState` / `mergeSavedAllInOne` so ids added after a save still get a default. Both tabs
 open on the roster main (`selectMainCharacter`), falling back to Manual Level.
 `loadCharacterState` / `loadCharacterAllInOne` serve both the mount seed and the dropdown so the
 paths can't drift; the seed runs in a lazy `useState` initializer and **must not write**. Selecting a
-character auto-fills level and EXP percent and disables those inputs. `mergeSavedAllInOne` drops a
+character auto-fills level and EXP percent, both of which stay editable. `mergeSavedAllInOne` drops a
 saved date window whose end has passed, falling back to today +27 days.
 
 **Farming → Daily/Weekly import** is a one-shot handoff through `imported` (an `ImportedFarmingRate`)

@@ -10,6 +10,7 @@ import {
 } from "../../characters/model/charactersStore";
 import { peekScouterCache } from "../../characters/scouter/scouterCache";
 import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
+import { readToolLevel, writeToolLevel } from "../toolLevel";
 import {
   DEFAULT_BOSS_PDR,
   hasStatBaseline,
@@ -60,10 +61,14 @@ type OptimizerResult =
 /** Position of each line in a core's [primary, additional0, additional1] order. */
 const CORE_LINE_SLOT: Record<CoreLineKey, 0 | 1 | 2> = { primary: 0, alt0: 1, alt1: 2 };
 
+/** The tool's own key in the character store. Only the level is saved (see `setLevel`). */
+const STAT_OPTIMIZER_TOOL_KEY = "statOptimizer";
+
 interface SelectionState {
   profile: ClassDamageProfile;
   inputs: OptimizerStatInputs;
   availablePoints: number;
+  untrackedPoints: number;
   hyperAlloc: HyperAllocation;
   cores: HexaCore[];
   calibration: KernelCalibration;
@@ -76,6 +81,7 @@ function seedToState(seed: CharacterSeed): SelectionState {
     profile: seed.profile,
     inputs: seed.inputs,
     availablePoints: seed.availablePoints,
+    untrackedPoints: seed.untrackedPoints,
     hyperAlloc: seed.storedHyper,
     cores: seed.cores,
     calibration: seed.calibration,
@@ -107,9 +113,8 @@ export function useStatOptimizer() {
     applyModeParam();
   }, [mounted, applyModeParam]);
   const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-  // The optimizer works standalone: state always exists (blank until a character
-  // is picked, which autopopulates it). Edits stay in memory and are intentionally
-  // not persisted; we could later save them per character if that proves useful.
+  // The optimizer works standalone: state always exists (blank until a character is picked, which
+  // autopopulates it). Edits stay in memory, with the sole exception of the level (see `setLevel`).
   const [state, setState] = useState<SelectionState>(() => seedToState(emptyCharacterSeed()));
   // Boss physical defense the allocation is valued against (percent), picked
   // per boss like maplescouter. Only rescales the ignore-def bucket.
@@ -121,7 +126,11 @@ export function useStatOptimizer() {
     // Cache-only read (no network call, see peekScouterCache): a hit calibrates the
     // kernel onto scouter's buffed footing, a miss leaves the raw stat window.
     const seed = record
-      ? seedFromCharacter(record, peekScouterCache(record)?.specEfficiency)
+      ? seedFromCharacter(
+          record,
+          peekScouterCache(record)?.specEfficiency,
+          readToolLevel(record, STAT_OPTIMIZER_TOOL_KEY),
+        )
       : emptyCharacterSeed();
     setState(seedToState(seed));
   }, []);
@@ -139,16 +148,21 @@ export function useStatOptimizer() {
     }));
   }, []);
 
-  // Only reachable in standalone mode (the level input is disabled while a
-  // stored character is selected), so resetting the budget to the closed form
-  // never stomps a seeded budget that deducts untracked-line spending.
+  // The level stays editable with a character selected, since the record's level only refreshes on
+  // a lookup and a player who levelled since still needs the tool. It is the one edit that
+  // persists (under the tool's own key, floored by the record's level on the way back in), and the
+  // budget is recomputed from the closed form less the same untracked-line spending the seed
+  // deducted, so typing a level never silently hands those points back.
   const setLevel = useCallback((level: number) => {
-    setState((prev) => ({
-      ...prev,
-      inputs: { ...prev.inputs, level },
-      availablePoints: availableHyperPoints(level),
-    }));
-  }, []);
+    setState((prev) => {
+      if (selectedCharName) writeToolLevel(selectedCharName, STAT_OPTIMIZER_TOOL_KEY, level);
+      return {
+        ...prev,
+        inputs: { ...prev.inputs, level },
+        availablePoints: Math.max(0, availableHyperPoints(level) - prev.untrackedPoints),
+      };
+    });
+  }, [selectedCharName]);
 
   // Clamped against what the other lines already spend, so a typed-in allocation can
   // never cost more hyper points than the character actually has.

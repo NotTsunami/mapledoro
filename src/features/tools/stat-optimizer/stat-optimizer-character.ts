@@ -54,6 +54,9 @@ export interface CharacterSeed {
   profile: ClassDamageProfile;
   inputs: OptimizerStatInputs;
   availablePoints: number;
+  /** Already deducted from `availablePoints`, kept so editing the level can recompute the budget
+   *  from the closed form without dropping the deduction. */
+  untrackedPoints: number;
   storedHyper: HyperAllocation;
   cores: HexaCore[];
   /** Buffed-state corrections solved from the character's cached Scouter data. */
@@ -81,10 +84,10 @@ function readLine(entry: { type?: string; level?: number } | undefined): HexaLin
   return { type, level };
 }
 
-function readCore(record: StoredCharacterRecord, node: HexaStatNode | undefined, index: number): HexaCore {
+function readCore(level: number, node: HexaStatNode | undefined, index: number): HexaCore {
   const slot = node?.presets?.[node.activePreset] ?? node?.presets?.[0];
   return {
-    unlocked: record.level >= HEXA_UNLOCK_LEVELS[index] || Boolean(node),
+    unlocked: level >= HEXA_UNLOCK_LEVELS[index] || Boolean(node),
     primary: readLine(slot?.main),
     additional: [readLine(slot?.alt?.[0]), readLine(slot?.alt?.[1])],
   };
@@ -124,23 +127,25 @@ function pointsSpentOnUntrackedLines(
   return spent;
 }
 
+/** `level` is the record's level unless the tool holds a higher one the player typed in (the
+ *  record only refreshes on a lookup), and stands in for it everywhere level is read. */
 export function seedFromCharacter(
   record: StoredCharacterRecord,
   specEfficiency?: ScouterSpecEfficiency,
+  level: number = record.level,
 ): CharacterSeed {
   const profile = resolveClassDamageProfile(record.jobName, record.stats);
   const nodes = readHexaNodes(record);
-  const inputs = prefillFromStats(record.stats, profile, record.level);
+  const inputs = prefillFromStats(record.stats, profile, level);
   const calibration = calibrateFromSpecEfficiency(specEfficiency, profile, inputs);
+  const untrackedPoints = pointsSpentOnUntrackedLines(record, profile);
   return {
     profile,
     inputs,
-    availablePoints: Math.max(
-      0,
-      availableHyperPoints(record.level) - pointsSpentOnUntrackedLines(record, profile),
-    ),
+    availablePoints: Math.max(0, availableHyperPoints(level) - untrackedPoints),
+    untrackedPoints,
     storedHyper: mapStoredHyper(record.stats.hyperStat, profile),
-    cores: Array.from({ length: HEXA_CORE_COUNT }, (_, i) => readCore(record, nodes[i], i)),
+    cores: Array.from({ length: HEXA_CORE_COUNT }, (_, i) => readCore(level, nodes[i], i)),
     calibration: calibration ?? zeroCalibration(),
     calibrationNotice: calibration ? null : noticeFor(record, profile),
   };
@@ -189,6 +194,7 @@ export function emptyCharacterSeed(): CharacterSeed {
       ignoreDefPct: 0,
     },
     availablePoints: availableHyperPoints(STANDALONE_LEVEL),
+    untrackedPoints: 0,
     storedHyper: zeroHyperAllocation(),
     cores: Array.from({ length: HEXA_CORE_COUNT }, () => ({
       unlocked: false,
