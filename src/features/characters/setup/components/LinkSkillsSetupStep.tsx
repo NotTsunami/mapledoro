@@ -7,6 +7,7 @@ import Image from "next/image";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
+import HoverTooltip from "../../../../components/HoverTooltip";
 import { linkSkillsStoredToDraftString, type StoredCharacterRecord, type LinkSkillId, type LinkSkillsData } from "../../model/charactersStore";
 import { LINK_SKILLS, computeLinkSkillsFromRoster, linkSkillFloorsForCharacter, bestKnownLinkSkillFloors, type LinkSkillDef } from "../data/linkSkillsData";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
@@ -114,6 +115,22 @@ export function LinkSkillIcon({ iconId, name, theme, size = 32 }: { iconId: stri
   );
 }
 
+// Reset a native button back to plain content so the icon reads the same as a static
+// image at rest — the accent ring on hover/focus is the only cue this is clickable,
+// matching the tap-target-friendly, chrome-at-rest-free style used elsewhere in setup.
+const linkSkillMaxButtonStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 2,
+  margin: -2,
+  borderRadius: "8px",
+  cursor: "pointer",
+  display: "flex",
+  outline: "2px solid transparent",
+  outlineOffset: "1px",
+  transition: "outline-color 0.15s ease, background 0.15s ease",
+};
+
 const linkLevelInputStyle = (theme: AppTheme): CSSProperties => ({
   width: "2.2rem",
   border: `1px solid ${theme.border}`,
@@ -168,7 +185,20 @@ function LinkSkillRow({
       background: theme.bg,
       ...(fullWidth ? { gridColumn: "1 / -1" } : {}),
     }}>
-      <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
+      <HoverTooltip label={`Set to max (${skill.maxLevel})`} theme={theme} style={{ flexShrink: 0 }}>
+        <button
+          type="button"
+          aria-label={`Set ${skill.name} to max level (${skill.maxLevel})`}
+          onClick={() => onUpdate(skill.id, String(skill.maxLevel))}
+          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
+          onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
+          onMouseLeave={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
+          style={linkSkillMaxButtonStyle}
+        >
+          <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
+        </button>
+      </HoverTooltip>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: theme.text, lineHeight: 1.2 }}>
           {skill.name}
@@ -354,7 +384,10 @@ function LinkSkillsEditor({
           <InfoTooltip content={masterLevelTooltip(theme)} theme={theme} />
         </div>
         <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>
-          Only enter the levels for the links that this character actually has equipped.
+          Only enter levels for the link skills equipped on this character&apos;s bossing setup, not every link skill on your account.
+        </p>
+        <p style={{ margin: 0, marginTop: "0.35rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700 }}>
+          Click a link skill&apos;s icon to set it straight to its max level.
         </p>
       </div>
       <div className="link-skills-grid" style={{ display: "grid", gap: "0.5rem" }}>
