@@ -1,13 +1,14 @@
 # Stat Optimizer
 
-Bossing-only optimizer with two modes (Hyper Stat, HEXA Stat) that are **exact
-ports of maplescouter.com's optimizer** (algorithms, tables, and damage kernel
-were reverse-engineered from its production bundle and behaviorally verified
-against the live site). Works **standalone**: state is always present, blank by
-default (`emptyCharacterSeed`), autopopulated when a stored character is picked.
-Edits live in memory only and are intentionally **not persisted**, with one
-exception: the level, saved per character under the `statOptimizer` tool key (see
-"Point budget").
+Two modes (Hyper Stat, HEXA Stat) that are **exact ports of maplescouter.com's
+optimizer** (algorithms, tables, and damage kernel were reverse-engineered from
+its production bundle and behaviorally verified against the live site). Scouter
+optimizes bossing only; Hyper Stat additionally has a **mobbing target** that is
+ours (see "Mobbing target" below). Works **standalone**: state is always present,
+blank by default (`emptyCharacterSeed`), autopopulated when a stored character is
+picked. Edits live in memory only and are intentionally **not persisted**, with
+one exception: the level, saved per character under the `statOptimizer` tool key
+(see "Point budget").
 
 ## Damage kernel (`damage-formula.ts`, scouter's `A`/n8/Ng/gt/h2/_M/VQ)
 `computeScouterDamage` = statFactor × attack × critBucket × dmgBucket × iedBucket.
@@ -60,7 +61,7 @@ from `availableHyperPoints(level)` (scouter's closed form, 1699 at 300) minus
 points the stored preset spends on untracked lines (HP, Arcane Power, ...).
 There is no separate budget input: the workspace's level field recomputes the
 budget on edit as the closed form less that same deduction, which the seed
-carries out on `CharacterSeed.untrackedPoints` for exactly that reason.
+carries out on `TargetSeed.untrackedPoints` for exactly that reason.
 
 ## HEXA Stat (scouter's per-line greedy, `hexa-stat-engine.ts`)
 Levels are fixed (RNG-rolled in-game); only the stat TYPE per line is assigned.
@@ -83,6 +84,64 @@ dpm constants); unlisted classes fall back to `classSkillData` requiredStats and
 zero constants. Xenon: STR main / DEX sub / LUK sub2, tri-stat hyper lines.
 Demon Avenger: HP main / STR sub.
 
+## Mobbing target (`OptimizeTarget`, Hyper Stat only)
+Scouter has no mobbing optimizer, so this is entirely ours: the *same* greedy and
+the *same* kernel with every boss-only term switched off. HEXA Stat doesn't take
+it (a HEXA line assignment is a bossing decision), so the workspace resolves an
+`activeTarget` that is forced back to `"bossing"` whenever HEXA mode is on
+screen, and hides the target picker there.
+
+What "mobbing" changes, and nothing else:
+- **The IED bucket collapses to 1**, so the Boss PDR picker, the Ignore Enemy
+  DEF field and the Ignore Defense line all disappear rather than being valued
+  at zero on screen.
+- **`dpmBossDmg` drops out of the damage bucket.** The other `dpm*` constants
+  stay: they are always-on class passives, not the bossing buffs the wording of
+  the panel's note is about.
+- **The archer excess-crit conversion is skipped.** Not because the mechanic
+  changes, but because Vicious Shot and its equivalents run ~25% uptime and a
+  mobbing allocation is tuned for the other 75%. This is the one place
+  `excessCritDamage` is deliberately not applied.
+- **No calibration.** `KernelCalibration` puts the kernel on scouter's fully
+  buffed bossing footing (links, potions, Champion's Renown, seed rings), which
+  is exactly the state a mobbing run isn't in, so it's zeroed and the panel shows
+  `MobbingNote` in place of `CalibrationNote`.
+- **Boss Damage % becomes Normal Enemy Damage %.** Label only: the field is the
+  same `inputs.bossDamagePct`, and the game puts both in the same damage bucket.
+
+**Normal Damage is a real in-game hyper line** (+3%/level, the Damage line's
+curve), not a relabelled Boss Damage. It's in `HYPER_LINES` and lands in `d.dmg`
+alongside Damage. Mobbing wants points in *both* precisely because the step-cost
+curve is per line: two lines at 8 buy more percent than one at 15.
+
+`HYPER_TARGET_LINES` is the single source of which lines a target touches: greedy
+candidates, and which preset keys `mapStoredHyper` reads (so an untouched line is
+never stripped from the baseline, and never shows a row). The bossing list is
+scouter's, in scouter's order, untouched.
+
+The **point budget deliberately does not vary by target.** `trackedPresetKeys`
+is the union of both lists, so a mobbing run frees up the preset's Boss Damage
+and IED points and a bossing run frees up its Normal Damage points, leaving the
+same total on the table either way. That figure is the character's respec budget,
+not a property of what they're respeccing for, and a budget that moved when you
+flipped the picker would read as a bug.
+
+## Per-target state
+`SelectionState.targets` holds a `TargetSeed` per target (`inputs`,
+`storedHyper`, `availablePoints`, `untrackedPoints`, `presetIndex`); `profile`, `cores` and the
+calibration are shared. Both open on the same stat window and diverge only as
+the user edits them, so typing mobbing numbers never clobbers the bossing ones.
+The level is the exception: it's a fact about the character, so `setLevel`
+writes it to both.
+
+The **Hyper Preset picker** chooses which of the character's three in-game
+presets seeds the "Now" column, which also re-derives `availablePoints` (a
+different preset locks a different amount into untracked lines). It's per target,
+which is the point: bossing preset on one, mobbing preset on the other. Greyed
+out when the character has no stored allocation (`presetCount === 0`), since
+there is nothing to switch between. Switching re-derives the budget off the level
+on screen, not the record's, so it survives a level typed ahead of the last lookup.
+
 ## Excess crit rate (the one deliberate divergence)
 Seven archer classes convert crit rate above the 100% cap into crit damage
 (Vicious Shot and equivalents). `excessCritDamage` folds
@@ -100,7 +159,7 @@ crit rate bucket at all, only `cridmgeff1` to translate into. So a live cross-ch
 of an archer will now legitimately disagree with us on the crit rate line. Verify
 against scouter with a non-archer, or with an archer under the cap.
 
-Three consequences to keep in mind:
+Three consequences to keep in mind (a fourth, the mobbing target, is above):
 - **`forceFullCrit` does not gate it.** That flag pins the rate for HEXA
   evaluations (scouter's convention); the overflow is a property of the character's
   stat line, so it applies in both modes. In HEXA it moves only the crit damage
@@ -235,6 +294,7 @@ UI has to honor (`standalone = selectedCharName === null`):
   `STANDALONE_LEVEL` (290) is the guard; keep it at or above 140.
 
 ## Data sources
-Hyper tables/costs: `hyper-stat-data.ts` (== scouter's tD/ve/hR; == wiki). HEXA
+Hyper tables/costs: `hyper-stat-data.ts` (== scouter's tD/ve/hR; == wiki, with
+Normal Damage added from the wiki since scouter has no need for it). HEXA
 per-level values reuse `setup/data/hexaStatData.ts` (== scouter's NZ/oF tables).
 Class constants: `scouter-class-data.ts` (vendored, GMS region table).
