@@ -68,8 +68,8 @@ import type { StoredCharacterRecord, StoredLegionArtifact, StoredScouterLegion, 
 import { findRosterCharacterByName } from "../../model/characterKeys";
 
 // Soul Weapon tooltip illustrations. Every stat-variant "Soul" item (Beefy/Swift/Clever/
-// etc.) shares the identical icon, pixel-verified 2026-07-01 — these are just one
-// representative id from each family.
+// etc.) shares the identical icon, pixel-verified -- these are just one representative id
+// from each family.
 const MU_GONG_SOUL_ITEM_ID = "02591038"; // "Beefy Mu Gong Soul"
 const EPHENIA_SOUL_ITEM_ID = "02591187"; // "Beefy Ephenia Soul"
 const RUIN_FORCE_SHIELD_ITEM_ID = "01099015"; // "Ruin Force Shield"

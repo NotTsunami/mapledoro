@@ -344,8 +344,8 @@ const WH_LEGION_RANK_SET = new Set<string>(["B", "A", "S", "SS", "SSS"]);
 // Hunter" or cleared their previous bracket pick (an explicit, deliberate clear).
 // "none" used to fall through to the WH_LEGION_RANK_SET check below and resolve to
 // undefined -- indistinguishable from never having answered at all, so anyone with
-// no Wild Hunter could never satisfy a completeness check that requires an answer
-// (Yuki, 2026-07-27). Checked explicitly now so it round-trips as its own value.
+// no Wild Hunter could never satisfy a completeness check that requires an answer.
+// Checked explicitly now so it round-trips as its own value.
 function resolveWhLegionRank(
   derived: WhLegionRank | null,
   manual: string | undefined,
@@ -433,10 +433,10 @@ function finalizeQuickOrFullSetupRecord(
 // A freshly-unlocked Legion Artifact starts at Artifact Level 1 (not 0 — namu.wiki's own
 // level table starts numbering at 1, same convention as character level), already with its
 // first 3 crystals (Orange Mushroom/Slime/Horny Mushroom) unlocked at Crystal Level 1 and
-// these exact 3 default lines — confirmed via namu.wiki (2026-07-08): "미변경 시 기본 할당
-// 옵션은 '올스탯 증가', '최대 HP/MP 증가', '공격력/마력 증가'이다" ("if unchanged, the
-// default assigned options are All Stat, Max HP/MP, ATT/Magic ATT"), and Crystal Grade 1
-// costs 0 AP (i.e. automatic, not a player action). None of our setup flows ask for a real
+// these exact 3 default lines — confirmed via namu.wiki: "미변경 시 기본 할당 옵션은
+// '올스탯 증가', '최대 HP/MP 증가', '공격력/마력 증가'이다" ("if unchanged, the default
+// assigned options are All Stat, Max HP/MP, ATT/Magic ATT"), and Crystal Grade 1 costs 0
+// AP (i.e. automatic, not a player action). None of our setup flows ask for a real
 // Artifact Level or crystal config, so this is the one piece of Legion Artifact data safe to
 // assume for literally every player, regardless of how far they've actually progressed.
 //

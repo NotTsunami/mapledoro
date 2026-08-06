@@ -1,9 +1,9 @@
-// Dev-only preview drill for the Scouter figure's UI states -- lets Yuki eyeball every
-// status/tooltip variant without needing to actually trigger each one for real (a real
-// timeout/rate-limit/etc. is now genuinely detected, but still awkward to reproduce on
-// demand for visual QA). Throwaway visual-QA tooling, not a permanent feature -- see the
-// v2 punch list in project_maplescouter_api_re_2026_07_27 memory. Every entry point is
-// behind NODE_ENV, same convention as wipeTripwire.ts's __mapledoroTestTripwire drill.
+// Dev-only preview drill for the Scouter figure's UI states -- lets a developer eyeball
+// every status/tooltip variant without needing to actually trigger each one for real (a
+// real timeout/rate-limit/etc. is now genuinely detected, but still awkward to reproduce
+// on demand for visual QA). Throwaway visual-QA tooling, not a permanent feature. Every
+// entry point is behind NODE_ENV, same convention as wipeTripwire.ts's
+// __mapledoroTestTripwire drill.
 
 import type { ScouterFigureStatus } from "./useScouterResult";
 

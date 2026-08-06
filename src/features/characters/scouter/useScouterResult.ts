@@ -50,9 +50,9 @@ function initialStatus(character: StoredCharacterRecord): ScouterFigureStatus {
   return cached ? { kind: "ready", entry: cached, stale: false } : { kind: "empty" };
 }
 
-/** Manual-refresh-only by design (Yuki, 2026-07-27). Never fetches MapleScouter's API
- *  on its own. Reading the cache on mount (initialStatus) costs no network call, only
- *  the user clicking refresh does. */
+/** Manual-refresh-only by design. Never fetches MapleScouter's API on its own. Reading
+ *  the cache on mount (initialStatus) costs no network call, only the user clicking
+ *  refresh does. */
 export function useScouterResult(character: StoredCharacterRecord): ScouterFigureState {
   const [characterKey, setCharacterKey] = useState(character.characterName);
   const [status, setStatus] = useState<ScouterFigureStatus>(() => initialStatus(character));
@@ -81,7 +81,7 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
   // hash per browser session (see autoRefreshScouterResultIfNeeded's own comment for why
   // this covers both "a new character just finished setup" and "an existing character's
   // data actually changed" with one rule, and why a failed attempt doesn't keep silently
-  // retrying just from bouncing between bookmarks). Yuki, 2026-07-27.
+  // retrying just from bouncing between bookmarks).
   useEffect(() => {
     if (status.kind !== "empty") return;
     let cancelled = false;

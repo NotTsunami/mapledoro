@@ -44,11 +44,11 @@ const SETUP_FLOWS = [
     // Superset of maplescouter_setup: `stats` is flow-aware (shows the WH Legion rank
     // question + Weapon ATT field here too); `buffs`/`oz_rings`/`legion_artifacts` are
     // the scouter-only data full_setup didn't used to collect.
-    // Ordered to minimize in-game window switching (2026-07-07): stats' Character-Info
-    // fields first, then the equipment cluster (equipment/oz_rings/familiars), then an
-    // uninterrupted Skill-window run (link_skills before v_matrix before hexa_matrix,
-    // matching the Beginner→V→VI tab order so you never jump backward a tab), then
-    // legion_artifacts + buffs last (weakest/most flexible window affinity).
+    // Ordered to minimize in-game window switching: stats' Character-Info fields first,
+    // then the equipment cluster (equipment/oz_rings/familiars), then an uninterrupted
+    // Skill-window run (link_skills before v_matrix before hexa_matrix, matching the
+    // Beginner→V→VI tab order so you never jump backward a tab), then legion_artifacts +
+    // buffs last (weakest/most flexible window affinity).
     steps: ["gender", "marriage", "stats", "equipment", "oz_rings", "familiars", "link_skills", "v_matrix", "hexa_matrix", "legion_artifacts", "buffs"] as const,
   },
   {
@@ -58,10 +58,10 @@ const SETUP_FLOWS = [
     required: false,
     // The `stats` step is flow-aware (it adds the scouter questionnaire + weapon ATT);
     // `hexa_matrix` reuses the full-setup step as-is (auto-skipped below Lv 260).
-    // Ordered to minimize in-game window switching (2026-07-07): oz_rings right after
-    // stats (both touch Equipment/Inventory), then an uninterrupted Skill-window run
-    // (link_skills before hexa_matrix), with buffs last since it draws from Guild/Skills/
-    // Inventory and has no single fixed window affinity.
+    // Ordered to minimize in-game window switching: oz_rings right after stats (both
+    // touch Equipment/Inventory), then an uninterrupted Skill-window run (link_skills
+    // before hexa_matrix), with buffs last since it draws from Guild/Skills/Inventory and
+    // has no single fixed window affinity.
     steps: ["stats", "oz_rings", "link_skills", "hexa_matrix", "buffs"] as const,
   },
   {

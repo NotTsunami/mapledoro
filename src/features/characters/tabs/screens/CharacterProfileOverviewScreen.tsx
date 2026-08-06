@@ -538,10 +538,8 @@ function isStatsFilled(character: StoredCharacterRecord | null): boolean {
   return Boolean(s.attackPower.base || s.bossDamage || s.str.base || s.dex.base || s.int.base || s.luk.base || s.hp.base);
 }
 
-// Placeholder headline figure -- unwired for now, reserved for a MapleScouter-style overall
-// score (see project_combat_power_investigation_2026_07_20 -- parked, no formula reproduces
-// cleanly across characters yet). This is a first pass at Juno's default-layout mockup;
-// expect the exact figure/sections here to keep changing.
+// Pre-mount fallback for ScouterFigure (real component, scouter/ScouterFigure.tsx) while
+// `mounted`/`character` aren't ready yet -- just renders the label with a dash value.
 function OverviewFigure({ label, value, theme }: { label: string; value: string; theme: Theme }) {
   return (
     <div>
@@ -712,8 +710,8 @@ function OverviewKeyStatsSection({ theme, character, classData }: {
 
 // Same node-tab + Main/Alt-stat readout as HexaStatBookmarkView, but flattened (no
 // StatBlock panel wrapping, no preset toggle) to match the plainer "6th job" section look
-// Juno's mockup uses -- always reads the node's own activePreset rather than letting the
-// user switch, since Overview is meant to be a glance, not an editor.
+// the default-layout mockup uses -- always reads the node's own activePreset rather than
+// letting the user switch, since Overview is meant to be a glance, not an editor.
 function OverviewHexaStatSection({ theme, character, classData, hexaStatNodes, onNavigateToBookmark }: {
   theme: Theme; character: StoredCharacterRecord | null; classData: ClassSkillData | undefined; hexaStatNodes: HexaStatNode[] | null;
   onNavigateToBookmark: (id: BookmarkId, subView?: string) => void;
@@ -930,9 +928,9 @@ function OverviewSymbolSection({ theme, symbolLevels, characterLevel, isLegacy, 
 }
 
 // Skill+Common on the left, Mastery+Boost on the right with a vertical divider between --
-// closer to an earlier layout pass than the flat chip rows this replaces, and more compact
-// than either: room's being cleared here for Main/Alt HEXA Stat lines to eventually sit
-// alongside this same panel.
+// more compact than a flat chip row and keeps Skill/Mastery paired with their own Common/Boost
+// rather than all four in one undifferentiated grid. HEXA Stat is its own section
+// (OverviewHexaStatSection), not squeezed in here.
 function OverviewHexaSkillsSection({ theme, hexaClassDef, hexaLevels, charName, onNavigateToBookmark }: {
   theme: Theme; hexaClassDef: ReturnType<typeof resolveHexaClassDef>; hexaLevels: HexaSkillLevels; charName: string | undefined;
   onNavigateToBookmark: (id: BookmarkId, subView?: string) => void;
@@ -1408,7 +1406,7 @@ function pctStat(raw: string | undefined, id: string): string {
   return Number.isFinite(numeric) ? `${numeric.toFixed(2)}%` : `${raw}%`;
 }
 
-// MapleStory's own final-stat formula (confirmed against Yuki's in-game tooltips):
+// MapleStory's own final-stat formula (confirmed against real in-game tooltips):
 // floor(Base Value × (1 + % Value/100)) + % Value Not Applied. The 3 inputs are exactly
 // what the Character Info window's [Applied Value] breakdown shows per stat — except that
 // window never itemizes familiar stat lines at all, see familiarStatBonuses in familiarsData.ts.
@@ -1971,9 +1969,9 @@ function symbolAreaLevel(levels: Record<string, SymbolState> | null, area: Symbo
 // as a locked tile (dimmed icon + its unlock level) via ReadOnlySymbolTile's `locked` prop,
 // rather than vanishing outright. Covers per-zone gaps within an eligible tier (Chu Chu
 // Island at 210 while Arcane-eligible from 200) the same way it covers a whole tier being
-// out of reach (Grand Sacred at 290+ while only Sacred-eligible) — hiding any of these read
-// as "bugged or missing" rather than "not unlocked yet" per Yuki's ask. Legacy is handled a
-// level up, in SymbolLevelsDisplay, so this only ever runs for a non-legacy character.
+// out of reach (Grand Sacred at 290+ while only Sacred-eligible) — hiding any of these would
+// read as "bugged or missing" rather than "not unlocked yet". Legacy is handled a level up,
+// in SymbolLevelsDisplay, so this only ever runs for a non-legacy character.
 function SymbolAreaGroup({ label, areas, levels, loadImages, characterLevel, theme }: {
   label: string; areas: SymbolArea[]; levels: Record<string, SymbolState> | null; loadImages: boolean; characterLevel: number | undefined; theme: Theme;
 }) {
@@ -2403,7 +2401,7 @@ type HexaBookmarkView = "skills" | "stat";
 // shape VMatrixBookmark shows for an untouched V Matrix, instead of a blank panel.
 // Origin always starts at level 1 once HEXA-eligible (defaultLevels/emptyLevels elsewhere
 // already agree on this) -- 0 here made an untouched character's profile bookmark read
-// "0/30" while the setup step's own draft correctly showed "1/30" (Yuki, 2026-07-27).
+// "0/30" while the setup step's own draft correctly showed "1/30".
 const EMPTY_HEXA_LEVELS: HexaSkillLevels = { origin: 1, ascent: 0, mastery: [], enhancement: [], common: [] };
 
 function hexaMatrixBookmarkHeaderLabel(view: HexaBookmarkView, defaultLabel: string): string {
@@ -3285,9 +3283,9 @@ function ScouterResultGate({ theme, character, onEditStep, children }: {
 // feeding every row below them, not unrelated data. BossClearGrid owns the Quick View/Spotlight
 // sub-view split internally, including its own Spotlight-side "back to Quick View" button --
 // this just passes view/onViewChange through. The old bottom action-bar nav (forward AND back
-// buttons) was removed 2026-07-30: the forward direction was redundant with clicking a boss's
-// banner or the Quick View dropdown (3 ways to do the same thing), and once that got removed
-// the back-only button didn't earn its own dedicated row anymore either, so it moved into
+// buttons) was removed: the forward direction was redundant with clicking a boss's banner or
+// the Quick View dropdown (3 ways to do the same thing), and once that got removed the
+// back-only button didn't earn its own dedicated row anymore either, so it moved into
 // BossSpotlight's own header instead.
 function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange, onEditStep }: {
   theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;

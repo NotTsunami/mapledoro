@@ -53,8 +53,8 @@ const SUBSTEP_COUNT = 3;
 
 // Reading-order chains for the two substeps whose slots line up top-to-bottom in a single
 // in-game window (Titles/Totems/Symbols, Pets). The main grid's own chain (MAIN_GRID_CHAIN,
-// defined below once its column layout constants exist) is a 2D spatial layout, but a
-// column-based reading order was worked out with Yuki (2026-07-08) — see its own comment.
+// defined below once its column layout constants exist) is a 2D spatial layout with its
+// own column-based reading order -- see its own comment.
 const ADDITIONAL_EQUIP_CHAIN: readonly SlotKey[] = ["title", "totem1", "totem2", "totem3"];
 const PETS_CHAIN: readonly SlotKey[] = ["pet1", "petEquip1", "pet2", "petEquip2", "pet3", "petEquip3"];
 
@@ -129,11 +129,11 @@ const SEARCH_DEBOUNCE_MS = 150;
 // same width so those buttons can right-align against the actual last tile.
 const SYMBOL_GRID_WIDTH = 3 * SYMBOL_TILE_SIZE + 2 * 4;
 
-// Reading-order chain for the main equipment grid (confirmed with Yuki, 2026-07-08): top to
-// bottom within each column, then the top of the next column, following the grid's own
-// left-to-right column order — rings/belt/pocket, then face/eye/earring/pendants, then
-// weapon/secondary/emblem, then hat/top/bottom/shoulder/android, then cape/glove/shoe/
-// medal/heart/badge. The sprite itself isn't a pickable slot, so it's naturally skipped.
+// Reading-order chain for the main equipment grid: top to bottom within each column, then
+// the top of the next column, following the grid's own left-to-right column order --
+// rings/belt/pocket, then face/eye/earring/pendants, then weapon/secondary/emblem, then
+// hat/top/bottom/shoulder/android, then cape/glove/shoe/medal/heart/badge. The sprite
+// itself isn't a pickable slot, so it's naturally skipped.
 const MAIN_GRID_CHAIN: readonly SlotKey[] = [
   ...COL1_SLOTS, ...COL2_SLOTS, ...CENTER_BOTTOM_SLOTS, ...COL6_SLOTS, ...COL7_SLOTS,
 ];
