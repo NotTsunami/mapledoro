@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { numericKeyDown, sanitizeDigitsInput } from "../../../../lib/inputUtils";
 import Image from "next/image";
@@ -118,6 +118,16 @@ export function LinkSkillIcon({ iconId, name, theme, size = 32 }: { iconId: stri
 // Reset a native button back to plain content so the icon reads the same as a static
 // image at rest — the accent ring on hover/focus is the only cue this is clickable,
 // matching the tap-target-friendly, chrome-at-rest-free style used elsewhere in setup.
+// Real CSS :hover/:focus-visible (see .link-skill-max-btn in LinkSkillsEditor's own
+// <style> block) for pointer/keyboard, plus LinkSkillRow's own JS-driven "flashing" state
+// for a guaranteed-visible tap flash (see MAX_BTN_FLASH_MS) -- not JS mouseenter/
+// mouseleave/focus/blur handlers, since touch devices routinely fire a tap's synthetic
+// mouseenter/focus without ever firing a matching mouseleave/blur afterward, leaving the
+// ring stuck lit permanently after a single tap, and :active alone isn't reliably computed
+// for a plain tap on several mobile browsers either. The transition here is intentionally
+// quick (0.15s) -- MAX_BTN_FLASH_MS controls how long the flash is actually visible, so a
+// slow transition just made the whole thing feel sluggish on top of that already-
+// deliberate hold time.
 const linkSkillMaxButtonStyle: CSSProperties = {
   background: "none",
   border: "none",
@@ -128,7 +138,7 @@ const linkSkillMaxButtonStyle: CSSProperties = {
   display: "flex",
   outline: "2px solid transparent",
   outlineOffset: "1px",
-  transition: "outline-color 0.15s ease, background 0.15s ease",
+  transition: "outline-color 0.15s ease",
 };
 
 const linkLevelInputStyle = (theme: AppTheme): CSSProperties => ({
@@ -163,6 +173,14 @@ function NowrapTokens({ tokens, separator }: { tokens: string[]; separator: stri
   );
 }
 
+// How long the tap-feedback flash (see LinkSkillRow's handleMaxClick) stays lit before
+// clearing itself via setTimeout -- a real, self-clearing JS timer rather than relying on
+// :active, since several mobile browsers don't reliably compute :active for a plain tap
+// without touch-event listeners already present, which made the CSS-only flash read as
+// completely absent on touch (see linkSkillMaxButtonStyle's comment for the rest of this
+// fix's history).
+const MAX_BTN_FLASH_MS = 180;
+
 function LinkSkillRow({
   skill, value, source, onUpdate, theme, fullWidth, min,
 }: {
@@ -174,6 +192,18 @@ function LinkSkillRow({
   fullWidth?: boolean;
   min?: number;
 }) {
+  const [flashing, setFlashing] = useState(false);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleMaxClick() {
+    onUpdate(skill.id, String(skill.maxLevel));
+    setFlashing(true);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setFlashing(false), MAX_BTN_FLASH_MS);
+  }
+
+  useEffect(() => () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current); }, []);
+
   return (
     <div style={{
       display: "flex",
@@ -188,13 +218,10 @@ function LinkSkillRow({
       <HoverTooltip label={`Set to max (${skill.maxLevel})`} theme={theme} style={{ flexShrink: 0 }}>
         <button
           type="button"
+          className="link-skill-max-btn"
           aria-label={`Set ${skill.name} to max level (${skill.maxLevel})`}
-          onClick={() => onUpdate(skill.id, String(skill.maxLevel))}
-          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-          onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
-          onMouseEnter={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-          onMouseLeave={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
-          style={linkSkillMaxButtonStyle}
+          onClick={handleMaxClick}
+          style={flashing ? { ...linkSkillMaxButtonStyle, outline: `2px solid ${theme.accent}` } : linkSkillMaxButtonStyle}
         >
           <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
         </button>
@@ -370,6 +397,15 @@ function LinkSkillsEditor({
       <style>{`
         .link-skills-root { container-type: inline-size; }
         .link-skills-grid { grid-template-columns: 1fr 1fr; }
+        .link-skills-root .link-skill-max-btn:focus-visible,
+        .link-skills-root .link-skill-max-btn:active {
+          outline-color: ${theme.accent} !important;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .link-skills-root .link-skill-max-btn:hover {
+            outline-color: ${theme.accent} !important;
+          }
+        }
         @container (max-width: 480px) {
           .link-skills-grid { grid-template-columns: 1fr; }
         }
