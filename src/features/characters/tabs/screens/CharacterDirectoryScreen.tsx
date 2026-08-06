@@ -201,12 +201,15 @@ function DirectoryControls({
   // background-color, and paints it white when that is transparent, which against
   // theme.text is unreadable in dark mode. Coloring the <option>s instead fixes
   // Chrome but makes Firefox paint that background onto the closed control too.
+  // No fontFamily here on purpose. It was `inherit`, which reached the same
+  // Nunito as the global `select` rule in globals.css but, being inline, beat
+  // that rule -- and so lost the plain-system-font tail it appends, which is the
+  // only thing Firefox can render in an open dropdown. See that rule for why.
   const selectStyle = {
     border: `1px solid ${theme.border}`,
     borderRadius: "8px",
     background: theme.panel,
     color: theme.text,
-    fontFamily: "inherit",
     fontSize: "0.8rem",
     fontWeight: 700,
     padding: "0.25rem 0.4rem",
