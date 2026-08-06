@@ -6,7 +6,9 @@ its production bundle and behaviorally verified against the live site). Scouter
 optimizes bossing only; Hyper Stat additionally has a **mobbing target** that is
 ours (see "Mobbing target" below). Works **standalone**: state is always present,
 blank by default (`emptyCharacterSeed`), autopopulated when a stored character is
-picked. Edits live in memory only and are intentionally **not persisted**.
+picked. Edits live in memory only and are intentionally **not persisted**, with
+one exception: the level, saved per character under the `statOptimizer` tool key
+(see "Point budget").
 
 ## Damage kernel (`damage-formula.ts`, scouter's `A`/n8/Ng/gt/h2/_M/VQ)
 `computeScouterDamage` = statFactor × attack × critBucket × dmgBucket × iedBucket.
@@ -57,9 +59,9 @@ the % and ×21 flat buckets). If the greedy scores below the current allocation,
 the current one is kept and reported as `alreadyOptimal`. Points budget seeds
 from `availableHyperPoints(level)` (scouter's closed form, 1699 at 300) minus
 points the stored preset spends on untracked lines (HP, Arcane Power, ...).
-There is no separate budget input: the workspace's level field (disabled while
-a stored character is selected) recomputes the budget from the closed form on
-edit, so the untracked-line deduction survives only for stored characters.
+There is no separate budget input: the workspace's level field recomputes the
+budget on edit as the closed form less that same deduction, which the seed
+carries out on `TargetSeed.untrackedPoints` for exactly that reason.
 
 ## HEXA Stat (scouter's per-line greedy, `hexa-stat-engine.ts`)
 Levels are fixed (RNG-rolled in-game); only the stat TYPE per line is assigned.
@@ -126,7 +128,7 @@ flipped the picker would read as a bug.
 
 ## Per-target state
 `SelectionState.targets` holds a `TargetSeed` per target (`inputs`,
-`storedHyper`, `availablePoints`, `presetIndex`); `profile`, `cores` and the
+`storedHyper`, `availablePoints`, `untrackedPoints`, `presetIndex`); `profile`, `cores` and the
 calibration are shared. Both open on the same stat window and diverge only as
 the user edits them, so typing mobbing numbers never clobbers the bossing ones.
 The level is the exception: it's a fact about the character, so `setLevel`
@@ -136,8 +138,9 @@ The **Hyper Preset picker** chooses which of the character's three in-game
 presets seeds the "Now" column, which also re-derives `availablePoints` (a
 different preset locks a different amount into untracked lines). It's per target,
 which is the point: bossing preset on one, mobbing preset on the other. Greyed
-out when the character has no stored allocation (`presetCount === 0`), the same
-treatment the level box gets when it isn't editable.
+out when the character has no stored allocation (`presetCount === 0`), since
+there is nothing to switch between. Switching re-derives the budget off the level
+on screen, not the record's, so it survives a level typed ahead of the last lookup.
 
 ## Excess crit rate (the one deliberate divergence)
 Seven archer classes convert crit rate above the 100% cap into crit damage
@@ -235,6 +238,15 @@ words alone don't say which core they belong to). The recommendation line reads
 "Best: ..." for the same reason the arrow went: a `★` announced inconsistently.
 
 ## Point budget
+The character level seeds from the stored record but stays editable, since a
+record only refreshes on a lookup and a player who levelled since still needs the
+tool. `readToolLevel` (`tools/toolLevel.ts`) floors the saved level with the
+record's, so a refresh that catches up re-syncs the tool and a level typed ahead
+of it survives until then. Everything the seed derives from the level (hyper
+budget, `prefillFromStats`, HEXA core unlocks) uses the resolved one, but only at
+seed time: a later edit moves the budget and the kernel's level term, not the
+core unlocks (those stay hand-togglable).
+
 Typed-in current levels are clamped so an allocation can never cost more than
 `availableHyperPoints(level)` (`capHyperLevelToBudget` against what the other lines
 already spend, in `setHyperLevel`). The panel's counter reports `result.pointsUsed`,

@@ -286,7 +286,6 @@ function NumberInput({
   max,
   width,
   id,
-  disabled,
 }: {
   /** Theme colors from the workspace's one `toolStyles`; shape is `.tool-input`. */
   inputStyle: CSSProperties;
@@ -296,7 +295,6 @@ function NumberInput({
   width?: number | string;
   /** Required: every box here is named by a real <label htmlFor>. */
   id: string;
-  disabled?: boolean;
 }) {
   return (
     <ToolNumberInput
@@ -305,10 +303,9 @@ function NumberInput({
       max={max}
       integer
       id={id}
-      disabled={disabled}
       onKeyDown={replaceZeroOnDigit}
       onCommit={onChange}
-      style={{ ...inputStyle, width: width ?? "100%", textAlign: "center", opacity: disabled ? 0.55 : 1 }}
+      style={{ ...inputStyle, width: width ?? "100%", textAlign: "center" }}
     />
   );
 }
@@ -967,16 +964,16 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
               drops that cap on a phone, where it takes half the line). */}
           <div className="stat-opt-level-field">
             <label className="tool-field-label" htmlFor="stat-opt-level" style={styles.labelStyle}>Level</label>
-            {/* A stored character's level (and hyper-point budget, which deducts
-                untracked-line spending) comes from the store; only standalone
-                entry edits it, recomputing the budget from the closed form. */}
+            {/* Seeds from a stored character but stays editable, so levelling between
+                lookups doesn't strand the tool; the typed level is saved per character
+                and recomputes the hyper-point budget (untracked spending still off). */}
             <NumberInput
               inputStyle={styles.inputStyle}
               id="stat-opt-level"
               value={opt.active.inputs.level}
               onChange={opt.setLevel}
               max={300}
-              disabled={opt.selectedCharName !== null}
+              width={72}
             />
           </div>
           {hyperMode && (
@@ -991,7 +988,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
                 value={String(opt.active.presetIndex)}
                 ariaLabel="Hyper Stat preset"
                 // Nothing to switch between until a character with a stored
-                // allocation is picked, so it greys out like the level box.
+                // allocation is picked, so it greys out until then.
                 disabled={opt.state.presetCount === 0}
                 btnClassName="stat-opt-row-option"
                 trackStyle={ROW_PICKER_TRACK}

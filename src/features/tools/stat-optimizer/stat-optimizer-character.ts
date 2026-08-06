@@ -57,6 +57,9 @@ export type CalibrationNotice =
 export interface TargetSeed {
   inputs: OptimizerStatInputs;
   availablePoints: number;
+  /** Already deducted from `availablePoints`, kept so editing the level can recompute the budget
+   *  from the closed form without dropping the deduction. */
+  untrackedPoints: number;
   storedHyper: HyperAllocation;
   /** Which of the character's in-game Hyper Stat presets the levels came from. */
   presetIndex: number;
@@ -94,10 +97,10 @@ function readLine(entry: { type?: string; level?: number } | undefined): HexaLin
   return { type, level };
 }
 
-function readCore(record: StoredCharacterRecord, node: HexaStatNode | undefined, index: number): HexaCore {
+function readCore(level: number, node: HexaStatNode | undefined, index: number): HexaCore {
   const slot = node?.presets?.[node.activePreset] ?? node?.presets?.[0];
   return {
-    unlocked: record.level >= HEXA_UNLOCK_LEVELS[index] || Boolean(node),
+    unlocked: level >= HEXA_UNLOCK_LEVELS[index] || Boolean(node),
     primary: readLine(slot?.main),
     additional: [readLine(slot?.alt?.[0]), readLine(slot?.alt?.[1])],
   };
@@ -151,29 +154,34 @@ function pointsSpentOnUntrackedLines(
 }
 
 /** The allocation and point budget one of the character's in-game Hyper Stat
- *  presets seeds, for one target. Re-run when the panel's preset picker moves. */
+ *  presets seeds, for one target. Re-run when the panel's preset picker moves.
+ *  `level` is the record's level unless the tool holds a higher one the player
+ *  typed in, as in `seedFromCharacter`. */
 export function seedHyperPreset(
   record: StoredCharacterRecord,
   profile: ClassDamageProfile,
   target: OptimizeTarget,
   presetIndex: number,
-): { storedHyper: HyperAllocation; availablePoints: number } {
+  level: number = record.level,
+): { storedHyper: HyperAllocation; availablePoints: number; untrackedPoints: number } {
+  const untrackedPoints = pointsSpentOnUntrackedLines(record, profile, presetIndex);
   return {
     storedHyper: mapStoredHyper(record.stats.hyperStat, profile, target, presetIndex),
-    availablePoints: Math.max(
-      0,
-      availableHyperPoints(record.level) - pointsSpentOnUntrackedLines(record, profile, presetIndex),
-    ),
+    availablePoints: Math.max(0, availableHyperPoints(level) - untrackedPoints),
+    untrackedPoints,
   };
 }
 
+/** `level` is the record's level unless the tool holds a higher one the player typed in (the
+ *  record only refreshes on a lookup), and stands in for it everywhere level is read. */
 export function seedFromCharacter(
   record: StoredCharacterRecord,
   specEfficiency?: ScouterSpecEfficiency,
+  level: number = record.level,
 ): CharacterSeed {
   const profile = resolveClassDamageProfile(record.jobName, record.stats);
   const nodes = readHexaNodes(record);
-  const inputs = prefillFromStats(record.stats, profile, record.level);
+  const inputs = prefillFromStats(record.stats, profile, level);
   const calibration = calibrateFromSpecEfficiency(specEfficiency, profile, inputs);
   const presetIndex = record.stats.hyperStat?.activePreset ?? 0;
   // Both targets open on the same stat window; they diverge only as the user
@@ -181,11 +189,11 @@ export function seedFromCharacter(
   const target = (t: OptimizeTarget): TargetSeed => ({
     inputs: { ...inputs },
     presetIndex,
-    ...seedHyperPreset(record, profile, t, presetIndex),
+    ...seedHyperPreset(record, profile, t, presetIndex, level),
   });
   return {
     profile,
-    cores: Array.from({ length: HEXA_CORE_COUNT }, (_, i) => readCore(record, nodes[i], i)),
+    cores: Array.from({ length: HEXA_CORE_COUNT }, (_, i) => readCore(level, nodes[i], i)),
     presetCount: record.stats.hyperStat?.presets?.length ?? 0,
     calibration: calibration ?? zeroCalibration(),
     calibrationNotice: calibration ? null : noticeFor(record, profile),
@@ -224,6 +232,7 @@ export function emptyCharacterSeed(): CharacterSeed {
       ignoreDefPct: 0,
     },
     availablePoints: availableHyperPoints(STANDALONE_LEVEL),
+    untrackedPoints: 0,
     storedHyper: zeroHyperAllocation(),
     presetIndex: 0,
   });
