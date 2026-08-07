@@ -252,7 +252,7 @@ function noGapLossToggleStyle(theme: AppTheme, checked: boolean): React.CSSPrope
 }
 function NoGapLossToggle({ theme, checked, onChange }: { theme: AppTheme; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <HoverTooltip theme={theme} label="Shows clear % as if you already meet every level, Arcane Force, and Sacred Power requirement.">
+    <HoverTooltip theme={theme} label="Shows clear % at the max level advantage, Arcane Force, and Sacred Power.">
       <button
         type="button"
         className="tool-btn"
