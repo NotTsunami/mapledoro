@@ -240,12 +240,40 @@ const BOSS_FILTER_OPTIONS: { value: BossFilter; label: string }[] = [
   { value: "all", label: "All" },
 ];
 
+// Same on/off color-swap look as the shared Toggle button (shared-ui.tsx), minus its checkmark
+// glyph -- a local copy rather than a Toggle prop, since Toggle's other 6 usages elsewhere in the
+// app all want the checkmark and shouldn't change.
+function noGapLossToggleStyle(theme: AppTheme, checked: boolean): React.CSSProperties {
+  return {
+    padding: "8px 16px", borderRadius: "10px", fontSize: "0.82rem", lineHeight: 1, fontWeight: 700,
+    cursor: "pointer", userSelect: "none", color: checked ? theme.accentText : theme.muted,
+    background: checked ? theme.accentSoft : theme.timerBg, border: `1px solid ${checked ? theme.accent : theme.border}`,
+  };
+}
+function NoGapLossToggle({ theme, checked, onChange }: { theme: AppTheme; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <HoverTooltip theme={theme} label="Shows clear % as if you already meet every level, Arcane Force, and Sacred Power requirement.">
+      <button
+        type="button"
+        className="tool-btn"
+        aria-pressed={checked}
+        onClick={() => onChange(!checked)}
+        style={noGapLossToggleStyle(theme, checked)}
+      >
+        Full HEXA
+      </button>
+    </HoverTooltip>
+  );
+}
+
 /** One boss+difficulty tile's computed result, or null if computeBossClear couldn't produce one
- *  (missing formula fields) -- filtered out before rendering either view. */
-function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, filter: BossFilter) {
+ *  (missing formula fields) -- filtered out before rendering either view. noGapLoss pins the
+ *  level/Arcane/Sacred Power gaps to their ceilings (see bossClearFormula.ts), showing clear%
+ *  at full HEXA damage as if every requirement gap were already closed. */
+function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, filter: BossFilter, noGapLoss: boolean) {
   const sorted = [...entries].sort((a, b) => (DIFFICULTY_ORDER[a.difficulty] ?? 99) - (DIFFICULTY_ORDER[b.difficulty] ?? 99));
   return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
-    const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
+    const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs, noGapLoss);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
       tiles.push({ entry, result });
     }
@@ -329,13 +357,13 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
 }
 
 function BossQuickViewRow({
-  theme, boss, entries, level, arcaneForce, authenticForce, inputs, filter, isLast, onSelect,
+  theme, boss, entries, level, arcaneForce, authenticForce, inputs, filter, noGapLoss, isLast, onSelect,
 }: {
   theme: AppTheme; boss: string; entries: BossCutEntry[]; level: number; arcaneForce: number;
   authenticForce: number; inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>;
-  filter: BossFilter; isLast: boolean; onSelect: (boss: string) => void;
+  filter: BossFilter; noGapLoss: boolean; isLast: boolean; onSelect: (boss: string) => void;
 }) {
-  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
+  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter, noGapLoss);
   if (tiles.length === 0) return null;
 
   const iconId = BOSS_ICON_ID[boss];
@@ -531,10 +559,11 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
 // unmounts BossQuickView entirely, see the view === "quickView" conditional render) resets it for
 // free -- nobody's profile should stay stuck in the expanded layout after they navigate away.
 function BossQuickView({
-  theme, entry, grouped, filter, onFilterChange, level, arcaneForce, authenticForce, inputs, onSelectBoss,
+  theme, entry, grouped, filter, onFilterChange, noGapLoss, onNoGapLossChange, level, arcaneForce, authenticForce, inputs, onSelectBoss,
 }: {
   theme: AppTheme; entry: ScouterResultEntry; grouped: BossEntryList[]; filter: BossFilter;
-  onFilterChange: (v: BossFilter) => void; level: number; arcaneForce: number; authenticForce: number;
+  onFilterChange: (v: BossFilter) => void; noGapLoss: boolean; onNoGapLossChange: (v: boolean) => void;
+  level: number; arcaneForce: number; authenticForce: number;
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onSelectBoss: (boss: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -550,6 +579,7 @@ function BossQuickView({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
+          <NoGapLossToggle theme={theme} checked={noGapLoss} onChange={onNoGapLossChange} />
           <InfoTooltip theme={theme} label="How to read this" content={QUICK_VIEW_INFO_CONTENT} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -594,6 +624,7 @@ function BossQuickView({
             authenticForce={authenticForce}
             inputs={inputs}
             filter={filter}
+            noGapLoss={noGapLoss}
             isLast={i === grouped.length - 1}
             onSelect={onSelectBoss}
           />
@@ -801,11 +832,11 @@ function BackToQuickViewButton({ theme, onClick }: { theme: AppTheme; onClick: (
 }
 
 function BossSpotlight({
-  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, onBack,
+  theme, grouped, selectedIndex, onNavigate, level, arcaneForce, authenticForce, inputs, noGapLoss, onBack,
 }: {
   theme: AppTheme; grouped: BossEntryList[]; selectedIndex: number; onNavigate: (i: number) => void;
   level: number; arcaneForce: number; authenticForce: number;
-  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onBack: () => void;
+  inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; noGapLoss: boolean; onBack: () => void;
 }) {
   const [boss, entries] = grouped[selectedIndex];
   const iconId = BOSS_ICON_ID[boss];
@@ -814,7 +845,7 @@ function BossSpotlight({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
-  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, "all");
+  const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, "all", noGapLoss);
 
   // Formula estimate holds on desktop (fixed single-line tiles); below 400px tiles can wrap onto
   // a second line (.spotlight-tile-numbers) so the fixed-height assumption breaks and this gets
@@ -926,6 +957,7 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
   onSelectedIndexChange: (i: number) => void;
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
+  const [noGapLoss, setNoGapLoss] = useState(false);
   const inputs = entry.bossClearInputs;
   const grouped = groupByBoss(BOSSCUT_DATA);
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
@@ -956,6 +988,8 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           grouped={grouped}
           filter={filter}
           onFilterChange={setFilter}
+          noGapLoss={noGapLoss}
+          onNoGapLossChange={setNoGapLoss}
           level={character.level}
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}
@@ -973,6 +1007,7 @@ export default function BossClearGrid({ theme, character, entry, view, onViewCha
           arcaneForce={arcaneForce}
           authenticForce={authenticForce}
           inputs={inputs}
+          noGapLoss={noGapLoss}
           onBack={() => onViewChange("quickView")}
         />
       )}

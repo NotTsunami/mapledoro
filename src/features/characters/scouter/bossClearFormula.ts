@@ -283,6 +283,35 @@ function gapContrastFields(entry: BossCutEntry, hasArcaneReq: boolean, hasAuthen
   };
 }
 
+/** The three gap*Dmg fields as reported to the UI -- at noGapLoss each reads as its own ceiling
+ *  (matching the ceiling damage() already collapsed to), so the tooltip's loss breakdown shows
+ *  0% loss instead of contradicting the displayed clear%. Split out of computeBossClear to keep
+ *  its own cognitive complexity under the sonarjs cap. */
+function reportedGapFields(levelGap: number, arcaneGap: number, authenticGap: number, arcaneCorrection: number, noGapLoss: boolean) {
+  return {
+    levelGapDmg: noGapLoss ? LEVEL_GAP_CEILING : levelGap,
+    arcaneGapDmg: noGapLoss ? arcaneCorrection : arcaneGap,
+    authenticGapDmg: noGapLoss ? AUTHENTIC_GAP_CEILING : authenticGap,
+  };
+}
+
+/** noGapLoss pins each gap to its own ceiling, which is exactly what correctionFactor
+ *  (1.2 * arcaneCorrection * authenticCorrection) is built from -- gapAdjusted / correctionFactor
+ *  collapses to rawDamage rather than approximating it. */
+function gapAdjustedDamage(
+  rawDamage: number,
+  arcaneGap: number,
+  authenticGap: number,
+  levelGap: number,
+  arcaneCorrection: number,
+  hasAuthenticReq: boolean,
+  noGapLoss: boolean,
+): number {
+  if (noGapLoss) return rawDamage;
+  const correctionFactor = 1.2 * arcaneCorrection * (hasAuthenticReq ? 1.25 : 1);
+  return (rawDamage * arcaneGap * authenticGap * levelGap) / correctionFactor;
+}
+
 /** Computes one boss+difficulty tile's clear rate, tag, and color for a character, or null if
  *  the character's cached Scouter result doesn't have Boss Clear inputs yet (needs a refresh) or
  *  the entry is missing required fields (bossCut/partyBossCut, or guard isn't 300/380). */
@@ -292,6 +321,7 @@ export function computeBossClear(
   characterArcaneForce: number,
   characterAuthenticForce: number,
   inputs: BossClearInputs,
+  noGapLoss = false,
 ): BossClearResult | null {
   if (entry.guard !== 300 && entry.guard !== 380) return null;
   const cutThreshold = entry.bossCut ?? entry.partyBossCut;
@@ -301,14 +331,12 @@ export function computeBossClear(
   const hasAuthenticReq = !!entry.authenticForce && entry.authenticForce > 0;
   let arcaneCorrection = 1;
   if (hasArcaneReq) arcaneCorrection = entry.boss === "검은 마법사" ? 1.1 : 1.5;
-  const correctionFactor = 1.2 * arcaneCorrection * (hasAuthenticReq ? 1.25 : 1);
 
   const rawDamage = adjustedHexaDamage(entry.boss, entry.guard, inputs);
   const arcaneGap = arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750));
   const authenticGap = authenticGapDmg(entry.authenticForce, characterAuthenticForce);
   const levelGap = levelGapDmg(characterLevel, entry.level);
-  const gapAdjusted = rawDamage * arcaneGap * authenticGap * levelGap;
-  const damage = gapAdjusted / correctionFactor;
+  const damage = gapAdjustedDamage(rawDamage, arcaneGap, authenticGap, levelGap, arcaneCorrection, hasAuthenticReq, noGapLoss);
 
   const spline = entry.guard === 300 ? inputs.spline300 : inputs.spline380;
   const cutInDamageSpace = splineEval(spline, cutThreshold);
@@ -333,9 +361,7 @@ export function computeBossClear(
     partyLimit,
     bossPower: convertedBossPower(bossStat, entry.guard),
     bossStat,
-    levelGapDmg: levelGap,
-    arcaneGapDmg: arcaneGap,
-    authenticGapDmg: authenticGap,
+    ...reportedGapFields(levelGap, arcaneGap, authenticGap, arcaneCorrection, noGapLoss),
     levelGapCeiling: LEVEL_GAP_CEILING,
     arcaneGapCeiling: arcaneCorrection,
     authenticGapCeiling: AUTHENTIC_GAP_CEILING,
