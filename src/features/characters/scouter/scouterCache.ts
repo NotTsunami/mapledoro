@@ -28,11 +28,24 @@ const MAX_CACHE_ENTRIES = 8;
 // either case, since it only changes when the character's own stats change. A version bump
 // makes every existing entry read as stale-by-version on next load, so it self-heals via one
 // real refetch per character, with no per-user localStorage clearing ever needed.
-// Bumped to 2 for specEfficiency (below). A newly-parsed response field can never reach an
-// already-cached entry on its own: refreshScouterResult returns a hash hit without fetching,
-// and the hash only moves when the character's own stats do, so without a bump the Stat
-// Efficiency bookmark would read "not available" forever for every existing character.
-const SCOUTER_CACHE_VERSION = 2;
+// Bumped to 2 for specEfficiency (below): a newly-parsed response field can't reach an
+// already-cached entry on its own, so without a bump the Stat Efficiency bookmark would
+// read "not available" forever for every existing character.
+// Bumped to 3: live-confirmed MapleScouter changed their Kanna HEXA calc server-side, with
+// no field/shape change for the hash to catch. Reserve future bumps for fixes that need to
+// land for everyone immediately -- routine drift is now handled by the TTL below instead.
+const SCOUTER_CACHE_VERSION = 3;
+
+// Entries older than this are treated as a miss by refreshScouterResult (real refetch, not
+// an instant hash hit) even though the hash still matches -- catches MapleScouter formula
+// drift we haven't confirmed yet, so it doesn't need its own version bump. peekScouterCache
+// (the passive cold-mount read) ignores this and still shows an expired entry rather than
+// nothing; only refreshScouterResult triggers a real network call.
+const SCOUTER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isEntryExpired(entry: ScouterResultEntry): boolean {
+  return Date.now() - entry.computedAt > SCOUTER_CACHE_TTL_MS;
+}
 
 interface ScouterSpline {
   x: number[];
@@ -342,7 +355,7 @@ export async function refreshScouterResult(character: StoredCharacterRecord): Pr
 
   const cache = readCache(character.characterName);
   const cached = cache?.entries[hash];
-  if (cached) {
+  if (cached && !isEntryExpired(cached)) {
     consecutiveBadResponses.delete(key);
     return { status: "ok", entry: cached, stale: false };
   }
