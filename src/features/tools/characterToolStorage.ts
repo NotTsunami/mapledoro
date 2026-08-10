@@ -20,6 +20,10 @@ export function writeCharacterToolData(charName: string, toolKey: string, data: 
     (id) => store.charactersById[id] === char,
   );
   if (!key) return;
+  // readCharactersStore hands out a shared cached object, so this mutates the
+  // cache itself. That is only sound because the write below persists it in the
+  // same tick -- don't mutate a read result without writing it (see the cache
+  // note in charactersStore.ts).
   store.charactersById[key] = {
     ...char,
     tools: { ...char.tools, [toolKey]: data },
