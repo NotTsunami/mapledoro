@@ -17,7 +17,7 @@
   Writers report through this module and StorageWriteFailureBanner surfaces it.
 */
 
-export type StorageWriteFailureSource = "characters" | "tools";
+export type StorageWriteFailureSource = "characters" | "tools" | "dropTracker";
 
 const failedSources = new Set<StorageWriteFailureSource>();
 const listeners = new Set<() => void>();

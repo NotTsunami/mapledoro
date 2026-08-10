@@ -74,7 +74,7 @@ Tool output stays in the conversation for every later request, so one careless c
 
 **Shared tool modules** (`src/features/tools/`): `usePerCharacterToolState.ts` (per-character load/save, character list, `?character=` seed), `useLazyChart.ts` (defers chart.js to first chart render), `date.ts` (`formatLongDate`/`formatShortDate`/`utcDateStr`/`localDateStr`), `useCardReorder.ts` (drag hook plus `moveInArray`).
 
-**Tool storage:** per-character data (symbols, liberation, astra, hexa skills, mystic frontier, exp calculator) lives in each character's `tools` field in the character store (`mapledoro_characters_store_v1`) via `characterToolStorage.ts`. Global data (dailies, event planner, boss crystals, pitched boss drops, trace restoration) lives under `mapledoro_tools_v1` via `globalToolsStore.ts`. Mapledle results have their own `mapledoro_games_v1`.
+**Tool storage:** per-character data (symbols, liberation, astra, hexa skills, mystic frontier, exp calculator) lives in each character's `tools` field in the character store (`mapledoro_characters_store_v1`) via `characterToolStorage.ts`. Global data (dailies, event planner, boss crystals, trace restoration) lives under `mapledoro_tools_v1` via `globalToolsStore.ts`. Mapledle results have their own `mapledoro_games_v1`, and the Drop Tracker its own `mapledoro_pitched_boss_drops_v1` (an uncapped event log, deliberately kept out of the shared blob — see its feature doc).
 
 ## Color & Contrast
 

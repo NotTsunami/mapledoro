@@ -19,6 +19,10 @@ import {
   type StoredCharacterRecord,
 } from "../../characters/model/charactersStore";
 import { readGlobalTool, writeGlobalTool } from "../globalToolsStore";
+import {
+  clearStorageWriteFailure,
+  reportStorageWriteFailure,
+} from "../../../lib/storageWriteFailure";
 import { DROP_CATEGORIES, DROP_ITEMS, DROP_ITEMS_BY_ID, type DropItem } from "./pitched-items";
 import LogDropDialog, { type LogDropPayload } from "./LogDropDialog";
 import { ActionButton } from "../shared-ui";
@@ -37,19 +41,71 @@ interface PitchedBossDropsStore {
   drops: PitchedBossDrop[];
 }
 
+/* The drop log has its own localStorage key rather than a field in the shared
+ * mapledoro_tools_v1 blob, because it is the one tool store that grows without
+ * bound: it is an append-only event log, so every Daily Tracker toggle and every
+ * Boss Crystals re-read used to parse the player's entire drop history along with
+ * their own data. The key keeps the older pitched-boss-drops naming, like the
+ * feature folder and the legacy field. */
+const STORAGE_KEY = "mapledoro_pitched_boss_drops_v1";
+/** Where the log lived before it got its own key: a field inside the shared store. */
+const LEGACY_TOOLS_KEY = "pitchedBossDrops";
+
+function emptyStore(): PitchedBossDropsStore {
+  return { version: 1, drops: [] };
+}
+
 function generateId(): string {
   return crypto.randomUUID();
 }
 
+function parseStore(raw: string | null): PitchedBossDropsStore | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PitchedBossDropsStore;
+    if (parsed?.version === 1 && Array.isArray(parsed.drops)) return parsed;
+  } catch { /* fall through to null */ }
+  return null;
+}
+
+/** Returns whether the write actually persisted, so the migration below can tell
+ *  a real save from a swallowed quota failure. */
+function persistStore(store: PitchedBossDropsStore): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    clearStorageWriteFailure("dropTracker");
+    return true;
+  } catch {
+    reportStorageWriteFailure("dropTracker");
+    return false;
+  }
+}
+
 function readStore(): PitchedBossDropsStore {
-  if (typeof window === "undefined") return { version: 1, drops: [] };
-  const stored = readGlobalTool<PitchedBossDropsStore>("pitchedBossDrops");
-  if (stored?.version === 1 && Array.isArray(stored.drops)) return stored;
-  return { version: 1, drops: [] };
+  if (typeof window === "undefined") return emptyStore();
+  const own = parseStore(window.localStorage.getItem(STORAGE_KEY));
+  if (own) return own;
+
+  // No own key yet, so fall back to the shared store and move the log across.
+  // The legacy copy is only cleared once the new key has actually persisted --
+  // persistStore swallows quota failures, so clearing first could lose the whole
+  // history. Returning the legacy data either way means a failed migration costs
+  // nothing and simply retries on the next mount.
+  //
+  // Kept indefinitely rather than run once: Settings' JSON export is a snapshot of
+  // whatever keys existed at the time, so a much older export can still be
+  // imported and needs this path.
+  const legacy = readGlobalTool<PitchedBossDropsStore>(LEGACY_TOOLS_KEY);
+  if (legacy?.version === 1 && Array.isArray(legacy.drops)) {
+    if (persistStore(legacy)) writeGlobalTool(LEGACY_TOOLS_KEY, null);
+    return legacy;
+  }
+  return emptyStore();
 }
 
 function writeStore(store: PitchedBossDropsStore): void {
-  writeGlobalTool("pitchedBossDrops", store);
+  persistStore(store);
 }
 
 /* ------------------------------------------------------------------ */
