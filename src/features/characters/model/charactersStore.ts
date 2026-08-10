@@ -1187,7 +1187,7 @@ export function writeCharactersStore(store: CharactersStore) {
     // persisted data, not values the app just built.
     cachedRaw = raw;
     cachedStore = store;
-    clearStorageWriteFailure();
+    clearStorageWriteFailure("characters");
   } catch {
     // This store is the only copy of the player's character data, so swallowing
     // the failure silently loses whatever change triggered the write -- the app
@@ -1200,7 +1200,7 @@ export function writeCharactersStore(store: CharactersStore) {
     // persisted.
     cachedRaw = null;
     cachedStore = null;
-    reportStorageWriteFailure();
+    reportStorageWriteFailure("characters");
   }
 }
 

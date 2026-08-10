@@ -6,7 +6,7 @@ import { useTheme } from "./ThemeContext";
 import type { AppTheme } from "./themes";
 import { statusText } from "./statusColors";
 import {
-  clearStorageWriteFailure,
+  dismissStorageWriteFailures,
   getStorageWriteFailureServerSnapshot,
   getStorageWriteFailureSnapshot,
   subscribeStorageWriteFailure,
@@ -21,7 +21,7 @@ export default function StorageWriteFailureBanner() {
   );
 
   if (!failed) return null;
-  return <Banner theme={theme} onDismiss={clearStorageWriteFailure} />;
+  return <Banner theme={theme} onDismiss={dismissStorageWriteFailures} />;
 }
 
 function Banner({ theme, onDismiss }: { theme: AppTheme; onDismiss: () => void }) {
