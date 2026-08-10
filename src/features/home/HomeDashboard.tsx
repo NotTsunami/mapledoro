@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import MiracleTimePanel from "../../components/MiracleTimePanel";
 import SunnySundayPanel from "../../components/SunnySundayPanel";
 import type { AppTheme } from "../../components/themes";
@@ -19,9 +20,13 @@ import { MobileTimerStrip, ResetTimerPanels, UrsusPanel } from "./SidebarTimers"
 
 export default function HomeDashboard({ theme }: { theme: AppTheme }) {
   const mounted = useMounted();
-  const characters: StoredCharacterRecord[] = mounted
-    ? selectCharactersList(readCharactersStore())
-    : [];
+  // Memoized because useClock() below re-renders this component every second: an
+  // unmemoized read would re-parse the whole character store on every tick, and
+  // hand CharactersPanel a fresh array identity each time.
+  const characters: StoredCharacterRecord[] = useMemo(
+    () => (mounted ? selectCharactersList(readCharactersStore()) : []),
+    [mounted],
+  );
 
   const now = useClock();
 
