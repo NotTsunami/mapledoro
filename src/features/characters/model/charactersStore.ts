@@ -2,6 +2,10 @@ import { toCharacterKey } from "./characterKeys";
 import type { NormalizedCharacterData } from "./types";
 import { checkForWipe } from "./wipeTripwire";
 import { MAX_CHARACTERS_PER_WORLD } from "./constants";
+import {
+  clearStorageWriteFailure,
+  reportStorageWriteFailure,
+} from "../../../lib/storageWriteFailure";
 
 const CHARACTERS_STORE_VERSION = 1 as const;
 const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -1156,8 +1160,14 @@ export function writeCharactersStore(store: CharactersStore) {
       checkForWipe(window.localStorage.getItem(CHARACTERS_STORE_STORAGE_KEY), store);
     }
     window.localStorage.setItem(CHARACTERS_STORE_STORAGE_KEY, JSON.stringify(store));
+    clearStorageWriteFailure();
   } catch {
-    // Ignore localStorage write failures.
+    // This store is the only copy of the player's character data, so swallowing
+    // the failure silently loses whatever change triggered the write -- the app
+    // goes on showing state that never reached disk. Surface it instead; the
+    // realistic causes are a full quota (this payload grows with roster size)
+    // and storage being blocked entirely.
+    reportStorageWriteFailure();
   }
 }
 

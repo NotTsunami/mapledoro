@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "../components/ThemeContext";
 import { ACCENT_THEMES, composeTheme, type ColorMode } from "../components/themes";
 import CookieConsentBanner from "../components/CookieConsentBanner";
+import StorageWriteFailureBanner from "../components/StorageWriteFailureBanner";
 import { RESOURCE_BASE } from "../lib/mapleResource";
 
 const nunito = Nunito({
@@ -73,6 +74,7 @@ export default async function RootLayout({
       <body>
         <ThemeProvider initialThemeKey={initialThemeKey} initialColorMode={initialColorMode}>
           {children}
+          <StorageWriteFailureBanner />
           <CookieConsentBanner />
         </ThemeProvider>
       </body>

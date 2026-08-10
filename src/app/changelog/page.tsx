@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-09",
+    changes: [
+      { type: "fixed", text: "MapleDoro now warns you when your browser will not save a change, instead of losing it silently, so a full or blocked browser storage no longer costs you edits without warning." },
+    ],
+  },
+  {
     date: "2026-08-06",
     changes: [
       { type: "changed", text: "Rebuilt the EXP Calculator's Resources tab: pick a resource from the dropdown and see what every source in it pays at your level, in EXP and as a share of the level, instead of reading a raw table." },
