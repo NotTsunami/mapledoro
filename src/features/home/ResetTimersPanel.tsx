@@ -151,6 +151,7 @@ function buildRows(now: Date | null): TimerRow[] {
   const eventDayEvents = liveEventNames(EVENT_RESET_DAY, nowMs);
 
   return [
+    { key: "ursus", label: "Ursus 2× Meso", tooltip: URSUS_TOOLTIP, ...valuesFor("ursus") },
     { key: "daily", label: "Daily Reset", tooltip: DAILY_TOOLTIP, ...valuesFor("daily") },
     {
       key: "weekly",
@@ -186,7 +187,6 @@ function buildRows(now: Date | null): TimerRow[] {
           ...valuesFor("events"),
         }]
       : []),
-    { key: "ursus", label: "Ursus 2× Meso", tooltip: URSUS_TOOLTIP, ...valuesFor("ursus") },
   ];
 }
 
@@ -243,7 +243,7 @@ function TimerRowCard({ theme, row }: { theme: AppTheme; row: TimerRow }) {
 
 const tooltipWrapStyle: CSSProperties = { display: "block" };
 
-/** Daily / weekly / event / Ursus countdowns in one panel. Owns its own clock so a
+/** Ursus / daily / weekly / event countdowns in one panel. Owns its own clock so a
  *  per-second tick re-renders these rows alone, not the whole dashboard. */
 export default function ResetTimersPanel({ theme }: { theme: AppTheme }) {
   const now = useClock();
