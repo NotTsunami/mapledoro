@@ -17,11 +17,21 @@ only the class. Stats are per mode (`computeSkillGuesserStats(mode)`). Mirror be
 the Discord Activity port.
 
 **Puzzle payload** (`puzzle-data.generated.ts`) is AUTO-GENERATED — never hand-edit. Regenerate with
-`node scripts/generate-skill-guesser-data.mjs` (needs dev-only `manifests/v269/skill.json`). It is
+`node scripts/generate-skill-guesser-data.mjs`. It is
 base64(XOR(json)) of `[resourceType, skillId, skillName, className]` tuples (0 = `skill`,
 1 = `hexa-skill`, 2 = `erda-skill`, rendered via `PuzzleSkillIcon`) so the answer isn't readable in
 devtools; the XOR key in `puzzles.ts` must match the script's. **Don't change the generator's `SEED`
 or reorder filters** — that reshuffles the daily order and breaks streaks mid-run.
+
+**The shipped payload was generated from v269 and is deliberately not re-run.** The script's own
+manifest path was bumped to `manifests/v270/skill.json` with the rest of `scripts/` in the v270 sweep
+(`5aa1d22`), but the payload was left alone: regenerating reshuffles the daily order for the same
+reason `SEED` is frozen, so it breaks every in-flight streak. **The v270 path in the script is not
+evidence the payload is v270 data**, and a version bump alone is not a reason to re-run this one.
+Treat a regen as a deliberate, disruptive action to schedule, not routine upkeep — the root
+CLAUDE.md's "re-run every generator after a bump" rule is about the manifest-derived character data,
+and this generator is the documented exception. (BGM Guesser is *not* in the same position: it
+shipped after the sweep and its payload really is v270.)
 
 **Class attribution** comes from skill-id job prefixes (`floor(id/10000)`), not the manifest, which
 has no class field. Excluded: branch-shared jobs (Explorer commons, beginners, 5th-job, removed
