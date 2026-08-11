@@ -1,6 +1,6 @@
 # Drop Tracker
 
-Display name is **"Drop Tracker"** and the route is `/tools/drop-tracker`. This feature folder and the `mapledoro_pitched_boss_drops_v1` localStorage key keep the older `pitched-boss-drops` naming — the key holds live user data, so don't rename it.
+Display name is **"Drop Tracker"** and the route is `/tools/drop-tracker`. This feature folder keeps the older `pitched-boss-drops` naming; storage lives under `mapledoro_drop_tracker_v1`, which holds live user data, so don't rename it.
 
 **Storage lives under its own localStorage key**, not in the shared `mapledoro_tools_v1` blob with the other global tools. The drop log is an append-only event list with no cap, so keeping it in the shared store made every Daily Tracker toggle and every Boss Crystals re-read parse the player's entire drop history. It is the only global tool that grows without bound; don't move it back.
 

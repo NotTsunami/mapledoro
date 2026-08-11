@@ -45,9 +45,8 @@ interface PitchedBossDropsStore {
  * mapledoro_tools_v1 blob, because it is the one tool store that grows without
  * bound: it is an append-only event log, so every Daily Tracker toggle and every
  * Boss Crystals re-read used to parse the player's entire drop history along with
- * their own data. The key keeps the older pitched-boss-drops naming, like the
- * feature folder and the legacy field. */
-const STORAGE_KEY = "mapledoro_pitched_boss_drops_v1";
+ * their own data. */
+const STORAGE_KEY = "mapledoro_drop_tracker_v1";
 /** Where the log lived before it got its own key: a field inside the shared store. */
 const LEGACY_TOOLS_KEY = "pitchedBossDrops";
 
