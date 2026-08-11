@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-10",
+    changes: [
+      { type: "fixed", text: "Fixed Mapledle and BGM Guesser erasing each other's saved results and stats when you played both." },
+    ],
+  },
+  {
     date: "2026-08-09",
     changes: [
       { type: "fixed", text: "MapleDoro now warns you when your browser will not save a change, instead of losing it silently, so a full or blocked browser storage no longer costs you edits without warning." },

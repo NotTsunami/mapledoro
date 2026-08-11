@@ -1,14 +1,20 @@
 /*
-  localStorage store for game results + game preferences. Games live in their
-  own `mapledoro_games_v1` key (mirrors globalToolsStore's shape/versioning).
+  Mapledle results, stored in the `skillGuesser` section of `mapledoro_games_v1`.
 
   Each puzzle keeps a separate result per mode: `normal` and `hard`. Hard mode
-  only becomes playable once the normal game is finished, and clearing it is
-  what reveals the skill name. (Store schema version 2; v1 stored a single
-  result per puzzle plus a global hard-mode toggle — migrated to `normal`.)
+  only becomes playable once the normal game is finished, and clearing it is what
+  reveals the skill name.
+
+  Section reads/writes go through gamesStore, which owns the key, preserves every
+  other game's section, and handles the v1 -> v2 schema migration (v1 stored a
+  single result per puzzle plus a global hard-mode toggle). This module must never
+  read or write the key directly: doing that is what previously let one game
+  overwrite another's history.
 */
 
-const STORAGE_KEY = "mapledoro_games_v1";
+import { readGameSection, writeGameSection } from "../gamesStore";
+
+const SECTION = "skillGuesser";
 
 export type GameMode = "normal" | "hard";
 
@@ -24,45 +30,16 @@ export interface PuzzleResults {
   hard?: SkillGuesserResult;
 }
 
-interface GamesStore {
-  version: 2;
-  skillGuesser: { results: Record<string, PuzzleResults> };
+interface SkillGuesserSection {
+  results: Record<string, PuzzleResults>;
 }
 
-function emptyStore(): GamesStore {
-  return { version: 2, skillGuesser: { results: {} } };
-}
-
-/* v1: { version: 1, skillGuesser: { results: Record<string, SkillGuesserResult>, hardMode? } }.
-   Old results scored against the class, so they all fold into the `normal` slot. */
-function migrateV1(parsed: { skillGuesser?: { results?: Record<string, SkillGuesserResult> } }): GamesStore | null {
-  const oldResults = parsed.skillGuesser?.results;
-  if (!oldResults) return null;
-  const results: Record<string, PuzzleResults> = {};
-  for (const [key, result] of Object.entries(oldResults)) {
-    results[key] = { normal: result };
-  }
-  return { version: 2, skillGuesser: { results } };
-}
-
-function readStore(): GamesStore {
-  if (typeof window === "undefined") return emptyStore();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.version === 2 && parsed.skillGuesser?.results) return parsed as GamesStore;
-      if (parsed?.version === 1) {
-        const migrated = migrateV1(parsed);
-        if (migrated) return migrated;
-      }
-    }
-  } catch { /* ignore */ }
-  return emptyStore();
+function readResults(): Record<string, PuzzleResults> {
+  return readGameSection<SkillGuesserSection>(SECTION)?.results ?? {};
 }
 
 export function readPuzzleResults(puzzleNumber: number): PuzzleResults {
-  return readStore().skillGuesser.results[String(puzzleNumber)] ?? {};
+  return readResults()[String(puzzleNumber)] ?? {};
 }
 
 export function writeSkillGuesserResult(
@@ -70,13 +47,11 @@ export function writeSkillGuesserResult(
   mode: GameMode,
   result: SkillGuesserResult,
 ): void {
-  if (typeof window === "undefined") return;
-  const store = readStore();
+  const results = readResults();
   const key = String(puzzleNumber);
-  store.skillGuesser.results[key] = { ...store.skillGuesser.results[key], [mode]: result };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch { /* ignore */ }
+  writeGameSection(SECTION, {
+    results: { ...results, [key]: { ...results[key], [mode]: result } },
+  } satisfies SkillGuesserSection);
 }
 
 export interface SkillGuesserStats {
@@ -90,7 +65,7 @@ export interface SkillGuesserStats {
 }
 
 export function computeSkillGuesserStats(mode: GameMode): SkillGuesserStats {
-  const results = Object.values(readStore().skillGuesser.results)
+  const results = Object.values(readResults())
     .map((r) => r[mode])
     .filter((r): r is SkillGuesserResult => r !== undefined && r.done);
   const distribution = [0, 0, 0, 0, 0, 0];

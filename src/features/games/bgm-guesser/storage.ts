@@ -1,13 +1,15 @@
 /*
-  localStorage store for BGM Guesser results.
+  BGM Guesser results, stored in the `bgmGuesser` section of `mapledoro_games_v1`.
 
-  Shares the `mapledoro_games_v1` key (and its version 2 schema) with the Skill
-  Guesser, under its own `bgmGuesser` section. Both modules read the whole store
-  and write it back, so each preserves the other's section -- keep it that way
-  rather than reconstructing the object from known keys.
+  Section reads/writes go through gamesStore, which owns the key and preserves
+  every other game's section. This module must never read or write the key
+  directly: doing that is what previously let one game overwrite another's
+  history.
 */
 
-const STORAGE_KEY = "mapledoro_games_v1";
+import { readGameSection, writeGameSection } from "../gamesStore";
+
+const SECTION = "bgmGuesser";
 
 export interface BgmGuesserResult {
   guesses: string[];
@@ -15,32 +17,22 @@ export interface BgmGuesserResult {
   done: boolean;
 }
 
-interface GamesStore {
-  version: 2;
-  bgmGuesser?: { results: Record<string, BgmGuesserResult> };
-  [section: string]: unknown;
+interface BgmGuesserSection {
+  results: Record<string, BgmGuesserResult>;
 }
 
-function readStore(): GamesStore {
-  if (typeof window === "undefined") return { version: 2 };
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (parsed?.version === 2) return parsed as GamesStore;
-  } catch { /* ignore */ }
-  return { version: 2 };
+function readResults(): Record<string, BgmGuesserResult> {
+  return readGameSection<BgmGuesserSection>(SECTION)?.results ?? {};
 }
 
 export function readPuzzleResult(puzzleNumber: number): BgmGuesserResult | undefined {
-  return readStore().bgmGuesser?.results[String(puzzleNumber)];
+  return readResults()[String(puzzleNumber)];
 }
 
 export function writeBgmGuesserResult(puzzleNumber: number, result: BgmGuesserResult): void {
-  if (typeof window === "undefined") return;
-  const store = readStore();
-  const results = { ...store.bgmGuesser?.results, [String(puzzleNumber)]: result };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...store, bgmGuesser: { results } }));
-  } catch { /* ignore */ }
+  writeGameSection(SECTION, {
+    results: { ...readResults(), [String(puzzleNumber)]: result },
+  } satisfies BgmGuesserSection);
 }
 
 export interface BgmGuesserStats {
@@ -54,7 +46,7 @@ export interface BgmGuesserStats {
 }
 
 export function computeBgmGuesserStats(maxGuesses: number): BgmGuesserStats {
-  const results = Object.values(readStore().bgmGuesser?.results ?? {}).filter((r) => r.done);
+  const results = Object.values(readResults()).filter((r) => r.done);
   const distribution = Array.from({ length: maxGuesses + 1 }, () => 0);
   let wins = 0;
   let winGuessTotal = 0;

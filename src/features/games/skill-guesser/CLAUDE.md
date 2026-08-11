@@ -37,7 +37,16 @@ class pool loses its origin/ascent.
 Renaming a class requires regenerating the payload, since the generator validates names against this
 file.
 
-**Results** live in `mapledoro_games_v1` (its own key, NOT `mapledoro_tools_v1`), keyed by puzzle
-number to `{ normal?, hard? }`. In-progress guesses persist too (`done: false`) and are excluded from
-stats. Schema is **version 2**; v1 (one result per puzzle plus a global `hardMode` toggle) migrates on
-read into the `normal` slot.
+**Results** live in `mapledoro_games_v1` (its own key, NOT `mapledoro_tools_v1`) under a
+`skillGuesser` section shared with BGM Guesser, keyed by puzzle number to `{ normal?, hard? }`.
+In-progress guesses persist too (`done: false`) and are excluded from stats.
+
+Reads and writes go through `games/gamesStore.ts` (`readGameSection`/`writeGameSection`), which owns
+the key and preserves every other game's section. **Never read or write `mapledoro_games_v1` directly
+from a game module.** Both modules used to own the whole key themselves, and each rebuilt it from the
+sections it knew about, so whichever game the player touched second erased the other's history.
+
+Schema is **version 2**; v1 (one result per puzzle plus a global `hardMode` toggle) migrates into the
+`normal` slot. That migration lives in `gamesStore.ts`, not here: `version` describes the whole key,
+so bumping it without reshaping this section in the same step would make every v1 puzzle read as
+never played.
