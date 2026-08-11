@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import MiracleTimePanel from "../../components/MiracleTimePanel";
 import SunnySundayPanel from "../../components/SunnySundayPanel";
 import type { AppTheme } from "../../components/themes";
-import { useClock } from "../../lib/useClock";
 import { useMounted } from "../../lib/useMounted";
 import {
   readCharactersStore,
@@ -16,19 +15,16 @@ import HeroBanner from "./HeroBanner";
 import PatchNotesPanel from "./PatchNotesPanel";
 import { QuickLinkGrid, QuickToolsGrid } from "./QuickLinkGrid";
 import { QUICK_GUIDES } from "./quickTools";
-import { MobileTimerStrip, ResetTimerPanels, UrsusPanel } from "./SidebarTimers";
+import ResetTimersPanel from "./ResetTimersPanel";
 
 export default function HomeDashboard({ theme }: { theme: AppTheme }) {
   const mounted = useMounted();
-  // Memoized because useClock() below re-renders this component every second: an
-  // unmemoized read would re-parse the whole character store on every tick, and
-  // hand CharactersPanel a fresh array identity each time.
+  // Memoized so the store is parsed once per mount rather than on every render of
+  // this component, and so CharactersPanel keeps a stable array identity.
   const characters: StoredCharacterRecord[] = useMemo(
     () => (mounted ? selectCharactersList(readCharactersStore()) : []),
     [mounted],
   );
-
-  const now = useClock();
 
   return (
     <>
@@ -51,13 +47,20 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
         }
         .timer-countdown {
           font-family: var(--font-heading);
-          font-size: 2rem;
+          font-size: 1.35rem;
           line-height: 1;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.02em;
+          /* Fixed-width digits so a ticking countdown doesn't reflow its own row. */
+          font-variant-numeric: tabular-nums;
         }
-        .timer-bar-card {
-          transition: background 0.35s ease, border-color 0.35s ease;
+        .timer-rows {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.6rem;
+          padding: 0.75rem;
         }
+        .timer-row { transition: background 0.35s ease, border-color 0.15s ease; }
+        .timer-row:hover { border-color: ${theme.accent} !important; }
 
         .dashboard-layout {
           max-width: 1560px;
@@ -84,7 +87,6 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
           top: 72px;
         }
         .sec-sunny { margin-bottom: 0.75rem; }
-        .mobile-timer-strip { display: none; }
 
         .customize-btn { transition: border-color 0.15s ease, color 0.15s ease; }
         .customize-btn:hover { border-color: ${theme.accent} !important; color: ${theme.accentText} !important; }
@@ -119,8 +121,9 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
           .sec-guides { order: 5; }
           .sec-sunny { order: 6; }
           .sec-patch { order: 7; }
-          .hide-mobile { display: none; }
-          .mobile-timer-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          /* The panel spans the full column here, so the rows pair up instead of
+             stretching one countdown across 900px. */
+          .timer-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 860px) {
@@ -129,10 +132,13 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
           .characters-grid { grid-template-columns: 1fr; }
         }
 
+        @media (max-width: 560px) {
+          .timer-rows { grid-template-columns: 1fr; }
+        }
+
         @media (max-width: 500px) {
           .quick-tools-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .quick-guides-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .timer-countdown { font-size: 1.5rem !important; }
           .hero-banner { padding: 1.25rem 1rem 1rem !important; }
           .hero-desc { display: none; }
         }
@@ -141,11 +147,8 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
       <div className="page-content">
         <div className="dashboard-layout">
           <aside className="dashboard-sidebar-left">
-            <div className="hide-mobile">
-              <ResetTimerPanels theme={theme} now={now} />
-              <div style={{ marginTop: "0.75rem" }}>
-                <UrsusPanel theme={theme} now={now} />
-              </div>
+            <div className="dash-sec sec-timers">
+              <ResetTimersPanel theme={theme} />
             </div>
             <div className="dash-sec sec-miracle">
               <MiracleTimePanel theme={theme} />
@@ -155,7 +158,6 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
             <div className="dash-sec sec-hero">
               <HeroBanner theme={theme} />
             </div>
-            <MobileTimerStrip theme={theme} now={now} />
             <div className="dash-sec sec-tools">
               <QuickToolsGrid theme={theme} />
             </div>
