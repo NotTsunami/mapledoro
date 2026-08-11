@@ -1,8 +1,8 @@
 # Stat Optimizer
 
 Two modes (Hyper Stat, HEXA Stat) that are **exact ports of maplescouter.com's
-optimizer** (algorithms, tables, and damage kernel were reverse-engineered from
-its production bundle and behaviorally verified against the live site). Scouter
+optimizer** (algorithms, tables, and damage kernel reverse-engineered from its
+production bundle, behaviorally verified against the live site). Scouter
 optimizes bossing only; Hyper Stat additionally has a **mobbing target** that is
 ours (see "Mobbing target" below). Works **standalone**: state is always present,
 blank by default (`emptyCharacterSeed`), autopopulated when a stored character is
@@ -180,14 +180,12 @@ Given identical inputs, recommendations match the live site, with the single
 documented exception above. The `dpm*` class constants must be refreshed if scouter
 rebalances its class data.
 
-Both modes need this equally. Scouter's HEXA optimizer (`async function G` in the
-optimizer chunk) is called as `G(userStat, calculatedData.myClassData, ...)` and
-evaluates candidates through the same kernel `A` the hyper path uses, differing
-only by the mode string (`"Hexa"` vs `"Hyper"`). `specEfficiency` appears nowhere
-in that chunk: it's a *derived* table computed in the store module from the same
-buffed state, which is exactly why inverting it recovers the buckets. So neither
-optimizer reads the efficiency table, and both need the same calibration; the
-kernel is shared, so `optimizeHexa` takes the same `KernelCalibration`.
+Both modes need this equally. Scouter's HEXA optimizer (`async function G`) evaluates
+candidates through the same kernel `A` the hyper path uses, differing only by a mode
+string, and `specEfficiency` appears nowhere in that chunk: it's a *derived* table
+computed in the store module from the same buffed state, which is why inverting it
+recovers the buckets. So neither optimizer reads the efficiency table and both need the
+same calibration; `optimizeHexa` takes the same `KernelCalibration`.
 
 **Buffed-state calibration (`scouter-calibration.ts`).** Our stat inputs are the
 in-game stat window, which is unbuffed, while scouter optimizes a fully-buffed
@@ -214,10 +212,9 @@ a non-positive field or 0% crit rate. Calibration is solved once at seed time fr
 the seeded inputs, so later edits to the stat fields move the buckets *from* the
 calibrated baseline rather than re-deriving it.
 
-Verified end to end against a real endgame Kanna: uncalibrated the greedy returned
-main 5 / sub 3 / ATT 7 / boss 15 / dmg 14 / crit dmg 14 / IED 8, calibrated it
-returns scouter's live answer exactly (ATT 8 / dmg 13 / crit dmg 15 / IED 6), at
-both 300 and 380 PDR.
+Verified end to end against a real endgame Kanna: calibrated, the greedy returns
+scouter's live answer exactly (ATT 8 / dmg 13 / crit dmg 15 / IED 6) at both 300 and
+380 PDR; uncalibrated it does not come close.
 
 ## Now/Best table
 The hyper lines are a real `<table>` (`HYPER_TABLE_CSS`), not a CSS grid: each stat is

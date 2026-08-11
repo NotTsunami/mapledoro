@@ -23,15 +23,11 @@ base64(XOR(json)) of `[resourceType, skillId, skillName, className]` tuples (0 =
 devtools; the XOR key in `puzzles.ts` must match the script's. **Don't change the generator's `SEED`
 or reorder filters** — that reshuffles the daily order and breaks streaks mid-run.
 
-**The shipped payload was generated from v269 and is deliberately not re-run.** The script's own
-manifest path was bumped to `manifests/v270/skill.json` with the rest of `scripts/` in the v270 sweep
-(`5aa1d22`), but the payload was left alone: regenerating reshuffles the daily order for the same
-reason `SEED` is frozen, so it breaks every in-flight streak. **The v270 path in the script is not
-evidence the payload is v270 data**, and a version bump alone is not a reason to re-run this one.
-Treat a regen as a deliberate, disruptive action to schedule, not routine upkeep — the root
-CLAUDE.md's "re-run every generator after a bump" rule is about the manifest-derived character data,
-and this generator is the documented exception. (BGM Guesser is *not* in the same position: it
-shipped after the sweep and its payload really is v270.)
+**The shipped payload was generated from v269 and is deliberately not re-run.** The script's manifest
+path was bumped to `manifests/v270/skill.json` with the rest of `scripts/` in the v270 sweep, but the
+payload was left alone: regenerating reshuffles the daily order and breaks every in-flight streak,
+the same reason `SEED` is frozen. **The v270 path in the script is not evidence the payload is v270
+data**, and a version bump alone is not a reason to re-run this one.
 
 **Class attribution** comes from skill-id job prefixes (`floor(id/10000)`), not the manifest, which
 has no class field. Excluded: branch-shared jobs (Explorer commons, beginners, 5th-job, removed
@@ -51,12 +47,12 @@ file.
 `skillGuesser` section shared with BGM Guesser, keyed by puzzle number to `{ normal?, hard? }`.
 In-progress guesses persist too (`done: false`) and are excluded from stats.
 
-Reads and writes go through `games/gamesStore.ts` (`readGameSection`/`writeGameSection`), which owns
-the key and preserves every other game's section. **Never read or write `mapledoro_games_v1` directly
-from a game module.** Both modules used to own the whole key themselves, and each rebuilt it from the
-sections it knew about, so whichever game the player touched second erased the other's history.
+Reads/writes go through `games/gamesStore.ts` (`readGameSection`/`writeGameSection`), which owns the
+key and preserves other games' sections. **Never touch `mapledoro_games_v1` directly from a game
+module** — when both modules owned the whole key, each rebuilt it from the sections it knew, so the
+second game played erased the other's history.
 
 Schema is **version 2**; v1 (one result per puzzle plus a global `hardMode` toggle) migrates into the
-`normal` slot. That migration lives in `gamesStore.ts`, not here: `version` describes the whole key,
-so bumping it without reshaping this section in the same step would make every v1 puzzle read as
-never played.
+`normal` slot. That migration lives in `gamesStore.ts` because `version` describes the whole key:
+bumping it without reshaping this section in the same step would make every v1 puzzle read as never
+played.

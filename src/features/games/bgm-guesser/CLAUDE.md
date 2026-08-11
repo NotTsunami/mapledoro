@@ -63,8 +63,7 @@ their surplus first. Adding or removing an answer reshuffles every day, since `a
 shuffle of the whole key set.
 
 **Results** live in `mapledoro_games_v1` under a `bgmGuesser` section, sharing the key (and its
-version 2 schema) with the Skill Guesser. Reads and writes go through `games/gamesStore.ts`
-(`readGameSection`/`writeGameSection`), which owns the key and carries every other game's section
-across untouched. **Never read or write `mapledoro_games_v1` directly from a game module.** Both
-modules used to own the whole key themselves, and each rebuilt it from the sections it knew about, so
-whichever game the player touched second erased the other's history.
+version 2 schema) with the Skill Guesser. Reads/writes go through `games/gamesStore.ts`
+(`readGameSection`/`writeGameSection`), which owns the key and preserves other games' sections.
+**Never touch `mapledoro_games_v1` directly from a game module** — when both modules owned the whole
+key, each rebuilt it from the sections it knew, so the second game played erased the other's history.
