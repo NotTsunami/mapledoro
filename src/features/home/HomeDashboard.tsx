@@ -144,6 +144,9 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
         }
 
         @media (max-width: 500px) {
+          /* The row has no width to spare for it here: the portrait, the tracker
+             icons, and the name all outrank knowing the world at a glance. */
+          .char-row-world { display: none; }
           .quick-tools-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .quick-guides-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .hero-banner { padding: 1.25rem 1rem 1rem !important; }
