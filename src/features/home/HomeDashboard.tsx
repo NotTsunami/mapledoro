@@ -113,6 +113,13 @@ export default function HomeDashboard({ theme }: { theme: AppTheme }) {
           .dashboard-sidebar-left, .dashboard-sidebar-right, .dashboard-main { display: contents; }
           .dash-sec { width: 100%; max-width: 900px; margin-bottom: 1.25rem; }
           .dash-sec:empty { display: none; }
+          /* .dash-sec supplies every gap in this stack. The blocks inside it carry
+             their own margins for the three-column layout (the hero, the tool and
+             guide grids, Miracle Time), which would stack a second gap on top of
+             it; a flex item is its own formatting context, so they never collapse
+             into one. Panels have no margin of their own, so this is a no-op there.
+             The customize-tools <dialog> is not a div and keeps its own centering. */
+          .dash-sec > div { margin-top: 0 !important; margin-bottom: 0 !important; }
           .sec-hero { order: 0; }
           .sec-timers { order: 1; }
           .sec-miracle { order: 2; }
