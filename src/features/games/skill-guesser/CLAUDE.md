@@ -17,11 +17,17 @@ only the class. Stats are per mode (`computeSkillGuesserStats(mode)`). Mirror be
 the Discord Activity port.
 
 **Puzzle payload** (`puzzle-data.generated.ts`) is AUTO-GENERATED — never hand-edit. Regenerate with
-`node scripts/generate-skill-guesser-data.mjs` (needs dev-only `manifests/v269/skill.json`). It is
+`node scripts/generate-skill-guesser-data.mjs`. It is
 base64(XOR(json)) of `[resourceType, skillId, skillName, className]` tuples (0 = `skill`,
 1 = `hexa-skill`, 2 = `erda-skill`, rendered via `PuzzleSkillIcon`) so the answer isn't readable in
 devtools; the XOR key in `puzzles.ts` must match the script's. **Don't change the generator's `SEED`
 or reorder filters** — that reshuffles the daily order and breaks streaks mid-run.
+
+**The shipped payload was generated from v269 and is deliberately not re-run.** The script's manifest
+path was bumped to `manifests/v270/skill.json` with the rest of `scripts/` in the v270 sweep, but the
+payload was left alone: regenerating reshuffles the daily order and breaks every in-flight streak,
+the same reason `SEED` is frozen. **The v270 path in the script is not evidence the payload is v270
+data**, and a version bump alone is not a reason to re-run this one.
 
 **Class attribution** comes from skill-id job prefixes (`floor(id/10000)`), not the manifest, which
 has no class field. Excluded: branch-shared jobs (Explorer commons, beginners, 5th-job, removed
@@ -37,7 +43,16 @@ class pool loses its origin/ascent.
 Renaming a class requires regenerating the payload, since the generator validates names against this
 file.
 
-**Results** live in `mapledoro_games_v1` (its own key, NOT `mapledoro_tools_v1`), keyed by puzzle
-number to `{ normal?, hard? }`. In-progress guesses persist too (`done: false`) and are excluded from
-stats. Schema is **version 2**; v1 (one result per puzzle plus a global `hardMode` toggle) migrates on
-read into the `normal` slot.
+**Results** live in `mapledoro_games_v1` (its own key, NOT `mapledoro_tools_v1`) under a
+`skillGuesser` section shared with BGM Guesser, keyed by puzzle number to `{ normal?, hard? }`.
+In-progress guesses persist too (`done: false`) and are excluded from stats.
+
+Reads/writes go through `games/gamesStore.ts` (`readGameSection`/`writeGameSection`), which owns the
+key and preserves other games' sections. **Never touch `mapledoro_games_v1` directly from a game
+module** — when both modules owned the whole key, each rebuilt it from the sections it knew, so the
+second game played erased the other's history.
+
+Schema is **version 2**; v1 (one result per puzzle plus a global `hardMode` toggle) migrates into the
+`normal` slot. That migration lives in `gamesStore.ts` because `version` describes the whole key:
+bumping it without reshaping this section in the same step would make every v1 puzzle read as never
+played.

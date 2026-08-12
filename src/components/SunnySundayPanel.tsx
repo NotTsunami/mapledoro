@@ -26,7 +26,7 @@ async function fetchSunnySundays(signal: AbortSignal): Promise<SunnySundayWeek[]
   const data = (await res.json()) as SunnySundayPayload;
   return data.weeks;
 }
-import { useClock } from "@/lib/useClock";
+import { useMinuteClock } from "@/lib/useClock";
 
 const activeBadgeStyle: CSSProperties = {
   marginLeft: "auto",
@@ -208,7 +208,7 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
     return () => { controller.abort(); };
   }, []);
 
-  const now = useClock();
+  const now = useMinuteClock();
   const futureWeeks = now ? weeks.filter((w) => getEventEnd(w.dateISO) > now) : [];
   const upcoming = futureWeeks[0] ?? null;
   const otherWeeks = futureWeeks.slice(1);

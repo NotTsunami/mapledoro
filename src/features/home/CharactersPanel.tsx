@@ -105,6 +105,7 @@ function CharacterRow({
       </Link>
       <TrackerIcons theme={theme} char={char} />
       <div
+        className="char-row-world"
         style={{
           fontSize: "0.75rem",
           fontWeight: 700,

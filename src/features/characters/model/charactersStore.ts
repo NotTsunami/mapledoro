@@ -2,6 +2,10 @@ import { toCharacterKey } from "./characterKeys";
 import type { NormalizedCharacterData } from "./types";
 import { checkForWipe } from "./wipeTripwire";
 import { MAX_CHARACTERS_PER_WORLD } from "./constants";
+import {
+  clearStorageWriteFailure,
+  reportStorageWriteFailure,
+} from "../../../lib/storageWriteFailure";
 
 const CHARACTERS_STORE_VERSION = 1 as const;
 const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
@@ -1149,15 +1153,54 @@ export function writeLegionArtifactForWorld(worldId: number, value: StoredLegion
   writeCharactersStore({ ...store, legionArtifactByWorld: { ...store.legionArtifactByWorld, [String(worldId)]: value } });
 }
 
+/* Parsed-store cache, keyed on the exact raw string it was parsed from.
+ *
+ * readCharactersStore() is called many times per interaction -- every tool read
+ * goes through characterToolStorage, which reads the whole store per key -- and
+ * parsing dominates: ~3.8ms for a 60 character roster against ~0.02ms to compare
+ * the raw string. Keying on the string rather than invalidating explicitly means
+ * any write that bypasses writeCharactersStore (Settings' hard reset, devtools,
+ * another tab) self-heals on the next read, with no storage listener to maintain
+ * and no way for the cache to serve data that is no longer on disk.
+ *
+ * Never populated during SSR: readCharactersStore returns early without a window,
+ * so this module-level state can't leak between requests on the server.
+ *
+ * Every caller gets the same object back, which is only safe because nothing
+ * mutates a read result without persisting it -- characterToolStorage is the sole
+ * mutator and it writes on the next line. Keep it that way. */
+let cachedRaw: string | null = null;
+let cachedStore: CharactersStore | null = null;
+
 export function writeCharactersStore(store: CharactersStore) {
   if (typeof window === "undefined") return;
   try {
     if (process.env.NODE_ENV !== "production") {
       checkForWipe(window.localStorage.getItem(CHARACTERS_STORE_STORAGE_KEY), store);
     }
-    window.localStorage.setItem(CHARACTERS_STORE_STORAGE_KEY, JSON.stringify(store));
+    const raw = JSON.stringify(store);
+    window.localStorage.setItem(CHARACTERS_STORE_STORAGE_KEY, raw);
+    // Seed the cache with what was just persisted: the serialization is already
+    // paid for here, so the read that follows a write is a hit rather than a
+    // re-parse. `store` stands in for parseCharactersStore(raw) on the assumption
+    // that callers write well-formed stores -- parsing normalizes untrusted
+    // persisted data, not values the app just built.
+    cachedRaw = raw;
+    cachedStore = store;
+    clearStorageWriteFailure("characters");
   } catch {
-    // Ignore localStorage write failures.
+    // This store is the only copy of the player's character data, so swallowing
+    // the failure silently loses whatever change triggered the write -- the app
+    // goes on showing state that never reached disk. Surface it instead; the
+    // realistic causes are a full quota (this payload grows with roster size)
+    // and storage being blocked entirely.
+    //
+    // Drop the cache rather than seeding it: `store` holds a change that never
+    // reached disk, and reads after a failed write must reflect what actually
+    // persisted.
+    cachedRaw = null;
+    cachedStore = null;
+    reportStorageWriteFailure("characters");
   }
 }
 
@@ -1165,8 +1208,13 @@ export function readCharactersStore(): CharactersStore {
   if (typeof window === "undefined") return createEmptyCharactersStore();
   const raw = window.localStorage.getItem(CHARACTERS_STORE_STORAGE_KEY);
   if (raw) {
+    if (cachedStore && raw === cachedRaw) return cachedStore;
     const parsed = parseCharactersStore(raw);
-    if (parsed) return parsed;
+    if (parsed) {
+      cachedRaw = raw;
+      cachedStore = parsed;
+      return parsed;
+    }
   }
   return createEmptyCharactersStore();
 }

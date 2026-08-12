@@ -142,7 +142,7 @@ const AREAS = {
   "Xuanshan": "Hajin",
   "Angler Company": "anglerCompany",
   "High Mountain": "HighMountain",
-  "Nightmare Wonderland": "nightmareParadise",
+  "Nightmare Paradise": "nightmareParadise",
   "Black Heaven": "BlockBuster",
   "Sharenian": "Guild",
   "Ghost Park": "GhostPark",
@@ -523,9 +523,9 @@ const ANSWERS = {
   "BgmED/Predator of the Deep Sea": "Angler Company",
   "BgmED/highMountain_n": "High Mountain",
   "BgmED/highMountain_b": "High Mountain",
-  "Bgm61/Ashes of spring": "Nightmare Wonderland",
-  "Bgm61/Feast of evil spirits": "Nightmare Wonderland",
-  "Bgm61/The downfall": "Nightmare Wonderland",
+  "Bgm61/Ashes of spring": "Nightmare Paradise",
+  "Bgm61/Feast of evil spirits": "Nightmare Paradise",
+  "Bgm61/The downfall": "Nightmare Paradise",
 
   // ── Bosses ────────────────────────────────────────────────────────────────
   "Bgm06/FinalFight": "Zakum",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import type { AppTheme } from "../../components/themes";
@@ -125,10 +125,19 @@ export function QuickToolsGrid({ theme }: { theme: AppTheme }) {
   const [override, setOverride] = useState<string[] | null>(null);
   const [editing, setEditing] = useState(false);
 
-  const selectedHrefs = override ?? (mounted ? readHomeToolSelection() : DEFAULT_TOOL_HREFS);
-  const selectedTools = selectedHrefs
-    .map((href) => ALL_QUICK_TOOLS.find((t) => t.href === href))
-    .filter((t): t is QuickLink => Boolean(t));
+  // Memoized so opening the dialog (or any other re-render) doesn't re-read and
+  // re-parse the global tools store; `override` covers a save made in this session.
+  const selectedHrefs = useMemo(
+    () => override ?? (mounted ? readHomeToolSelection() : DEFAULT_TOOL_HREFS),
+    [override, mounted],
+  );
+  const selectedTools = useMemo(
+    () =>
+      selectedHrefs
+        .map((href) => ALL_QUICK_TOOLS.find((t) => t.href === href))
+        .filter((t): t is QuickLink => Boolean(t)),
+    [selectedHrefs],
+  );
 
   const handleSave = (hrefs: string[]) => {
     setOverride(hrefs);

@@ -12,6 +12,25 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-11",
+    changes: [
+      { type: "changed", text: "The home page's Reset Timers and Ursus 2x Meso panels are now one panel, with the daily reset, the weekly reset, the Wednesday event reset, and Ursus side by side. Each row shows the reset in your own time zone, and hovering one lists what it resets." },
+      { type: "added", text: "The home page now counts down the v270 event resets: Ride or Die, Operation: Dive, Tallahart Fantasia, Momentum Pass, Frontier Pass, and Phantasmal Echoes on Wednesday, and Challenger Pass and Item Burning Plus with the Thursday weekly reset. Each event drops off the panel when it ends." },
+    ],
+  },
+  {
+    date: "2026-08-10",
+    changes: [
+      { type: "fixed", text: "Fixed Mapledle and BGM Guesser erasing each other's saved results and stats when you played both." },
+    ],
+  },
+  {
+    date: "2026-08-09",
+    changes: [
+      { type: "fixed", text: "MapleDoro now warns you when your browser will not save a change, instead of losing it silently, so a full or blocked browser storage no longer costs you edits without warning." },
+    ],
+  },
+  {
     date: "2026-08-06",
     changes: [
       { type: "changed", text: "Rebuilt the EXP Calculator's Resources tab: pick a resource from the dropdown and see what every source in it pays at your level, in EXP and as a share of the level, instead of reading a raw table." },

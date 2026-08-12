@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Panel from "./Panel";
 import type { AppTheme } from "./themes";
 import { STATUS } from "./statusColors";
-import { useClock } from "@/lib/useClock";
+import { useMinuteClock } from "@/lib/useClock";
 import type { MiracleTimeSlot, MiracleTimePayload } from "@/lib/miracleTime";
 
 async function fetchMiracleTime(signal: AbortSignal): Promise<MiracleTimeSlot[]> {
@@ -91,7 +91,7 @@ export default function MiracleTimePanel({ theme }: { theme: AppTheme }) {
     return () => { controller.abort(); };
   }, []);
 
-  const now = useClock();
+  const now = useMinuteClock();
   const nowMs = now ? now.getTime() : 0;
   const upcoming = now
     ? slots.filter((s) => Date.parse(s.endISO) >= nowMs)
