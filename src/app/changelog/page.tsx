@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-13",
+    changes: [
+      { type: "added", text: "The Stat Optimizer can now apply a recommendation to your character. It saves the Hyper Stat or HEXA Stat allocation and updates your saved stat window to match, then shows what your Boss 380 HEXA changed to. It asks you to confirm you have already made the change in-game first, since your saved stats would otherwise be wrong." },
+    ],
+  },
+  {
     date: "2026-08-11",
     changes: [
       { type: "changed", text: "The home page's Reset Timers and Ursus 2x Meso panels are now one panel, with the daily reset, the weekly reset, the Wednesday event reset, and Ursus side by side. Each row shows the reset in your own time zone, and hovering one lists what it resets." },

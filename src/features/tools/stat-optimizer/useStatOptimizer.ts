@@ -8,7 +8,7 @@ import {
   selectCharacterByIgn,
   type StoredCharacterRecord,
 } from "../../characters/model/charactersStore";
-import { peekScouterCache } from "../../characters/scouter/scouterCache";
+import { peekScouterCache, refreshScouterResult } from "../../characters/scouter/scouterCache";
 import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
 import { readToolLevel, writeToolLevel } from "../toolLevel";
 import {
@@ -42,6 +42,7 @@ import {
   type CharacterSeed,
   type TargetSeed,
 } from "./stat-optimizer-character";
+import { applyHexaToRecord, applyHyperToRecord, updateCharacterRecord } from "./stat-optimizer-apply";
 
 export type OptimizerMode = "hyper" | "hexa";
 /** Editable single-number stat inputs (the triples are edited via setTriplePart;
@@ -63,8 +64,41 @@ type OptimizerResult =
 /** Position of each line in a core's [primary, additional0, additional1] order. */
 const CORE_LINE_SLOT: Record<CoreLineKey, 0 | 1 | 2> = { primary: 0, alt0: 1, alt1: 2 };
 
-/** The tool's own key in the character store. Only the level is saved (see `setLevel`). */
+/** The tool's own key in the character store. Only the level is saved from an edit
+ *  (see `setLevel`); the apply action writes the allocation itself elsewhere. */
 const STAT_OPTIMIZER_TOOL_KEY = "statOptimizer";
+
+/** Where the character's Boss 380 HEXA figure landed after an apply. It isn't ours
+ *  to compute — MapleScouter derives it server-side — so the apply re-runs their
+ *  lookup against the stat window it just wrote and reports what came back. */
+export type ApplyOutcome =
+  | { kind: "figure"; before: number | null; after: number }
+  /** Written, but the character has no MapleScouter setup to recompute against. */
+  | { kind: "unsupported" }
+  /** Written, but the lookup failed (offline, rate limited, bad response). */
+  | { kind: "failed" };
+
+/** An apply and its result, tagged with what it applied to so a character or mode
+ *  switch stops showing an answer that no longer belongs to the panel on screen. */
+export interface ApplyRun {
+  char: string;
+  mode: OptimizerMode;
+  status: "applying" | "done";
+  outcome: ApplyOutcome | null;
+}
+
+async function recomputeBoss380Hexa(
+  record: StoredCharacterRecord,
+  before: number | null,
+): Promise<ApplyOutcome> {
+  const result = await refreshScouterResult(record);
+  // A stale "ok" is the LAST good entry handed back after a failed refetch, so it
+  // describes the allocation we just replaced -- not a recomputed figure.
+  if (result.status === "ok" && !result.stale) {
+    return { kind: "figure", before, after: result.entry.boss380Hexa };
+  }
+  return result.status === "unsupported" ? { kind: "unsupported" } : { kind: "failed" };
+}
 
 interface SelectionState {
   profile: ClassDamageProfile;
@@ -311,6 +345,51 @@ export function useStatOptimizer() {
     [state.profile, active.inputs],
   );
 
+  // The tool's one write to the character store, and the only one that touches a
+  // character's real data: it swaps in the recommended allocation AND moves the
+  // stat window by what those lines grant, since a stored stat window is the
+  // in-game tooltip and already includes the allocation being replaced (see
+  // stat-optimizer-apply.ts). The panel gates it behind a confirm for that reason:
+  // it only describes reality once the player has really respecced in-game.
+  const [applyRun, setApplyRun] = useState<ApplyRun | null>(null);
+
+  const applyRecommendation = useCallback(async () => {
+    const char = selectedCharName;
+    if (!char) return;
+    const previous = selectCharacterByIgn(readCharactersStore(), char);
+    if (!previous) return;
+    // Read before the write: afterwards the payload hash has moved and this
+    // entry is no longer the character's current one.
+    const before = peekScouterCache(previous)?.boss380Hexa ?? null;
+    setApplyRun({ char, mode, status: "applying", outcome: null });
+    const written = updateCharacterRecord(char, (record) =>
+      result.mode === "hyper"
+        ? applyHyperToRecord(record, {
+            profile: state.profile,
+            target: activeTarget,
+            presetIndex: active.presetIndex,
+            current: active.storedHyper,
+            best: result.hyper.allocation,
+          })
+        : applyHexaToRecord(record, {
+            profile: state.profile,
+            cores: state.cores,
+            recommended: result.hexa.cores,
+          }),
+    );
+    if (!written) {
+      setApplyRun(null);
+      return;
+    }
+    const outcome = await recomputeBoss380Hexa(written, before);
+    // Re-seed last: the store is the truth now, so the Now column, the gain and
+    // the calibration should all describe what was just written -- and the
+    // lookup above is what left a matching Scouter entry for the calibration to
+    // read (without it every apply would drop the panel to "uncalibrated").
+    handleCharChange(char);
+    setApplyRun({ char, mode, status: "done", outcome });
+  }, [selectedCharName, mode, result, state.profile, state.cores, activeTarget, active.presetIndex, active.storedHyper, handleCharChange]);
+
   return {
     mounted,
     characters,
@@ -335,5 +414,9 @@ export function useStatOptimizer() {
     setCoreLine,
     result,
     hasStats,
+    applyRecommendation,
+    /** The last apply, or null once it no longer belongs to the panel on screen. */
+    applyRun:
+      applyRun && applyRun.char === selectedCharName && applyRun.mode === mode ? applyRun : null,
   };
 }

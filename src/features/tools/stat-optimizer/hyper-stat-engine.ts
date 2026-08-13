@@ -86,8 +86,14 @@ export function capHyperLevelToBudget(desired: number, budget: number): number {
   return 0;
 }
 
+/** Every line the store can hold a level for, in HYPER_LINES order. A target's
+ *  own list is a subset (HYPER_TARGET_LINES); this is what the apply path reads
+ *  and writes, since applying frees the points sitting on the other target's
+ *  lines and has to zero them. */
+export const ALL_HYPER_LINE_IDS: HyperLineId[] = HYPER_LINES.map((line) => line.id);
+
 /** Preset key in the character store's hyper allocation for each line. */
-function presetKey(id: HyperLineId, profile: ClassDamageProfile): string | null {
+export function hyperPresetKey(id: HyperLineId, profile: ClassDamageProfile): string | null {
   switch (id) {
     case "mainStat":
       return profile.mainStat;
@@ -113,18 +119,19 @@ function presetKey(id: HyperLineId, profile: ClassDamageProfile): string | null 
 }
 
 /** Reads one preset of a stored hyper allocation into the optimizer's line levels.
- *  Lines the target doesn't assign stay 0, so they are neither stripped from the
- *  damage baseline nor counted as spend the recommendation has to preserve. */
+ *  Lines outside `lineIds` stay 0: read with a target's list they are neither
+ *  stripped from the damage baseline nor counted as spend the recommendation has
+ *  to preserve; read with ALL_HYPER_LINE_IDS the result is the whole preset. */
 export function mapStoredHyper(
   stored: StoredHyperStat | undefined,
   profile: ClassDamageProfile,
-  target: OptimizeTarget,
+  lineIds: readonly HyperLineId[],
   presetIndex: number,
 ): HyperAllocation {
   const preset = stored?.presets?.[presetIndex] ?? {};
   const alloc = zeroHyperAllocation();
-  for (const id of HYPER_TARGET_LINES[target]) {
-    const key = presetKey(id, profile);
+  for (const id of lineIds) {
+    const key = hyperPresetKey(id, profile);
     const n = key ? Math.floor(Number(preset[key] ?? 0)) : 0;
     alloc[id] = Number.isFinite(n) ? Math.min(Math.max(n, 0), HYPER_MAX_LEVEL) : 0;
   }

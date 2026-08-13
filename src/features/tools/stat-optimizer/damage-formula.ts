@@ -290,8 +290,10 @@ export function stackIedSources(...sources: number[]): number {
   return (1e4 * acc) / 100;
 }
 
-/** Applies a (possibly negative = un-stack) IED percent onto a total IED fraction. */
-function applyIed(pct: number, frac: number): number {
+/** Applies a (possibly negative = un-stack) IED percent onto a total IED fraction.
+ *  Exported for the apply path, which has to move the stored Ignore Enemy DEF %
+ *  by exactly the arithmetic the kernel valued the change with. */
+export function applyIed(pct: number, frac: number): number {
   return pct >= 0 ? 1 - (1 - frac) * (1 - pct / 100) : (1e4 * frac + 100 * pct) / (100 + pct) / 100;
 }
 
