@@ -313,7 +313,12 @@ operations, HEXA runs one net operation).
 Three rules that aren't obvious from the code:
 - **Deltas come from the allocation tables, never from the stat fields**, so a
   value typed to model a hypothetical can't leak into the write. The delta is
-  applied to whatever the store holds.
+  applied to whatever the store holds, floored at 0 (every field written here is
+  non-negative in-game, and an overstated Now column can strip more than is
+  there).
+- **The HEXA baseline is unlocked cores only**, mirroring the engine's own strip.
+  The recommendation skips locked cores, so counting them on the "before" side
+  reads as "this core's lines went away" and subtracts a whole core.
 - **Every tracked preset key is written, not just the target's lines.** The point
   budget is target-independent (see "Mobbing target"), so a mobbing run's budget
   already spent the Boss Damage and IED points; applying has to zero those lines

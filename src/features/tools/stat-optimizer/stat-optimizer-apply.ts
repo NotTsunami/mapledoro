@@ -109,9 +109,12 @@ function num(value: string | undefined): number {
 
 /** Stat fields are strings in the store. Whole numbers stay whole; the IED
  *  re-stack is the only source of a fraction, and two places is what the in-game
- *  window itself shows. */
+ *  window itself shows. Floored at 0, since every field written here is a
+ *  non-negative quantity in-game: a Now column typed higher than the stat window
+ *  really carries (the untracked-allocation case the panel warns about) would
+ *  otherwise strip more than is there and persist a negative stat. */
 function fmt(value: number): string {
-  return String(Math.round(value * 100) / 100);
+  return String(Math.max(0, Math.round(value * 100) / 100));
 }
 
 function addTo(
@@ -300,7 +303,10 @@ function hexaStatWindowDelta(
   cores: HexaCore[],
   best: (HexaCoreRecommendation | undefined)[],
 ): StatWindowDelta {
-  const before = hexaTotals(cores, cores.map(coreTypes));
+  // Unlocked cores only, exactly like the engine's strip. `best` already skips
+  // the locked ones, so counting them here would read as "this core's lines went
+  // away" and subtract a whole core from the stat window.
+  const before = hexaTotals(cores, cores.map((core) => (core.unlocked ? coreTypes(core) : undefined)));
   const after = hexaTotals(cores, best);
   const moved = (type: HexaStatType): number => (after[type] ?? 0) - (before[type] ?? 0);
 

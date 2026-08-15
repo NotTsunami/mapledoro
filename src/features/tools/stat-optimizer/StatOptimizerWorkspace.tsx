@@ -397,8 +397,7 @@ function ApplyConfirmDialog({
         </div>
         <WarnNote theme={theme}>
           Only confirm this if you have already made the change in-game. If you have not, {charName}
-          &apos;s saved stats will describe a character that does not exist, and every figure
-          MapleDoro derives from them will be wrong until your next character refresh.
+          &apos;s saved stats will be inaccurate.
         </WarnNote>
         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
           <input

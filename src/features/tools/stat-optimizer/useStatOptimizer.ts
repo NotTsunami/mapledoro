@@ -157,7 +157,12 @@ export function useStatOptimizer() {
   // per boss like maplescouter. Only rescales the ignore-def bucket.
   const [bossPdrPct, setBossPdr] = useState<number>(DEFAULT_BOSS_PDR);
 
+  // Mirrors `selectedCharName` for the post-await guard in applyRecommendation,
+  // which can't read the state it closed over. This is the only setter of it.
+  const selectedCharRef = useRef<string | null>(null);
+
   const handleCharChange = useCallback((charName: string | null) => {
+    selectedCharRef.current = charName;
     setSelectedCharName(charName);
     const record = charName ? selectCharacterByIgn(readCharactersStore(), charName) : null;
     // Cache-only read (no network call, see peekScouterCache): a hit calibrates the
@@ -386,7 +391,9 @@ export function useStatOptimizer() {
     // the calibration should all describe what was just written -- and the
     // lookup above is what left a matching Scouter entry for the calibration to
     // read (without it every apply would drop the panel to "uncalibrated").
-    handleCharChange(char);
+    // Skipped if the picker moved on during that lookup (a real network round
+    // trip), which would otherwise pull the panel back to the applied character.
+    if (selectedCharRef.current === char) handleCharChange(char);
     setApplyRun({ char, mode, status: "done", outcome });
   }, [selectedCharName, mode, result, state.profile, state.cores, activeTarget, active.presetIndex, active.storedHyper, handleCharChange]);
 
