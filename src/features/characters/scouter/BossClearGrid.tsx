@@ -33,6 +33,12 @@ const BOSS_ICON_ID: Record<string, string> = {
 
 const DIFFICULTY_ORDER: Record<string, number> = { Easy: 0, Normal: 1, Hard: 2, Chaos: 3, Extreme: 4, Destiny: 5, Champion: 6 };
 
+// Black Mage is the sole exception to the global ladder above: its Champion (solo Hard, same
+// bossCut) is easier than Extreme, not harder, so it sorts before both Hard and Extreme here.
+const DIFFICULTY_ORDER_OVERRIDE: Partial<Record<string, Record<string, number>>> = {
+  blackMage: { Champion: 0, Hard: 1, Extreme: 2 },
+};
+
 // Tag order matches the severity ladder in bossClearFormula.ts's TAG_COLOR (best to worst),
 // so this list stays a direct reading aid for the pill colors on every chip/tile.
 const QUICK_VIEW_INFO_CONTENT: TooltipContent = {
@@ -271,7 +277,8 @@ function NoGapLossToggle({ theme, checked, onChange }: { theme: AppTheme; checke
  *  level/Arcane/Sacred Power gaps to their ceilings (see bossClearFormula.ts), showing clear%
  *  at full HEXA damage as if every requirement gap were already closed. */
 function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: number, authenticForce: number, inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>, filter: BossFilter, noGapLoss: boolean) {
-  const sorted = [...entries].sort((a, b) => (DIFFICULTY_ORDER[a.difficulty] ?? 99) - (DIFFICULTY_ORDER[b.difficulty] ?? 99));
+  const order = (entries[0] && DIFFICULTY_ORDER_OVERRIDE[entries[0].name]) ?? DIFFICULTY_ORDER;
+  const sorted = [...entries].sort((a, b) => (order[a.difficulty] ?? 99) - (order[b.difficulty] ?? 99));
   return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs, noGapLoss);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
