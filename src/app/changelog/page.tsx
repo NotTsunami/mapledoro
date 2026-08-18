@@ -17,6 +17,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "fixed", text: "Fixed the EXP Calculator's Resources tab switching to a different resource while you typed a level. Every resource now stays in the list, and one your level cannot reach yet says so instead of disappearing." },
       { type: "fixed", text: "Fixed the EXP Calculator's Daily / Weekly tab dropping your chosen Monster Park dungeon out of its list while you typed a level." },
       { type: "fixed", text: "Fixed the Cubing Calculator clearing your desired stat when you retyped the item level, even when the new level still offered that stat." },
+      { type: "fixed", text: "Fixed a stray line of text appearing down the left edge of the page beside the Star Force Calculator's distribution chart in Firefox." },
     ],
   },
   {

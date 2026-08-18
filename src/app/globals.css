@@ -76,6 +76,13 @@ button {
   border: 0;
 }
 
+/* Never put this class on a `<table>`. A table splits into a wrapper box (which
+   takes `position` and the margins) and an inner table box (which takes the
+   size, `overflow` and `clip-path`), and a `<caption>` belongs to the wrapper,
+   beside the inner box: it escapes the clip and paints full size at `left: 0`.
+   Wrap the table in a `<div class="sr-only">` instead. On a `<caption>` itself
+   the class is fine, since absolute positioning blockifies it into one box. */
+
 html.scroll-locked,
 html.scroll-locked body {
   overflow: hidden;
