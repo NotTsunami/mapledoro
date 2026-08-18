@@ -8,6 +8,7 @@ import { HexaSkillIcon } from "../../../components/ResourceImage";
 import { SegmentedToggle } from "../../../components/SegmentedToggle";
 import { STATUS, statusText } from "../../../components/statusColors";
 import type { AppTheme } from "../../../components/themes";
+import InfoTooltip, { type TooltipContent } from "../../characters/setup/components/InfoTooltip";
 import { formatFigure } from "../../characters/scouter/scouterFormat";
 import { ActionButton, ToolNumberInput } from "../shared-ui";
 import { ToolDialog } from "../ToolDialog";
@@ -140,14 +141,81 @@ const SKELETON_CSS = `
   }
 `;
 
+// ── Tooltips ──────────────────────────────────────────────────────────────────
+
+/* The setup flow's own InfoTooltip, reused rather than reinvented. The stat
+   window one is deliberately the Stats step's instruction almost verbatim: these
+   are the same numbers off the same in-game window, so a player who filled them
+   in during setup shouldn't be told to read them a different way here. The rest
+   cover the controls whose effect isn't visible from the numbers on screen. */
+const STATS_TOOLTIP: TooltipContent = {
+  title: "Your Stats",
+  description:
+    "Hover over each stat in your in-game Character Info window and look under [Applied Value]. Enter Base Value, % Value, and % Value Not Applied exactly as shown there.",
+};
+
+const BOSS_PDR_TOOLTIP: TooltipContent = {
+  title: "Boss PDR",
+  description:
+    "The boss defense the allocation is valued against. 300% covers standard endgame bosses, 380% is the hardest tier and the fight an allocation usually gets tuned for. It only changes how much Ignore DEF is worth.",
+};
+
+const TARGET_TOOLTIP: TooltipContent = {
+  title: "Optimize for",
+  description:
+    "Bossing values everything against the Boss PDR beside it. Mobbing drops every boss-only term (Ignore DEF and Boss Damage stop counting) and offers a Normal Damage line instead, since none of those do anything to a regular mob.",
+};
+
+const PRESET_TOOLTIP: TooltipContent = {
+  title: "Hyper Preset",
+  description:
+    "Which of your three in-game Hyper Stat presets seeds the Now column. Switching also recalculates your available points, since a different preset locks a different amount into lines this tool never reallocates.",
+};
+
+const HYPER_PANEL_TOOLTIP: TooltipContent = {
+  title: "Hyper Stat",
+  description:
+    "Now is what you have allocated, Best is the recommendation. The counter is what Best spends out of your level's total points, less anything already sitting on lines this tool leaves alone (HP, Arcane Power, Status Resistance, and so on).",
+};
+
+const LABEL_INFO_ROW: CSSProperties = { display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: 4 };
+
+/** A `.tool-field-label` with an info trigger beside it, for the segmented picker
+ *  groups. The label keeps its own class (typography, and `.tool-control-row`'s
+ *  nowrap rule) but hands its bottom margin to the flex row, so the trigger sits
+ *  on the label's line instead of under it. A plain `<div>`, not a `<label>`:
+ *  every caller is a group with no single control to point `htmlFor` at, which is
+ *  why they name themselves through `ariaLabel` instead. */
+function LabelWithInfo({
+  theme,
+  styles,
+  label,
+  tooltip,
+}: {
+  theme: AppTheme;
+  styles: ToolStyles;
+  label: string;
+  tooltip: TooltipContent;
+}) {
+  return (
+    <div style={LABEL_INFO_ROW}>
+      <div className="tool-field-label" style={{ ...styles.labelStyle, marginBottom: 0 }}>{label}</div>
+      <InfoTooltip content={tooltip} theme={theme} />
+    </div>
+  );
+}
+
 // ── Small shared pieces ───────────────────────────────────────────────────────
 
-function PanelTitle({ theme, title, subtitle, aside }: { theme: AppTheme; title: string; subtitle?: string; aside?: ReactNode }) {
+function PanelTitle({ theme, title, subtitle, aside, tooltip }: { theme: AppTheme; title: string; subtitle?: string; aside?: ReactNode; tooltip?: TooltipContent }) {
   return (
     <div style={{ marginBottom: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
         {/* fontWeight pinned so the heading keeps the weight the <div> version inherited */}
-        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", fontWeight: 400, color: theme.text, margin: 0 }}>{title}</h2>
+        <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", fontWeight: 400, color: theme.text, margin: 0 }}>{title}</h2>
+          {tooltip && <InfoTooltip content={tooltip} theme={theme} />}
+        </span>
         {aside}
       </div>
       {subtitle && (
@@ -582,7 +650,8 @@ function StatsPanel({
       <PanelTitle
         theme={theme}
         title="Your Stats"
-        subtitle="Values from the in-game stat window tooltips (Base Value / % Value / % Value Not Applied). Pulled from this character; edit any value to model a change."
+        tooltip={STATS_TOOLTIP}
+        subtitle="Values from your in-game Character Info window. Pulled from this character; edit any value to model a change."
       />
       <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", marginBottom: "0.85rem" }}>
         {triples.map((t) => (
@@ -771,6 +840,7 @@ function HyperPanel({
       <PanelTitle
         theme={theme}
         title="Hyper Stat"
+        tooltip={HYPER_PANEL_TOOLTIP}
         aside={
           <span style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
             {result.pointsUsed} / {result.pointsAvailable} points used
@@ -1208,9 +1278,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
           </div>
           {hyperMode && (
             <div>
-              {/* Plain <div>s, not <label>s: there is no single control to point
-                  `htmlFor` at, so each group names itself through `ariaLabel`. */}
-              <div className="tool-field-label" style={styles.labelStyle}>Hyper Preset</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Hyper Preset" tooltip={PRESET_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={PRESET_OPTIONS}
@@ -1236,7 +1304,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
               for the recommendation to be tuned against. */}
           {opt.activeTarget === "bossing" && (
             <div>
-              <div className="tool-field-label" style={styles.labelStyle}>Boss PDR</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Boss PDR" tooltip={BOSS_PDR_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={BOSS_PDR_OPTIONS}
@@ -1252,7 +1320,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
           )}
           {hyperMode && (
             <div>
-              <div className="tool-field-label" style={styles.labelStyle}>Optimize for</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Optimize for" tooltip={TARGET_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={TARGET_OPTIONS}
