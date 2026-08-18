@@ -19,9 +19,11 @@ a stale form.
 - **Double Miracle Time is Red and Black only** (`DMT_CUBES`) and affects tier-ups only, so the toggle
   is disabled for other cubes and when current tier equals desired; the reducer clears the flag on
   cube change.
-- **Desired stat survives level edits** — `withValidDesiredStat` checks the option list, never the
-  level's validity, because a level typed one digit at a time passes through out-of-range values.
-  Crossing level 160 legitimately invalidates exact-amount options (every line amount shifts by 1%).
+- **Desired stat survives level edits** — a level typed one digit at a time passes through
+  out-of-range values, and those sit under the Lv. 160 bonus, which shifts every exact-amount option
+  by 1%. So `withValidDesiredStat` skips the check entirely while `levelInRange` is false and runs it
+  again once the level lands; without that, retyping 165 as 170 drops the stat on the leading "1".
+  Crossing 160 with a level that *is* in range legitimately invalidates exact-amount options.
 - **Special-line limits** — `MAX_CATEGORY_COUNT` caps how often IED / Boss / Drop / Decent Skill can
   appear across 3 lines; the engine adjusts line 2/3 probabilities accordingly.
 - **Level 160+ adjustment** — Stat/ATT/HP values get +1% at calculation time, not baked into data.

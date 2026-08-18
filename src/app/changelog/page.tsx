@@ -12,6 +12,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-18",
+    changes: [
+      { type: "fixed", text: "Fixed the EXP Calculator's Resources tab switching to a different resource while you typed a level. Every resource now stays in the list, and one your level cannot reach yet says so instead of disappearing." },
+      { type: "fixed", text: "Fixed the EXP Calculator's Daily / Weekly tab dropping your chosen Monster Park dungeon out of its list while you typed a level." },
+      { type: "fixed", text: "Fixed the Cubing Calculator clearing your desired stat when you retyped the item level, even when the new level still offered that stat." },
+    ],
+  },
+  {
     date: "2026-08-13",
     changes: [
       { type: "added", text: "The Stat Optimizer can now apply a recommendation to your character. It saves the Hyper Stat or HEXA Stat allocation and updates your saved stat window to match, then shows what your Boss 380 HEXA changed to. It asks you to confirm you have already made the change in-game first, since your saved stats would otherwise be wrong." },

@@ -78,9 +78,12 @@ that source produces: Epic Dungeon reward tiers, treasure box grades, Monster Pa
 section the Resource dropdown picks is rendered**, so it gets the full panel width; the dropdown is
 built from the same list, which is why `title` stays on the section even though nothing prints it as
 a heading any more. The pick is a plain id in state, resolved through
-`sections.find(...) ?? sections[0]` on every render (`""` means unpicked). Never correct that state
-in an effect: level gates which sections exist, and holding the id lets a section the level dropped
-come back on its own when the level does.
+`sections.find(...) ?? sections[0]` on every render (`""` means unpicked). **The list is
+level-independent**: every section is always present, and `minLevel` (declared per section, derived
+from the same options the group filter uses) decides whether the body renders or shows a locked
+line. Level gating the list would let a half-typed level, which the field clamps to Lv. 200 for a
+keystroke, silently reassign the pick. Never correct the pick in an effect either. The Monster Park
+dungeon pin keeps its option listed out of reach for the same reason.
 
 Formulas are ported from the whackybeanz Contents Breakdown bundle and the figures match it exactly
 at equal inputs. The one shape they all share is `withBonus`: a percent bonus **adds to** the base
@@ -113,7 +116,8 @@ count of runs.
 
 It is **GMS-only and unbuffed**: no Singapore, Malaysia, Blood Moon Forest, or Sunday Maple, and no
 EXP buffs (every source here either ignores them or is quoted before them). Sources the level cannot
-enter are dropped rather than shown as zero, and a section left with no groups is dropped whole.
+enter are dropped rather than shown as zero; a section left with no groups keeps its slot in the
+picker and renders as locked.
 Treasure Boxes are flat multiples of the *monster's* base EXP, not the character's; their icons are
 the EXP Gem the box drops, since the boxes have no item icon.
 
