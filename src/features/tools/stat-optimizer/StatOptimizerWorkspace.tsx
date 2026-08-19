@@ -157,7 +157,7 @@ const STATS_TOOLTIP: TooltipContent = {
 const BOSS_PDR_TOOLTIP: TooltipContent = {
   title: "Boss PDR",
   description:
-    "The boss defense the allocation is valued against. 300% covers standard endgame bosses, 380% is the hardest tier and the fight an allocation usually gets tuned for. It only changes how much Ignore DEF is worth.",
+    "The boss defense the allocation is valued against. Most early-game bosses sit at 300%; the endgame bosses worth tuning for are 380%. It only changes how much Ignore DEF is worth.",
 };
 
 const TARGET_TOOLTIP: TooltipContent = {
@@ -175,7 +175,7 @@ const PRESET_TOOLTIP: TooltipContent = {
 const HYPER_PANEL_TOOLTIP: TooltipContent = {
   title: "Hyper Stat",
   description:
-    "Now is what you have allocated, Best is the recommendation. The counter is what Best spends out of your level's total points, less anything already sitting on lines this tool leaves alone (HP, Arcane Power, Status Resistance, and so on).",
+    "Now is what you have allocated, Best is the recommendation. The counter is what Best spends of your level's points, minus anything already on lines this tool leaves alone.",
 };
 
 const LABEL_INFO_ROW: CSSProperties = { display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: 4 };

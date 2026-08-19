@@ -33,8 +33,9 @@ import {
 
 /** Boss physical damage reduction the allocation is valued against. Scouter's
  *  selector spans 50-380; the picker offers the two ends players actually plan
- *  around, 300% (standard endgame bosses) and 380% (the hardest tier), and
- *  opens on 380% since that is the fight an allocation gets tuned for. */
+ *  around, 300% (where most early-game bosses sit) and 380% (the real endgame
+ *  bosses), and opens on 380% since that is the fight an allocation gets tuned
+ *  for. */
 export const DEFAULT_BOSS_PDR = 380;
 
 /**
