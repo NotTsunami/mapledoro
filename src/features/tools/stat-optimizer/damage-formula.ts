@@ -33,8 +33,9 @@ import {
 
 /** Boss physical damage reduction the allocation is valued against. Scouter's
  *  selector spans 50-380; the picker offers the two ends players actually plan
- *  around, 300% (standard endgame bosses) and 380% (the hardest tier), and
- *  opens on 380% since that is the fight an allocation gets tuned for. */
+ *  around, 300% (where most early-game bosses sit) and 380% (the real endgame
+ *  bosses), and opens on 380% since that is the fight an allocation gets tuned
+ *  for. */
 export const DEFAULT_BOSS_PDR = 380;
 
 /**
@@ -290,8 +291,10 @@ export function stackIedSources(...sources: number[]): number {
   return (1e4 * acc) / 100;
 }
 
-/** Applies a (possibly negative = un-stack) IED percent onto a total IED fraction. */
-function applyIed(pct: number, frac: number): number {
+/** Applies a (possibly negative = un-stack) IED percent onto a total IED fraction.
+ *  Exported for the apply path, which has to move the stored Ignore Enemy DEF %
+ *  by exactly the arithmetic the kernel valued the change with. */
+export function applyIed(pct: number, frac: number): number {
   return pct >= 0 ? 1 - (1 - frac) * (1 - pct / 100) : (1e4 * frac + 100 * pct) / (100 + pct) / 100;
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
+import { STATUS, statusText } from "../../../components/statusColors";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
@@ -350,8 +351,6 @@ function WaveSelector({ theme, activeWave, waveCount, filledCounts, onChange, in
 
 // ── result + rerolls ──────────────────────────────────────────────────────────
 
-const PASS_COLOR = "#16a34a";
-const FAIL_COLOR = "#dc2626";
 
 /** The target is the denominator of the headline score, so it's edited as the denominator
  *  rather than as a field in the setup row three panels away. Shape and focus underline
@@ -393,15 +392,27 @@ function VerdictBanner({ result, target, passed, hasLineup, theme, onTargetChang
 }) {
   const targetId = useId();
   const decided = hasLineup && target > 0;
-  const color = passed ? PASS_COLOR : FAIL_COLOR;
+  // The verdict word is ink, so it takes the per-color-mode `statusText` value; the
+  // border is decoration and takes the shared `fill`. Splitting them is the point of
+  // statusColors.ts: one fixed hex used for both modes can't clear 4.5:1 in each (a
+  // green dark enough to read on #faf8f5 is too dark for #101014).
+  //
+  // The background stays a NEUTRAL surface for the same reason WarnNote's does: the
+  // `statusText` values are contrast-fitted against the theme's own surfaces, not
+  // against a status-tinted one. Tinting this panel green/red put the ink back under
+  // 4.5:1 (light danger has only 0.1 of headroom, so even a 3% tint sank it). The
+  // verdict is carried by the glyph, the word, and the ink, so the tint was never
+  // load-bearing anyway.
+  const kind = passed ? "success" : "danger";
+  const ink = statusText(theme, kind);
   const labelStyle: CSSProperties = { color: theme.muted, marginBottom: 0 };
 
-  const borderColor = decided ? `${color}66` : theme.border;
+  const borderColor = decided ? `${STATUS[kind].fill}66` : theme.border;
   const bannerStyle: CSSProperties = {
     display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap",
     padding: "0.85rem 1rem", borderRadius: 12,
     border: `1px solid ${borderColor}`,
-    background: decided ? `${color}14` : theme.bg,
+    background: decided ? theme.timerBg : theme.bg,
   };
 
   const prompt = !hasLineup
@@ -413,7 +424,7 @@ function VerdictBanner({ result, target, passed, hasLineup, theme, onTargetChang
       {decided ? (
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6,
-          fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em", color,
+          fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em", color: ink,
         }}>
           <span aria-hidden style={{ fontSize: "1.15rem", lineHeight: 1 }}>{passed ? "✓" : "✗"}</span>
           {passed ? "PASS" : "FAIL"}

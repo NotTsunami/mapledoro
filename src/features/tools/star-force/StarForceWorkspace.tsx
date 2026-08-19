@@ -247,30 +247,40 @@ function buildBoomBins(sorted: Float64Array): Bins {
   };
 }
 
-/** The chart is a canvas. This is the same data, for screen readers. */
+/** The chart is a canvas. This is the same data, for screen readers.
+ *
+ *  `sr-only` goes on a wrapping div, never on the `<table>` itself. A table
+ *  element generates two boxes: a wrapper box that takes `position` and the
+ *  margins, and an inner table box that takes `width` / `height` / `overflow` /
+ *  `clip-path`. The `<caption>` is laid out in the wrapper, *beside* the inner
+ *  box, so hiding the table clips the rows and leaves the caption painting full
+ *  size at the class's `left: 0`: down the left edge of the page, level with the
+ *  chart. Firefox does exactly that; Chrome happens to clip it anyway. */
 function HistogramTable({ bins, total, metric }: { bins: Bins; total: number; metric: HistMetric }) {
   return (
-    <table className="sr-only">
-      <caption>{metric === "cost" ? "Meso cost" : "Boom count"} distribution across {total.toLocaleString()} trials</caption>
-      <thead>
-        <tr>
-          <th scope="col">{metric === "cost" ? "Cost range" : "Booms"}</th>
-          <th scope="col">Trials</th>
-          <th scope="col">Share</th>
-          <th scope="col">Cumulative</th>
-        </tr>
-      </thead>
-      <tbody>
-        {bins.counts.map((count, i) => (
-          <tr key={bins.rangeLabels[i]}>
-            <th scope="row">{bins.rangeLabels[i]}</th>
-            <td>{count.toLocaleString()}</td>
-            <td>{((count / total) * 100).toFixed(1)}%</td>
-            <td>{((bins.cumulative[i] / total) * 100).toFixed(1)}%</td>
+    <div className="sr-only">
+      <table>
+        <caption>{metric === "cost" ? "Meso cost" : "Boom count"} distribution across {total.toLocaleString()} trials</caption>
+        <thead>
+          <tr>
+            <th scope="col">{metric === "cost" ? "Cost range" : "Booms"}</th>
+            <th scope="col">Trials</th>
+            <th scope="col">Share</th>
+            <th scope="col">Cumulative</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {bins.counts.map((count, i) => (
+            <tr key={bins.rangeLabels[i]}>
+              <th scope="row">{bins.rangeLabels[i]}</th>
+              <td>{count.toLocaleString()}</td>
+              <td>{((count / total) * 100).toFixed(1)}%</td>
+              <td>{((bins.cumulative[i] / total) * 100).toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

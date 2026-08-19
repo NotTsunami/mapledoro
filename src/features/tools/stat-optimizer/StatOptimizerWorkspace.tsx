@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ToolHeader } from "../../../components/ToolHeader";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
@@ -8,7 +8,10 @@ import { HexaSkillIcon } from "../../../components/ResourceImage";
 import { SegmentedToggle } from "../../../components/SegmentedToggle";
 import { STATUS, statusText } from "../../../components/statusColors";
 import type { AppTheme } from "../../../components/themes";
-import { ToolNumberInput } from "../shared-ui";
+import InfoTooltip, { type TooltipContent } from "../../characters/setup/components/InfoTooltip";
+import { formatFigure } from "../../characters/scouter/scouterFormat";
+import { ActionButton, ToolNumberInput } from "../shared-ui";
+import { ToolDialog } from "../ToolDialog";
 import { toolStyles, type ToolStyles } from "../tool-styles";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { HYPER_STAT_PRESET_COUNT } from "../../characters/setup/data/hyperStatData";
@@ -32,6 +35,7 @@ import { HEXA_CORE_TOTAL, HEXA_MAX_LINE_LEVEL, type HexaCore, type HexaLine, typ
 import type { CalibrationNotice } from "./stat-optimizer-character";
 import {
   useStatOptimizer,
+  type ApplyRun,
   type CoreLineKey,
   type OptimizerMode,
   type ScalarInputKey,
@@ -137,14 +141,81 @@ const SKELETON_CSS = `
   }
 `;
 
+// ── Tooltips ──────────────────────────────────────────────────────────────────
+
+/* The setup flow's own InfoTooltip, reused rather than reinvented. The stat
+   window one is deliberately the Stats step's instruction almost verbatim: these
+   are the same numbers off the same in-game window, so a player who filled them
+   in during setup shouldn't be told to read them a different way here. The rest
+   cover the controls whose effect isn't visible from the numbers on screen. */
+const STATS_TOOLTIP: TooltipContent = {
+  title: "Your Stats",
+  description:
+    "Hover over each stat in your in-game Character Info window and look under [Applied Value]. Enter Base Value, % Value, and % Value Not Applied exactly as shown there.",
+};
+
+const BOSS_PDR_TOOLTIP: TooltipContent = {
+  title: "Boss PDR",
+  description:
+    "The boss defense the allocation is valued against. Most early-game bosses sit at 300%; the endgame bosses worth tuning for are 380%. It only changes how much Ignore DEF is worth.",
+};
+
+const TARGET_TOOLTIP: TooltipContent = {
+  title: "Optimize for",
+  description:
+    "Bossing values everything against the Boss PDR beside it. Mobbing drops every boss-only term (Ignore DEF and Boss Damage stop counting) and offers a Normal Damage line instead, since none of those do anything to a regular mob.",
+};
+
+const PRESET_TOOLTIP: TooltipContent = {
+  title: "Hyper Preset",
+  description:
+    "Which of your three in-game Hyper Stat presets seeds the Now column. Switching also recalculates your available points, since a different preset locks a different amount into lines this tool never reallocates.",
+};
+
+const HYPER_PANEL_TOOLTIP: TooltipContent = {
+  title: "Hyper Stat",
+  description:
+    "Now is what you have allocated, Best is the recommendation. The counter is what Best spends of your level's points, minus anything already on lines this tool leaves alone.",
+};
+
+const LABEL_INFO_ROW: CSSProperties = { display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: 4 };
+
+/** A `.tool-field-label` with an info trigger beside it, for the segmented picker
+ *  groups. The label keeps its own class (typography, and `.tool-control-row`'s
+ *  nowrap rule) but hands its bottom margin to the flex row, so the trigger sits
+ *  on the label's line instead of under it. A plain `<div>`, not a `<label>`:
+ *  every caller is a group with no single control to point `htmlFor` at, which is
+ *  why they name themselves through `ariaLabel` instead. */
+function LabelWithInfo({
+  theme,
+  styles,
+  label,
+  tooltip,
+}: {
+  theme: AppTheme;
+  styles: ToolStyles;
+  label: string;
+  tooltip: TooltipContent;
+}) {
+  return (
+    <div style={LABEL_INFO_ROW}>
+      <div className="tool-field-label" style={{ ...styles.labelStyle, marginBottom: 0 }}>{label}</div>
+      <InfoTooltip content={tooltip} theme={theme} />
+    </div>
+  );
+}
+
 // ── Small shared pieces ───────────────────────────────────────────────────────
 
-function PanelTitle({ theme, title, subtitle, aside }: { theme: AppTheme; title: string; subtitle?: string; aside?: ReactNode }) {
+function PanelTitle({ theme, title, subtitle, aside, tooltip }: { theme: AppTheme; title: string; subtitle?: string; aside?: ReactNode; tooltip?: TooltipContent }) {
   return (
     <div style={{ marginBottom: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
         {/* fontWeight pinned so the heading keeps the weight the <div> version inherited */}
-        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", fontWeight: 400, color: theme.text, margin: 0 }}>{title}</h2>
+        <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", fontWeight: 400, color: theme.text, margin: 0 }}>{title}</h2>
+          {tooltip && <InfoTooltip content={tooltip} theme={theme} />}
+        </span>
         {aside}
       </div>
       {subtitle && (
@@ -279,6 +350,194 @@ function CalibrationNote({ theme, notice }: { theme: AppTheme; notice: Calibrati
   );
 }
 
+// ── Apply to character ────────────────────────────────────────────────────────
+
+const APPLY_SECTION: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "0.6rem",
+  marginTop: "1.1rem",
+  paddingTop: "1.1rem",
+};
+const APPLY_NOTE: CSSProperties = { fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.5 };
+
+/**
+ * What applying did to the character's Boss 380 HEXA, which is the figure this
+ * whole action is aimed at: the panel's own gain is a kernel ratio between two
+ * allocations, while this is the number the rest of the app shows for the
+ * character. MapleScouter derives it server-side, so it is re-looked-up against
+ * the stat window the apply just wrote rather than computed here.
+ */
+function ApplyOutcomeLine({ theme, run }: { theme: AppTheme; run: ApplyRun }) {
+  if (run.status === "applying" || !run.outcome) {
+    return <div style={{ ...APPLY_NOTE, color: theme.muted }}>Recalculating Boss 380 HEXA…</div>;
+  }
+  const outcome = run.outcome;
+  if (outcome.kind === "unsupported") {
+    return (
+      <div style={{ ...APPLY_NOTE, color: theme.muted }}>
+        Applied. Finish this character&apos;s Scouter setup in{" "}
+        <Link href="/characters" style={{ color: theme.accentText }}>Characters</Link> to get a Boss
+        380 HEXA figure.
+      </div>
+    );
+  }
+  if (outcome.kind === "failed") {
+    return (
+      <div style={{ ...APPLY_NOTE, color: statusText(theme, "warning") }}>
+        Applied, but the Boss 380 HEXA lookup did not come back. Refresh the figure in{" "}
+        <Link href="/characters" style={{ color: theme.accentText }}>Characters</Link>.
+      </div>
+    );
+  }
+  const { before, after } = outcome;
+  if (before === null) {
+    return (
+      <div style={{ ...APPLY_NOTE, color: theme.text }}>
+        Applied. Boss 380 HEXA is now <strong>{formatFigure(after)}</strong>.
+      </div>
+    );
+  }
+  // Signed and colored: a mobbing allocation legitimately costs bossing damage,
+  // so this figure can and should be able to go down.
+  const change = Math.round(after) - Math.round(before);
+  const changeColor = statusText(theme, change > 0 ? "success" : "danger");
+  const changeLabel = `${change > 0 ? "+" : "−"}${formatFigure(Math.abs(change))}`;
+  return (
+    <div style={{ ...APPLY_NOTE, color: theme.text }}>
+      Boss 380 HEXA <span style={{ color: theme.muted }}>{formatFigure(before)}</span> →{" "}
+      <strong>{formatFigure(after)}</strong>{" "}
+      <span style={{ color: change === 0 ? theme.muted : changeColor, fontWeight: 800 }}>
+        ({change === 0 ? "no change" : changeLabel})
+      </span>
+    </div>
+  );
+}
+
+/** The gate. Applying is only true of the character once they have really
+ *  respecced, so the confirm asks for that in as many words and the button stays
+ *  dead until it's ticked. */
+function ApplyConfirmDialog({
+  theme,
+  styles,
+  charName,
+  what,
+  onConfirm,
+  onClose,
+}: {
+  theme: AppTheme;
+  styles: ToolStyles;
+  charName: string;
+  /** What is being overwritten, e.g. "Hyper Stat preset 2". */
+  what: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [acknowledged, setAcknowledged] = useState(false);
+  const footer = (
+    <>
+      <button type="button" className="tool-btn tool-dialog-btn" onClick={onClose} style={styles.dialogBtnStyle}>
+        Cancel
+      </button>
+      <button
+        type="button"
+        className="tool-btn tool-dialog-btn"
+        disabled={!acknowledged}
+        onClick={onConfirm}
+        style={{
+          ...(acknowledged ? styles.dialogPrimaryBtnStyle : styles.dialogBtnStyle),
+          opacity: acknowledged ? 1 : 0.5,
+          cursor: acknowledged ? "pointer" : "not-allowed",
+        }}
+      >
+        Apply
+      </button>
+    </>
+  );
+  return (
+    <ToolDialog theme={theme} title={`Apply to ${charName}?`} onClose={onClose} footer={footer} maxWidth={520}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+        <div style={{ fontSize: "0.85rem", color: theme.text, lineHeight: 1.6 }}>
+          This replaces {charName}&apos;s saved {what} with the recommended one, and moves their
+          saved stat window by what those lines grant, since the stat window you entered already
+          includes the allocation being replaced.
+        </div>
+        <WarnNote theme={theme}>
+          Only confirm this if you have already made the change in-game. If you have not, {charName}
+          &apos;s saved stats will be inaccurate.
+        </WarnNote>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            style={{ accentColor: theme.accent }}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+          />
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: theme.text }}>
+            I have already applied this in-game
+          </span>
+        </label>
+      </div>
+    </ToolDialog>
+  );
+}
+
+/** The half of the apply section only the workspace can supply. Null on a panel
+ *  running standalone, where there is no character to write to. */
+interface ApplyProps {
+  charName: string;
+  /** What is being overwritten, e.g. "Hyper Stat preset 2". */
+  what: string;
+  run: ApplyRun | null;
+  onApply: () => void;
+}
+
+function ApplyPanel({
+  theme,
+  styles,
+  disabled,
+  apply: { charName, what, run, onApply },
+}: {
+  theme: AppTheme;
+  styles: ToolStyles;
+  /** Nothing to write: no recommended change, or nothing to compute one from. */
+  disabled: boolean;
+  apply: ApplyProps;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const busy = run?.status === "applying";
+  return (
+    <div style={{ ...APPLY_SECTION, borderTop: `1px solid ${theme.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
+        <ActionButton
+          theme={theme}
+          label={busy ? "Applying…" : "Apply to character"}
+          disabled={disabled || busy}
+          onClick={() => setConfirming(true)}
+        />
+        <span style={{ ...APPLY_NOTE, color: theme.muted }}>
+          Saves the Best column to {charName} and updates their stat window.
+        </span>
+      </div>
+      {run && <ApplyOutcomeLine theme={theme} run={run} />}
+      {confirming && (
+        <ApplyConfirmDialog
+          theme={theme}
+          styles={styles}
+          charName={charName}
+          what={what}
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            onApply();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function NumberInput({
   inputStyle,
   value,
@@ -391,7 +650,8 @@ function StatsPanel({
       <PanelTitle
         theme={theme}
         title="Your Stats"
-        subtitle="Values from the in-game stat window tooltips (Base Value / % Value / % Value Not Applied). Pulled from this character; edit any value to model a change."
+        tooltip={STATS_TOOLTIP}
+        subtitle="Values from your in-game Character Info window. Pulled from this character; edit any value to model a change."
       />
       <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", marginBottom: "0.85rem" }}>
         {triples.map((t) => (
@@ -552,6 +812,7 @@ function HyperPanel({
   tracked,
   calibrationNotice,
   hasStats,
+  apply,
 }: {
   theme: AppTheme;
   styles: ToolStyles;
@@ -564,6 +825,8 @@ function HyperPanel({
   tracked: boolean;
   calibrationNotice: CalibrationNotice | null;
   hasStats: boolean;
+  /** Absent while the tool runs standalone: there is no character to write to. */
+  apply: ApplyProps | null;
 }) {
   const mobbing = target === "mobbing";
   const rows = HYPER_DISPLAY_ORDER[target].filter(
@@ -577,6 +840,7 @@ function HyperPanel({
       <PanelTitle
         theme={theme}
         title="Hyper Stat"
+        tooltip={HYPER_PANEL_TOOLTIP}
         aside={
           <span style={{ fontSize: "0.8rem", color: theme.muted, fontWeight: 700 }}>
             {result.pointsUsed} / {result.pointsAvailable} points used
@@ -633,6 +897,20 @@ function HyperPanel({
           ))}
         </tbody>
       </table>
+      {apply && (
+        <ApplyPanel
+          theme={theme}
+          styles={styles}
+          // Gated on the columns on screen: with Now and Best identical there is
+          // nothing to do in-game, so there is nothing to confirm having done.
+          // (That covers `alreadyOptimal`, which returns the current allocation.)
+          disabled={
+            rows.every((id) => result.allocation[id] === alloc[id]) ||
+            hyperPending(hasStats, result.pointsAvailable) !== null
+          }
+          apply={apply}
+        />
+      )}
     </div>
   );
 }
@@ -829,6 +1107,7 @@ function HexaPanel({
   tracked,
   calibrationNotice,
   hasStats,
+  apply,
 }: {
   theme: AppTheme;
   styles: ToolStyles;
@@ -841,11 +1120,24 @@ function HexaPanel({
   tracked: boolean;
   calibrationNotice: CalibrationNotice | null;
   hasStats: boolean;
+  /** Absent while the tool runs standalone: there is no character to write to. */
+  apply: ApplyProps | null;
 }) {
   // result.cores is aligned to the unlocked cores in order; map each core to its recommendation.
   const recByCore: (HexaResult["cores"][number] | undefined)[] = [];
   let recCursor = 0;
   for (const c of cores) recByCore.push(c.unlocked ? result.cores[recCursor++] : undefined);
+  // Same gate as Hyper's Now/Best columns: every line already carrying its
+  // recommended type means there is nothing to do in-game, so nothing to apply.
+  const unchanged = cores.every((core, i) => {
+    const rec = recByCore[i];
+    return (
+      !rec ||
+      (rec.primary === core.primary.type &&
+        rec.additional[0] === core.additional[0].type &&
+        rec.additional[1] === core.additional[1].type)
+    );
+  });
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
       <PanelTitle
@@ -884,6 +1176,14 @@ function HexaPanel({
           />
         ))}
       </div>
+      {apply && (
+        <ApplyPanel
+          theme={theme}
+          styles={styles}
+          disabled={unchanged || hexaPending(hasStats, tracked) !== null}
+          apply={apply}
+        />
+      )}
     </div>
   );
 }
@@ -978,9 +1278,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
           </div>
           {hyperMode && (
             <div>
-              {/* Plain <div>s, not <label>s: there is no single control to point
-                  `htmlFor` at, so each group names itself through `ariaLabel`. */}
-              <div className="tool-field-label" style={styles.labelStyle}>Hyper Preset</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Hyper Preset" tooltip={PRESET_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={PRESET_OPTIONS}
@@ -1006,7 +1304,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
               for the recommendation to be tuned against. */}
           {opt.activeTarget === "bossing" && (
             <div>
-              <div className="tool-field-label" style={styles.labelStyle}>Boss PDR</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Boss PDR" tooltip={BOSS_PDR_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={BOSS_PDR_OPTIONS}
@@ -1022,7 +1320,7 @@ function CharacterControls({ theme, opt, styles }: { theme: AppTheme; opt: StatO
           )}
           {hyperMode && (
             <div>
-              <div className="tool-field-label" style={styles.labelStyle}>Optimize for</div>
+              <LabelWithInfo theme={theme} styles={styles} label="Optimize for" tooltip={TARGET_TOOLTIP} />
               <SegmentedToggle
                 theme={theme}
                 options={TARGET_OPTIONS}
@@ -1047,6 +1345,19 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
   // No character behind the numbers, so the seed's class-shaped placeholders
   // (STR main / DEX secondary) are withheld rather than presented as facts.
   const standalone = opt.selectedCharName === null;
+  // ...and nothing to write a recommendation back to, which is what hides the
+  // whole apply section rather than disabling it.
+  const apply: ApplyProps | null = opt.selectedCharName
+    ? {
+        charName: opt.selectedCharName,
+        what:
+          opt.mode === "hyper"
+            ? `Hyper Stat preset ${opt.active.presetIndex + 1}`
+            : "HEXA Stat lines",
+        run: opt.applyRun,
+        onApply: () => void opt.applyRecommendation(),
+      }
+    : null;
 
   return (
     <>
@@ -1077,6 +1388,7 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
             tracked={hyperTracked(opt.active.storedHyper)}
             calibrationNotice={state.calibrationNotice}
             hasStats={opt.hasStats}
+            apply={apply}
           />
         ) : (
           <HexaPanel
@@ -1091,6 +1403,7 @@ function StatOptimizerContent({ theme, styles, opt }: { theme: AppTheme; styles:
             tracked={hexaTracked(state.cores)}
             calibrationNotice={state.calibrationNotice}
             hasStats={opt.hasStats}
+            apply={apply}
           />
         )}
       </div>

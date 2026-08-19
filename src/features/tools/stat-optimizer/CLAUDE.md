@@ -7,8 +7,8 @@ optimizes bossing only; Hyper Stat additionally has a **mobbing target** that is
 ours (see "Mobbing target" below). Works **standalone**: state is always present,
 blank by default (`emptyCharacterSeed`), autopopulated when a stored character is
 picked. Edits live in memory only and are intentionally **not persisted**, with
-one exception: the level, saved per character under the `statOptimizer` tool key
-(see "Point budget").
+two exceptions: the level, saved per character under the `statOptimizer` tool key
+(see "Point budget"), and an explicit **Apply** (see "Applying a recommendation").
 
 ## Damage kernel (`damage-formula.ts`, scouter's `A`/n8/Ng/gt/h2/_M/VQ)
 `computeScouterDamage` = statFactor × attack × critBucket × dmgBucket × iedBucket.
@@ -35,9 +35,10 @@ marginal values and therefore recommendations.
 - **iedBucket** `1 - PDR%*(1 - ied)/100`; sources stack multiplicatively with
   scouter's exact stack/un-stack arithmetic (`stackIedSources`/`applyIed`,
   including their odd mixed-sign combine). `dpmIgnoreGuard` is stacked in.
-- Boss PDR is a two-option picker, 300% (standard endgame) or 380% (hardest
-  tier), defaulting to `DEFAULT_BOSS_PDR` = 380. Scouter offers the full 50-380
-  range; the kernel still takes any number, so widening it is a UI change only.
+- Boss PDR is a two-option picker, 300% (where most early-game bosses sit) or
+  380% (the real endgame bosses), defaulting to `DEFAULT_BOSS_PDR` = 380.
+  Scouter offers the full 50-380 range; the kernel still takes any number, so
+  widening it is a UI change only.
 
 ## Strip-then-optimize
 Stored character stats are displayed totals that already include the current
@@ -289,6 +290,69 @@ UI has to honor (`standalone = selectedCharName === null`):
   a 0 budget makes `capHyperLevelToBudget` clamp every typed level straight back to
   0, so the panel silently refuses the levels its own warning asks for.
   `STANDALONE_LEVEL` (290) is the guard; keep it at or above 140.
+
+## Applying a recommendation (`stat-optimizer-apply.ts`)
+The tool's one write to a character. Both panels get an Apply button, hidden
+entirely on standalone entry (nothing to write to) and disabled on any
+"nothing-to-optimize" state or whenever **the columns on screen already match**
+(every hyper line at its recommended level, every HEXA line carrying its
+recommended type). That last gate is the meaningful one: with Now equal to Best
+there is nothing to do in-game, so there is nothing to confirm having done. It
+subsumes `alreadyOptimal`, which returns the current allocation by definition.
+
+**It writes two things, and both are required.** The allocation (the hyper
+preset's levels, or the HEXA nodes' types and levels) *and* a delta on the stored
+stat window, because a stored stat window is the in-game tooltip and therefore
+already includes the allocation being replaced. Write only the allocation and
+every figure derived from the stats -- MapleScouter, Boss Clear, this tool's own
+next run -- still describes the old one. Each line lands in the bucket the kernel
+valued it in: main/sub stat in "% Not Applied", ATT inside the base, the percent
+lines in their own fields, Ignore Enemy DEF re-stacked through the kernel's own
+`applyIed` (mirroring each engine's stack order: hyper runs add-then-strip as two
+operations, HEXA runs one net operation).
+
+Three rules that aren't obvious from the code:
+- **Deltas come from the allocation tables, never from the stat fields**, so a
+  value typed to model a hypothetical can't leak into the write. The delta is
+  applied to whatever the store holds, floored at 0 (every field written here is
+  non-negative in-game, and an overstated Now column can strip more than is
+  there).
+- **The HEXA baseline is unlocked cores only**, mirroring the engine's own strip.
+  The recommendation skips locked cores, so counting them on the "before" side
+  reads as "this core's lines went away" and subtracts a whole core.
+- **Every tracked preset key is written, not just the target's lines.** The point
+  budget is target-independent (see "Mobbing target"), so a mobbing run's budget
+  already spent the Boss Damage and IED points; applying has to zero those lines
+  or the preset overspends. `currentFullAllocation` therefore reads the whole
+  stored preset and overlays the panel's editable Now column on the target's
+  lines only, so the stat delta removes the freed lines too.
+- **The record's level catches up on apply** (`withToolLevel`, raised only). The
+  budget comes from the level on screen, which can run ahead of the record, so
+  writing the allocation alone can leave a preset costing more than
+  `availableHyperPoints(record.level)` — and the Boss 380 HEXA figure reported
+  afterwards is recomputed off `record.level` in both modes either way.
+- **The Boss 380 HEXA figure is not ours to compute.** MapleScouter derives it
+  server-side, so the apply re-runs `refreshScouterResult` against the stat window
+  it just wrote and reports what came back. A `stale` "ok" is the *last good*
+  entry handed back after a failed refetch, i.e. the allocation just replaced --
+  never report it as the recomputed figure.
+
+The panel re-seeds from the store **after** that lookup, not before: re-seeding is
+what moves the Now column onto what was just written (so the gain settles at
+"already optimized"), and the refresh is what leaves a cache entry matching the
+new payload hash -- re-seeding first would drop every apply straight into the
+uncalibrated warning. Applying to a non-active hyper preset also makes it active,
+since the stat window written alongside it is only true with that preset equipped.
+
+The apply writes a node for every HEXA core, including blank shells for the ones
+it doesn't fill, so **`readCore` must derive `unlocked` from a core's DATA, never
+from a stored node merely existing** — that older test unlocked all three cores on
+the first apply.
+
+The confirm dialog is load-bearing, not ceremony. Nothing here verifies the player
+actually respecced, and a confirmed apply on a character who didn't leaves their
+saved stats describing a character that doesn't exist, so the dialog names that
+consequence and gates the button on a ticked "I have already applied this in-game".
 
 ## Data sources
 Hyper tables/costs: `hyper-stat-data.ts` (== scouter's tD/ve/hR; == wiki, with

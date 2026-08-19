@@ -1139,7 +1139,9 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
     [input, heroicWorld, burningSpent],
   );
   const result = useMemo(() => calculateAllInOne(effectiveInput), [effectiveInput]);
-  const eligibleParks = MONSTER_PARK_OPTIONS.filter((park) => park.minLevel <= input.startLevel);
+  // The pin stays listed even out of reach: Current Level commits per keystroke, so a level being
+  // retyped dips to Lv. 200 and would otherwise drop the pinned dungeon out of its own select.
+  const eligibleParks = MONSTER_PARK_OPTIONS.filter((park) => park.minLevel <= input.startLevel || park.id === input.monsterParkId);
   const bestPark = bestMonsterParkForLevel(input.startLevel);
   /** Persists to the selected character as part of the state update; manual level stays in memory. */
   const updateInput = (updater: (state: AllInOneInput) => AllInOneInput) => {
@@ -1470,12 +1472,14 @@ function ResourcesTab({ theme }: { theme: AppTheme }) {
   const selectStyle = fullWidthControl(styles.selectStyle);
   const panelStyle = expPanelStyle(styles);
   const [input, setInput] = useState(initialBreakdownInput);
-  // `""` is "not picked yet", which resolves to the first resource the level can reach.
+  // `""` is "not picked yet", which resolves to the first resource.
   const [sectionId, setSectionId] = useState("");
+  // The list holds every resource at every level, so the pick always resolves. Level gates a
+  // section's contents, never its presence: a half-typed "2" clamps to Lv. 200 for a keystroke,
+  // and dropping the unreachable sections there would silently reassign the player's pick.
   const sections = useMemo(() => buildResourceBreakdown(input), [input]);
-  // Level also gates which resources exist, so a pick can drop out of the list. Falling back on
-  // read rather than correcting the state hands the pick back if the level climbs to it again.
   const section = sections.find((entry) => entry.id === sectionId) ?? sections[0];
+  const locked = input.level < section.minLevel;
 
   // Changing the character level re-seeds the monster-level fields with it, since "what is this
   // worth at Lv. X" almost always means fighting Lv. X monsters. They stay editable after.
@@ -1517,36 +1521,44 @@ function ResourcesTab({ theme }: { theme: AppTheme }) {
       {section.note && <p style={{ ...breakdownNoteStyle, color: theme.muted }}>{section.note}</p>}
       {/* Keyed so switching resources replays the site-wide fade on the body that swapped. */}
       <div key={section.id} className="fade-in" style={breakdownBodyStyle(theme)}>
-        {section.controls.length > 0 && (
-          // The body fill is `timerBg`, so the knob band is the lighter `panel` fill.
-          <div style={{ ...breakdownControlRowStyle, background: theme.panel, borderBottom: `1px solid ${theme.border}`, padding: "10px 14px" }}>
-            {section.controls.map((control) => (
-              <BreakdownControl
-                key={control}
-                id={control}
-                input={input}
-                styles={styles}
-                inputStyle={inputStyle}
-                selectStyle={selectStyle}
-                onChangeNumber={updateNumber}
-                onSelectMonsterPark={selectMonsterPark}
-              />
-            ))}
-          </div>
+        {locked ? (
+          <p style={{ ...breakdownLockedStyle, color: theme.muted }}>
+            {section.title} unlocks at Lv. {section.minLevel}.
+          </p>
+        ) : (
+          <>
+            {section.controls.length > 0 && (
+              // The body fill is `timerBg`, so the knob band is the lighter `panel` fill.
+              <div style={{ ...breakdownControlRowStyle, background: theme.panel, borderBottom: `1px solid ${theme.border}`, padding: "10px 14px" }}>
+                {section.controls.map((control) => (
+                  <BreakdownControl
+                    key={control}
+                    id={control}
+                    input={input}
+                    styles={styles}
+                    inputStyle={inputStyle}
+                    selectStyle={selectStyle}
+                    onChangeNumber={updateNumber}
+                    onSelectMonsterPark={selectMonsterPark}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="exp-breakdown-grid">
+              {section.groups.map((group) => (
+                <Fragment key={group.id}>
+                  {group.heading && (
+                    <div style={{ ...breakdownHeadingStyle, color: theme.muted }}>
+                      <span>{group.heading}</span>
+                      <span style={{ ...breakdownHeadingRuleStyle, background: theme.border }} />
+                    </div>
+                  )}
+                  <BreakdownGroupBlock theme={theme} group={group} level={input.level} />
+                </Fragment>
+              ))}
+            </div>
+          </>
         )}
-        <div className="exp-breakdown-grid">
-          {section.groups.map((group) => (
-            <Fragment key={group.id}>
-              {group.heading && (
-                <div style={{ ...breakdownHeadingStyle, color: theme.muted }}>
-                  <span>{group.heading}</span>
-                  <span style={{ ...breakdownHeadingRuleStyle, background: theme.border }} />
-                </div>
-              )}
-              <BreakdownGroupBlock theme={theme} group={group} level={input.level} />
-            </Fragment>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -1580,7 +1592,9 @@ function BreakdownControl({
             onChange={(e) => onSelectMonsterPark(e.target.value)}
           >
             <option value="">Highest available</option>
-            {MONSTER_PARK_OPTIONS.filter((park) => park.minLevel <= input.level).map((park) => (
+            {/* The pin stays listed even out of reach, for the same reason the Resource list is
+                level-independent: a level mid-edit must not blank a choice the player made. */}
+            {MONSTER_PARK_OPTIONS.filter((park) => park.minLevel <= input.level || park.id === input.monsterParkId).map((park) => (
               <option key={park.id} value={park.id}>
                 {park.label}
               </option>
@@ -1645,6 +1659,17 @@ const levelFieldStyle: React.CSSProperties = { width: 116 };
 function breakdownBodyStyle(theme: AppTheme): React.CSSProperties {
   return { ...innerCardStyle(theme), overflow: "hidden", marginTop: "1rem" };
 }
+
+/** Stands in for the body while the level is under the picked resource's gate, so a pick the
+ *  player made survives a level they are mid-edit on instead of being swapped out from under them. */
+const breakdownLockedStyle: React.CSSProperties = {
+  margin: 0,
+  padding: "20px 14px",
+  fontSize: "0.8rem",
+  fontWeight: 700,
+  lineHeight: 1.45,
+  textAlign: "center",
+};
 
 /** Describes the picked resource, so it sits under the picker rather than in the body. */
 const breakdownNoteStyle: React.CSSProperties = { margin: "8px 0 0", fontSize: "0.78rem", fontWeight: 700, lineHeight: 1.45 };

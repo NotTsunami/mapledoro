@@ -55,6 +55,12 @@ export function FamiliarSprite({ fam, size, theme }: { fam: MfFamiliar; size: nu
         alt=""
         width={size}
         height={size}
+        // The picker lists up to 50 familiars with roughly a viewport's worth on
+        // screen, so without this every row fetches a sprite the moment the
+        // dropdown opens. The onError fallback chain below still runs normally
+        // for whichever ones the browser actually loads.
+        loading="lazy"
+        decoding="async"
         style={{ objectFit: "contain", width: size, height: size, display: "block" }}
         onError={(e) => {
           const img = e.currentTarget;

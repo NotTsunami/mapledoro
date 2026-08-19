@@ -78,13 +78,20 @@ function withValidTiers(s: FormState): FormState {
   return { ...s, desiredTier, currentTier };
 }
 
+/** The box takes a level a digit at a time, so out-of-range is a normal mid-edit state, not a bug. */
+function levelInRange(itemLevel: number): boolean {
+  return itemLevel >= MIN_ITEM_LEVEL && itemLevel <= MAX_ITEM_LEVEL;
+}
+
 /** Keep the chosen desired stat across form changes, resetting to "any" only
  *  when it's genuinely no longer offered (armor ↔ WSE swaps, a tier-up, or the
- *  level-160 bonus shifting every line amount). Deliberately does *not* look at
- *  whether the level is in range: a level typed one digit at a time passes
- *  through invalid values, and dropping the stat on the way would lose it. */
+ *  level-160 bonus shifting every line amount). An out-of-range level is skipped
+ *  rather than rebuilt against: a level typed one digit at a time passes through
+ *  values under the Lv. 160 bonus (the "1" on the way from 165 to 170), where the
+ *  amounts all shift and the stat would be dropped for a level that still offers
+ *  it. The check runs again the moment the level is back in range. */
 function withValidDesiredStat(s: FormState): FormState {
-  if (s.desiredStat === "any") return s;
+  if (s.desiredStat === "any" || !levelInRange(s.itemLevel)) return s;
   const stillValid =
     s.currentTier === s.desiredTier &&
     buildStatOptions(s.itemType, s.cubeType, s.desiredTier, s.itemLevel, s.statType)
@@ -134,7 +141,7 @@ const ROW_LABELS = ["Average", "75th percentile", "85th percentile", "95th perce
 const NO_STAT_COST: QuantileResult = { mean: 0, median: 0, seventy_fifth: 0, eighty_fifth: 0, ninety_fifth: 0 };
 
 function computeOutcome(f: FormState): Outcome {
-  if (f.itemLevel < MIN_ITEM_LEVEL || f.itemLevel > MAX_ITEM_LEVEL) return { status: "invalidLevel" };
+  if (!levelInRange(f.itemLevel)) return { status: "invalidLevel" };
 
   const isAny = f.desiredStat === "any";
   const tieringUp = f.currentTier < f.desiredTier;
@@ -323,7 +330,7 @@ export default function CubingWorkspace({ theme }: { theme: AppTheme }) {
   const outcome = useMemo(() => computeOutcome(deferred), [deferred]);
 
   const canPickStat = currentTier === desiredTier;
-  const levelValid = itemLevel >= MIN_ITEM_LEVEL && itemLevel <= MAX_ITEM_LEVEL;
+  const levelValid = levelInRange(itemLevel);
 
   const desiredTierOptions = useMemo(() => availableDesiredTiers(itemType, cubeType), [itemType, cubeType]);
   const currentTierOptions = TIERS.filter((t) => t.value <= desiredTier);

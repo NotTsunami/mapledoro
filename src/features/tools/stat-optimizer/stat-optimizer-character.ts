@@ -21,7 +21,7 @@ import {
   type OptimizeTarget,
 } from "./damage-formula";
 import { calibrateFromSpecEfficiency } from "./scouter-calibration";
-import { availableHyperPoints, HYPER_COST_CUMULATIVE, HYPER_MAX_LEVEL } from "./hyper-stat-data";
+import { availableHyperPoints, HYPER_COST_CUMULATIVE, HYPER_MAX_LEVEL, HYPER_TARGET_LINES } from "./hyper-stat-data";
 import { mapStoredHyper, zeroHyperAllocation, type HyperAllocation } from "./hyper-stat-engine";
 import { HEXA_CORE_COUNT, HEXA_MAX_LINE_LEVEL, type HexaCore, type HexaLine } from "./hexa-stat-engine";
 
@@ -99,10 +99,16 @@ function readLine(entry: { type?: string; level?: number } | undefined): HexaLin
 
 function readCore(level: number, node: HexaStatNode | undefined, index: number): HexaCore {
   const slot = node?.presets?.[node.activePreset] ?? node?.presets?.[0];
+  const primary = readLine(slot?.main);
+  const additional: [HexaLine, HexaLine] = [readLine(slot?.alt?.[0]), readLine(slot?.alt?.[1])];
+  // Below the unlock level a core is unlocked only if it carries real data -- the
+  // mere EXISTENCE of a stored node doesn't mean anything, since both the setup
+  // flow and this tool's apply write blank shells for the cores they don't fill.
+  const hasData = [primary, ...additional].some((line) => line.type !== "" || line.level > 0);
   return {
-    unlocked: level >= HEXA_UNLOCK_LEVELS[index] || Boolean(node),
-    primary: readLine(slot?.main),
-    additional: [readLine(slot?.alt?.[0]), readLine(slot?.alt?.[1])],
+    unlocked: level >= HEXA_UNLOCK_LEVELS[index] || hasData,
+    primary,
+    additional,
   };
 }
 
@@ -166,7 +172,7 @@ export function seedHyperPreset(
 ): { storedHyper: HyperAllocation; availablePoints: number; untrackedPoints: number } {
   const untrackedPoints = pointsSpentOnUntrackedLines(record, profile, presetIndex);
   return {
-    storedHyper: mapStoredHyper(record.stats.hyperStat, profile, target, presetIndex),
+    storedHyper: mapStoredHyper(record.stats.hyperStat, profile, HYPER_TARGET_LINES[target], presetIndex),
     availablePoints: Math.max(0, availableHyperPoints(level) - untrackedPoints),
     untrackedPoints,
   };

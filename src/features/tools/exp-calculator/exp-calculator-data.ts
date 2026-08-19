@@ -99,6 +99,10 @@ export interface BreakdownGroup {
 export interface BreakdownSection {
   id: string;
   title: string;
+  /** Level this section's first source unlocks at. Every section is listed at every level, so one
+   *  the character can't reach yet renders as locked rather than vanishing and taking the pick
+   *  with it (a half-typed "2" would otherwise reassign the Resource dropdown). */
+  minLevel: number;
   note?: string;
   /** The knobs this section's card renders above its groups. */
   controls: BreakdownControlId[];
@@ -386,6 +390,8 @@ const STRAWBERRY_FARM = [
   9291645, 9291645, 9291645, 9291645, 9291645, 9291645, 9291645, 9291645,
 ];
 
+const MECHABERRY_FARM_MIN_LEVEL = 280;
+
 const MECHABERRY_FARM = [
   3265600060800, 3310161465600, 3349939507200, 3394838304000, 3435009811200, 5148589248000, 5208577228800, 5276305267200,
   5344448947200, 5405227660800, 6580266950400, 6653978073600, 6737444313600, 6821411625600, 6896248444800, 6896248444800,
@@ -485,7 +491,7 @@ const RESOURCE_TABLES: ResourceTable[] = [
   { id: "advanced-exp-ticket", rows: makeLevelRows(260, ADV_EXP_TICKET) },
   { id: "punch-king", rows: makeLevelRows(200, PUNCH_KING) },
   { id: "strawberry-farm", rows: makeLevelRows(200, STRAWBERRY_FARM) },
-  { id: "mechaberry-farm", rows: makeLevelRows(280, MECHABERRY_FARM) },
+  { id: "mechaberry-farm", rows: makeLevelRows(MECHABERRY_FARM_MIN_LEVEL, MECHABERRY_FARM) },
   { id: "luxe-sauna", rows: makeLevelRows(200, LUXE_SAUNA) },
   { id: "express-booster", rows: makeLevelRows(260, EXPRESS_BOOSTER_EXP) },
   { id: "haste-inferno", rows: makeLevelRows(200, HASTE_INFERNO_EXP) },
@@ -1110,6 +1116,14 @@ export function defaultBreakdownInput(level: number): ResourceBreakdownInput {
   };
 }
 
+/** Lowest gate in an options array, so a section's `minLevel` can't drift from the filter that
+ *  actually drops its sources. */
+function lowestLevel(options: { minLevel: number }[]): number {
+  return Math.min(...options.map((option) => option.minLevel));
+}
+
+/** Every resource, in picker order. The list is deliberately level-independent: sections the level
+ *  can't reach come back empty and render locked, so typing a level never rewrites the pick. */
 export function buildResourceBreakdown(input: ResourceBreakdownInput): BreakdownSection[] {
   return [
     dailySection(input),
@@ -1126,7 +1140,7 @@ export function buildResourceBreakdown(input: ResourceBreakdownInput): Breakdown
     hasteFeverSection(input),
     afkSection(input),
     doubleUpSection(input),
-  ].filter((section) => section.groups.length > 0);
+  ];
 }
 
 /** A percent bonus that adds to a base multiplier rather than compounding with it, which is how
@@ -1145,6 +1159,7 @@ function dailySection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "dailies",
     title: "Dailies",
+    minLevel: lowestLevel(DAILY_EXP_CONTENT),
     note: "Arcane River, Tenebris and Grandis symbol dailies, per clear.",
     controls: ["arcaneRiverBonus", "grandisBonus"],
     groups: DAILY_EXP_CONTENT.filter((daily) => input.level >= daily.minLevel).map((daily) => {
@@ -1166,6 +1181,7 @@ function weeklySection(level: number): BreakdownSection {
   return {
     id: "weeklies",
     title: "Arcane River Weeklies",
+    minLevel: lowestLevel(WEEKLY_EXP_CONTENT),
     note: "Per run, up to three runs a week.",
     controls: [],
     groups: WEEKLY_EXP_CONTENT.filter((weekly) => level >= weekly.minLevel).map((weekly) => ({
@@ -1184,6 +1200,7 @@ function epicDungeonSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "epic-dungeon",
     title: "Epic Dungeon",
+    minLevel: lowestLevel(EPIC_DUNGEON_OPTIONS),
     note: "One weekly clear, by reward tier.",
     controls: ["epicDungeonBonus"],
     groups: EPIC_DUNGEON_OPTIONS.filter((dungeon) => input.level >= dungeon.minLevel).map((dungeon) => ({
@@ -1203,6 +1220,7 @@ function growthPotionSection(level: number): BreakdownSection {
   return {
     id: "growth-potions",
     title: "Growth Potions",
+    minLevel: MIN_EXP_LEVEL,
     note: "One potion is a full level, capped at the potion's top level.",
     controls: [],
     groups: GROWTH_POTION_OPTIONS.map((potion) => ({
@@ -1225,6 +1243,7 @@ function treasureBoxSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "treasure-boxes",
     title: "Treasure Boxes",
+    minLevel: lowestLevel(TREASURE_BOXES),
     note: "A flat multiple of the monster's base EXP.",
     controls: ["treasureMonsterLevel", "treasureBonus"],
     groups: TREASURE_BOXES.filter((box) => input.level >= box.minLevel).map((box) => ({
@@ -1273,6 +1292,7 @@ function monsterParkSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "monster-park",
     title: "Monster Park",
+    minLevel: lowestLevel(MONSTER_PARK_OPTIONS),
     note: "Sunday pays 1.5x. Extreme clears once a week.",
     controls: ["monsterParkId", "monsterParkRuns", "monsterParkBonus"],
     groups,
@@ -1307,6 +1327,7 @@ function expTicketSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "exp-tickets",
     title: "EXP Tickets",
+    minLevel: MIN_EXP_LEVEL,
     note: "Per ticket used.",
     controls: ["expTickets"],
     groups,
@@ -1318,6 +1339,7 @@ function punchKingSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "punch-king",
     title: "EXP Punch King",
+    minLevel: MIN_EXP_LEVEL,
     note: `Spiegelmann's Golden Carriage, max ${formatCount(PUNCH_KING_MAX_POINTS)} points a run.`,
     controls: ["punchKingPoints"],
     groups: [
@@ -1336,6 +1358,7 @@ function strawberryFarmSection(input: ResourceBreakdownInput): BreakdownSection 
   return {
     id: "strawberry-farm",
     title: "Golden Strawberry Farm",
+    minLevel: MIN_EXP_LEVEL,
     note: `Per ticket used. Affected by EXP multipliers.`,
     controls: ["strawberryTickets", "strawberryBonus"],
     groups: [
@@ -1358,10 +1381,11 @@ function mechaberryFarmSection(input: ResourceBreakdownInput): BreakdownSection 
   return {
     id: "mechaberry-farm",
     title: "Mechaberry Farm",
+    minLevel: MECHABERRY_FARM_MIN_LEVEL,
     note: "Per ticket used. NOT affected by EXP multipliers.",
     controls: ["mechaberryTickets"],
     groups:
-      input.level >= 280
+      input.level >= MECHABERRY_FARM_MIN_LEVEL
         ? [
             {
               id: "mechaberry-farm",
@@ -1384,6 +1408,7 @@ function expressBoosterSection(input: ResourceBreakdownInput): BreakdownSection 
   return {
     id: "express-booster",
     title: "Express Booster",
+    minLevel: EXPRESS_BOOSTER_MIN_LEVEL,
     note: `10 flames a spawn, ${EXPRESS_BOOSTER_FLAMES} flames a booster.`,
     controls: ["expressMonsterLevel"],
     groups:
@@ -1408,6 +1433,7 @@ function hasteFeverSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "haste-fever",
     title: "Haste Fever Time",
+    minLevel: MIN_EXP_LEVEL,
     note: `${HASTE_INFERNO_MULTIPLIER}x the monster's base EXP a kill.`,
     controls: ["hasteMonsterLevel", "hasteKills"],
     groups: [
@@ -1429,6 +1455,7 @@ function afkSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "afk",
     title: "AFK Contents",
+    minLevel: MIN_EXP_LEVEL,
     note: "Sauna EXP ticks every 5 seconds.",
     controls: ["saunaHours"],
     groups: [
@@ -1453,6 +1480,7 @@ function doubleUpSection(input: ResourceBreakdownInput): BreakdownSection {
   return {
     id: "double-up",
     title: "Champion Double Up",
+    minLevel: MIN_EXP_LEVEL,
     note: `${CHAMPION_DOUBLE_UP_MULTIPLIER}x the level's base monster EXP a point.`,
     controls: ["doubleUpPoints"],
     groups: [
