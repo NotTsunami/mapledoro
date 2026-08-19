@@ -27,3 +27,10 @@
   character's top-14 selected set (`calcCharacterProgress`).
 
 Card reordering shares `../useCardReorder.ts` with the Daily Tracker (`moveInArray` for the reducer).
+
+**Persistence** goes inside the state updaters (`commitCharacters` / `commitServer`), not an effect
+watching state — the root `CLAUDE.md` rule, so a write is atomic with the change that caused it.
+`saveState` needs both halves of the state and they live in two `useState`s, so each commit takes its
+counterpart from the closure (the value as of the last committed render, which is correct: commits
+only run from event handlers and the reset interval). `clearData` deliberately uses the raw setters,
+since `clearState` removes the blob and a commit would write an empty one straight back.

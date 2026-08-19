@@ -14,16 +14,13 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-18",
     changes: [
+      { type: "added", text: "The Stat Optimizer can now apply a recommendation to your character. It saves the Hyper Stat or HEXA Stat allocation and updates your saved stat window to match, then shows what your Boss 380 HEXA changed to. It asks you to confirm you have already made the change in-game first, since your saved stats would otherwise be wrong." },
+      { type: "fixed", text: "Fixed the Daily Tracker and Boss Crystal Tracker letting you add the same character twice by typing a name already in the list, which left two cards the tracker could not tell apart. The Add Character dialog now says the name is already there." },
+      { type: "fixed", text: "Fixed the Mystic Frontier Calculator's PASS and FAIL result being hard to read against its background, in both light and dark mode." },
       { type: "fixed", text: "Fixed the EXP Calculator's Resources tab switching to a different resource while you typed a level. Every resource now stays in the list, and one your level cannot reach yet says so instead of disappearing." },
       { type: "fixed", text: "Fixed the EXP Calculator's Daily / Weekly tab dropping your chosen Monster Park dungeon out of its list while you typed a level." },
       { type: "fixed", text: "Fixed the Cubing Calculator clearing your desired stat when you retyped the item level, even when the new level still offered that stat." },
       { type: "fixed", text: "Fixed a stray line of text appearing down the left edge of the page beside the Star Force Calculator's distribution chart in Firefox." },
-    ],
-  },
-  {
-    date: "2026-08-13",
-    changes: [
-      { type: "added", text: "The Stat Optimizer can now apply a recommendation to your character. It saves the Hyper Stat or HEXA Stat allocation and updates your saved stat window to match, then shows what your Boss 380 HEXA changed to. It asks you to confirm you have already made the change in-game first, since your saved stats would otherwise be wrong." },
     ],
   },
   {

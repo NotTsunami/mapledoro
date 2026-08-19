@@ -35,9 +35,10 @@ marginal values and therefore recommendations.
 - **iedBucket** `1 - PDR%*(1 - ied)/100`; sources stack multiplicatively with
   scouter's exact stack/un-stack arithmetic (`stackIedSources`/`applyIed`,
   including their odd mixed-sign combine). `dpmIgnoreGuard` is stacked in.
-- Boss PDR is a two-option picker, 300% (standard endgame) or 380% (hardest
-  tier), defaulting to `DEFAULT_BOSS_PDR` = 380. Scouter offers the full 50-380
-  range; the kernel still takes any number, so widening it is a UI change only.
+- Boss PDR is a two-option picker, 300% (where most early-game bosses sit) or
+  380% (the real endgame bosses), defaulting to `DEFAULT_BOSS_PDR` = 380.
+  Scouter offers the full 50-380 range; the kernel still takes any number, so
+  widening it is a UI change only.
 
 ## Strip-then-optimize
 Stored character stats are displayed totals that already include the current
@@ -325,6 +326,11 @@ Three rules that aren't obvious from the code:
   or the preset overspends. `currentFullAllocation` therefore reads the whole
   stored preset and overlays the panel's editable Now column on the target's
   lines only, so the stat delta removes the freed lines too.
+- **The record's level catches up on apply** (`withToolLevel`, raised only). The
+  budget comes from the level on screen, which can run ahead of the record, so
+  writing the allocation alone can leave a preset costing more than
+  `availableHyperPoints(record.level)` — and the Boss 380 HEXA figure reported
+  afterwards is recomputed off `record.level` in both modes either way.
 - **The Boss 380 HEXA figure is not ours to compute.** MapleScouter derives it
   server-side, so the apply re-runs `refreshScouterResult` against the stat window
   it just wrote and reports what came back. A `stale` "ok" is the *last good*

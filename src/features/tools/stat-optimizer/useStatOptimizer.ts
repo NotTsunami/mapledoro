@@ -373,11 +373,13 @@ export function useStatOptimizer() {
             profile: state.profile,
             target: activeTarget,
             presetIndex: active.presetIndex,
+            level: active.inputs.level,
             current: active.storedHyper,
             best: result.hyper.allocation,
           })
         : applyHexaToRecord(record, {
             profile: state.profile,
+            level: active.inputs.level,
             cores: state.cores,
             recommended: result.hexa.cores,
           }),
@@ -395,7 +397,7 @@ export function useStatOptimizer() {
     // trip), which would otherwise pull the panel back to the applied character.
     if (selectedCharRef.current === char) handleCharChange(char);
     setApplyRun({ char, mode, status: "done", outcome });
-  }, [selectedCharName, mode, result, state.profile, state.cores, activeTarget, active.presetIndex, active.storedHyper, handleCharChange]);
+  }, [selectedCharName, mode, result, state.profile, state.cores, activeTarget, active.presetIndex, active.inputs.level, active.storedHyper, handleCharChange]);
 
   return {
     mounted,

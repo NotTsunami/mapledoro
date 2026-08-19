@@ -96,10 +96,36 @@ export function useBossCrystalsState(mounted: boolean) {
     }
   }
 
-  // Persist on change
-  useEffect(() => {
-    if (loaded) saveState(server, characters);
-  }, [loaded, server, characters]);
+  /* Persistence goes inside the state updaters below, not an effect watching state
+     (root CLAUDE.md), so the write is atomic with the change that caused it rather
+     than landing a render later.
+
+     `saveState` needs both halves of the state and they live in two `useState`s, so
+     each commit takes its counterpart from the closure. That is the value as of the
+     last committed render, which is the right one: a commit only ever runs from an
+     event handler or the reset interval, both of which run after that render.
+
+     Only user actions and the period resets commit. The initial load above sets
+     state directly, which is the point -- the effect this replaced fired a redundant
+     write of the value it had just read back. */
+  const commitCharacters = useCallback(
+    (updater: (prev: CharacterEntry[]) => CharacterEntry[]) => {
+      setCharacters((prev) => {
+        const next = updater(prev);
+        saveState(server, next);
+        return next;
+      });
+    },
+    [server],
+  );
+
+  const commitServer = useCallback(
+    (next: string) => {
+      saveState(next, characters);
+      setServer(next);
+    },
+    [characters],
+  );
 
   // Period resets while the page stays open: weekly bosses on Thursday 00:00 UTC,
   // monthly bosses (Black Mage) on the 1st at 00:00 UTC.
@@ -111,16 +137,16 @@ export function useBossCrystalsState(mounted: boolean) {
       const wk = currentWeekId();
       if (wk !== weekRef.current) {
         weekRef.current = wk;
-        setCharacters((prev) => resetClearedFlags(prev, false));
+        commitCharacters((prev) => resetClearedFlags(prev, false));
       }
       const mo = currentMonthId();
       if (mo !== monthRef.current) {
         monthRef.current = mo;
-        setCharacters((prev) => resetClearedFlags(prev, true));
+        commitCharacters((prev) => resetClearedFlags(prev, true));
       }
     }, 60 * 1000);
     return () => clearInterval(id);
-  }, [mounted]);
+  }, [mounted, commitCharacters]);
 
   // -- Calculations --
   // Only characters in the selected world are shown; totals (income and the
@@ -174,6 +200,10 @@ export function useBossCrystalsState(mounted: boolean) {
   );
   const pendingName =
     nameMode === "type" ? typedName.trim() : (selectedStoreChar?.characterName ?? "");
+  // The picker can't offer a name already added, but a typed one can still collide.
+  // Two entries under one name leave the cards indistinguishable (they key on it),
+  // so the dialog blocks it rather than letting a silent duplicate through.
+  const pendingNameTaken = pendingName !== "" && usedNames.has(pendingName.toLowerCase());
 
   let dialogTitle = "";
   if (dialog?.type === "add-bosses") dialogTitle = `Select Bosses \u2014 ${dialog.name}`;
@@ -190,7 +220,7 @@ export function useBossCrystalsState(mounted: boolean) {
   }, []);
 
   const proceedToBosses = useCallback(() => {
-    if (!pendingName) return;
+    if (!pendingName || pendingNameTaken) return;
     const imageURL =
       nameMode === "select" ? (selectedStoreChar?.characterImgURL ?? null) : null;
     // Imported characters take their real world; typed ones take the current view.
@@ -200,16 +230,16 @@ export function useBossCrystalsState(mounted: boolean) {
         : (server as ServerType);
     setDialogBosses(createBosses(""));
     setDialog({ type: "add-bosses", name: pendingName, imageURL, world });
-  }, [pendingName, nameMode, selectedStoreChar, server]);
+  }, [pendingName, pendingNameTaken, nameMode, selectedStoreChar, server]);
 
   const confirmAdd = useCallback(() => {
     if (dialog?.type !== "add-bosses") return;
-    setCharacters((prev) => [
+    commitCharacters((prev) => [
       ...prev,
       { name: dialog.name, imageURL: dialog.imageURL, world: dialog.world, bosses: dialogBosses },
     ]);
     setDialog(null);
-  }, [dialog, dialogBosses]);
+  }, [dialog, dialogBosses, commitCharacters]);
 
   const openEdit = useCallback(
     (idx: number) => {
@@ -222,27 +252,27 @@ export function useBossCrystalsState(mounted: boolean) {
   const confirmEdit = useCallback(() => {
     if (dialog?.type !== "edit") return;
     const idx = dialog.index;
-    setCharacters((prev) =>
+    commitCharacters((prev) =>
       prev.map((c, i) => (i === idx ? { ...c, bosses: dialogBosses } : c)),
     );
     setDialog(null);
-  }, [dialog, dialogBosses]);
+  }, [dialog, dialogBosses, commitCharacters]);
 
   const deleteCharacter = useCallback((idx: number) => {
-    setCharacters((prev) => prev.filter((_, i) => i !== idx));
-  }, []);
+    commitCharacters((prev) => prev.filter((_, i) => i !== idx));
+  }, [commitCharacters]);
 
   const toggleBossCleared = useCallback((charIdx: number, bossIdx: number) => {
-    setCharacters((prev) => toggleClearedAt(prev, charIdx, bossIdx));
-  }, []);
+    commitCharacters((prev) => toggleClearedAt(prev, charIdx, bossIdx));
+  }, [commitCharacters]);
 
   const setAllBossesCleared = useCallback((charIdx: number, cleared: boolean) => {
-    setCharacters((prev) => setClearedForChar(prev, charIdx, cleared));
-  }, []);
+    commitCharacters((prev) => setClearedForChar(prev, charIdx, cleared));
+  }, [commitCharacters]);
 
   const reorderCharacters = useCallback((from: number, to: number) => {
-    setCharacters((prev) => moveInArray(prev, from, to));
-  }, []);
+    commitCharacters((prev) => moveInArray(prev, from, to));
+  }, [commitCharacters]);
 
   const toggleDialogBoss = useCallback((bi: number) => {
     setDialogBosses((prev) =>
@@ -260,6 +290,8 @@ export function useBossCrystalsState(mounted: boolean) {
     setDialogBosses(createBosses(key));
   }, []);
 
+  // Raw setters, not the commits: `clearState` removes the stored blob, and
+  // committing would immediately write an empty one back in its place.
   const clearData = useCallback(() => {
     clearState();
     setServer("heroic");
@@ -276,7 +308,7 @@ export function useBossCrystalsState(mounted: boolean) {
 
   return {
     server,
-    setServer,
+    setServer: commitServer,
     visibleCharacters,
     totalWeeklyMeso,
     totalMonthlyMeso,
@@ -291,6 +323,7 @@ export function useBossCrystalsState(mounted: boolean) {
     dialogTitle,
     showBossDialog,
     pendingName,
+    pendingNameTaken,
     nameMode,
     setNameMode,
     typedName,

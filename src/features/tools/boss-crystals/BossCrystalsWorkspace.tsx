@@ -803,7 +803,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
     server, setServer, visibleCharacters,
     totalWeeklyMeso, totalMonthlyMeso, totalCrystals, clearedMeso, clearedCrystals, serverMult,
     dialog, dialogBosses, dialogDisabled, dialogPreview,
-    dialogTitle, showBossDialog, pendingName,
+    dialogTitle, showBossDialog, pendingName, pendingNameTaken,
     nameMode, setNameMode, typedName, setTypedName,
     selectedStoreChar, setSelectedStoreChar, availableStoreChars,
     openAdd, proceedToBosses, confirmAdd, openEdit, confirmEdit,
@@ -933,6 +933,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
           selectedChar={selectedStoreChar}
           onSelectedChar={setSelectedStoreChar}
           pendingName={pendingName}
+          nameTaken={pendingNameTaken}
           onNext={proceedToBosses}
           onClose={closeDialog}
         />

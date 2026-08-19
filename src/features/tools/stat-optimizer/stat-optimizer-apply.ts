@@ -251,6 +251,8 @@ export interface ApplyHyperInput {
   profile: ClassDamageProfile;
   target: OptimizeTarget;
   presetIndex: number;
+  /** The level on screen, which the point budget was derived from. */
+  level: number;
   /** The panel's editable "Now" column. */
   current: HyperAllocation;
   /** The recommended allocation (`HyperResult.allocation`). */
@@ -259,11 +261,11 @@ export interface ApplyHyperInput {
 
 export function applyHyperToRecord(
   record: StoredCharacterRecord,
-  { profile, target, presetIndex, current, best }: ApplyHyperInput,
+  { profile, target, presetIndex, level, current, best }: ApplyHyperInput,
 ): StoredCharacterRecord {
   const full = currentFullAllocation(record, profile, presetIndex, target, current);
   return {
-    ...record,
+    ...withToolLevel(record, level),
     stats: {
       ...applyStatWindowDelta(record.stats, profile, hyperStatWindowDelta(profile, full, best)),
       hyperStat: writeHyperPreset(record.stats.hyperStat, profile, presetIndex, best),
@@ -372,6 +374,10 @@ function writeHexaNodes(
 
 export interface ApplyHexaInput {
   profile: ClassDamageProfile;
+  /** The level on screen; see `withToolLevel`. HEXA spends no level-derived
+   *  budget, but the figure reported after the write is recomputed off the
+   *  record's level, so it catches up here for the same reason. */
+  level: number;
   /** The panel's editable cores (levels and current types). */
   cores: HexaCore[];
   /** `HexaResult.cores`, which is aligned to the UNLOCKED cores in order. */
@@ -380,17 +386,35 @@ export interface ApplyHexaInput {
 
 export function applyHexaToRecord(
   record: StoredCharacterRecord,
-  { profile, cores, recommended }: ApplyHexaInput,
+  { profile, level, cores, recommended }: ApplyHexaInput,
 ): StoredCharacterRecord {
   // Re-align the engine's unlocked-only list onto all three core slots.
   let cursor = 0;
   const best = cores.map((core) => (core.unlocked ? recommended[cursor++] : undefined));
   const storedNodes = (record.tools?.hexaStat as { nodes?: HexaStatNode[] } | undefined)?.nodes ?? [];
   return {
-    ...record,
+    ...withToolLevel(record, level),
     stats: applyStatWindowDelta(record.stats, profile, hexaStatWindowDelta(profile, cores, best)),
     tools: { ...record.tools, hexaStat: { nodes: writeHexaNodes(storedNodes, cores, best) } },
   };
+}
+
+/**
+ * The record's level, caught up to the one the tool ran at.
+ *
+ * The level field stays editable because a record only refreshes on a lookup, so
+ * a player who levelled since can type the real one in (`readToolLevel`). Applying
+ * has to carry that onto the record: the hyper budget is derived from the level on
+ * screen, so writing the allocation alone can leave a preset spending more points
+ * than `availableHyperPoints(record.level)` allows, and the Boss 380 HEXA figure
+ * reported afterwards is recomputed off `record.level` either way.
+ *
+ * Only ever raised. `readToolProgress` already treats the record as a floor and
+ * drops the typed level once the record reaches it, so this is that same catch-up
+ * happening at the moment the player tells us the change is real.
+ */
+function withToolLevel(record: StoredCharacterRecord, level: number): StoredCharacterRecord {
+  return level > record.level ? { ...record, level } : record;
 }
 
 // ── Store write ───────────────────────────────────────────────────────────────

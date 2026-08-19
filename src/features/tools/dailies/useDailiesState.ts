@@ -391,6 +391,11 @@ export function useDailiesState() {
 
   const pendingName =
     nameMode === "type" ? typedName.trim() : (selectedStoreChar?.characterName ?? "");
+  // The picker can't offer a name already added, but a typed one can still collide.
+  // Two entries under one name leave the cards indistinguishable (they key on it)
+  // and double-count in the per-world counter totals, so the dialog blocks it
+  // rather than letting a silent duplicate through.
+  const pendingNameTaken = pendingName !== "" && usedNames.has(pendingName.toLowerCase());
 
   // -- Dialog handlers --
   const openAdd = useCallback(() => {
@@ -401,10 +406,10 @@ export function useDailiesState() {
   }, []);
 
   const proceedToTasks = useCallback(() => {
-    if (!pendingName) return;
+    if (!pendingName || pendingNameTaken) return;
     setDraft(emptySelected());
     setDialog({ type: "add-tasks", name: pendingName });
-  }, [pendingName]);
+  }, [pendingName, pendingNameTaken]);
 
   const confirmAdd = useCallback(() => {
     if (dialog?.type !== "add-tasks") return;
@@ -502,6 +507,7 @@ export function useDailiesState() {
     selectedStoreChar,
     setSelectedStoreChar,
     pendingName,
+    pendingNameTaken,
     draft,
     setDraft,
     openAdd,

@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import type { AppTheme } from "../../components/themes";
+import { statusText } from "../../components/statusColors";
 import type { StoredCharacterRecord } from "../characters/model/charactersStore";
 import { CharacterPickerRow } from "./CharacterPickerRow";
 import { ToolDialog } from "./ToolDialog";
@@ -21,6 +22,7 @@ export function AddCharacterNameDialog({
   selectedChar,
   onSelectedChar,
   pendingName,
+  nameTaken = false,
   onNext,
   onClose,
 }: {
@@ -33,6 +35,10 @@ export function AddCharacterNameDialog({
   selectedChar: StoredCharacterRecord | null;
   onSelectedChar: (c: StoredCharacterRecord) => void;
   pendingName: string;
+  /** The tracker already holds this name. The picker below can't offer a
+   *  duplicate (it filters them out), but a typed name can still collide, and
+   *  adding one twice leaves two cards the tracker can't tell apart. */
+  nameTaken?: boolean;
   onNext: () => void;
   onClose: () => void;
 }) {
@@ -48,6 +54,7 @@ export function AddCharacterNameDialog({
     }
   };
 
+  const canProceed = Boolean(pendingName) && !nameTaken;
   const footer = (
     <>
       <button
@@ -61,18 +68,27 @@ export function AddCharacterNameDialog({
       <button
         type="button"
         className="tool-btn tool-dialog-btn"
-        disabled={!pendingName}
+        disabled={!canProceed}
         onClick={onNext}
         style={{
-          ...(pendingName ? styles.dialogPrimaryBtnStyle : styles.dialogBtnStyle),
-          opacity: pendingName ? 1 : 0.5,
-          cursor: pendingName ? "pointer" : "not-allowed",
+          ...(canProceed ? styles.dialogPrimaryBtnStyle : styles.dialogBtnStyle),
+          opacity: canProceed ? 1 : 0.5,
+          cursor: canProceed ? "pointer" : "not-allowed",
         }}
       >
         Next
       </button>
     </>
   );
+
+  /* Named rather than only greying Next out: the picker silently omits names
+     already added, so a disabled button with no reason reads as a bug when the
+     same name was just typed by hand. */
+  const takenNote = nameTaken ? (
+    <div role="alert" style={{ fontSize: "0.78rem", fontWeight: 700, color: statusText(theme, "warning") }}>
+      {pendingName} is already in this tracker.
+    </div>
+  ) : null;
 
   return (
     <ToolDialog theme={theme} title="Add Character" onClose={onClose} footer={footer}>
@@ -102,7 +118,7 @@ export function AddCharacterNameDialog({
               value={typedName}
               onChange={(e) => onTypedName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && typedName.trim()) onNext();
+                if (e.key === "Enter" && canProceed) onNext();
               }}
               ref={focusOnce}
               className="tool-input"
@@ -167,6 +183,7 @@ export function AddCharacterNameDialog({
           style={{ ...styles.inputStyle, width: "100%" }}
         />
       )}
+      {takenNote}
     </ToolDialog>
   );
 }

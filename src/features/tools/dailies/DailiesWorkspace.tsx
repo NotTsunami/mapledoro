@@ -761,7 +761,7 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
     setTypedName,
     selectedStoreChar,
     setSelectedStoreChar,
-    pendingName,
+    pendingName, pendingNameTaken,
     draft,
     setDraft,
     openAdd,
@@ -857,6 +857,7 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
           selectedChar={selectedStoreChar}
           onSelectedChar={setSelectedStoreChar}
           pendingName={pendingName}
+          nameTaken={pendingNameTaken}
           onNext={proceedToTasks}
           onClose={closeDialog}
         />
