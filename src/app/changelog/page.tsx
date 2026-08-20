@@ -15,6 +15,7 @@ const CHANGELOG: ChangelogEntry[] = [
     date: "2026-08-20",
     changes: [
       { type: "added", text: "Settings can now back up your data to Google Drive and restore it on another device. It is optional and off until you connect, and it only saves your MapleDoro data to a private, hidden app folder that cannot see anything else in your Drive." },
+      { type: "added", text: "Backing up and restoring both show you what will change first, including any characters that would be added or lost, so a backup cannot quietly wipe a character that is only saved in your Drive." },
     ],
   },
   {

@@ -19,7 +19,6 @@ import {
   readDriveSyncState,
   saveToAppData,
 } from "../../lib/driveSync";
-import ConfirmModal from "../../components/ConfirmModal";
 import ModalShell from "../../components/ModalShell";
 import WarningIcon from "../../components/WarningIcon";
 import { STATUS, statusText } from "../../components/statusColors";
@@ -76,7 +75,7 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
-/* ---------- Drive backup comparison (restore preview / overwrite guard) ---------- */
+/* ---------- Drive backup comparison (shown before a restore or a backup) ---------- */
 
 /* Drive stamps modifiedTime server-side while lastSyncedAt comes from this
    browser's clock, so "newer" needs slack for clock skew. A minute is far above
@@ -99,8 +98,7 @@ function nameList(names: string[]): string {
   return `${names.slice(0, MAX_NAMES).join(", ")} and ${names.length - MAX_NAMES} more`;
 }
 
-interface RestorePreview {
-  entries: [string, string][];
+interface DriveComparison {
   /** Drive's modifiedTime for the backup file. */
   savedAt: number | null;
   localNames: string[];
@@ -113,61 +111,95 @@ interface RestorePreview {
    vocabulary players think in, and it answers "will I lose something?" exactly.
    Anything deeper -- which side of the SAME character is newer, tool blob diffs --
    the stores can't answer honestly (they don't timestamp their writes), so the
-   dialog sticks to facts: counts, names, and the two exact times. */
-function buildRestorePreview(entries: [string, string][], savedAt: number | null): RestorePreview {
-  const rawBackupStore = entries.find(([key]) => key === CHARACTERS_STORE_STORAGE_KEY)?.[1];
+   dialog sticks to facts: counts, names, and the two exact times.
+
+   `entries` is null when the file in Drive isn't a readable backup at all; the
+   backup direction still offers to overwrite it, so that isn't fatal here. */
+function buildDriveComparison(entries: [string, string][] | null, savedAt: number | null): DriveComparison {
+  const rawBackupStore = entries?.find(([key]) => key === CHARACTERS_STORE_STORAGE_KEY)?.[1];
   const backupStore = rawBackupStore == null ? null : parseCharactersStore(rawBackupStore);
   return {
-    entries,
     savedAt,
     localNames: selectCharactersList(readCharactersStore()).map((c) => c.ign),
     backupNames:
-      rawBackupStore == null
-        ? [] // no characters key in the backup = a roster of zero, not a parse failure
+      entries !== null && rawBackupStore == null
+        ? [] // a readable backup with no characters key = a roster of zero, not a parse failure
         : backupStore && selectCharactersList(backupStore).map((c) => c.ign),
   };
 }
 
 /** What the savedAt / lastSyncedAt relationship means, in player terms. Both
  *  facts are exact (Drive's server clock vs this browser's own backup stamp);
- *  everything else stays out because the stores can't date their own changes. */
-function restoreInterpretation(savedAt: number | null, lastSyncedAt: number | null): string | null {
+ *  everything else stays out because the stores can't date their own changes.
+ *
+ *  Note this only ever detects "another device wrote this file". It cannot see
+ *  a local deletion made since the last backup, which is why the roster diff
+ *  above carries the real safety weight and this is only context. */
+function comparisonInterpretation(
+  mode: CompareMode,
+  savedAt: number | null,
+  lastSyncedAt: number | null,
+): string | null {
   if (savedAt === null) return null;
   if (lastSyncedAt === null) {
-    return "This browser hasn't backed up yet, so this backup came from another browser or device.";
+    return "This browser hasn't backed up before, so the file in your Drive came from another browser or device.";
   }
   if (savedAt > lastSyncedAt + CLOCK_SLACK_MS) {
-    return "This backup is newer than this browser's last backup, so it likely holds progress from another device.";
+    return "The file in your Drive is newer than this browser's last backup, so it likely holds progress from another device.";
   }
-  return "This backup matches this browser's last backup. Restoring rolls back anything changed here since then.";
+  return mode === "restore"
+    ? "This backup matches this browser's last backup. Restoring rolls back anything changed here since then."
+    : "This is the backup this browser last wrote.";
 }
 
-function overwriteWarningDescription(savedAt: number | null, lastSyncedAt: number | null): string {
-  const savedPart = savedAt === null ? "The backup in your Drive" : `The backup in your Drive from ${formatSyncTime(savedAt)}`;
-  const syncPart = lastSyncedAt === null
-    ? "was made by another browser or device"
-    : `is newer than this browser's last backup (${formatSyncTime(lastSyncedAt)})`;
-  return `${savedPart} ${syncPart}, so it may hold progress this browser doesn't have.`;
-}
+type CompareMode = "restore" | "backup";
 
-function DriveRestoreModal({
+/* Same two-column comparison for both directions, because the question is the
+   same one either way: what does this write add, and what does it destroy? Only
+   the direction of the arrows changes, so the copy is a lookup rather than a
+   second dialog to keep in sync. */
+const COMPARE_COPY = {
+  restore: {
+    title: "Restore from Google Drive?",
+    gainedLabel: "Only in the backup",
+    lostLabel: "Only in this browser, lost on restore",
+    warning: "Restoring replaces all of this browser's MapleDoro data. There is no undo.",
+    confirmLabel: "Restore backup",
+  },
+  backup: {
+    title: "Back up to Google Drive?",
+    gainedLabel: "Added to the backup",
+    lostLabel: "Removed from the backup",
+    warning: "Backing up replaces the file in your Drive. There is no undo.",
+    confirmLabel: "Back up",
+  },
+} as const;
+
+function DriveCompareModal({
   theme,
-  preview,
+  mode,
+  comparison,
   lastSyncedAt,
   onConfirm,
   onCancel,
 }: {
   theme: AppTheme;
-  preview: RestorePreview;
+  mode: CompareMode;
+  comparison: DriveComparison;
   lastSyncedAt: number | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const localSet = new Set(preview.localNames);
-  const backupSet = preview.backupNames === null ? null : new Set(preview.backupNames);
-  const gained = backupSet === null ? [] : [...backupSet].filter((name) => !localSet.has(name));
-  const lost = backupSet === null ? [] : [...localSet].filter((name) => !backupSet.has(name));
-  const interpretation = restoreInterpretation(preview.savedAt, lastSyncedAt);
+  const copy = COMPARE_COPY[mode];
+  const localSet = new Set(comparison.localNames);
+  const backupSet = comparison.backupNames === null ? null : new Set(comparison.backupNames);
+  const localOnly = backupSet === null ? [] : [...localSet].filter((name) => !backupSet.has(name));
+  const backupOnly = backupSet === null ? [] : [...backupSet].filter((name) => !localSet.has(name));
+  // Whichever side the write destroys is the red one: restoring drops what only
+  // this browser has, backing up drops what only the backup has.
+  const gained = mode === "restore" ? backupOnly : localOnly;
+  const lost = mode === "restore" ? localOnly : backupOnly;
+  const interpretation = comparisonInterpretation(mode, comparison.savedAt, lastSyncedAt);
 
   const columnStyle: CSSProperties = {
     border: `1px solid ${theme.border}`,
@@ -192,16 +224,16 @@ function DriveRestoreModal({
   return (
     <ModalShell
       theme={theme}
-      ariaLabel="Restore from Google Drive"
+      ariaLabel={copy.title}
       onClose={onCancel}
       style={{ width: "min(480px, calc(100vw - 2rem))", padding: "1rem" }}
     >
       <div style={{ display: "grid", gap: "0.75rem" }}>
-        <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800 }}>Restore from Google Drive?</p>
+        <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800 }}>{copy.title}</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
           <div style={columnStyle}>
             <span style={columnHeadStyle}>This browser</span>
-            <span style={countStyle}>{countCharacters(preview.localNames.length)}</span>
+            <span style={countStyle}>{countCharacters(comparison.localNames.length)}</span>
             <span style={timeStyle}>
               {lastSyncedAt === null
                 ? "Never backed up from here"
@@ -211,27 +243,32 @@ function DriveRestoreModal({
           <div style={columnStyle}>
             <span style={columnHeadStyle}>Drive backup</span>
             <span style={countStyle}>
-              {preview.backupNames === null ? "Characters unreadable" : countCharacters(preview.backupNames.length)}
+              {comparison.backupNames === null ? "Characters unreadable" : countCharacters(comparison.backupNames.length)}
             </span>
             <span style={timeStyle}>
-              {preview.savedAt === null ? "Save time unknown" : `Saved ${formatSyncTime(preview.savedAt)}`}
+              {comparison.savedAt === null ? "Save time unknown" : `Saved ${formatSyncTime(comparison.savedAt)}`}
             </span>
           </div>
         </div>
         {gained.length > 0 && (
           <p style={{ ...diffStyle, color: statusText(theme, "success") }}>
-            + Only in the backup: {nameList(gained)}
+            + {copy.gainedLabel}: {nameList(gained)}
           </p>
         )}
         {lost.length > 0 && (
           <p style={{ ...diffStyle, color: statusText(theme, "danger") }}>
-            − Only in this browser, lost on restore: {nameList(lost)}
+            − {copy.lostLabel}: {nameList(lost)}
           </p>
         )}
-        {preview.backupNames === null && (
+        {comparison.backupNames !== null && gained.length === 0 && lost.length === 0 && (
           <p style={{ ...diffStyle, color: theme.muted }}>
-            The backup&apos;s character list couldn&apos;t be read (it may be from a different
-            MapleDoro version), so no roster comparison is shown.
+            Same characters on both sides. Tool, game, and tracker data still updates.
+          </p>
+        )}
+        {comparison.backupNames === null && (
+          <p style={{ ...diffStyle, color: theme.muted }}>
+            The file in your Drive couldn&apos;t be read as a MapleDoro backup, so no character
+            comparison is shown.
           </p>
         )}
         {interpretation && <p style={{ ...diffStyle, color: theme.muted }}>{interpretation}</p>}
@@ -247,7 +284,7 @@ function DriveRestoreModal({
           }}
         >
           <WarningIcon color={statusText(theme, "warning")} />
-          Restoring replaces all of this browser&apos;s MapleDoro data. There is no undo.
+          {copy.warning}
         </p>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.55rem" }}>
           <button
@@ -262,9 +299,16 @@ function DriveRestoreModal({
             type="button"
             onClick={onConfirm}
             className="tool-btn tool-dialog-btn"
-            style={{ background: STATUS.danger.fill, border: `1px solid ${STATUS.danger.fill}`, color: STATUS.danger.on }}
+            // Red only when this write actually destroys something -- a restore
+            // always replaces local data, a backup only sometimes drops a
+            // character from the file. A routine backup shouldn't look alarming.
+            style={
+              mode === "restore" || lost.length > 0
+                ? { background: STATUS.danger.fill, border: `1px solid ${STATUS.danger.fill}`, color: STATUS.danger.on }
+                : dialogPrimaryBtnColors(theme)
+            }
           >
-            Restore backup
+            {copy.confirmLabel}
           </button>
         </div>
       </div>
@@ -292,8 +336,13 @@ function DriveSyncPanel({
   const [sync, setSync] = useState(readDriveSyncState);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
-  const [overwritePending, setOverwritePending] = useState<{ id: string; savedAt: number | null } | null>(null);
+  /* The dialog awaiting confirmation. A restore carries the parsed payload it
+     will write locally; a backup carries the Drive file it will overwrite. */
+  const [pending, setPending] = useState<
+    | { mode: "restore"; comparison: DriveComparison; entries: [string, string][] }
+    | { mode: "backup"; comparison: DriveComparison; existing: { id: string } }
+    | null
+  >(null);
 
   const runDriveAction = async (action: () => Promise<void>) => {
     if (busy) return;
@@ -320,25 +369,23 @@ function DriveSyncPanel({
     setStatus("Backed up to Google Drive.");
   };
 
+  /* Downloads the existing backup and shows what the write would change before
+     touching it. A timestamp alone can't catch the case that matters most --
+     a character deleted locally since the last backup, where the clocks agree
+     and the write would quietly destroy the only surviving copy -- so the
+     comparison is the guard, not a heuristic. Nothing in Drive yet means
+     nothing can be lost, so the first backup skips straight through. */
   const handleBackup = () =>
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
-      // A cloud file newer than this browser's last backup (or one this browser
-      // never wrote at all) likely holds another device's progress -- confirm
-      // before clobbering it instead of silently last-write-wins.
-      const cloudLooksNewer =
-        meta !== null &&
-        (sync.lastSyncedAt === null ||
-          (meta.savedAt !== null && meta.savedAt > sync.lastSyncedAt + CLOCK_SLACK_MS));
-      if (cloudLooksNewer) {
-        setOverwritePending(meta);
+      if (meta === null) {
+        await performBackup(null);
         return;
       }
-      await performBackup(meta);
+      const entries = parseBackupEntries(await loadFromAppData(meta.id));
+      setPending({ mode: "backup", comparison: buildDriveComparison(entries, meta.savedAt), existing: meta });
     });
 
-  // Downloads and compares before anything is touched; the actual overwrite
-  // happens in applyRestore once the preview dialog is confirmed.
   const handleRestore = () =>
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
@@ -351,16 +398,20 @@ function DriveSyncPanel({
         setStatus("The file in your Drive doesn't look like a MapleDoro backup.");
         return;
       }
-      setRestorePreview(buildRestorePreview(entries, meta.savedAt));
+      setPending({ mode: "restore", comparison: buildDriveComparison(entries, meta.savedAt), entries });
     });
 
-  const applyRestore = () => {
-    if (!restorePreview) return;
-    setRestorePreview(null);
-    for (const [key, value] of restorePreview.entries) {
+  const applyPending = () => {
+    if (!pending) return;
+    setPending(null);
+    if (pending.mode === "backup") {
+      runDriveAction(() => performBackup(pending.existing));
+      return;
+    }
+    for (const [key, value] of pending.entries) {
       localStorage.setItem(key, value);
     }
-    setStatus(`Restored ${restorePreview.entries.length} item${restorePreview.entries.length === 1 ? "" : "s"}. Reloading...`);
+    setStatus(`Restored ${pending.entries.length} item${pending.entries.length === 1 ? "" : "s"}. Reloading...`);
     setTimeout(() => window.location.reload(), 800);
   };
 
@@ -410,7 +461,7 @@ function DriveSyncPanel({
                   className="tool-btn tool-dialog-btn"
                   style={{ ...dialogPrimaryBtnColors(theme), ...busyStyle }}
                 >
-                  Back up now
+                  Back up
                 </button>
                 <button
                   type="button"
@@ -452,29 +503,14 @@ function DriveSyncPanel({
           )
         ))}
       </div>
-      {restorePreview && (
-        <DriveRestoreModal
+      {pending && (
+        <DriveCompareModal
           theme={theme}
-          preview={restorePreview}
+          mode={pending.mode}
+          comparison={pending.comparison}
           lastSyncedAt={sync.lastSyncedAt}
-          onConfirm={applyRestore}
-          onCancel={() => setRestorePreview(null)}
-        />
-      )}
-      {overwritePending && (
-        <ConfirmModal
-          theme={theme}
-          title="Overwrite the Drive backup?"
-          description={overwriteWarningDescription(overwritePending.savedAt, sync.lastSyncedAt)}
-          warning="Backing up now replaces it with this browser's data."
-          confirmLabel="Overwrite backup"
-          confirmDanger
-          onConfirm={() => {
-            const existing = overwritePending;
-            setOverwritePending(null);
-            runDriveAction(() => performBackup(existing));
-          }}
-          onCancel={() => setOverwritePending(null)}
+          onConfirm={applyPending}
+          onCancel={() => setPending(null)}
         />
       )}
     </div>
