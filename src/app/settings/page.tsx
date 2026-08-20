@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import AppShell from "../../components/AppShell";
 import type { AppTheme } from "../../components/themes";
 import { ACCENT_THEMES, dialogBtnColors, dialogPrimaryBtnColors } from "../../components/themes";
 import { useTheme } from "../../components/ThemeContext";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { SegmentedToggle } from "../../components/SegmentedToggle";
+import { useMounted } from "../../lib/useMounted";
+import {
+  DRIVE_SYNC_STORAGE_KEY,
+  connectDrive,
+  disconnectDrive,
+  driveSyncConfigured,
+  loadFromAppData,
+  markDriveSynced,
+  readDriveSyncState,
+  saveToAppData,
+} from "../../lib/driveSync";
 
 const COLOR_MODES = ["light", "dark"] as const;
 const COLOR_MODE_LABELS = { light: "Light", dark: "Dark" } as const;
@@ -17,21 +28,186 @@ function hardReset() {
   window.location.reload();
 }
 
-function exportData() {
+/* One backup payload for both the file export and the Drive backup, so a Drive
+   restore behaves exactly like importing an exported file. The Drive-connection
+   flag is the one exclusion: it is sync metadata, not save data, and a backup
+   restored on another browser must not claim that browser is connected. */
+function collectBackupData(): Record<string, string> {
   const data: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.startsWith("mapledoro")) {
+    if (key?.startsWith("mapledoro") && key !== DRIVE_SYNC_STORAGE_KEY) {
       data[key] = localStorage.getItem(key) ?? "";
     }
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  return data;
+}
+
+/* Whole-payload reject, not a silent per-entry skip: collectBackupData can only
+   ever produce mapledoro-prefixed string values, so anything else (a wrong key,
+   a non-string value) means the payload was hand-edited or corrupted, not a
+   real backup -- same "reject, don't quietly drop what's wrong" reasoning as
+   world import's own cap/shape checks. */
+function parseBackupEntries(data: unknown): [string, string][] | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const entries = Object.entries(data);
+  const isValid = entries.every(([key, value]) => key.startsWith("mapledoro") && typeof value === "string");
+  return isValid ? (entries as [string, string][]) : null;
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(collectBackupData(), null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = `mapledoro-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/* Optional Google Drive cloud backup (see src/lib/driveSync.ts for the flow and
+   the privacy constraints). Backs up and restores the same payload as the file
+   export/import above, so the two paths can never drift apart. */
+function DriveSyncPanel({
+  theme,
+  panelStyle,
+  labelStyle,
+  descStyle,
+}: {
+  theme: AppTheme;
+  panelStyle: CSSProperties;
+  labelStyle: CSSProperties;
+  descStyle: CSSProperties;
+}) {
+  const mounted = useMounted();
+  // Lazy read is SSR-safe (disconnected on the server), and the connected UI
+  // only renders once mounted, so the server and hydration renders agree.
+  const [sync, setSync] = useState(readDriveSyncState);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const runDriveAction = async (action: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      await action();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Something went wrong talking to Google Drive.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConnect = () =>
+    runDriveAction(async () => {
+      setSync(await connectDrive());
+      setStatus("Connected to Google Drive.");
+    });
+
+  const handleBackup = () =>
+    runDriveAction(async () => {
+      await saveToAppData(collectBackupData());
+      setSync(markDriveSynced());
+      setStatus("Backed up to Google Drive.");
+    });
+
+  const handleRestore = () =>
+    runDriveAction(async () => {
+      const data = await loadFromAppData();
+      if (data === null) {
+        setStatus("No backup in your Drive yet. Back up from your other device first.");
+        return;
+      }
+      const entries = parseBackupEntries(data);
+      if (!entries) {
+        setStatus("The file in your Drive doesn't look like a MapleDoro backup.");
+        return;
+      }
+      for (const [key, value] of entries) {
+        localStorage.setItem(key, value);
+      }
+      setStatus(`Restored ${entries.length} item${entries.length === 1 ? "" : "s"}. Reloading...`);
+      setTimeout(() => window.location.reload(), 800);
+    });
+
+  const handleDisconnect = () => {
+    if (busy) return;
+    setSync(disconnectDrive());
+    setStatus("Disconnected. The backup file stays in your Drive.");
+  };
+
+  const busyStyle: CSSProperties = busy ? { opacity: 0.6, pointerEvents: "none" } : {};
+  const noteStyle: CSSProperties = { fontSize: "0.8rem", fontWeight: 700, color: theme.muted };
+
+  return (
+    <div className="fade-in panel-card settings-row-panel" style={panelStyle}>
+      <div style={{ maxWidth: 460 }}>
+        <p style={labelStyle}>Google Drive backup</p>
+        <p style={descStyle}>
+          Back up your data to your Google Drive and restore it on another device.
+        </p>
+        <p style={descStyle}>
+          This only saves your MapleDoro data to a private, hidden app folder in your Drive.
+          MapleDoro can&apos;t see or touch anything else in your Drive.
+        </p>
+      </div>
+      <div className="settings-data-actions">
+        {mounted && (
+          <div className="settings-actions">
+            {sync.connected ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBackup}
+                  disabled={busy}
+                  className="tool-btn tool-dialog-btn"
+                  style={{ ...dialogPrimaryBtnColors(theme), ...busyStyle }}
+                >
+                  Back up now
+                </button>
+                <ConfirmButton
+                  theme={theme}
+                  label="Restore"
+                  title="Restore from Google Drive?"
+                  message="This will replace the data in this browser with your Drive backup, then reload. There is no undo."
+                  confirmLabel="Restore backup"
+                  onConfirm={handleRestore}
+                  style={{ padding: "0.5rem 1rem", fontSize: "0.82rem", borderRadius: "10px" }}
+                />
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={busy}
+                  className="tool-btn tool-dialog-btn"
+                  style={{ ...dialogBtnColors(theme), ...busyStyle }}
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnect}
+                disabled={busy}
+                className="tool-btn tool-dialog-btn"
+                style={{ ...dialogPrimaryBtnColors(theme), ...busyStyle }}
+              >
+                Connect Google Drive
+              </button>
+            )}
+          </div>
+        )}
+        {mounted && (status ? (
+          <span style={noteStyle}>{status}</span>
+        ) : (
+          sync.connected && sync.lastSyncedAt !== null && (
+            <span style={noteStyle}>Last backed up {new Date(sync.lastSyncedAt).toLocaleString()}</span>
+          )
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function SettingsContent({ theme }: { theme: AppTheme }) {
@@ -71,23 +247,13 @@ function SettingsContent({ theme }: { theme: AppTheme }) {
         setImportStatus("That file isn't valid JSON.");
         return;
       }
-      if (typeof data !== "object" || data === null || Array.isArray(data)) {
-        setImportStatus("That file doesn't look like a MapleDoro backup.");
-        return;
-      }
-      const entries = Object.entries(data);
-      // Whole-file reject, not a silent per-entry skip: exportData() can only ever
-      // produce mapledoro-prefixed string values, so anything else (a wrong key, a
-      // non-string value) means the file was hand-edited or corrupted, not a real
-      // backup -- same "reject, don't quietly drop what's wrong" reasoning as world
-      // import's own cap/shape checks.
-      const isValid = entries.every(([key, value]) => key.startsWith("mapledoro") && typeof value === "string");
-      if (!isValid) {
+      const entries = parseBackupEntries(data);
+      if (!entries) {
         setImportStatus("That file doesn't look like a MapleDoro backup.");
         return;
       }
       for (const [key, value] of entries) {
-        localStorage.setItem(key, value as string);
+        localStorage.setItem(key, value);
       }
       setImportStatus(`Imported ${entries.length} item${entries.length === 1 ? "" : "s"}. Reloading...`);
       setTimeout(() => window.location.reload(), 800);
@@ -267,6 +433,16 @@ function SettingsContent({ theme }: { theme: AppTheme }) {
             )}
           </div>
         </div>
+
+        {/* Google Drive backup, only in deployments with an OAuth client ID configured */}
+        {driveSyncConfigured && (
+          <DriveSyncPanel
+            theme={theme}
+            panelStyle={panelStyle}
+            labelStyle={labelStyle}
+            descStyle={descStyle}
+          />
+        )}
 
         {/* Reset */}
         <div
