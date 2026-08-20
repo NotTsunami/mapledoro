@@ -68,6 +68,22 @@ The character lookup route (`/api/characters/lookup`) uses Redis when `REDIS_URL
    docker exec -it mapledoro-redis redis-cli keys "mapledoro:characters:lookup:v1:*"
    ```
 
+## Google Drive backup (optional)
+
+The Settings page has an optional Google Drive backup panel. It only renders when an OAuth
+client ID is configured; without one the feature is simply absent. The flow is pure client
+side (Google Identity Services token client + Drive REST from the browser) with the
+non-sensitive `drive.appdata` scope, so there is no backend, database, or client secret.
+
+1. In the Google Cloud console, create an OAuth 2.0 Client ID of type "Web application" and
+   add the site's origin (e.g. `http://localhost:3000`) under "Authorized JavaScript origins".
+   The consent screen only needs the `https://www.googleapis.com/auth/drive.appdata` scope.
+2. Add it to `.env.local`:
+   ```env
+   NEXT_PUBLIC_GOOGLE_CLIENT_ID=<your client id>.apps.googleusercontent.com
+   ```
+3. Restart the dev server after changing env vars.
+
 ## Legal Disclaimer
 **MapleDoro is a non-commercial, fan-made project.** It is not affiliated with, endorsed, or supported by **Nexon**, Wizet, or any of their partners.
 

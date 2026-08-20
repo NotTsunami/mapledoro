@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-20",
+    changes: [
+      { type: "added", text: "Settings can now back up your data to Google Drive and restore it on another device. It is optional and off until you connect, and it only saves your MapleDoro data to a private, hidden app folder that cannot see anything else in your Drive." },
+    ],
+  },
+  {
     date: "2026-08-18",
     changes: [
       { type: "added", text: "The Stat Optimizer can now apply a recommendation to your character. It saves the Hyper Stat or HEXA Stat allocation and updates your saved stat window to match, then shows what your Boss 380 HEXA changed to. It asks you to confirm you have already made the change in-game first, since your saved stats would otherwise be wrong." },
