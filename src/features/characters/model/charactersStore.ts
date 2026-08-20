@@ -8,7 +8,9 @@ import {
 } from "../../../lib/storageWriteFailure";
 
 const CHARACTERS_STORE_VERSION = 1 as const;
-const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
+/** Exported for the Drive restore preview (Settings), which pulls this key's
+ *  raw value out of a downloaded backup payload to compare rosters. */
+export const CHARACTERS_STORE_STORAGE_KEY = "mapledoro_characters_store_v1";
 
 export interface CharacterMarriage {
   isMarried: boolean | null;
@@ -1100,7 +1102,10 @@ function parseLegionArtifactByWorld(raw: unknown): Record<string, StoredLegionAr
   return result;
 }
 
-function parseCharactersStore(raw: string): CharactersStore | null {
+/** Exported for the Drive restore preview (Settings), which parses the backup's
+ *  copy of this store the same way a real load would -- returning null on a
+ *  version mismatch rather than guessing at an unknown shape. */
+export function parseCharactersStore(raw: string): CharactersStore | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isObject(parsed)) return null;

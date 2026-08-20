@@ -184,15 +184,22 @@ async function driveFetch(url: string, init: RequestInit & { headers?: Record<st
   return response;
 }
 
-async function findBackupFileId(): Promise<string | null> {
+/** Finds the backup file, with Drive's own last-modified time (server-stamped,
+ *  so it is trustworthy across devices in a way client clocks are not). Null
+ *  when no backup exists yet. Callers pass the result to saveToAppData /
+ *  loadFromAppData so one metadata fetch serves the whole flow. */
+export async function getDriveBackupMeta(): Promise<{ id: string; savedAt: number | null } | null> {
   const query = encodeURIComponent(`name='${FILE_NAME}'`);
   const response = await driveFetch(
-    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id)`,
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,modifiedTime)`,
     { method: "GET" },
   );
   if (!response.ok) throw new Error("Couldn't reach Google Drive. Try again in a moment.");
-  const body = (await response.json()) as { files?: { id: string }[] };
-  return body.files?.[0]?.id ?? null;
+  const body = (await response.json()) as { files?: { id: string; modifiedTime?: string }[] };
+  const file = body.files?.[0];
+  if (!file) return null;
+  const savedAt = file.modifiedTime ? Date.parse(file.modifiedTime) : NaN;
+  return { id: file.id, savedAt: Number.isNaN(savedAt) ? null : savedAt };
 }
 
 // A constant boundary is fine here: both multipart parts are JSON we serialize
@@ -215,29 +222,33 @@ function multipartCreateBody(content: string): string {
   ].join("\r\n");
 }
 
-/** Writes the backup payload as the one appDataFolder file, creating it on
- *  first save and overwriting its content after that. */
-export async function saveToAppData(data: unknown): Promise<void> {
+/** Writes the backup payload as the one appDataFolder file: overwrites
+ *  `existing` (a getDriveBackupMeta result) when given, creates the file
+ *  otherwise. A 404 on the overwrite falls back to creating, covering a backup
+ *  deleted between the caller's metadata fetch and this write. */
+export async function saveToAppData(data: unknown, existing: { id: string } | null): Promise<void> {
   const content = JSON.stringify(data);
-  const fileId = await findBackupFileId();
-  const response = fileId
-    ? await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: content,
-      })
-    : await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-        method: "POST",
-        headers: { "Content-Type": `multipart/related; boundary=${MULTIPART_BOUNDARY}` },
-        body: multipartCreateBody(content),
-      });
+  if (existing) {
+    const response = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: content,
+    });
+    if (response.status !== 404) {
+      if (!response.ok) throw new Error("Couldn't save the backup to Google Drive. Try again in a moment.");
+      return;
+    }
+  }
+  const response = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: { "Content-Type": `multipart/related; boundary=${MULTIPART_BOUNDARY}` },
+    body: multipartCreateBody(content),
+  });
   if (!response.ok) throw new Error("Couldn't save the backup to Google Drive. Try again in a moment.");
 }
 
-/** Downloads the backup file's content, or null when no backup exists yet. */
-export async function loadFromAppData(): Promise<unknown> {
-  const fileId = await findBackupFileId();
-  if (fileId === null) return null;
+/** Downloads the backup file's content, given an id from getDriveBackupMeta. */
+export async function loadFromAppData(fileId: string): Promise<unknown> {
   const response = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     method: "GET",
   });
