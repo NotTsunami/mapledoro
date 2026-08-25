@@ -82,6 +82,9 @@ export interface ScouterDoping {
   rainbow: boolean;
   thanks: boolean;
   genePass: boolean;
+  // Not a GMS buff -- always "0" here, same treatment as the KMS-only seed rings below
+  // (buildSeedRing's own comment).
+  criDmgRing: "0";
 }
 
 export interface ScouterSpecial {
@@ -120,6 +123,9 @@ export interface ScouterStat {
   ssubStatAbs: string;
   arcaneForce: string;
   authenticForce: string;
+  // Some later tribe-force stat GMS has no class using yet (unreleased content, same
+  // treatment as hexa's skillCore3-6 below) -- always "0" until something real needs it.
+  classForce: "0";
   atkBase: string;
   atkAbs: string;
   dmg: string;
@@ -154,6 +160,8 @@ export interface ScouterStat {
   ignoreElementalResist: string;
   maple_combatPower: "";
   tms_fd: "0";
+  // TMS (Taiwan) soul weapon stat -- we're GMS, always "0".
+  tms_soul: "0";
 }
 
 interface ScouterSeedRingEntry {
@@ -176,6 +184,12 @@ export interface ScouterSeedRing {
 export interface ScouterHexa {
   skillCore1: string;
   skillCore2: string;
+  // GMS has no content for skill cores past Origin (1)/Ascent (2) yet -- always "0" until
+  // something releases into one of these slots.
+  skillCore3: "0";
+  skillCore4: "0";
+  skillCore5: "0";
+  skillCore6: "0";
   masteryCore1: string;
   masteryCore2: string;
   masteryCore3: string;
@@ -184,16 +198,10 @@ export interface ScouterHexa {
   reinCore2: string;
   reinCore3: string;
   reinCore4: string;
-  generalCore1: string;
   generalCore2: string;
   generalCore3: string;
   generalCore4: string;
   hexaStat: 2;
-  character_class: string;
-  hexaSkill: Record<string, number>;
-  hexaSkill_general: Record<string, number>;
-  hexaSkill_used: { sole_Erda: 0; sole_ErdaPrice: 0 };
-  hexaStat_opened: false;
 }
 
 interface ScouterPower {
@@ -301,7 +309,8 @@ function buildDoping(character: StoredCharacterRecord): ScouterDoping {
     hyperRainbow: false,
     rainbow: false,
     thanks: false,
-    genePass: false,
+    genePass: Boolean(buffs?.genepass),
+    criDmgRing: "0",
   };
 }
 
@@ -429,6 +438,7 @@ function buildStat(
     ssubStatAbs: ssub.abs,
     arcaneForce: character.stats.arcanePower || "0",
     authenticForce: character.stats.sacredPower || "0",
+    classForce: "0",
     atkBase: atk.base || "0",
     atkAbs: atk.percentUnapplied || "0",
     dmg: character.stats.damage || "0",
@@ -436,7 +446,9 @@ function buildStat(
     // Field is greyed out/disabled on MapleScouter's own site -- looks like dead/buggy
     // input on their end, not something worth collecting from mapledoro's users. Safe to
     // always send 0; confirmed against a Lara character that its number matched with this
-    // at 0.
+    // at 0. MapleScouter's own site sends a bogus nonzero value here regardless (seen "37"
+    // in real captures) -- that's their dead field's leftover state, not a real stat to
+    // match; we deliberately always send our own 0 instead of trying to replicate it.
     normalDmg: character.stats.normalEnemyDamage || "0",
     ignoreDef: character.stats.ignoreDefense || "0",
     buffDuration: character.stats.buffDuration || "0",
@@ -477,6 +489,7 @@ function buildStat(
     ignoreElementalResist: character.stats.ignoreElementalResistance || "0",
     maple_combatPower: "",
     tms_fd: "0",
+    tms_soul: "0",
   };
 }
 
@@ -513,29 +526,20 @@ interface HexaBuildResult {
   solJanusLevel: number;
 }
 
-function buildHexa(characterName: string, koreanClassName: string, isHexaEligible: boolean): HexaBuildResult {
+function buildHexa(characterName: string, isHexaEligible: boolean): HexaBuildResult {
   const saved = readCharacterToolData<{ levels?: HexaSkillLevels }>(characterName, "hexaSkills");
   const cores = hexaCoreLevels(saved?.levels, isHexaEligible);
   const solJanusLevel = SOL_JANUS_INDEX >= 0 ? (saved?.levels?.common[SOL_JANUS_INDEX] ?? 0) : 0;
   const solHecateLevel = SOL_HECATE_INDEX >= 0 ? (saved?.levels?.common[SOL_HECATE_INDEX] ?? 0) : 0;
 
-  const hexaSkill: Record<string, number> = {
-    skillCore1: Number(cores.skillCore1),
-    skillCore2: Number(cores.skillCore2),
-    masteryCore1: Number(cores.mastery[0]),
-    masteryCore2: Number(cores.mastery[1]),
-    masteryCore3: Number(cores.mastery[2]),
-    masteryCore4: Number(cores.mastery[3]),
-    reinCore1: Number(cores.rein[0]),
-    reinCore2: Number(cores.rein[1]),
-    reinCore3: Number(cores.rein[2]),
-    reinCore4: Number(cores.rein[3]),
-  };
-
   return {
     hexa: {
       skillCore1: cores.skillCore1,
       skillCore2: cores.skillCore2,
+      skillCore3: "0",
+      skillCore4: "0",
+      skillCore5: "0",
+      skillCore6: "0",
       masteryCore1: cores.mastery[0],
       masteryCore2: cores.mastery[1],
       masteryCore3: cores.mastery[2],
@@ -544,20 +548,15 @@ function buildHexa(characterName: string, koreanClassName: string, isHexaEligibl
       reinCore2: cores.rein[1],
       reinCore3: cores.rein[2],
       reinCore4: cores.rein[3],
-      // generalCore2 = Sol Hecate (confirmed live via hover tooltip). generalCore3
-      // ("Freud's Blessing VI") and generalCore4 have never appeared in any real capture
-      // (Freud's Blessing hasn't reached GMS yet; generalCore4 has no known content at
-      // all), both always "0" until something real releases into either slot.
-      generalCore1: "0",
+      // generalCore2 = Sol Hecate. generalCore3 ("Freud's Blessing VI") hasn't reached
+      // GMS yet, and generalCore4 has no known content at all -- both always "0" until
+      // something real releases into either slot. No generalCore1 -- GMS doesn't have
+      // one yet either, and maplescouter.com's own request omits the key entirely
+      // rather than sending "0" for it, unlike generalCore3/4.
       generalCore2: String(solHecateLevel),
       generalCore3: "0",
       generalCore4: "0",
       hexaStat: 2,
-      character_class: koreanClassName,
-      hexaSkill,
-      hexaSkill_general: { generalCore1: 0 },
-      hexaSkill_used: { sole_Erda: 0, sole_ErdaPrice: 0 },
-      hexaStat_opened: false,
     },
     solJanusLevel,
   };
@@ -569,6 +568,12 @@ const ZERO_RING: ScouterSeedRingEntry = { level: "0", efficiency: 0 };
 
 function buildSeedRing(character: StoredCharacterRecord): ScouterSeedRing {
   return {
+    // efficiency is always 0 here, even for rings mapledoro does have real level data
+    // for -- a real maplescouter.com request sends real nonzero per-ring efficiency
+    // numbers, but the result matched ours anyway in a same-inputs test with these left
+    // at 0, so this looks like a value the API computes itself from `level` rather than
+    // trusting from the request. Left as a known mismatch rather than guessing at their
+    // formula; revisit if a real result ever depends on it.
     restraintRing: { level: ozRingLevel(character, "restraint"), efficiency: 0 },
     weaponRing: { level: ozRingLevel(character, "weaponJump"), efficiency: 0 },
     ringOfSum: { level: ozRingLevel(character, "totalling"), efficiency: 0 },
@@ -695,7 +700,7 @@ export function buildScouterPayload(character: StoredCharacterRecord, ctx: Scout
 
   const legion = ctx.scouterLegionByWorld[String(character.worldID)];
   const isHexaEligible = character.level >= 260 && !classData.isLegacy;
-  const { hexa, solJanusLevel } = buildHexa(character.characterName, koreanClassName, isHexaEligible);
+  const { hexa, solJanusLevel } = buildHexa(character.characterName, isHexaEligible);
 
   return {
     doping: buildDoping(character),

@@ -48,6 +48,9 @@ function buildExampleStatuses(): Record<string, ScouterFigureStatus> {
     incomplete_quick_questions: { kind: "incomplete", gap: "quickQuestions" },
     empty: { kind: "empty" },
     ready: { kind: "ready", entry: placeholderEntry(now), stale: false },
+    // No reason: the cold-mount last-known-value case (initialStatus in
+    // useScouterResult.ts), not a failed refresh -- see its own comment there.
+    ready_stale_no_reason: { kind: "ready", entry: staleEntry, stale: true },
     ready_stale_rate_limited: { kind: "ready", entry: staleEntry, stale: true, reason: "rate_limited" },
     ready_stale_timeout: { kind: "ready", entry: staleEntry, stale: true, reason: "timeout" },
     ready_stale_bad_response: { kind: "ready", entry: staleEntry, stale: true, reason: "bad_response" },

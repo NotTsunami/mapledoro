@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { findScouterSetupGap, isScouterSupportedClass, type ScouterSetupGap } from "./scouterApi";
 import {
-  autoRefreshScouterResultIfNeeded, peekScouterCache, refreshScouterResult,
+  autoRefreshScouterResultIfNeeded, peekScouterCache, peekScouterLastKnown, refreshScouterResult,
   type ScouterErrorReason, type ScouterRefreshResult, type ScouterResultEntry,
 } from "./scouterCache";
 import { getScouterDevOverride, subscribeScouterDevOverride } from "./scouterDevDrill";
@@ -16,8 +16,11 @@ export type ScouterFigureStatus =
   | { kind: "incomplete"; gap: ScouterSetupGap }
   | { kind: "empty" }
   | { kind: "ready"; entry: ScouterResultEntry; stale: false }
-  // stale is only ever reached via a failed refresh, so the reason is always known.
-  | { kind: "ready"; entry: ScouterResultEntry; stale: true; reason: ScouterErrorReason }
+  // reason is set when this came from a failed refresh this session; unset on a cold
+  // mount showing a previous build's last known value that simply hasn't been
+  // recomputed for the character's current inputs yet (see initialStatus below) --
+  // the UI should not say "an error happened" for that second case.
+  | { kind: "ready"; entry: ScouterResultEntry; stale: true; reason?: ScouterErrorReason }
   // reason/repeatedFailure are optional only so the dev drill can force a bare "error"
   // preview with neither -- a real refresh always supplies both.
   | { kind: "error"; reason?: ScouterErrorReason; repeatedFailure?: boolean };
@@ -47,7 +50,13 @@ function initialStatus(character: StoredCharacterRecord): ScouterFigureStatus {
   const gap = findScouterSetupGap(character);
   if (gap) return { kind: "incomplete", gap };
   const cached = peekScouterCache(character);
-  return cached ? { kind: "ready", entry: cached, stale: false } : { kind: "empty" };
+  if (cached) return { kind: "ready", entry: cached, stale: false };
+  // No result for the CURRENT inputs (e.g. stats were just edited), but a previous
+  // build's result is still sitting in the cache -- show that instead of dropping to
+  // "empty"/"--", same last-known-value fallback a failed refresh already gets
+  // in-session, just surviving a remount too (see peekScouterLastKnown).
+  const lastKnown = peekScouterLastKnown(character);
+  return lastKnown ? { kind: "ready", entry: lastKnown, stale: true } : { kind: "empty" };
 }
 
 /** Manual-refresh-only by design. Never fetches MapleScouter's API on its own. Reading

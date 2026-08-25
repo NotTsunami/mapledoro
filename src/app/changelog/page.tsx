@@ -12,6 +12,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-25",
+    changes: [
+      { type: "added", text: "Buff Setup step now has a toggle for Power of the Rival." },
+      { type: "fixed", text: "Fixed the Scouter figure returning a failed result by matching MapleDoro's request to MapleScouter's current API." },
+      { type: "fixed", text: "Fixed the Scouter figure and Scouter bookmark dropping back to a blank dash after you edited your stats and left the page, instead of continuing to show your last known value until you refresh." },
+    ],
+  },
+  {
     date: "2026-08-20",
     changes: [
       { type: "added", text: "Settings can now back up your data to Google Drive and restore it on another device. It is optional and off until you connect, and it only saves your MapleDoro data to a private, hidden app folder that cannot see anything else in your Drive." },

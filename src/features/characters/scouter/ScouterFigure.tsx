@@ -116,8 +116,12 @@ function figureTooltip(status: ScouterFigureStatus, theme: AppTheme): ReactNode 
     // would otherwise replace that context instead of adding to it. "As of" stays neutral
     // (theme.muted, plain metadata); the reason gets the SAME warning color the number
     // itself turns when stale, so the two visually connect instead of blending into one
-    // undifferentiated muted paragraph.
-    return <>Boss 380 HEXA<br />{asOf}<br /><span style={{ color: statusText(theme, "warning") }}>{STALE_REASON_TOOLTIP[status.reason]}</span></>;
+    // undifferentiated muted paragraph. No reason at all (cold-mount last-known-value,
+    // not a failed refresh) gets its own neutral "not yet recalculated" line instead.
+    const staleLine = status.reason
+      ? STALE_REASON_TOOLTIP[status.reason]
+      : "Showing the results for the last known values. Refresh to update.";
+    return <>Boss 380 HEXA<br />{asOf}<br /><span style={{ color: statusText(theme, "warning") }}>{staleLine}</span></>;
   }
   if (status.kind === "error") {
     const base = status.reason ? ERROR_REASON_TOOLTIP[status.reason] : "MapleScouter's API didn't respond. Click refresh to try again.";

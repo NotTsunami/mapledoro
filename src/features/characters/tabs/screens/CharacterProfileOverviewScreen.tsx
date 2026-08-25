@@ -3270,7 +3270,9 @@ function ScouterResultGate({ theme, character, onEditStep, children }: {
     <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
       {status.stale && (
         <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
-          Showing the last known values -- {SCOUTER_ERROR_REASON_TEXT[status.reason]}
+          {status.reason
+            ? <>Showing the last known values. {SCOUTER_ERROR_REASON_TEXT[status.reason]}</>
+            : "Showing the results for the last known values. Refresh your Scouter figure on Overview to update."}
         </p>
       )}
       {children(status.entry)}

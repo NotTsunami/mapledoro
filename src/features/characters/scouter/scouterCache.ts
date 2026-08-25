@@ -34,7 +34,12 @@ const MAX_CACHE_ENTRIES = 8;
 // Bumped to 3: live-confirmed MapleScouter changed their Kanna HEXA calc server-side, with
 // no field/shape change for the hash to catch. Reserve future bumps for fixes that need to
 // land for everyone immediately -- routine drift is now handled by the TTL below instead.
-const SCOUTER_CACHE_VERSION = 3;
+// Bumped to 4: buildScouterPayload's doping/hexa payload shape corrected against a real
+// maplescouter.com request capture (added criDmgRing/genePass wiring, dropped hexa fields
+// their own frontend never sends). The hash already changes for this on its own, but a
+// version bump gets every existing user off the old shape on their very next load instead
+// of only whenever they next happen to edit a stat.
+const SCOUTER_CACHE_VERSION = 4;
 
 // Entries older than this are treated as a miss by refreshScouterResult (real refetch, not
 // an instant hash hit) even though the hash still matches -- catches MapleScouter formula
@@ -342,6 +347,18 @@ export function peekScouterCache(character: StoredCharacterRecord): ScouterResul
   if (!built) return null;
   const cache = readCache(character.characterName);
   return cache?.entries[built.hash] ?? null;
+}
+
+/** Cache-only read (no network call) for the last computed result under ANY previous
+ *  input hash, not just the character's current one -- used only as a cold-mount
+ *  fallback (initialStatus in useScouterResult.ts) so leaving and returning to a
+ *  bookmark after editing stats still shows the last known figure instead of dropping
+ *  to "--", the same last-known value a failed refresh already falls back to in-session
+ *  (staleFallback above). Null whenever peekScouterCache would also be null, i.e. never
+ *  computed anything for this character at all. */
+export function peekScouterLastKnown(character: StoredCharacterRecord): ScouterResultEntry | null {
+  const cache = readCache(character.characterName);
+  return cache ? (cache.entries[cache.lastHash] ?? null) : null;
 }
 
 /** Refreshes a character's Scouter figure. Builds the payload fresh each call (so it

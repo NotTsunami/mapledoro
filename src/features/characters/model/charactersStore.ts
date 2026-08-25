@@ -81,6 +81,7 @@ export interface StoredScouterBuffs {
   onyxApple?: true;
   tengusJudgement?: true;
   fishBuff?: true;
+  genepass?: true;
   renown?: Partial<Record<"allStats" | "atkMagAtk" | "bossDmg" | "ignoreDef" | "critDmg", number>>;
 }
 
