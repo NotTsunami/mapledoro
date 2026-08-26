@@ -15,6 +15,8 @@ const CHANGELOG: ChangelogEntry[] = [
     date: "2026-08-25",
     changes: [
       { type: "added", text: "Buff Setup step now has a toggle for Power of the Rival." },
+      { type: "added", text: "Mapledle and BGM Guesser now have a link for every past day, like mapledoro.com/games/bgm-guesser/11. The arrows update the address bar as you move between days, so you can bookmark or share any puzzle." },
+      { type: "changed", text: "Copying your Mapledle or BGM Guesser result now shares a link to the exact day you played instead of the game's front page." },
       { type: "fixed", text: "Fixed the Scouter figure returning a failed result by matching MapleDoro's request to MapleScouter's current API." },
       { type: "fixed", text: "Fixed the Scouter figure and Scouter bookmark dropping back to a blank dash after you edited your stats and left the page, instead of continuing to show your last known value until you refresh." },
     ],
