@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-08-31",
+    changes: [
+      { type: "added", text: "Erel Light characters now get a Scouter figure, Stat Efficiency and Stat Optimizer results, now that MapleScouter supports the class. Buff Setup asks for Light Enchant and Helian Blessing so the numbers line up." },
+    ],
+  },
+  {
     date: "2026-08-25",
     changes: [
       { type: "added", text: "Buff Setup step now has a toggle for Power of the Rival." },
