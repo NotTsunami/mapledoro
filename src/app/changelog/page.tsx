@@ -14,7 +14,9 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-08-31",
     changes: [
-      { type: "added", text: "Erel Light characters now get a Scouter figure, Stat Efficiency and Stat Optimizer results, now that MapleScouter supports the class. Buff Setup asks for Light Enchant and Helian Blessing so the numbers line up." },
+      { type: "added", text: "Erel Light characters now get a Scouter figure, Stat Efficiency and Stat Optimizer results, now that MapleScouter supports the class." },
+      { type: "added", text: "Sia Astelle and Erel Light now get the HEXA Skill Tracker's final damage breakdown and leveling guide. Their fragment costs are still placeholder values until Erda Link is supported properly." },
+      { type: "added", text: "Add Sol Hecate to the leveling guide for Hayato, Kanna, Lynn and Mo Xuan." },
     ],
   },
   {
