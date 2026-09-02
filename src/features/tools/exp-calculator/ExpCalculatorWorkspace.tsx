@@ -1613,8 +1613,8 @@ function ResourceChartView({ theme, chart, level }: { theme: AppTheme; chart: Re
             )}
             <tr>
               <th style={levelThStyle}>Level</th>
-              {chart.columns.map((column, index) => (
-                <th key={index} style={thStyle} title={column.title}>
+              {chart.columns.map((column) => (
+                <th key={column.group ? `${column.group}/${column.label}` : column.label} style={thStyle} title={column.title}>
                   {column.label}
                 </th>
               ))}
