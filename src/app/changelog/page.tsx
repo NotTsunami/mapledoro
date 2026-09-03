@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-03",
+    changes: [
+      { type: "added", text: "The Liberation Tracker's Astra Secondary tab now lists the meso cost of transferring a Warrior, Mage or Shadower shield, a Kanna talisman or a Dual Blade katara into its Astra version at every star force level." },
+    ],
+  },
+  {
     date: "2026-09-02",
     changes: [
       { type: "fixed", text: "Fixed the character lookup rate limit lasting far longer than a minute." },
