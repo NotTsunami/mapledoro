@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-02",
+    changes: [
+      { type: "fixed", text: "Fixed the character lookup rate limit lasting far longer than a minute." },
+    ],
+  },
+  {
     date: "2026-08-31",
     changes: [
       { type: "added", text: "Erel Light characters now get a Scouter figure, Stat Efficiency and Stat Optimizer results, now that MapleScouter supports the class." },
