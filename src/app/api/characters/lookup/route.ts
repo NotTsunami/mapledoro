@@ -14,8 +14,7 @@ const LOOKUP_TOTAL_TIMEOUT_MS = 25000;
 const CACHE_KEY_PREFIX = "mapledoro:characters:lookup:v1:";
 const RATE_LIMIT_KEY_PREFIX = "mapledoro:rate:lookup:v1:";
 const CHARACTER_NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ0-9]{4,12}$/;
-// dont know yet if the 'weekly' for exp is actually weekly or a daily lol
-const NEXON_RANKING_URL = "https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=weekly&reboot_index=0&page_index=1";
+const NEXON_RANKING_URL = "https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=0&page_index=1";
 // Comma-separated list of proxy base URLs. Each is tried in order before falling back to direct Nexon.
 // Format: NEXON_PROXY_URLS=https://worker1.example.com,https://worker2.example.com
 const NEXON_PROXY_URLS: string[] = (process.env.NEXON_PROXY_URLS ?? "")
