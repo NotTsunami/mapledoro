@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-04",
+    changes: [
+      { type: "added", text: "Doro now has a speech bubble on the home page. Poke Doro for a new phrase." },
+    ],
+  },
+  {
     date: "2026-09-03",
     changes: [
       { type: "added", text: "The Liberation Tracker's Astra Secondary tab now lists the meso cost of transferring a Warrior, Mage or Shadower shield, a Kanna talisman or a Dual Blade katara into its Astra version at every star force level." },
