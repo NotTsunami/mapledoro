@@ -8,22 +8,17 @@ import { useMounted } from "../../lib/useMounted";
 /* Kept short enough to sit on one line at the bubble's max width, so poking
    Doro for a new phrase never reflows the banner. */
 const DORO_PHRASES = [
-  "Doro doro!",
-  "Have you done your dailies?",
-  "Just one more cube. Promise.",
-  "Pitched drop when?",
-  "Reset is coming. Are you ready?",
-  "Legendary or bust.",
-  "Your symbols look hungry.",
-  "That was definitely a lag death.",
-  "One more boss run, then bed.",
-  "Mesos come and go. Mostly go.",
-  "22 star is perfectly safe, right?",
-  "Liberation is closer than it feels.",
-  "Free EXP is the best EXP.",
-  "Don't sleep on Sunny Sunday.",
-  "Big damage incoming. I can feel it.",
-  "Did you feed your familiars today?",
+  "buh",
+  "BUH?!",
+  "bruh",
+  "BRUH",
+  "doro doro",
+  "dowo dowo",
+  "fuwa fuwa",
+  "same people.",
+  "this game sucks.",
+  "mm yes bunny",
+  "erm",
 ];
 
 export default function HeroBanner({ theme }: { theme: AppTheme }) {
