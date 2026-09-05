@@ -17,6 +17,7 @@ import {
   type HexaClassDef,
   type HexaSkillLevels,
 } from "./hexa-classes";
+import { applyGuideSteps, type GuideStep } from "./hexa-fd";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -293,6 +294,14 @@ export function useHexaSkillsState() {
     updateState((prev) => ({ ...prev, levels: defaultLevels() }));
   }, [updateState]);
 
+  /** Mark leveling-guide steps as done in game: raise each node to the step's target level. */
+  const applyGuide = useCallback((steps: GuideStep[]) => {
+    updateState((prev) => ({
+      ...prev,
+      levels: applyGuideSteps(normalizeLevels(prev.levels, prev.className ? findClassByName(prev.className) : null), steps),
+    }));
+  }, [updateState]);
+
   const costs = calcTotalCosts(levels, desiredLevels, classDef);
 
   return {
@@ -316,6 +325,7 @@ export function useHexaSkillsState() {
     setDesiredEnhancementLevel,
     setDesiredCommonLevel,
     resetAll,
+    applyGuide,
     costs,
   };
 }
