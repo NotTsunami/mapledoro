@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-05",
+    changes: [
+      { type: "added", text: "Click a skill in the HEXA Skill Tracker's leveling guide to mark that step and every step before it as done, after confirming you've leveled them in game." },
+    ],
+  },
+  {
     date: "2026-09-04",
     changes: [
       { type: "added", text: "Doro now has a speech bubble on the home page. Poke Doro for a new phrase." },

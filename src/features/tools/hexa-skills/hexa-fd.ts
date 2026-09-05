@@ -336,3 +336,32 @@ export function computeGuide(
 
   return { steps, totalFrag: cumFrag, totalSolErda, remainingFd, hecateFdMissing };
 }
+
+/**
+ * Levels after following `steps` (a prefix of a guide's steps): each node is raised to the
+ * highest `toLevel` any of them gives it. Codes are the ones minted in `buildNodes`
+ * (`o`, `a`, `m{i}`, `e{i}`, `c{i}`).
+ */
+export function applyGuideSteps(levels: HexaSkillLevels, steps: GuideStep[]): HexaSkillLevels {
+  const next: HexaSkillLevels = {
+    ...levels,
+    mastery: [...levels.mastery],
+    enhancement: [...levels.enhancement],
+    common: [...levels.common],
+  };
+  const raise = (arr: number[], idx: number, to: number) => {
+    arr[idx] = Math.max(arr[idx] ?? 0, to);
+  };
+  for (const step of steps) {
+    const idx = Number(step.code.slice(1));
+    switch (step.kind) {
+      case "origin": next.origin = Math.max(next.origin, step.toLevel); break;
+      case "ascent": next.ascent = Math.max(next.ascent, step.toLevel); break;
+      case "mastery": raise(next.mastery, idx, step.toLevel); break;
+      case "enhancement": raise(next.enhancement, idx, step.toLevel); break;
+      case "common": raise(next.common, idx, step.toLevel); break;
+      default: break;
+    }
+  }
+  return next;
+}

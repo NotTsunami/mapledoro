@@ -304,6 +304,7 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
     setDesiredEnhancementLevel,
     setDesiredCommonLevel,
     resetAll,
+    applyGuide,
     costs,
   } = useHexaSkillsState();
 
@@ -441,7 +442,7 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
         {!classDef && <EmptyState theme={theme} sectionPanel={sectionPanel} />}
 
         {classDef && activeTab === "guide" && guide && (
-          <GuideView theme={theme} guide={guide} sectionPanel={sectionPanel} />
+          <GuideView theme={theme} guide={guide} sectionPanel={sectionPanel} onApply={applyGuide} />
         )}
 
         {classDef && activeTab === "fd" && breakdown && (
