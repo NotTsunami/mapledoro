@@ -27,6 +27,7 @@ import { LINK_SKILL_TO_SCOUTER_KEY, SCOUTER_UNMODELED_LINK_SKILL_KEYS } from "./
 import { readCharacterToolData } from "../../tools/characterToolStorage";
 import type { HexaSkillLevels } from "../../tools/hexa-skills/hexa-classes";
 import { COMMON_SKILLS } from "../../tools/hexa-skills/hexa-classes";
+import { critRateToCritDmg } from "../../tools/stat-optimizer/scouter-class-data";
 
 // ── Request shape ──────────────────────────────────────────────────────────────
 
@@ -940,30 +941,50 @@ function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverr
  *  Damage% and Final Damage% are handled together here because they land on the same field
  *  and don't simply add: Final Damage is its own separate multiplicative source (per the game's
  *  own "multiple Final Damage sources multiply with each other" rule), and Critical Damage's
- *  own FD-equivalent contribution (typedCritDmg * cridmgeff1) counts as a second source, so the
- *  two compound as (1+a)*(1+b)-1 rather than adding -- typing 7% Crit Damage AND 10% Final
- *  Damage together does NOT equal typing 7 + (10's Crit-Damage equivalent) as one flat amount;
- *  it's a bigger number than that, live-confirmed against MapleScouter's own combined reading.
+ *  own FD-equivalent contribution counts as a second source, so the two compound as
+ *  (1+a)*(1+b)-1 rather than adding -- typing 7% Crit Damage AND 10% Final Damage together
+ *  does NOT equal typing 7 + (10's Crit-Damage equivalent) as one flat amount; it's a bigger
+ *  number than that, live-confirmed against MapleScouter's own combined reading.
+ *
+ *  `existingCritDmgFdShare` is typedCritDmg PLUS whatever NEW excess-Crit-Rate-to-Crit-Damage
+ *  conversion the typed Crit Rate delta itself causes -- the 7 archer classes with a
+ *  critRateToCritDmg rate turn Crit Rate past 100% into bonus Crit Damage server-side
+ *  (stat-optimizer's CLAUDE.md documents the same per-class rates), and typing MORE Crit Rate
+ *  triggers MORE of that conversion, which is itself a new Final Damage source that has to be
+ *  counted before compounding a typed Final Damage% on top. Only the DELTA matters here, not
+ *  the character's total post-override excess -- their real baseline's own excess-Crit-Rate
+ *  conversion is already part of reality, not something introduced by this Apply, so it must
+ *  not be re-added into the compounding math (live-confirmed: MapleScouter's own FD% panel
+ *  reads relative to the real baseline, not from an absolute-zero starting point -- typing
+ *  +100 Crit Rate alone read 8.504% FD-gain, not the far larger value predicted by treating
+ *  the character's full post-override excess as new). realCritRate is the character's own
+ *  real, un-overridden Crit Rate (before the 100% floor and before any typed delta), needed
+ *  to isolate that delta from stat.critical's already-mutated, post-override value.
+ *
  *  There's no field for Final Damage% itself, so it's expressed by adding the RIGHT total
  *  amount to criticalDmg instead. Needs specEfficiency (cridmgeff1) from the character's last
  *  computed Scouter result whenever finalDmgPercent is set. */
-function applyCritDmgAndFinalDmg(stat: ScouterStat, typedCritDmg: number, finalDmgPercent: string | undefined, cridmgeff1: number | undefined): void {
+function applyCritDmgAndFinalDmg(stat: ScouterStat, typedCritDmg: number, finalDmgPercent: string | undefined, cridmgeff1: number | undefined, critRateToDmg: number, realCritRate: number): void {
   const finalDmg = finalDmgPercent ? Number(finalDmgPercent) : 0;
   if (!finalDmg || !cridmgeff1) {
     addToStatField(stat, "criticalDmg", typedCritDmg);
     return;
   }
-  const critDmgOwnFdShare = typedCritDmg * cridmgeff1;
-  const combinedFdShare = (1 + critDmgOwnFdShare) * (1 + finalDmg / 100) - 1;
-  addToStatField(stat, "criticalDmg", combinedFdShare / cridmgeff1);
+  const realExcessCritRate = Math.max(0, realCritRate - 100);
+  const totalExcessCritRate = Math.max(0, Number(stat.critical) - 100);
+  const newExcessCritRate = totalExcessCritRate - realExcessCritRate;
+  const existingCritDmgFdShare = (typedCritDmg + newExcessCritRate * critRateToDmg) * cridmgeff1;
+  const combinedFdShare = (1 + existingCritDmgFdShare) * (1 + finalDmg / 100) - 1;
+  const totalCritDmgNeeded = combinedFdShare / cridmgeff1 - newExcessCritRate * critRateToDmg;
+  addToStatField(stat, "criticalDmg", totalCritDmgNeeded);
 }
 
-function applyInputOverrides(stat: ScouterStat, input: SimulatorInputOverrides | undefined, finalDmgPercent: string | undefined, cridmgeff1: number | undefined, realLevel: number): void {
+function applyInputOverrides(stat: ScouterStat, input: SimulatorInputOverrides | undefined, finalDmgPercent: string | undefined, cridmgeff1: number | undefined, realLevel: number, critRateToDmg: number, realCritRate: number): void {
   if (input) {
     applyStatFamilyOverrides(stat, input, realLevel);
     applyCombatFieldOverrides(stat, input);
   }
-  applyCritDmgAndFinalDmg(stat, input?.criDmg ? Number(input.criDmg) : 0, finalDmgPercent, cridmgeff1);
+  applyCritDmgAndFinalDmg(stat, input?.criDmg ? Number(input.criDmg) : 0, finalDmgPercent, cridmgeff1, critRateToDmg, realCritRate);
 }
 
 /** Builds a real ScouterUserStat with a Scouter Simulator popup's full overrides applied, for
@@ -988,7 +1009,9 @@ export function buildDirectScouterPayload(
       if (value !== undefined) userStat.hexa[field as SimulatorHexaCoreField] = value;
     }
   }
-  applyInputOverrides(userStat.stat, overrides.input, overrides.finalDmgPercent, cridmgeff1, character.level);
+  const classId = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName)?.id;
+  const realCritRate = Number(userStat.stat.critical);
+  applyInputOverrides(userStat.stat, overrides.input, overrides.finalDmgPercent, cridmgeff1, character.level, critRateToCritDmg(classId), realCritRate);
   return userStat;
 }
 
