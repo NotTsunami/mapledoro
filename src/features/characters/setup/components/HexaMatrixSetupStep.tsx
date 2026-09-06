@@ -21,6 +21,7 @@ import { readSavedHexaValue } from "../data/hexaMatrixDraft";
 import SetupStepFrame from "./SetupStepFrame";
 import { CopyFromPreset } from "./CopyFromPreset";
 import { LeveledIconTile } from "./LeveledIconTile";
+import SectionLabel from "./SectionLabel";
 
 interface HexaMatrixSetupStepProps {
   theme: AppTheme;
@@ -401,43 +402,6 @@ function LevelInput({ value, onChange, theme, min = 0, max = MAX_LEVEL, label, t
   );
 }
 
-function SectionLabel({ label, theme, onMaxAll, onClear }: { label: string; theme: AppTheme; onMaxAll?: () => void; onClear?: () => void }) {
-  return (
-    <div style={{
-      display: "flex", justifyContent: "space-between", alignItems: "baseline",
-      marginBottom: "0.45rem", paddingBottom: "0.25rem", borderBottom: `1px solid ${theme.border}`,
-    }}>
-      <p style={{
-        margin: 0,
-        fontSize: "0.75rem",
-        fontWeight: 800,
-        color: theme.muted,
-        letterSpacing: "0.05em",
-        textTransform: "uppercase" as const,
-      }}>
-        {label}
-      </p>
-      {(onMaxAll || onClear) && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          {onClear && (
-            <button type="button" onClick={onClear} style={{ ...sectionBtnStyle, color: theme.muted }}>
-              Clear
-            </button>
-          )}
-          {onClear && onMaxAll && (
-            <span style={{ width: 1, alignSelf: "stretch", background: theme.border, flexShrink: 0 }} />
-          )}
-          {onMaxAll && (
-            <button type="button" onClick={onMaxAll} style={{ ...sectionBtnStyle, color: theme.accent }}>
-              Max All
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function StatDropdown({ value, options, onChange, onAdvance, isOpen, onToggle, onClose, theme, isError, disabledTypes }: {
   value: string;
   options: { value: string; label: string }[];
@@ -739,7 +703,7 @@ function HexaSkillLevelsSubstep({
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
           <div>
-            <SectionLabel label="Origin & Ascent" theme={theme}
+            <SectionLabel label="Origin & Ascent" theme={theme} btnStyle={sectionBtnStyle}
               onMaxAll={() => update({ origin: String(MAX_LEVEL), ...(classDef.ascent ? { ascent: String(MAX_LEVEL) } : {}) })}
               onClear={() => update({ origin: "0", ...(classDef.ascent ? { ascent: "" } : {}) })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
@@ -753,7 +717,7 @@ function HexaSkillLevelsSubstep({
           </div>
 
           <div>
-            <SectionLabel label="Mastery" theme={theme}
+            <SectionLabel label="Mastery" theme={theme} btnStyle={sectionBtnStyle}
               onMaxAll={() => update({ mastery: classDef.mastery.map(() => String(MAX_LEVEL)) })}
               onClear={() => update({ mastery: classDef.mastery.map(() => "") })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
@@ -777,7 +741,7 @@ function HexaSkillLevelsSubstep({
           </div>
 
           <div>
-            <SectionLabel label="Enhancement" theme={theme}
+            <SectionLabel label="Enhancement" theme={theme} btnStyle={sectionBtnStyle}
               onMaxAll={() => update({ enhancement: classDef.enhancement.map(() => String(MAX_LEVEL)) })}
               onClear={() => update({ enhancement: classDef.enhancement.map(() => "") })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
@@ -797,7 +761,7 @@ function HexaSkillLevelsSubstep({
           </div>
 
           <div>
-            <SectionLabel label="Common" theme={theme}
+            <SectionLabel label="Common" theme={theme} btnStyle={sectionBtnStyle}
               onMaxAll={() => update({ common: COMMON_SKILLS.map(() => String(MAX_LEVEL)) })}
               onClear={() => update({ common: COMMON_SKILLS.map(() => "") })} />
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>

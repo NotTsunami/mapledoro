@@ -22,6 +22,7 @@ import {
 import { BuffIconImage, BoolBuffTile, RenownCol } from "../setup/components/BuffsSetupStep";
 import { boolTileStyle, pickOneGroupStyle, pickOneLabelStyle, buffIconOverride, buffSecondIconOverride, boolBuffLabel } from "../setup/components/buffTileHelpers";
 import { LeveledIconTile } from "../setup/components/LeveledIconTile";
+import SectionLabel from "../setup/components/SectionLabel";
 import { statInputStyle, inputSuffixStyle } from "../setup/components/QuestionControls";
 import {
   OZ_RING_MAX_LEVEL, OZ_RING_ICON_IDS,
@@ -238,31 +239,16 @@ function ResetLink({ theme, onReset, label = "Reset" }: { theme: AppTheme; onRes
 
 // ── HEXA tab ─────────────────────────────────────────────────────────────────
 
-function HexaSectionLabel({ theme, label, onMaxAll, onClear }: { theme: AppTheme; label: string; onMaxAll: () => void; onClear: () => void }) {
-  return (
-    <div style={{
-      display: "flex", justifyContent: "space-between", alignItems: "baseline",
-      marginBottom: "0.45rem", paddingBottom: "0.25rem", borderBottom: `1px solid ${theme.border}`,
-    }}>
-      <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 800, color: theme.muted, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</p>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <button type="button" onClick={onClear} style={{ ...hexaSectionBtnStyle, color: theme.muted }}>Clear</button>
-        <span style={{ width: 1, alignSelf: "stretch", background: theme.border, flexShrink: 0 }} />
-        <button type="button" onClick={onMaxAll} style={{ ...hexaSectionBtnStyle, color: theme.accent }}>Max All</button>
-      </div>
-    </div>
-  );
-}
-
 function HexaSection({ theme, label, fields, hexaCores, onChange }: {
   theme: AppTheme; label: string; fields: { field: SimulatorHexaCoreField; label: string; name: string; iconId: string; iconUrl?: string }[];
   hexaCores: Record<SimulatorHexaCoreField, number>; onChange: (field: SimulatorHexaCoreField, value: number) => void;
 }) {
   return (
     <div>
-      <HexaSectionLabel
+      <SectionLabel
         theme={theme}
         label={label}
+        btnStyle={hexaSectionBtnStyle}
         onMaxAll={() => fields.forEach(({ field }) => onChange(field, SIMULATOR_HEXA_CORE_MAX))}
         onClear={() => fields.forEach(({ field }) => onChange(field, HEXA_CORE_MIN[field] ?? 0))}
       />
