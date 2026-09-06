@@ -8,6 +8,8 @@ import {
   type ScouterErrorReason, type ScouterRefreshResult, type ScouterResultEntry,
 } from "./scouterCache";
 import { getScouterDevOverride, subscribeScouterDevOverride } from "./scouterDevDrill";
+// Side-effect only (installs a NODE_ENV-gated window global) -- see the file's own header.
+import "./scouterInputFieldDrill";
 
 export type { ScouterErrorReason };
 

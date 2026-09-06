@@ -3331,6 +3331,7 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
                 if (result.status === "ok") setSimulatorDialogOpen(false);
                 return result;
               }}
+              onReset={scouterSimulator.reset}
               onClose={() => setSimulatorDialogOpen(false)}
             />
           )}

@@ -65,6 +65,15 @@ const HEXA_CORE_MIN: Partial<Record<SimulatorHexaCoreField, number>> = { skillCo
 // it's not manifest-derived).
 const MAX_CHARACTER_LEVEL = 300;
 
+// Arcane Force's cap is a real game/formula constant (bossClearFormula.ts's own
+// Math.min(characterArcaneForce, 1750), live-confirmed to match MapleScouter's own site).
+// Sacred Power has no fixed in-game ceiling (Grandis keeps adding symbols), so this is a
+// generous practical cap instead, matched to Arcane Force's own number rather than a
+// separately-derived one -- current max achievable (8 symbols + a announced 9th, event buff,
+// hyper burning title) is a bit under 1200, and a plausible future 12-symbol lineup is under
+// 1500, so 1750 has real headroom either way.
+const ARCANE_AND_SACRED_FORCE_MAX = 1750;
+
 function sectionLabelStyle(theme: AppTheme): CSSProperties {
   return { margin: "0 0 0.5rem", fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.muted };
 }
@@ -273,6 +282,18 @@ function HexaSection({ theme, label, fields, hexaCores, onChange }: {
   );
 }
 
+// HEXA has no real level requirement on MapleScouter's own API side (a level-250 character
+// still gets real HEXA numbers back) -- but simulating HEXA below the level it actually
+// unlocks at is a "what if I were also higher level" combination, not a straightforward one,
+// so it needs the Level row bumped to 260+ first rather than showing right away.
+function HexaLockedMessage({ theme }: { theme: AppTheme }) {
+  return (
+    <p style={{ margin: 0, fontSize: "0.85rem", color: theme.muted, fontWeight: 700, textAlign: "center", padding: "1.5rem 0" }}>
+      HEXA Matrix unlocks at level 260. Set the Level row above to 260 or higher to simulate it.
+    </p>
+  );
+}
+
 function HexaTab({ theme, classDef, hexaCores, onChange }: {
   theme: AppTheme; classDef: HexaClassDef | null; hexaCores: Record<SimulatorHexaCoreField, number>; onChange: (field: SimulatorHexaCoreField, value: number) => void;
 }) {
@@ -351,8 +372,8 @@ const tripleInputGridStyle: CSSProperties = { display: "grid", gridTemplateColum
 
 /** Real per-field caps and whether MapleScouter's own simulator accepts a decimal for it,
  *  matching maplescouter.com's own Input panel. Every field the Input tab renders is covered
- *  here. */
-const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; decimal: boolean }> = {
+ *  here EXCEPT weaponAtk, which gets a dynamic max instead (see InputTab's own weaponAtk row). */
+const INPUT_FIELD_LIMITS: Record<Exclude<keyof SimulatorInputOverrides, "weaponAtk">, { max: number; decimal: boolean }> = {
   mainStat: { max: 3000, decimal: false },
   mainStatPer: { max: 400, decimal: false },
   mainStatAbs: { max: 40000, decimal: false },
@@ -361,8 +382,12 @@ const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; d
   subStatPer: { max: 400, decimal: false },
   subStatAbs: { max: 40000, decimal: false },
   subStat9Level: { max: 40, decimal: false },
+  ssubStat: { max: 3000, decimal: false },
+  ssubStatPer: { max: 400, decimal: false },
+  ssubStatAbs: { max: 40000, decimal: false },
+  ssubStat9Level: { max: 40, decimal: false },
   allStatPer: { max: 400, decimal: false },
-  criRate: { max: 100, decimal: true },
+  criRate: { max: 100, decimal: false },
   buffDuration: { max: 150, decimal: false },
   coolTimeReduce: { max: 7, decimal: false },
   atk: { max: 1500, decimal: false },
@@ -371,12 +396,12 @@ const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; d
   criDmg: { max: 70, decimal: true },
   ignoreGuard: { max: 99, decimal: true },
   resetCoolDown: { max: 27.5, decimal: true },
-  weaponAtk: { max: 1004, decimal: false },
 };
+
+const WEAPON_ATT_ABSOLUTE_MAX = 1150;
 const FINAL_DMG_LIMIT = { max: 75, decimal: true };
 
-/** A field's numeric bounds for LimitedNumberInput -- max omitted means no real in-game cap
- *  (Arcane Force/Sacred Power grow indefinitely, same as the real Stats setup step). min
+/** A field's numeric bounds for LimitedNumberInput -- max omitted means no real cap. min
  *  defaults to 0 (every field but Level, which can't go below 1). */
 interface InputLimit { max?: number; min?: number; decimal: boolean }
 
@@ -405,15 +430,21 @@ function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }:
   style: CSSProperties; ariaLabel: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  // An emptied field commits as 0 (this popup's own "no override" value), rather than
+  // silently keeping the last real number -- clearing the box and clicking away should
+  // leave it empty, not snap back to whatever was typed before.
   const commit = (raw: string) => {
     const sanitized = sanitizeLimitedInput(raw, limit);
-    if (sanitized === "" || sanitized === ".") return;
+    if (sanitized === "" || sanitized === ".") {
+      onChange(0);
+      return;
+    }
     onChange(clampNumber(Number(sanitized), limit.max ?? Infinity, limit.min ?? 0));
   };
   return (
     <input
       type="text" inputMode={limit.decimal ? "decimal" : "numeric"} aria-label={ariaLabel}
-      value={draft ?? String(value)} style={style}
+      value={draft ?? (value === 0 ? "" : String(value))} placeholder="0" style={style}
       onKeyDown={limit.decimal ? decimalKeyDown : numericKeyDown}
       onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; e.currentTarget.select(); }}
       onChange={(e) => {
@@ -442,10 +473,12 @@ function TripleInputBox({ label, sublabel, value, limit, onChange, inputStyle, t
   );
 }
 
+type StatFamilyInputKey = Exclude<keyof SimulatorInputOverrides, "weaponAtk">;
+
 function TripleInputRow({ theme, inputStyle, label, baseKey, percentKey, absKey, per9Key, base, percent, abs, per9Levels, onChange }: {
   theme: AppTheme; inputStyle: CSSProperties; label: string;
-  baseKey: keyof SimulatorInputOverrides; percentKey: keyof SimulatorInputOverrides;
-  absKey: keyof SimulatorInputOverrides; per9Key: keyof SimulatorInputOverrides;
+  baseKey: StatFamilyInputKey; percentKey: StatFamilyInputKey;
+  absKey: StatFamilyInputKey; per9Key: StatFamilyInputKey;
   base: number; percent: number; abs: number; per9Levels: number;
   onChange: (field: "base" | "percent" | "abs" | "per9Levels", v: number) => void;
 }) {
@@ -483,34 +516,35 @@ function InputGroupField({ theme, inputStyle, label, value, limit, onChange, suf
   );
 }
 
-const COMBAT_LEFT_FIELDS: { key: keyof SimulatorInputOverrides; label: string; suffix?: string | null }[] = [
+const COMBAT_LEFT_FIELDS: { key: StatFamilyInputKey; label: string; suffix?: string | null }[] = [
   { key: "ignoreGuard", label: "Ignore DEF" },
   { key: "coolTimeReduce", label: "Cooldown Reduction", suffix: "s" },
   { key: "resetCoolDown", label: "Cooldown Not Applied" },
 ];
 
-const COMBAT_RIGHT_FIELDS: { key: keyof SimulatorInputOverrides; label: string; suffix?: string | null }[] = [
+const COMBAT_RIGHT_FIELDS: { key: StatFamilyInputKey; label: string; suffix?: string | null }[] = [
   { key: "bossDmg", label: "Damage/Boss" },
   { key: "criRate", label: "Critical Rate" },
   { key: "criDmg", label: "Critical Damage" },
   { key: "buffDuration", label: "Buff Duration" },
 ];
 
-function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChange, statLabels, usesMagicWeapon, weaponAttLabel }: {
+function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChange, statLabels, usesMagicWeapon, weaponAttLabel, realWeaponAtt }: {
   theme: AppTheme; finalDmgPercent: number; onFinalDmgChange: (v: number) => void;
   input: Record<keyof SimulatorInputOverrides, number>; onInputChange: (key: keyof SimulatorInputOverrides, value: number) => void;
   statLabels: ReturnType<typeof simulatorStatLabels>;
   usesMagicWeapon: boolean;
   weaponAttLabel: string;
+  realWeaponAtt: number;
 }) {
   const inputStyle = statInputStyle(theme);
-  const field = (key: keyof SimulatorInputOverrides, label: string, suffix: string | null = "%") => (
+  const field = (key: StatFamilyInputKey, label: string, suffix: string | null = "%") => (
     <InputGroupField key={key} theme={theme} inputStyle={inputStyle} label={label} value={input[key]} limit={INPUT_FIELD_LIMITS[key]} onChange={(v) => onInputChange(key, v)} suffix={suffix} />
   );
   const tripleField = (
     label: string,
-    baseKey: keyof SimulatorInputOverrides, percentKey: keyof SimulatorInputOverrides,
-    absKey: keyof SimulatorInputOverrides, per9Key: keyof SimulatorInputOverrides,
+    baseKey: StatFamilyInputKey, percentKey: StatFamilyInputKey,
+    absKey: StatFamilyInputKey, per9Key: StatFamilyInputKey,
   ) => {
     const keyFor = { base: baseKey, percent: percentKey, abs: absKey, per9Levels: per9Key } as const;
     return (
@@ -537,6 +571,7 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {statLabels.main && tripleField(statLabels.main.label, "mainStat", "mainStatPer", "mainStatAbs", "mainStat9Level")}
           {statLabels.sub && tripleField(statLabels.sub.label, "subStat", "subStatPer", "subStatAbs", "subStat9Level")}
+          {statLabels.ssub && tripleField(statLabels.ssub.label, "ssubStat", "ssubStatPer", "ssubStatAbs", "ssubStat9Level")}
           <div>
             <p style={{ margin: 0, marginBottom: "0.25rem", fontSize: "0.82rem", fontWeight: 800, color: theme.text }}>{atkLabel}</p>
             <div style={tripleInputGridStyle}>
@@ -564,7 +599,9 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
         <p style={dividedSectionLabelStyle(theme)}>Other</p>
         <div style={{ display: "flex", minWidth: 0, gap: "1.1rem" }}>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            {field("weaponAtk", weaponAttLabel, null)}
+            <InputGroupField theme={theme} inputStyle={inputStyle} label={weaponAttLabel} value={input.weaponAtk}
+              limit={{ max: Math.max(0, WEAPON_ATT_ABSOLUTE_MAX - realWeaponAtt), decimal: false }}
+              onChange={(v) => onInputChange("weaponAtk", v)} suffix={null} />
           </div>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {field("allStatPer", "All Stat")}
@@ -583,6 +620,7 @@ export default function ScouterSimulatorDialog({
   applying,
   previousOverrides,
   onApply,
+  onReset,
   onClose,
 }: {
   theme: AppTheme;
@@ -592,13 +630,25 @@ export default function ScouterSimulatorDialog({
    *  popup should show what was typed in, not the character's real values again. */
   previousOverrides: ScouterSimulatorOverrides | null;
   onApply: (overrides: ScouterSimulatorOverrides) => Promise<ScouterSimulatorApplyResult>;
+  /** Clears an active simulation back to the real Scouter result. Called instead of onApply
+   *  when a simulation is active and every field has been put back to its real value -- an
+   *  onApply call in that state would be a no-op request, but just closing the popup would
+   *  leave the OLD simulated result showing instead of reverting to real. */
+  onReset: () => void;
   onClose: () => void;
 }) {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName);
   const primaryStat = primaryStatForClass(classData?.requiredStats ?? []);
   const statLabels = simulatorStatLabels(classData?.id ?? "", classData?.requiredStats ?? []);
   const ozClassInfo = getOzClassStatInfo(classData?.id, classData?.requiredStats ?? []);
-  const hexaClassDef = classData ? findClassById(classData.id) : null;
+  // Legacy classes never get HEXA regardless of level -- same as flows.ts's own gating.
+  // Level alone isn't a hard block here the way it is in the real setup flow, though:
+  // MapleScouter's API doesn't validate whether the character is really HEXA-eligible, it
+  // just computes whatever hexa.* fields it's sent (live-confirmed a level-250 character
+  // still gets real numbers back) -- so the HEXA tab stays reachable, gated on the
+  // SIMULATED level (draft.level) reaching 260, not the character's real one.
+  const hexaLegacyBlocked = Boolean(classData?.isLegacy);
+  const hexaClassDef = classData && !hexaLegacyBlocked ? findClassById(classData.id) : null;
   const { usesMagicWeapon, label: weaponAttLabel } = deriveWeaponAttLabel(classData);
   const inputStyle = statInputStyle(theme);
 
@@ -611,9 +661,12 @@ export default function ScouterSimulatorDialog({
 
   const handleApply = () => {
     // Nothing to simulate -- every field is still at its real starting value, so a request
-    // would just return the same result the real Scouter figure already shows. Close as if it
-    // had succeeded rather than round-tripping the API for a known no-op.
+    // would just return the same result the real Scouter figure already shows. If a simulation
+    // is currently active, clear it back to real instead of just closing (closing alone would
+    // leave the OLD simulated result on screen); otherwise there's nothing to revert, so just
+    // close as if it had succeeded rather than round-tripping the API for a known no-op.
     if (!draft.hasChanges) {
+      if (previousOverrides) onReset();
       onClose();
       return;
     }
@@ -672,24 +725,28 @@ export default function ScouterSimulatorDialog({
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Arcane Force" short="Arc. Force" />
-              <LimitedNumberInput theme={theme} value={draft.arcaneForce} limit={{ decimal: false }} onChange={draft.setArcaneForce} ariaLabel="Simulated Arcane Force" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput theme={theme} value={draft.arcaneForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setArcaneForce} ariaLabel="Simulated Arcane Force" style={{ ...inputStyle, width: "100%" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Sacred Power" short="Sac. Power" />
-              <LimitedNumberInput theme={theme} value={draft.authenticForce} limit={{ decimal: false }} onChange={draft.setAuthenticForce} ariaLabel="Simulated Sacred Power" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput theme={theme} value={draft.authenticForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setAuthenticForce} ariaLabel="Simulated Sacred Power" style={{ ...inputStyle, width: "100%" }} />
             </div>
           </div>
           <ResetLink theme={theme} onReset={draft.resetLevelRow} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <PillGroup theme={theme} options={TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} />
+          <PillGroup theme={theme} options={hexaLegacyBlocked ? TAB_OPTIONS.filter((o) => o.value !== "hexa") : TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} />
           <ResetLink theme={theme} onReset={RESET_BY_TAB[draft.tab]} label="Reset Tab" />
         </div>
       </div>
 
       <div style={{ padding: "0.85rem 1.1rem", overflowY: "auto", flex: 1, minHeight: 0 }}>
         {draft.tab === "buffs" && <BuffsTab theme={theme} draft={draft.buffsDraft} onChange={draft.setBuffsDraft} primaryStat={primaryStat} jobName={character.jobName} />}
-        {draft.tab === "hexa" && <HexaTab theme={theme} classDef={hexaClassDef} hexaCores={draft.hexaCores} onChange={draft.setHexaCore} />}
+        {draft.tab === "hexa" && (
+          draft.level < 260
+            ? <HexaLockedMessage theme={theme} />
+            : <HexaTab theme={theme} classDef={hexaClassDef} hexaCores={draft.hexaCores} onChange={draft.setHexaCore} />
+        )}
         {draft.tab === "ozRings" && (
           <OzRingsTab
             theme={theme}
@@ -709,6 +766,7 @@ export default function ScouterSimulatorDialog({
             statLabels={statLabels}
             usesMagicWeapon={usesMagicWeapon}
             weaponAttLabel={weaponAttLabel}
+            realWeaponAtt={character.scouter?.weaponAtt ?? 0}
           />
         )}
 

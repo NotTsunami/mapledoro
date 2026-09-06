@@ -5,12 +5,24 @@ import type { StoredCharacterRecord } from "../model/charactersStore";
 import { readCharactersStore } from "../model/charactersStore";
 import type { ScouterSimulatorOverrides } from "./scouterApi";
 import { runScouterSimulator } from "./scouterSimulatorCache";
-import type { ScouterErrorReason, ScouterResultEntry } from "./scouterCache";
+import { peekScouterLastKnown, type ScouterErrorReason, type ScouterResultEntry } from "./scouterCache";
+
+/** True when the override combo only touches level/Arcane Force/Sacred Power -- fields that
+ *  never reach MapleScouter's API at all (pure local Boss Clear Grid gap math, see
+ *  ScouterSimulatorOverrides' own field comments). Applying one of these alone needs no fresh
+ *  API result -- the character's real, already-cached entry is exactly as accurate. */
+function isLocalOnlyOverride(overrides: ScouterSimulatorOverrides): boolean {
+  return (
+    !overrides.finalDmgPercent ||
+    Number(overrides.finalDmgPercent) === 0
+  ) && !overrides.hexaCoreOverrides && !overrides.dopingOverrides && !overrides.ringOverrides
+    && Object.values(overrides.input ?? {}).every((v) => v === undefined || Number(v) === 0);
+}
 
 /** The overrides a player can set from the Scouter Simulator popup -- level/Arcane Force/
  *  Sacred Power are MapleDoro-only concepts (never reach MapleScouter's API, pure local
  *  Boss Clear Grid formula math), the rest (finalDmgPercent/hexaCoreOverrides/etc.) become
- *  part of the real request via buildSimulatorPayload. */
+ *  part of the real request via buildDirectScouterPayload. */
 export interface ScouterSimulatorState {
   overrides: ScouterSimulatorOverrides;
   entry: ScouterResultEntry;
@@ -54,6 +66,12 @@ export function useScouterSimulator(character: StoredCharacterRecord | null): Sc
 
   const apply = useCallback(async (overrides: ScouterSimulatorOverrides): Promise<ScouterSimulatorApplyResult> => {
     if (!character) return { status: "unsupported" };
+    if (isLocalOnlyOverride(overrides)) {
+      const entry = peekScouterLastKnown(character);
+      if (!entry) return { status: "unsupported" };
+      setActive({ overrides, entry });
+      return { status: "ok" };
+    }
     setApplying(true);
     const store = readCharactersStore();
     const result = await runScouterSimulator(character, { scouterLegionByWorld: store.scouterLegionByWorld }, overrides);

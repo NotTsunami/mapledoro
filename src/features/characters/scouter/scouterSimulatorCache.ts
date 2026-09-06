@@ -13,15 +13,15 @@
 */
 
 import { readCharacterToolData, writeCharacterToolData } from "../../tools/characterToolStorage";
-import { buildSimulatorPayload, hashScouterPayload, type ScouterPayloadContext, type ScouterSimulatorOverrides } from "./scouterApi";
-import { parseSimulatorCalcResponse, type ScouterErrorReason, type ScouterResultEntry } from "./scouterCache";
+import { buildDirectScouterPayload, hashScouterPayload, type ScouterPayloadContext, type ScouterSimulatorOverrides } from "./scouterApi";
+import { parseCalcResponse, peekScouterLastKnown, type ScouterErrorReason, type ScouterResultEntry } from "./scouterCache";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 
 const SCOUTER_SIMULATOR_RESULT_TOOL_KEY = "scouterSimulatorResult";
 const MAX_CACHE_ENTRIES = 8;
 
 // Kept in lockstep with scouterCache.ts's SCOUTER_CACHE_VERSION conceptually -- a payload-
-// shape fix to buildScouterPayload/buildSimulatorPayload should invalidate stale simulator
+// shape fix to buildScouterPayload/buildDirectScouterPayload should invalidate stale simulator
 // entries too, same reasoning as the real cache's own version bump. Bumped independently
 // (not literally shared) so a real-result-only fix doesn't force a needless simulator-cache
 // wipe, and vice versa.
@@ -61,15 +61,16 @@ const ERROR_CODE_TO_REASON: Record<string, ScouterErrorReason> = {
 
 /** Runs a Scouter Simulator "what if", hash-cached the same way the real result is: an
  *  identical override combo (down to the character's own current real stats) is an instant
- *  hit, no network call. A hash miss POSTs through the scouter-simulator proxy route. Never
- *  throws -- every failure resolves to a tagged reason, same contract as the real cache's
- *  own fetch helper. */
+ *  hit, no network call. A hash miss POSTs the mutated payload to /api/scouter (MapleScouter's
+ *  plain /calc/dmg, no api-key header). Never throws -- every failure resolves to a tagged
+ *  reason, same contract as the real cache's own fetch helper. */
 export async function runScouterSimulator(
   character: StoredCharacterRecord,
   ctx: ScouterPayloadContext,
   overrides: ScouterSimulatorOverrides,
 ): Promise<ScouterSimulatorRunResult> {
-  const request = buildSimulatorPayload(character, ctx, overrides);
+  const cridmgeff1 = peekScouterLastKnown(character)?.specEfficiency?.cridmgeff1;
+  const request = buildDirectScouterPayload(character, ctx, overrides, cridmgeff1);
   if (!request) return { status: "unsupported" };
   const hash = hashScouterPayload(request);
 
@@ -79,10 +80,10 @@ export async function runScouterSimulator(
 
   let response: Response;
   try {
-    response = await fetch("/api/scouter-simulator", {
+    response = await fetch("/api/scouter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify({ userStat: request }),
     });
   } catch {
     return { status: "error", reason: "network" };
@@ -93,7 +94,7 @@ export async function runScouterSimulator(
     return { status: "error", reason: reason ?? "bad_response" };
   }
   const data = await response.json().catch(() => null);
-  const entry = data === null ? null : parseSimulatorCalcResponse(data);
+  const entry = data === null ? null : parseCalcResponse(data);
   if (!entry) return { status: "error", reason: "bad_response" };
 
   storeCacheEntry(character.characterName, hash, entry, cache);

@@ -236,9 +236,13 @@ function parseSpecEfficiency(raw: unknown): ScouterSpecEfficiency | undefined {
 }
 
 /** A 0 for the headline figure is MapleScouter's own known failure signature (e.g. the
- *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result. */
-function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry | null {
-  const c = data.calculatedData;
+ *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result.
+ *  Exported (unknown-typed, matching parseSimulatorCalcResponse's own signature) for
+ *  scouterSimulatorCache.ts's direct-override path, which POSTs a mutated ScouterUserStat
+ *  to the same /api/scouter route (MapleScouter's plain /calc/dmg) the real refresh uses,
+ *  and gets the same calculatedData-wrapped response shape back. */
+export function parseCalcResponse(data: unknown): ScouterResultEntry | null {
+  const c = (data as MapleScouterCalcResponse | null)?.calculatedData;
   if (!c) return null;
   return parseCalculatedData(c);
 }

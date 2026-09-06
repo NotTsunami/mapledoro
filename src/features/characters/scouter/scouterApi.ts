@@ -727,8 +727,13 @@ export interface ScouterPayloadContext {
 }
 
 /** Builds MapleScouter's request body for a character, or null if this class isn't
- *  supported by MapleScouter at all. */
-export function buildScouterPayload(character: StoredCharacterRecord, ctx: ScouterPayloadContext): ScouterUserStat | null {
+ *  supported by MapleScouter at all. `overrides` is only ever passed by
+ *  buildDirectScouterPayload -- omit it for the real, unmodified payload. */
+export function buildScouterPayload(
+  character: StoredCharacterRecord,
+  ctx: ScouterPayloadContext,
+  overrides?: Pick<ScouterSimulatorOverrides, "dopingOverrides" | "ringOverrides">,
+): ScouterUserStat | null {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName);
   if (!classData) return null;
   const koreanClassName = scouterKoreanClassName(classData.id);
@@ -746,12 +751,12 @@ export function buildScouterPayload(character: StoredCharacterRecord, ctx: Scout
   const { hexa, solJanusLevel } = buildHexa(character.characterName, isHexaEligible, koreanClassName);
 
   return {
-    doping: buildDoping(character.scouter?.buffs),
+    doping: buildDoping(overrides?.dopingOverrides ?? character.scouter?.buffs),
     linkSkill: buildLinkSkill(character.linkSkills),
-    special: buildSpecial(character, offStats),
+    special: buildSpecial(character, offStats, overrides?.ringOverrides),
     stat: buildStat(character, classData.id, koreanClassName, assignment, legion),
     hexa,
-    seedRing: buildSeedRing(character),
+    seedRing: buildSeedRing(character, overrides?.ringOverrides),
     entireStat: ZERO_ENTIRE_STAT,
     isGMS: true,
     isTMS: false,
@@ -789,14 +794,16 @@ export const SIMULATOR_HEXA_CORE_MAX = 30;
 export interface SimulatorInputOverrides {
   mainStat?: string; mainStatPer?: string; mainStatAbs?: string; mainStat9Level?: string;
   subStat?: string; subStatPer?: string; subStatAbs?: string; subStat9Level?: string;
+  ssubStat?: string; ssubStatPer?: string; ssubStatAbs?: string; ssubStat9Level?: string;
   allStatPer?: string; criRate?: string; buffDuration?: string; coolTimeReduce?: string;
   atk?: string; atkPer?: string; bossDmg?: string; criDmg?: string; ignoreGuard?: string;
   resetCoolDown?: string; weaponAtk?: string;
 }
 
 export interface ScouterSimulatorOverrides {
-  /** Overrides userStat.stat.level -- MapleDoro-only, MapleScouter's simulator has no
-   *  level field of its own (confirmed via live capture). */
+  /** MapleDoro-only, local Boss Clear Grid gap math -- never reaches the API at all.
+   *  computeBossClear uses this in place of character.level when set. Live-confirmed a Level
+   *  override doesn't affect boss380Hexa on MapleScouter's own site either. */
   level?: number;
   /** MapleDoro-only, local Boss Clear Grid gap math -- neither reaches the /dmg-simulator
    *  request at all (MapleScouter's own simulator has no Arcane Force/Sacred Power override
@@ -846,13 +853,156 @@ export interface ScouterSimulator {
   destiny2ndSkill: false;
 }
 
+/** The subset of ScouterSimulatorOverrides that has a real 1:1 field on ScouterUserStat
+ *  itself, either directly or through a same-value equivalence -- everything a
+ *  ScouterSimulatorOverrides can carry ends up mutating this real payload instead of the
+ *  separate `simulator` overlay object, so the whole popup can run through MapleScouter's
+ *  plain /calc/dmg endpoint (no api-key header) instead of the api-key-gated
+ *  /calc/dmg-simulator one. */
+export type DirectScouterOverrides = ScouterSimulatorOverrides;
+
+/** Adds `amount` onto a ScouterStat field's current string value, in place. */
+function addToStatField(stat: ScouterStat, field: keyof ScouterStat, amount: number): void {
+  (stat[field] as string) = String(Number(stat[field]) + amount);
+}
+
+/** floor(level / 9) * amount, the "X per 9 Levels" potential line's real formula. Uses the
+ *  character's REAL level, not a simulated Level override -- live-confirmed that
+ *  MapleScouter's own mainStat9Level/subStat9Level fields ignore a Level override entirely
+ *  and always compute off the real level, even in the same request. */
+function per9LevelsAmount(realLevel: number, amount: number): number {
+  return Math.floor(realLevel / 9) * amount;
+}
+
+/** Applies every Input tab field's confirmed formula onto a real ScouterStat, in place.
+ *  Plain fields add their typed value straight onto the matching stat field. A few need a
+ *  different rule:
+ *  - weaponAtk replaces the field outright instead of adding to it.
+ *  - mainStat9Level/subStat9Level/ssubStat9Level add floor(level / 9) * typed onto the
+ *    matching base stat.
+ *  - allStatPer adds onto mainStatPer, subStatPer, and (for 3-real-stat classes) ssubStatPer
+ *    all at once.
+ *  - There's no field for Final Damage% itself. Critical Damage% behaves the same way FD does
+ *    (a standalone multiplier, no boss/normal distinction), unlike Boss Damage% (which does
+ *    have one and gives a different result per boss bracket) -- so a Final Damage% target is
+ *    converted into the equivalent amount of Critical Damage% using the character's own
+ *    specEfficiency.cridmgeff1 rate, then added the same way a real Critical Damage% input
+ *    would be. Needs specEfficiency from the character's last computed Scouter result. */
+/** mainStat/subStat/ssubStat's base/percent/abs/9-per-level fields, plus allStatPer (which
+ *  fans out across all of them at once). ssubStatPer only gets allStatPer's share when the
+ *  class actually has a 3rd real stat slot (ssubStatBase nonzero, or already touched by its
+ *  own override this call). realLevel is the character's real level, for the 9-per-level
+ *  fields -- NOT stat.level, which may already carry a Level override by this point. */
+function applyStatFamilyOverrides(stat: ScouterStat, input: SimulatorInputOverrides, realLevel: number): void {
+  if (input.mainStat) addToStatField(stat, "mainStatBase", Number(input.mainStat));
+  if (input.mainStatPer) addToStatField(stat, "mainStatPer", Number(input.mainStatPer));
+  if (input.mainStatAbs) addToStatField(stat, "mainStatAbs", Number(input.mainStatAbs));
+  if (input.mainStat9Level) addToStatField(stat, "mainStatBase", per9LevelsAmount(realLevel, Number(input.mainStat9Level)));
+  if (input.subStat) addToStatField(stat, "subStatBase", Number(input.subStat));
+  if (input.subStatPer) addToStatField(stat, "subStatPer", Number(input.subStatPer));
+  if (input.subStatAbs) addToStatField(stat, "subStatAbs", Number(input.subStatAbs));
+  if (input.subStat9Level) addToStatField(stat, "subStatBase", per9LevelsAmount(realLevel, Number(input.subStat9Level)));
+  if (input.ssubStat) addToStatField(stat, "ssubStatBase", Number(input.ssubStat));
+  if (input.ssubStatPer) addToStatField(stat, "ssubStatPer", Number(input.ssubStatPer));
+  if (input.ssubStatAbs) addToStatField(stat, "ssubStatAbs", Number(input.ssubStatAbs));
+  if (input.ssubStat9Level) addToStatField(stat, "ssubStatBase", per9LevelsAmount(realLevel, Number(input.ssubStat9Level)));
+  if (input.allStatPer) {
+    const amount = Number(input.allStatPer);
+    addToStatField(stat, "mainStatPer", amount);
+    addToStatField(stat, "subStatPer", amount);
+    if (Number(stat.ssubStatPer) !== 0 || stat.ssubStatBase !== "0") addToStatField(stat, "ssubStatPer", amount);
+  }
+}
+
+/** Everything else on the Input tab -- combat percentages, cooldowns, ATT. ignoreGuard is the
+ *  one diminishing-stack field (real + (100 - real) * (typed / 100)); the rest, including
+ *  weaponAtk, are plain adds -- the popup shows Weapon ATT as a delta on top of the real value
+ *  (same UX as every other field), even though MapleScouter's own API wants the resulting
+ *  absolute number. criDmg is applied by applyInputOverrides itself, not here, since it needs
+ *  to combine with a Final Damage% override on the same field. */
+function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverrides): void {
+  if (input.criRate) addToStatField(stat, "critical", Number(input.criRate));
+  if (input.buffDuration) addToStatField(stat, "buffDuration", Number(input.buffDuration));
+  if (input.coolTimeReduce) addToStatField(stat, "coolTimeReduce", Number(input.coolTimeReduce));
+  if (input.atk) addToStatField(stat, "atkBase", Number(input.atk));
+  if (input.atkPer) addToStatField(stat, "atkPercent", Number(input.atkPer));
+  if (input.bossDmg) addToStatField(stat, "bossDmg", Number(input.bossDmg));
+  if (input.ignoreGuard) {
+    const real = Number(stat.ignoreDef);
+    stat.ignoreDef = String(real + (100 - real) * (Number(input.ignoreGuard) / 100));
+  }
+  if (input.resetCoolDown) addToStatField(stat, "resetCoolDown", Number(input.resetCoolDown));
+  if (input.weaponAtk) addToStatField(stat, "weaponAtk", Number(input.weaponAtk));
+}
+
+/** Applies every Input tab field's confirmed formula onto a real ScouterStat, in place -- see
+ *  applyStatFamilyOverrides/applyCombatFieldOverrides for the field-by-field rules. Critical
+ *  Damage% and Final Damage% are handled together here because they land on the same field
+ *  and don't simply add: Final Damage is its own separate multiplicative source (per the game's
+ *  own "multiple Final Damage sources multiply with each other" rule), and Critical Damage's
+ *  own FD-equivalent contribution (typedCritDmg * cridmgeff1) counts as a second source, so the
+ *  two compound as (1+a)*(1+b)-1 rather than adding -- typing 7% Crit Damage AND 10% Final
+ *  Damage together does NOT equal typing 7 + (10's Crit-Damage equivalent) as one flat amount;
+ *  it's a bigger number than that, live-confirmed against MapleScouter's own combined reading.
+ *  There's no field for Final Damage% itself, so it's expressed by adding the RIGHT total
+ *  amount to criticalDmg instead. Needs specEfficiency (cridmgeff1) from the character's last
+ *  computed Scouter result whenever finalDmgPercent is set. */
+function applyCritDmgAndFinalDmg(stat: ScouterStat, typedCritDmg: number, finalDmgPercent: string | undefined, cridmgeff1: number | undefined): void {
+  const finalDmg = finalDmgPercent ? Number(finalDmgPercent) : 0;
+  if (!finalDmg || !cridmgeff1) {
+    addToStatField(stat, "criticalDmg", typedCritDmg);
+    return;
+  }
+  const critDmgOwnFdShare = typedCritDmg * cridmgeff1;
+  const combinedFdShare = (1 + critDmgOwnFdShare) * (1 + finalDmg / 100) - 1;
+  addToStatField(stat, "criticalDmg", combinedFdShare / cridmgeff1);
+}
+
+function applyInputOverrides(stat: ScouterStat, input: SimulatorInputOverrides | undefined, finalDmgPercent: string | undefined, cridmgeff1: number | undefined, realLevel: number): void {
+  if (input) {
+    applyStatFamilyOverrides(stat, input, realLevel);
+    applyCombatFieldOverrides(stat, input);
+  }
+  applyCritDmgAndFinalDmg(stat, input?.criDmg ? Number(input.criDmg) : 0, finalDmgPercent, cridmgeff1);
+}
+
+/** Builds a real ScouterUserStat with a Scouter Simulator popup's full overrides applied, for
+ *  POSTing straight to /api/scouter (MapleScouter's plain /calc/dmg) instead of the api-key-
+ *  gated simulator endpoint. Returns null under the same conditions buildScouterPayload does
+ *  (class unsupported). `cridmgeff1` is the character's own specEfficiency rate (from their
+ *  last computed Scouter result), needed only when finalDmgPercent is set. */
+export function buildDirectScouterPayload(
+  character: StoredCharacterRecord,
+  ctx: ScouterPayloadContext,
+  overrides: DirectScouterOverrides,
+  cridmgeff1?: number,
+): ScouterUserStat | null {
+  const userStat = buildScouterPayload(character, ctx, overrides);
+  if (!userStat) return null;
+  // level is NOT sent to the API -- live-confirmed a Level override doesn't change
+  // boss380Hexa on MapleScouter's own site at all (only the Boss Clear Grid's own level-gap
+  // math, computed entirely locally in bossClearFormula.ts, uses it). Sending it here used
+  // to change boss380Hexa on mapledoro's side when it shouldn't have.
+  if (overrides.hexaCoreOverrides) {
+    for (const [field, value] of Object.entries(overrides.hexaCoreOverrides)) {
+      if (value !== undefined) userStat.hexa[field as SimulatorHexaCoreField] = value;
+    }
+  }
+  applyInputOverrides(userStat.stat, overrides.input, overrides.finalDmgPercent, cridmgeff1, character.level);
+  return userStat;
+}
+
 /** Builds the combined {userStat, simulator} body for MapleScouter's Additional Spec
  *  Simulator endpoint (POST /api/calc/dmg-simulator via the scouter-simulator proxy route),
  *  or null under the same conditions buildScouterPayload returns null (class unsupported).
  *  linkSimul is a straight copy of userStat.linkSkill -- the API rejected the request
  *  entirely without it, so it's required, not editable (no Link Skills tab in the popup).
  *  ssubStat/erda/solJanus/tms_fd/tms_soul stay hardcoded no-ops -- no confirmed effect,
- *  unlike mainStat9Level/subStat9Level (confirmed live to matter). */
+ *  unlike mainStat9Level/subStat9Level (confirmed live to matter).
+ *  Only finalDmgPercent and Input tab fields actually need this endpoint now -- level/HEXA/
+ *  buffs/rings route through buildDirectScouterPayload/the plain /calc/dmg endpoint instead
+ *  (still applied below too, so a combined draft that touches both groups still works in one
+ *  request when this function is the one called). */
 export function buildSimulatorPayload(
   character: StoredCharacterRecord,
   ctx: ScouterPayloadContext,
