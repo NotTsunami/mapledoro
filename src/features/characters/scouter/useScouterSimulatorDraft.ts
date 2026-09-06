@@ -78,11 +78,10 @@ function ozRingOverridesToDraft(character: StoredCharacterRecord, overrides: OzR
 /** Owns every field the Scouter Simulator popup lets a player edit -- one hook rather than
  *  ScouterSimulatorDialog declaring 9 separate useState calls itself, so that component can
  *  stay focused on class-derived lookups and rendering. Every field is pre-filled from the
- *  character's real current values (matches maplescouter.com's own simulator UI, confirmed
- *  live this session) so "max HEXA" is just bumping a few numbers up rather than re-typing
- *  everything from blank -- unless a simulation is already active (previousOverrides), in
- *  which case fields start from what was last typed in instead, so reopening the popup doesn't
- *  silently discard it. */
+ *  character's real current values (matches maplescouter.com's own simulator UI) so "max HEXA"
+ *  is just bumping a few numbers up rather than re-typing everything from blank -- unless a
+ *  simulation is already active (previousOverrides), in which case fields start from what was
+ *  last typed in instead, so reopening the popup doesn't silently discard it. */
 export function useScouterSimulatorDraft(
   character: StoredCharacterRecord,
   hexaClassDef: HexaClassDef | null,

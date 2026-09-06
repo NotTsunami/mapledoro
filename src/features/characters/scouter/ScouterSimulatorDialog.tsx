@@ -6,7 +6,8 @@ import { dialogBtnColors, dialogPrimaryBtnColors, type AppTheme } from "../../..
 import { statusText } from "../../../components/statusColors";
 import HoverTooltip from "../../../components/HoverTooltip";
 import { ItemIcon } from "../../../components/ResourceImage";
-import { ToolNumberInput, PillGroup } from "../../tools/shared-ui";
+import { PillGroup } from "../../tools/shared-ui";
+import { sanitizeDigitsInput, sanitizeDecimalInput, numericKeyDown, decimalKeyDown, clampNumber } from "../../../lib/inputUtils";
 import { SkillIcon } from "../../tools/hexa-skills/hexa-ui";
 import { findClassById, type HexaClassDef } from "../../tools/hexa-skills/hexa-classes";
 import type { StoredCharacterRecord } from "../model/charactersStore";
@@ -362,19 +363,103 @@ function OzRingsTab({ theme, draft, onChange, weaponJumpLabel, weaponJumpIconId 
 // Not-Applied trio (Yuki's real reference: Character Info's Basic Stats section).
 const tripleInputGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.35rem" };
 
-function TripleInputBox({ theme, inputStyle, label, sublabel, value, onChange, integer }: {
-  theme: AppTheme; inputStyle: CSSProperties; label: string; sublabel: string; value: number; onChange: (v: number) => void; integer?: boolean;
+/** Real per-field caps and whether MapleScouter's own simulator accepts a decimal for it,
+ *  matching maplescouter.com's own Input panel. Every field the Input tab renders is covered
+ *  here. */
+const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; decimal: boolean }> = {
+  mainStat: { max: 3000, decimal: false },
+  mainStatPer: { max: 400, decimal: false },
+  mainStatAbs: { max: 40000, decimal: false },
+  mainStat9Level: { max: 40, decimal: false },
+  subStat: { max: 3000, decimal: false },
+  subStatPer: { max: 400, decimal: false },
+  subStatAbs: { max: 40000, decimal: false },
+  subStat9Level: { max: 40, decimal: false },
+  allStatPer: { max: 400, decimal: false },
+  criRate: { max: 100, decimal: true },
+  buffDuration: { max: 150, decimal: false },
+  coolTimeReduce: { max: 7, decimal: false },
+  atk: { max: 1500, decimal: false },
+  atkPer: { max: 120, decimal: false },
+  bossDmg: { max: 400, decimal: true },
+  criDmg: { max: 70, decimal: true },
+  ignoreGuard: { max: 99, decimal: true },
+  resetCoolDown: { max: 27.5, decimal: true },
+  weaponAtk: { max: 1004, decimal: false },
+};
+const FINAL_DMG_LIMIT = { max: 75, decimal: true };
+
+/** A field's numeric bounds for LimitedNumberInput -- max omitted means no real in-game cap
+ *  (Arcane Force/Sacred Power grow indefinitely, same as the real Stats setup step). min
+ *  defaults to 0 (every field but Level, which can't go below 1). */
+interface InputLimit { max?: number; min?: number; decimal: boolean }
+
+/** Sanitizes AND clamps a raw text-input value to the field's real cap, same logic as
+ *  StatsSetupStep.tsx's own clampIgnoreDefense/clampIgnoreElementalResist -- reformats down
+ *  to the max only once the typed number actually exceeds it, never mid-decimal-typing
+ *  ("27." stays "27." rather than getting stripped to "27"), so the displayed box itself
+ *  can't be typed past its cap the way ToolNumberInput's plain commit-time clamp could. */
+function sanitizeLimitedInput(raw: string, limit: InputLimit): string {
+  const sanitized = limit.decimal ? sanitizeDecimalInput(raw) : sanitizeDigitsInput(raw);
+  if (sanitized === "" || sanitized.endsWith(".")) return sanitized;
+  if (limit.max !== undefined && Number(sanitized) > limit.max) return String(limit.max);
+  if (limit.min !== undefined && Number(sanitized) < limit.min) return String(limit.min);
+  return sanitized;
+}
+
+/** Draft-while-focused text input, shared by the Input tab's own fields and the Level/Arcane
+ *  Force/Sacred Power row -- keeps raw keystrokes visible (so a trailing "." isn't stomped
+ *  mid-type) while committing a clamped number on every change, same division of labor as
+ *  ToolNumberInput's own draft/commit split. Sets the focus outline color inline
+ *  (StatsSetupStep.tsx's own pattern) rather than relying on :focus-visible -- that only
+ *  lights up for keyboard focus in most browsers, so a plain mouse click into the box showed
+ *  no highlight at all. */
+function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }: {
+  theme: AppTheme; value: number; limit: InputLimit; onChange: (v: number) => void;
+  style: CSSProperties; ariaLabel: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = (raw: string) => {
+    const sanitized = sanitizeLimitedInput(raw, limit);
+    if (sanitized === "" || sanitized === ".") return;
+    onChange(clampNumber(Number(sanitized), limit.max ?? Infinity, limit.min ?? 0));
+  };
+  return (
+    <input
+      type="text" inputMode={limit.decimal ? "decimal" : "numeric"} aria-label={ariaLabel}
+      value={draft ?? String(value)} style={style}
+      onKeyDown={limit.decimal ? decimalKeyDown : numericKeyDown}
+      onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; e.currentTarget.select(); }}
+      onChange={(e) => {
+        const sanitized = sanitizeLimitedInput(e.target.value, limit);
+        setDraft(sanitized);
+        commit(sanitized);
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.outlineColor = "transparent";
+        setDraft(null);
+        commit(e.target.value);
+      }}
+    />
+  );
+}
+
+function TripleInputBox({ label, sublabel, value, limit, onChange, inputStyle, theme }: {
+  theme: AppTheme; inputStyle: CSSProperties; label: string; sublabel: string; value: number;
+  limit: { max: number; decimal: boolean }; onChange: (v: number) => void;
 }) {
   return (
     <div>
-      <ToolNumberInput value={value} min={0} integer={integer} onCommit={onChange} aria-label={label} className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+      <LimitedNumberInput theme={theme} value={value} limit={limit} onChange={onChange} ariaLabel={label} style={{ ...inputStyle, width: "100%" }} />
       <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>{sublabel}</p>
     </div>
   );
 }
 
-function TripleInputRow({ theme, inputStyle, label, base, percent, abs, per9Levels, onChange }: {
+function TripleInputRow({ theme, inputStyle, label, baseKey, percentKey, absKey, per9Key, base, percent, abs, per9Levels, onChange }: {
   theme: AppTheme; inputStyle: CSSProperties; label: string;
+  baseKey: keyof SimulatorInputOverrides; percentKey: keyof SimulatorInputOverrides;
+  absKey: keyof SimulatorInputOverrides; per9Key: keyof SimulatorInputOverrides;
   base: number; percent: number; abs: number; per9Levels: number;
   onChange: (field: "base" | "percent" | "abs" | "per9Levels", v: number) => void;
 }) {
@@ -382,10 +467,10 @@ function TripleInputRow({ theme, inputStyle, label, base, percent, abs, per9Leve
     <div>
       <p style={{ margin: 0, marginBottom: "0.25rem", fontSize: "0.82rem", fontWeight: 800, color: theme.text }}>{label}</p>
       <div style={{ ...tripleInputGridStyle, gridTemplateColumns: "repeat(4, 1fr)" }}>
-        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} base value`} sublabel="Base Value" value={base} onChange={(v) => onChange("base", v)} integer />
-        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} percent value`} sublabel="% Value" value={percent} onChange={(v) => onChange("percent", v)} integer />
-        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} percent not applied`} sublabel="% Not Applied" value={abs} onChange={(v) => onChange("abs", v)} integer />
-        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} per 9 levels`} sublabel="Per 9 Levels" value={per9Levels} onChange={(v) => onChange("per9Levels", v)} integer />
+        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} base value`} sublabel="Base Value" value={base} limit={INPUT_FIELD_LIMITS[baseKey]} onChange={(v) => onChange("base", v)} />
+        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} percent value`} sublabel="% Value" value={percent} limit={INPUT_FIELD_LIMITS[percentKey]} onChange={(v) => onChange("percent", v)} />
+        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} percent not applied`} sublabel="% Not Applied" value={abs} limit={INPUT_FIELD_LIMITS[absKey]} onChange={(v) => onChange("abs", v)} />
+        <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${label} per 9 levels`} sublabel="Per 9 Levels" value={per9Levels} limit={INPUT_FIELD_LIMITS[per9Key]} onChange={(v) => onChange("per9Levels", v)} />
       </div>
     </div>
   );
@@ -394,15 +479,16 @@ function TripleInputRow({ theme, inputStyle, label, base, percent, abs, per9Leve
 // Same compact row shape StatsSetupStep.tsx's own CombatStatCell uses (label left,
 // ellipsis-truncated; fixed-width input right, optional % suffix badge) -- not Field's
 // label-above-input stacking, which reads far taller/looser than the real setup step.
-function InputGroupField({ theme, inputStyle, label, value, onChange, suffix = "%" }: {
-  theme: AppTheme; inputStyle: CSSProperties; label: string; value: number; onChange: (v: number) => void; suffix?: string | null;
+function InputGroupField({ theme, inputStyle, label, value, limit, onChange, suffix = "%" }: {
+  theme: AppTheme; inputStyle: CSSProperties; label: string; value: number;
+  limit: { max: number; decimal: boolean }; onChange: (v: number) => void; suffix?: string | null;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
       <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <ToolNumberInput
-          value={value} min={0} onCommit={onChange} aria-label={label} className="no-spinner"
+        <LimitedNumberInput
+          theme={theme} value={value} limit={limit} onChange={onChange} ariaLabel={label}
           style={suffix ? { ...inputStyle, width: "4.6rem", paddingRight: "1.15rem" } : { ...inputStyle, width: "4.6rem" }}
         />
         {suffix && <span style={inputSuffixStyle(theme)}>{suffix}</span>}
@@ -433,7 +519,7 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
 }) {
   const inputStyle = statInputStyle(theme);
   const field = (key: keyof SimulatorInputOverrides, label: string, suffix: string | null = "%") => (
-    <InputGroupField key={key} theme={theme} inputStyle={inputStyle} label={label} value={input[key]} onChange={(v) => onInputChange(key, v)} suffix={suffix} />
+    <InputGroupField key={key} theme={theme} inputStyle={inputStyle} label={label} value={input[key]} limit={INPUT_FIELD_LIMITS[key]} onChange={(v) => onInputChange(key, v)} suffix={suffix} />
   );
   const tripleField = (
     label: string,
@@ -445,6 +531,7 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
       <TripleInputRow
         key={baseKey}
         theme={theme} inputStyle={inputStyle} label={label}
+        baseKey={baseKey} percentKey={percentKey} absKey={absKey} per9Key={per9Key}
         base={input[baseKey]} percent={input[percentKey]} abs={input[absKey]} per9Levels={input[per9Key]}
         onChange={(field2, v) => onInputChange(keyFor[field2], v)}
       />
@@ -467,8 +554,8 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
           <div>
             <p style={{ margin: 0, marginBottom: "0.25rem", fontSize: "0.82rem", fontWeight: 800, color: theme.text }}>{atkLabel}</p>
             <div style={tripleInputGridStyle}>
-              <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${atkLabel} base value`} sublabel="Base Value" value={input.atk} onChange={(v) => onInputChange("atk", v)} integer />
-              <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${atkLabel} percent value`} sublabel="% Value" value={input.atkPer} onChange={(v) => onInputChange("atkPer", v)} integer />
+              <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${atkLabel} base value`} sublabel="Base Value" value={input.atk} limit={INPUT_FIELD_LIMITS.atk} onChange={(v) => onInputChange("atk", v)} />
+              <TripleInputBox theme={theme} inputStyle={inputStyle} label={`${atkLabel} percent value`} sublabel="% Value" value={input.atkPer} limit={INPUT_FIELD_LIMITS.atkPer} onChange={(v) => onInputChange("atkPer", v)} />
             </div>
           </div>
         </div>
@@ -481,7 +568,7 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
             {COMBAT_LEFT_FIELDS.map(({ key, label, suffix }) => field(key, label, suffix === undefined ? "%" : suffix))}
           </div>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            <InputGroupField theme={theme} inputStyle={inputStyle} label="Final Damage" value={finalDmgPercent} onChange={onFinalDmgChange} />
+            <InputGroupField theme={theme} inputStyle={inputStyle} label="Final Damage" value={finalDmgPercent} limit={FINAL_DMG_LIMIT} onChange={onFinalDmgChange} />
             {COMBAT_RIGHT_FIELDS.map(({ key, label, suffix }) => field(key, label, suffix === undefined ? "%" : suffix))}
           </div>
         </div>
@@ -561,18 +648,10 @@ export default function ScouterSimulatorDialog({
       onClose={onClose}
       style={{ width: "min(700px, 100%)", height: "min(760px, 85vh)", overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
-      {/* ToolNumberInput's onFocus/onBlur are already spoken for (select-all-on-focus, commit
-          draft on blur -- see its own file), so a themed focus ring can't be layered on via
-          props the way StatsSetupStep.tsx's raw inputs do (onFocus/onBlur there directly set
-          outlineColor). This dialog-scoped rule gets the same themed color a different way --
-          without it, input:focus-visible's outline (globals.css) has no explicit color and
-          falls back to the browser's unthemed default, which reads as a stray white ring on
-          this dark popup. */}
       {/* Mobile: the subtitle only matters the first time this dialog opens, and the level
           row/tab switcher's padding is generous enough on desktop to eat most of a phone
           viewport's height before any real tab content shows -- shrink both there. */}
       <style>{`
-        .scouter-simulator-dialog input:focus-visible { outline-color: ${theme.accent}; }
         .scouter-sim-level-grid { container-type: inline-size; }
         .scouter-sim-label-short { display: none; }
         @container (max-width: 340px) {
@@ -603,15 +682,15 @@ export default function ScouterSimulatorDialog({
           <div className="scouter-sim-level-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, flex: 1 }}>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Level" short="Level" />
-              <ToolNumberInput value={draft.level} min={1} max={MAX_CHARACTER_LEVEL} integer onCommit={draft.setLevel} aria-label="Simulated level" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput theme={theme} value={draft.level} limit={{ min: 1, max: MAX_CHARACTER_LEVEL, decimal: false }} onChange={draft.setLevel} ariaLabel="Simulated level" style={{ ...inputStyle, width: "100%" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Arcane Force" short="Arc. Force" />
-              <ToolNumberInput value={draft.arcaneForce} min={0} integer onCommit={draft.setArcaneForce} aria-label="Simulated Arcane Force" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput theme={theme} value={draft.arcaneForce} limit={{ decimal: false }} onChange={draft.setArcaneForce} ariaLabel="Simulated Arcane Force" style={{ ...inputStyle, width: "100%" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Sacred Power" short="Sac. Power" />
-              <ToolNumberInput value={draft.authenticForce} min={0} integer onCommit={draft.setAuthenticForce} aria-label="Simulated Sacred Power" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput theme={theme} value={draft.authenticForce} limit={{ decimal: false }} onChange={draft.setAuthenticForce} ariaLabel="Simulated Sacred Power" style={{ ...inputStyle, width: "100%" }} />
             </div>
           </div>
           <ResetLink theme={theme} onReset={draft.resetLevelRow} />
