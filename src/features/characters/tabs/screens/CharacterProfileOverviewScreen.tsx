@@ -3325,6 +3325,7 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
               theme={theme}
               character={character}
               applying={scouterSimulator.applying}
+              previousOverrides={simulated?.overrides ?? null}
               onApply={async (overrides) => {
                 const result = await scouterSimulator.apply(overrides);
                 if (result.status === "ok") setSimulatorDialogOpen(false);

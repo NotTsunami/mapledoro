@@ -217,14 +217,25 @@ function BuffsTab({ theme, draft, onChange, primaryStat, jobName }: {
   );
 }
 
-// ── HEXA tab ─────────────────────────────────────────────────────────────────
-
 const hexaSectionBtnStyle: CSSProperties = {
   background: "none", border: "none", font: "inherit",
   fontSize: "0.75rem", fontWeight: 800,
   padding: 0,
   cursor: "pointer",
 };
+
+/** Small text-only "Reset" link, same look as HexaSection's own Max All/Clear -- used both
+ *  next to the Level/Arc. Force/Sac. Power row and next to the tab switcher (resets whichever
+ *  tab is active), so every group of simulated fields has one consistent way back to real. */
+function ResetLink({ theme, onReset, label = "Reset" }: { theme: AppTheme; onReset: () => void; label?: string }) {
+  return (
+    <button type="button" onClick={onReset} style={{ ...hexaSectionBtnStyle, color: theme.muted }}>
+      {label}
+    </button>
+  );
+}
+
+// ── HEXA tab ─────────────────────────────────────────────────────────────────
 
 function HexaSectionLabel({ theme, label, onMaxAll, onClear }: { theme: AppTheme; label: string; onMaxAll: () => void; onClear: () => void }) {
   return (
@@ -497,12 +508,16 @@ export default function ScouterSimulatorDialog({
   theme,
   character,
   applying,
+  previousOverrides,
   onApply,
   onClose,
 }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
   applying: boolean;
+  /** The last-applied simulation's overrides, if one is currently active -- reopening the
+   *  popup should show what was typed in, not the character's real values again. */
+  previousOverrides: ScouterSimulatorOverrides | null;
   onApply: (overrides: ScouterSimulatorOverrides) => Promise<ScouterSimulatorApplyResult>;
   onClose: () => void;
 }) {
@@ -514,10 +529,21 @@ export default function ScouterSimulatorDialog({
   const { usesMagicWeapon, label: weaponAttLabel } = deriveWeaponAttLabel(classData);
   const inputStyle = statInputStyle(theme);
 
-  const draft = useScouterSimulatorDraft(character, hexaClassDef);
+  const draft = useScouterSimulatorDraft(character, hexaClassDef, previousOverrides);
   const [error, setError] = useState<ScouterErrorReason | null>(null);
 
+  const RESET_BY_TAB: Record<SimulatorTab, () => void> = {
+    buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, input: draft.resetInput,
+  };
+
   const handleApply = () => {
+    // Nothing to simulate -- every field is still at its real starting value, so a request
+    // would just return the same result the real Scouter figure already shows. Close as if it
+    // had succeeded rather than round-tripping the API for a known no-op.
+    if (!draft.hasChanges) {
+      onClose();
+      return;
+    }
     setError(null);
     void onApply(draft.buildOverrides()).then((result) => {
       if (result.status === "error") setError(result.reason);
@@ -573,21 +599,27 @@ export default function ScouterSimulatorDialog({
           than appearing to repeat under every tab. Typing the boss's own requirement here
           already closes that gap, so there's no separate "close this gap" toggle. */}
       <div className="scouter-sim-level-row" style={{ padding: "0.7rem 1.1rem", borderBottom: `1px solid ${theme.border}`, display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        <div className="scouter-sim-level-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          <div style={{ minWidth: 0 }}>
-            <LevelRowLabel full="Level" short="Level" />
-            <ToolNumberInput value={draft.level} min={1} max={MAX_CHARACTER_LEVEL} integer onCommit={draft.setLevel} aria-label="Simulated level" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+          <div className="scouter-sim-level-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, flex: 1 }}>
+            <div style={{ minWidth: 0 }}>
+              <LevelRowLabel full="Level" short="Level" />
+              <ToolNumberInput value={draft.level} min={1} max={MAX_CHARACTER_LEVEL} integer onCommit={draft.setLevel} aria-label="Simulated level" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <LevelRowLabel full="Arcane Force" short="Arc. Force" />
+              <ToolNumberInput value={draft.arcaneForce} min={0} integer onCommit={draft.setArcaneForce} aria-label="Simulated Arcane Force" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <LevelRowLabel full="Sacred Power" short="Sac. Power" />
+              <ToolNumberInput value={draft.authenticForce} min={0} integer onCommit={draft.setAuthenticForce} aria-label="Simulated Sacred Power" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
+            </div>
           </div>
-          <div style={{ minWidth: 0 }}>
-            <LevelRowLabel full="Arcane Force" short="Arc. Force" />
-            <ToolNumberInput value={draft.arcaneForce} min={0} integer onCommit={draft.setArcaneForce} aria-label="Simulated Arcane Force" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <LevelRowLabel full="Sacred Power" short="Sac. Power" />
-            <ToolNumberInput value={draft.authenticForce} min={0} integer onCommit={draft.setAuthenticForce} aria-label="Simulated Sacred Power" className="no-spinner" style={{ ...inputStyle, width: "100%" }} />
-          </div>
+          <ResetLink theme={theme} onReset={draft.resetLevelRow} />
         </div>
-        <PillGroup theme={theme} options={TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <PillGroup theme={theme} options={TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} />
+          <ResetLink theme={theme} onReset={RESET_BY_TAB[draft.tab]} label="Reset Tab" />
+        </div>
       </div>
 
       <div style={{ padding: "0.85rem 1.1rem", overflowY: "auto", flex: 1, minHeight: 0 }}>
