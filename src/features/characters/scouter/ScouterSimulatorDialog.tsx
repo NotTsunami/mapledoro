@@ -66,12 +66,9 @@ const HEXA_CORE_MIN: Partial<Record<SimulatorHexaCoreField, number>> = { skillCo
 const MAX_CHARACTER_LEVEL = 300;
 
 // Arcane Force's cap is a real game/formula constant (bossClearFormula.ts's own
-// Math.min(characterArcaneForce, 1750), live-confirmed to match MapleScouter's own site).
-// Sacred Power has no fixed in-game ceiling (Grandis keeps adding symbols), so this is a
-// generous practical cap instead, matched to Arcane Force's own number rather than a
-// separately-derived one -- current max achievable (8 symbols + a announced 9th, event buff,
-// hyper burning title) is a bit under 1200, and a plausible future 12-symbol lineup is under
-// 1500, so 1750 has real headroom either way.
+// Math.min(characterArcaneForce, 1750)). Sacred Power has no fixed in-game ceiling (Grandis
+// keeps adding symbols), so this reuses Arcane Force's number as a generous practical cap
+// with real headroom over the current achievable max.
 const ARCANE_AND_SACRED_FORCE_MAX = 1750;
 
 function sectionLabelStyle(theme: AppTheme): CSSProperties {
@@ -641,12 +638,9 @@ export default function ScouterSimulatorDialog({
   const primaryStat = primaryStatForClass(classData?.requiredStats ?? []);
   const statLabels = simulatorStatLabels(classData?.id ?? "", classData?.requiredStats ?? []);
   const ozClassInfo = getOzClassStatInfo(classData?.id, classData?.requiredStats ?? []);
-  // Legacy classes never get HEXA regardless of level -- same as flows.ts's own gating.
-  // Level alone isn't a hard block here the way it is in the real setup flow, though:
-  // MapleScouter's API doesn't validate whether the character is really HEXA-eligible, it
-  // just computes whatever hexa.* fields it's sent (live-confirmed a level-250 character
-  // still gets real numbers back) -- so the HEXA tab stays reachable, gated on the
-  // SIMULATED level (draft.level) reaching 260, not the character's real one.
+  // Legacy classes never get HEXA regardless of level, same as flows.ts's own gating. Level
+  // alone isn't a hard block here the way it is in the real setup flow -- see
+  // HexaLockedMessage's own comment for why.
   const hexaLegacyBlocked = Boolean(classData?.isLegacy);
   const hexaClassDef = classData && !hexaLegacyBlocked ? findClassById(classData.id) : null;
   const { usesMagicWeapon, label: weaponAttLabel } = deriveWeaponAttLabel(classData);

@@ -237,30 +237,13 @@ function parseSpecEfficiency(raw: unknown): ScouterSpecEfficiency | undefined {
 
 /** A 0 for the headline figure is MapleScouter's own known failure signature (e.g. the
  *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result.
- *  Exported (unknown-typed, matching parseSimulatorCalcResponse's own signature) for
- *  scouterSimulatorCache.ts's direct-override path, which POSTs a mutated ScouterUserStat
- *  to the same /api/scouter route (MapleScouter's plain /calc/dmg) the real refresh uses,
- *  and gets the same calculatedData-wrapped response shape back. */
+ *  Exported (unknown-typed) for scouterSimulatorCache.ts's direct-override path, which POSTs
+ *  a mutated ScouterUserStat to this same /api/scouter route (MapleScouter's plain /calc/dmg)
+ *  the real refresh uses, and gets the same calculatedData-wrapped response shape back. */
 export function parseCalcResponse(data: unknown): ScouterResultEntry | null {
   const c = (data as MapleScouterCalcResponse | null)?.calculatedData;
   if (!c) return null;
   return parseCalculatedData(c);
-}
-
-/** POST /api/calc/dmg-simulator's response is NOT wrapped in a `calculatedData` object the
- *  way /api/calc/dmg's is -- every field (boss300_stat, spline_300, specEfficiency, etc.)
- *  sits directly on the response root instead, live-confirmed on a real captured Kanna
- *  simulator response. Same field set otherwise (their frontend clearly reuses the same
- *  result-rendering code for both), so this just re-roots the flat body through the same
- *  parsing logic rather than duplicating it. One real difference confirmed in that same
- *  capture: the simulator response's specEfficiency omits igreff1_380/igreffminus40_380 (no
- *  "_380" suffixed keys at all in that block) -- parseSpecEfficiency's own all-or-nothing
- *  rule already handles this by leaving specEfficiency undefined for a simulator result, so
- *  the Stat Efficiency bookmark just isn't available for a simulated result, no special
- *  case needed here. */
-export function parseSimulatorCalcResponse(data: unknown): ScouterResultEntry | null {
-  if (!data || typeof data !== "object") return null;
-  return parseCalculatedData(data as NonNullable<MapleScouterCalcResponse["calculatedData"]>);
 }
 
 function parseCalculatedData(c: NonNullable<MapleScouterCalcResponse["calculatedData"]>): ScouterResultEntry | null {

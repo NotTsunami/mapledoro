@@ -1,10 +1,10 @@
 /*
-  Per-character, hash-keyed cache for MapleScouter Additional Spec Simulator ("what if")
-  results -- sibling to scouterCache.ts's real-result cache, same client-side/hash-keyed
-  rationale (see that file's header), but under its OWN tool key so a one-off simulator run
-  never mixes with a character's real saved Scouter result even though the two hashes could
-  never actually collide (a simulator hash includes the patched level + full simulator
-  overlay, a real hash never does).
+  Per-character, hash-keyed cache for Scouter Simulator ("what if") results -- sibling to
+  scouterCache.ts's real-result cache, same client-side/hash-keyed rationale (see that file's
+  header), but under its OWN tool key so a one-off simulator run never mixes with a
+  character's real saved Scouter result even though the two hashes could never actually
+  collide (a simulator hash includes the overrides' own field values, a real hash never
+  does).
 
   No TTL the way the real cache has one -- a simulator entry is inherently "as of when I ran
   this specific what-if," not something that silently drifts the way a real character's gear

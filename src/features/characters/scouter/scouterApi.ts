@@ -267,9 +267,8 @@ function renownLevel(buffs: StoredScouterBuffs | undefined, key: "allStats" | "a
 }
 
 /** Builds the doping (buffs) block from a plain StoredScouterBuffs, not read directly off a
- *  character -- lets buildSimulatorPayload call this SAME function twice: once with the
- *  character's real buffs for `doping`, once with the Scouter Simulator popup's own draft-
- *  derived buffs for `dopingSimul`, without duplicating this mapping. */
+ *  character -- lets buildScouterPayload pass the Scouter Simulator popup's own draft-derived
+ *  buffs override in place of the character's real ones, without a separate code path. */
 function buildDoping(buffs: StoredScouterBuffs | undefined): ScouterDoping {
   const bossSlayers = buffs?.bossSlayers ?? 0;
   const forTheGuild = buffs?.forTheGuild ?? 0;
@@ -806,52 +805,23 @@ export interface ScouterSimulatorOverrides {
    *  computeBossClear uses this in place of character.level when set. Live-confirmed a Level
    *  override doesn't affect boss380Hexa on MapleScouter's own site either. */
   level?: number;
-  /** MapleDoro-only, local Boss Clear Grid gap math -- neither reaches the /dmg-simulator
-   *  request at all (MapleScouter's own simulator has no Arcane Force/Sacred Power override
-   *  field either, same absence as level). computeBossClear uses these in place of the
-   *  character's real character.stats.arcanePower/sacredPower when set, so typing the boss's
-   *  own requirement here closes that gap honestly -- no separate "pin to ceiling" toggle. */
+  /** MapleDoro-only, local Boss Clear Grid gap math -- neither reaches the API at all.
+   *  computeBossClear uses these in place of the character's real
+   *  character.stats.arcanePower/sacredPower when set, so typing the boss's own requirement
+   *  here closes that gap honestly -- no separate "pin to ceiling" toggle. */
   arcaneForceOverride?: number;
   authenticForceOverride?: number;
-  /** Percent string, e.g. "75.00000" -- MapleScouter's own simulator field format. */
+  /** Percent string, e.g. "75.00000". No real ScouterUserStat field of its own -- converted
+   *  into an equivalent Critical Damage% amount at request-build time, see
+   *  applyCritDmgAndFinalDmg. */
   finalDmgPercent?: string;
   hexaCoreOverrides?: Partial<Record<SimulatorHexaCoreField, string>>;
   /** From the Buffs tab's own draft -- a full independent buff re-pick, not a partial patch
-   *  onto the character's real buffs (matches dopingSimul's real shape: MapleScouter's own
-   *  simulator sends a full second buff object, not a delta). Undefined means "same as the
-   *  character's real buffs", not "no buffs". */
+   *  onto the character's real buffs. Undefined means "same as the character's real buffs",
+   *  not "no buffs". */
   dopingOverrides?: StoredScouterBuffs;
   ringOverrides?: OzRingOverrides;
   input?: SimulatorInputOverrides;
-}
-
-export interface ScouterSimulatorRequest {
-  userStat: ScouterUserStat;
-  simulator: ScouterSimulator;
-}
-
-export interface ScouterSimulator {
-  mainStat: string; mainStatPer: string; mainStatAbs: string;
-  subStat: string; subStatPer: string; subStatAbs: string;
-  ssubStat: "0"; ssubStatPer: "0"; ssubStatAbs: "0";
-  allStatPer: string; criRate: string; buffDuration: string; coolTimeReduce: string;
-  atk: string; atkPer: string; bossDmg: string; criDmg: string; ignoreGuard: string; resetCoolDown: string;
-  weaponAtk: string; erda: "0"; solJanus: "0";
-  genesis: boolean;
-  finalDmg: string;
-  mainStat9Level: string; subStat9Level: string; ssubStat9Level: "";
-  tms_fd: ""; tms_soul: "";
-  masteryCore1: string; masteryCore2: string; masteryCore3: string; masteryCore4: string;
-  skillCore1: string; skillCore2: string;
-  // skillCore3 is a real slot with no GMS content yet ("0"); skillCore4-6 don't exist at all ("").
-  skillCore3: "0"; skillCore4: ""; skillCore5: ""; skillCore6: "";
-  reinCore1: string; reinCore2: string; reinCore3: string; reinCore4: string;
-  generalCore2: string;
-  generalCore3: "0"; generalCore4: "";
-  dopingSimul: ScouterDoping;
-  linkSimul: Record<string, string>;
-  restraintRing: string; weaponRing: string; ringofSum: string; riskTaker: "0"; contiRing: string;
-  destiny2ndSkill: false;
 }
 
 /** The subset of ScouterSimulatorOverrides that has a real 1:1 field on ScouterUserStat
@@ -875,20 +845,6 @@ function per9LevelsAmount(realLevel: number, amount: number): number {
   return Math.floor(realLevel / 9) * amount;
 }
 
-/** Applies every Input tab field's confirmed formula onto a real ScouterStat, in place.
- *  Plain fields add their typed value straight onto the matching stat field. A few need a
- *  different rule:
- *  - weaponAtk replaces the field outright instead of adding to it.
- *  - mainStat9Level/subStat9Level/ssubStat9Level add floor(level / 9) * typed onto the
- *    matching base stat.
- *  - allStatPer adds onto mainStatPer, subStatPer, and (for 3-real-stat classes) ssubStatPer
- *    all at once.
- *  - There's no field for Final Damage% itself. Critical Damage% behaves the same way FD does
- *    (a standalone multiplier, no boss/normal distinction), unlike Boss Damage% (which does
- *    have one and gives a different result per boss bracket) -- so a Final Damage% target is
- *    converted into the equivalent amount of Critical Damage% using the character's own
- *    specEfficiency.cridmgeff1 rate, then added the same way a real Critical Damage% input
- *    would be. Needs specEfficiency from the character's last computed Scouter result. */
 /** mainStat/subStat/ssubStat's base/percent/abs/9-per-level fields, plus allStatPer (which
  *  fans out across all of them at once). ssubStatPer only gets allStatPer's share when the
  *  class actually has a 3rd real stat slot (ssubStatBase nonzero, or already touched by its
@@ -937,33 +893,19 @@ function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverr
 }
 
 /** Applies every Input tab field's confirmed formula onto a real ScouterStat, in place -- see
- *  applyStatFamilyOverrides/applyCombatFieldOverrides for the field-by-field rules. Critical
- *  Damage% and Final Damage% are handled together here because they land on the same field
- *  and don't simply add: Final Damage is its own separate multiplicative source (per the game's
- *  own "multiple Final Damage sources multiply with each other" rule), and Critical Damage's
- *  own FD-equivalent contribution counts as a second source, so the two compound as
- *  (1+a)*(1+b)-1 rather than adding -- typing 7% Crit Damage AND 10% Final Damage together
- *  does NOT equal typing 7 + (10's Crit-Damage equivalent) as one flat amount; it's a bigger
- *  number than that, live-confirmed against MapleScouter's own combined reading.
+ *  applyStatFamilyOverrides/applyCombatFieldOverrides for the field-by-field rules. There's no
+ *  field for Final Damage% itself, so it's expressed as a Critical Damage delta instead --
+ *  needs specEfficiency (cridmgeff1) from the character's last computed Scouter result.
  *
- *  `existingCritDmgFdShare` is typedCritDmg PLUS whatever NEW excess-Crit-Rate-to-Crit-Damage
- *  conversion the typed Crit Rate delta itself causes -- the 7 archer classes with a
- *  critRateToCritDmg rate turn Crit Rate past 100% into bonus Crit Damage server-side
- *  (stat-optimizer's CLAUDE.md documents the same per-class rates), and typing MORE Crit Rate
- *  triggers MORE of that conversion, which is itself a new Final Damage source that has to be
- *  counted before compounding a typed Final Damage% on top. Only the DELTA matters here, not
- *  the character's total post-override excess -- their real baseline's own excess-Crit-Rate
- *  conversion is already part of reality, not something introduced by this Apply, so it must
- *  not be re-added into the compounding math (live-confirmed: MapleScouter's own FD% panel
- *  reads relative to the real baseline, not from an absolute-zero starting point -- typing
- *  +100 Crit Rate alone read 8.504% FD-gain, not the far larger value predicted by treating
- *  the character's full post-override excess as new). realCritRate is the character's own
- *  real, un-overridden Crit Rate (before the 100% floor and before any typed delta), needed
- *  to isolate that delta from stat.critical's already-mutated, post-override value.
- *
- *  There's no field for Final Damage% itself, so it's expressed by adding the RIGHT total
- *  amount to criticalDmg instead. Needs specEfficiency (cridmgeff1) from the character's last
- *  computed Scouter result whenever finalDmgPercent is set. */
+ *  Critical Damage% and Final Damage% share this field because they're both Final Damage
+ *  sources, and multiple sources multiply together rather than adding (typing 7% Crit Damage
+ *  AND 10% Final Damage isn't 7 + 10's-Crit-Damage-equivalent, it compounds to a bigger total).
+ *  The 7 archer classes with a critRateToCritDmg rate add a third source: typing more Crit
+ *  Rate grows their excess-Crit-Rate-to-Crit-Damage conversion, which is itself a Final Damage
+ *  source and has to compound in too. Only the DELTA of that conversion caused by THIS Apply's
+ *  typed Crit Rate counts -- the character's real, pre-existing excess is already part of
+ *  reality, not a new source this Apply introduces, so realCritRate (the un-overridden value)
+ *  is needed to isolate the delta from stat.critical's already-mutated total. */
 function applyCritDmgAndFinalDmg(stat: ScouterStat, typedCritDmg: number, finalDmgPercent: string | undefined, cridmgeff1: number | undefined, critRateToDmg: number, realCritRate: number): void {
   const finalDmg = finalDmgPercent ? Number(finalDmgPercent) : 0;
   if (!finalDmg || !cridmgeff1) {
@@ -1015,68 +957,6 @@ export function buildDirectScouterPayload(
   return userStat;
 }
 
-/** Builds the combined {userStat, simulator} body for MapleScouter's Additional Spec
- *  Simulator endpoint (POST /api/calc/dmg-simulator via the scouter-simulator proxy route),
- *  or null under the same conditions buildScouterPayload returns null (class unsupported).
- *  linkSimul is a straight copy of userStat.linkSkill -- the API rejected the request
- *  entirely without it, so it's required, not editable (no Link Skills tab in the popup).
- *  ssubStat/erda/solJanus/tms_fd/tms_soul stay hardcoded no-ops -- no confirmed effect,
- *  unlike mainStat9Level/subStat9Level (confirmed live to matter).
- *  Only finalDmgPercent and Input tab fields actually need this endpoint now -- level/HEXA/
- *  buffs/rings route through buildDirectScouterPayload/the plain /calc/dmg endpoint instead
- *  (still applied below too, so a combined draft that touches both groups still works in one
- *  request when this function is the one called). */
-export function buildSimulatorPayload(
-  character: StoredCharacterRecord,
-  ctx: ScouterPayloadContext,
-  overrides: ScouterSimulatorOverrides,
-): ScouterSimulatorRequest | null {
-  const userStat = buildScouterPayload(character, ctx);
-  if (!userStat) return null;
-  if (overrides.level !== undefined) {
-    userStat.stat.level = String(overrides.level);
-  }
-
-  const hexaCore = (field: SimulatorHexaCoreField): string =>
-    overrides.hexaCoreOverrides?.[field] ?? userStat.hexa[field];
-  const input = overrides.input;
-  const num = (v: string | undefined): string => v ?? "0";
-
-  const ringOverrides = overrides.ringOverrides;
-
-  return {
-    userStat,
-    simulator: {
-      mainStat: num(input?.mainStat), mainStatPer: num(input?.mainStatPer), mainStatAbs: num(input?.mainStatAbs),
-      subStat: num(input?.subStat), subStatPer: num(input?.subStatPer), subStatAbs: num(input?.subStatAbs),
-      ssubStat: "0", ssubStatPer: "0", ssubStatAbs: "0",
-      allStatPer: num(input?.allStatPer), criRate: num(input?.criRate), buffDuration: num(input?.buffDuration), coolTimeReduce: num(input?.coolTimeReduce),
-      atk: num(input?.atk), atkPer: num(input?.atkPer), bossDmg: num(input?.bossDmg), criDmg: num(input?.criDmg), ignoreGuard: num(input?.ignoreGuard), resetCoolDown: num(input?.resetCoolDown),
-      weaponAtk: num(input?.weaponAtk), erda: "0", solJanus: "0",
-      genesis: userStat.special.genesis,
-      finalDmg: overrides.finalDmgPercent ?? "0.00000",
-      mainStat9Level: num(input?.mainStat9Level), subStat9Level: num(input?.subStat9Level), ssubStat9Level: "",
-      tms_fd: "", tms_soul: "",
-      masteryCore1: hexaCore("masteryCore1"), masteryCore2: hexaCore("masteryCore2"),
-      masteryCore3: hexaCore("masteryCore3"), masteryCore4: hexaCore("masteryCore4"),
-      skillCore1: hexaCore("skillCore1"), skillCore2: hexaCore("skillCore2"),
-      skillCore3: "0", skillCore4: "", skillCore5: "", skillCore6: "",
-      reinCore1: hexaCore("reinCore1"), reinCore2: hexaCore("reinCore2"),
-      reinCore3: hexaCore("reinCore3"), reinCore4: hexaCore("reinCore4"),
-      generalCore2: hexaCore("generalCore2"),
-      generalCore3: "0", generalCore4: "",
-      dopingSimul: buildDoping(overrides.dopingOverrides ?? character.scouter?.buffs),
-      linkSimul: userStat.linkSkill,
-      restraintRing: ozRingLevel(character, "restraint", ringOverrides),
-      weaponRing: ozRingLevel(character, "weaponJump", ringOverrides),
-      ringofSum: ozRingLevel(character, "totalling", ringOverrides),
-      riskTaker: "0",
-      contiRing: ozRingLevel(character, "continuous", ringOverrides),
-      destiny2ndSkill: false,
-    },
-  };
-}
-
 export interface SimulatorStatLabel {
   field: TripleStatFieldId | "hp";
   label: string;
@@ -1106,12 +986,11 @@ export function simulatorStatLabels(classId: string, requiredStats: readonly str
 
 /** Deterministic FNV-1a hash of a built payload, used as the client-side cache key --
  *  cached per-character, keyed by input hash, not "most recent value". Field order is
- *  already stable, buildScouterPayload/buildSimulatorPayload construct the object
+ *  already stable, buildScouterPayload/buildDirectScouterPayload construct the object
  *  identically every call — so plain JSON.stringify is deterministic without an explicit
  *  key-sort replacer (which would otherwise strip every nested key not present at the top
- *  level). Generic over ScouterUserStat and ScouterSimulatorRequest -- both are plain,
- *  fully-serializable payload objects. */
-export function hashScouterPayload(payload: ScouterUserStat | ScouterSimulatorRequest): string {
+ *  level). */
+export function hashScouterPayload(payload: ScouterUserStat): string {
   const json = JSON.stringify(payload);
   let hash = 0x811c9dc5;
   for (let i = 0; i < json.length; i++) {

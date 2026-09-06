@@ -1,10 +1,10 @@
 /*
-  Shared plumbing for both MapleScouter calc proxy routes (src/app/api/scouter/route.ts and
-  src/app/api/scouter-simulator/route.ts) -- CORS workaround, per-IP-per-minute rate limiting
-  (Redis with an in-memory fallback), timeout-guarded upstream fetch, and error-code shaping.
-  Everything here is generic; only the upstream URL and rate-limit key/limit are route-specific,
-  passed in by each thin route handler. See scouter/route.ts's own file header for why this
-  proxy exists at all and why it caches nothing.
+  Shared plumbing for MapleScouter calc proxy routes (src/app/api/scouter/route.ts) -- CORS
+  workaround, per-IP-per-minute rate limiting (Redis with an in-memory fallback), timeout-
+  guarded upstream fetch, and error-code shaping. Everything here is generic; only the
+  upstream URL and rate-limit key/limit are route-specific, passed in by the route handler.
+  See scouter/route.ts's own file header for why this proxy exists at all and why it caches
+  nothing.
 */
 import { NextRequest, NextResponse } from "next/server";
 import Redis from "ioredis";
@@ -18,14 +18,6 @@ export function parsePositiveIntEnv(name: string, fallback: number): number {
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
 }
-
-// MapleScouter's own frontend sends this on every calc request (a static value baked into
-// their public JS bundle, not a per-user/per-session token). /calc/dmg accepts requests
-// without it; /calc/dmg-simulator rejects them ("no permission") -- inconsistent enforcement
-// across their own two endpoints, not something we're relying on being stable. Kept in an env
-// var rather than hardcoded so it's easy to drop/rotate once there's a real answer on whether
-// MapleDoro should be sending it at all (flagged for follow-up, not a settled decision).
-const mapleScouterApiKey = process.env.MAPLESCOUTER_API_KEY?.trim() ?? "";
 
 const redisUrl = process.env.REDIS_URL?.trim() ?? "";
 const REDIS_CONNECT_TIMEOUT_MS = parsePositiveIntEnv("REDIS_CONNECT_TIMEOUT_MS", 1500);
@@ -165,10 +157,7 @@ export async function proxyMapleScouterCalc(request: NextRequest, opts: MapleSco
   try {
     const upstream = await fetch(opts.upstreamUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(mapleScouterApiKey ? { "api-key": mapleScouterApiKey } : {}),
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: controller.signal,
     });

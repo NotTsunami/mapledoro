@@ -18,8 +18,8 @@
   own manual-refresh-only/hash-cache protections.
 
   The generic proxy plumbing (rate limiting, timeout-guarded fetch, error shaping) lives in
-  src/lib/mapleScouterProxy.ts, shared with scouter-simulator/route.ts -- this file only
-  supplies the upstream URL and this route's own rate-limit bucket.
+  src/lib/mapleScouterProxy.ts -- this file only supplies the upstream URL and this route's
+  own rate-limit bucket.
 */
 import { NextRequest, NextResponse } from "next/server";
 import { proxyMapleScouterCalc, parsePositiveIntEnv } from "../../../lib/mapleScouterProxy";
