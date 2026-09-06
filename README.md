@@ -39,7 +39,7 @@ A free, open-source companion app for the MapleStory community, characters, prog
 
 ## Local setup
 
-1. Install Node.js 20+ (LTS recommended).
+1. Install Node.js 20+ (LTS recommended)
 2. Install dependencies:
    ```bash
    npm install
@@ -48,7 +48,7 @@ A free, open-source companion app for the MapleStory community, characters, prog
    ```bash
    npm run dev
    ```
-4. Open `http://localhost:3000`.
+4. Open `http://localhost:3000`
 
 ## Local Redis cache (character lookup API)
 
