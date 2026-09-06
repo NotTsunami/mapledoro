@@ -12,6 +12,13 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-06",
+    changes: [
+      { type: "added", text: "Character Guides now have a full build guide for 27 classes, covering the buff sequence, HEXA leveling order, utility skills, link skill, legion bonus and inner ability." },
+      { type: "added", text: "The New Player Guide is now an interactive walkthrough from level 10 to 200 that adapts to your world type and whether you are on Hyper Burning, with checkboxes to track how far you have got." },
+    ],
+  },
+  {
     date: "2026-09-05",
     changes: [
       { type: "added", text: "Click a skill in the HEXA Skill Tracker's leveling guide to mark that step and every step before it as done, after confirming you've leveled them in game." },
