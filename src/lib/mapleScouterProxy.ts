@@ -58,33 +58,51 @@ function pruneFallbackMap(store: Map<string, { count: number; expiresAt: number 
   }
 }
 
-function getFallbackMinuteCount(ipKey: string): number {
+interface RateWindow {
+  count: number;
+  resetInMs: number;
+}
+
+function getFallbackMinuteWindow(ipKey: string): RateWindow {
   const now = Date.now();
   const existing = fallbackMinuteRate.get(ipKey);
   if (!existing || now >= existing.expiresAt) {
     pruneFallbackMap(fallbackMinuteRate);
     fallbackMinuteRate.set(ipKey, { count: 1, expiresAt: now + 60_000 });
-    return 1;
+    return { count: 1, resetInMs: 60_000 };
   }
   existing.count += 1;
   fallbackMinuteRate.set(ipKey, existing);
-  return existing.count;
+  return { count: existing.count, resetInMs: existing.expiresAt - now };
 }
 
-async function checkAndTrackIpMinuteRate(rateLimitKey: string): Promise<number> {
+// The window's TTL is seeded exactly once, by SET ... NX. A bare EXPIRE on every hit
+// (what this used to do) slides the window forward, so a client that keeps retrying
+// while blocked pushes the reset out indefinitely and the limit outlasts its own
+// duration. SET/INCR is used instead of EXPIRE ... NX to work on Redis older than 7.0.
+async function checkAndTrackIpMinuteRate(rateLimitKey: string): Promise<RateWindow> {
   if (redis) {
     try {
       if (redis.status === "wait") await redis.connect();
-      const rows = await redis.multi().incr(rateLimitKey).expire(rateLimitKey, 60).exec();
+      const rows = await redis
+        .multi()
+        .set(rateLimitKey, 0, "EX", 60, "NX")
+        .incr(rateLimitKey)
+        .pttl(rateLimitKey)
+        .exec();
       hasWarnedRedisFallback = false;
-      return Number(rows?.[0]?.[1] ?? 1);
+      const pttl = Number(rows?.[2]?.[1] ?? -1);
+      return {
+        count: Number(rows?.[1]?.[1] ?? 1),
+        resetInMs: pttl > 0 ? pttl : 60_000,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[scouter][redis] checkAndTrackIpMinuteRate failed: ${message}`);
       // Fall through to memory fallback.
     }
   }
-  return getFallbackMinuteCount(rateLimitKey);
+  return getFallbackMinuteWindow(rateLimitKey);
 }
 
 // Client IP for rate limiting: must be a trusted value, or an attacker rotates it to dodge the
@@ -116,11 +134,19 @@ export interface MapleScouterProxyOptions {
  *  timeout-guarded upstream fetch. Caches nothing -- see scouter/route.ts's file header. */
 export async function proxyMapleScouterCalc(request: NextRequest, opts: MapleScouterProxyOptions): Promise<NextResponse> {
   const ipKey = getClientIp(request);
-  const minuteCount = await checkAndTrackIpMinuteRate(`${opts.rateLimitKeyPrefix}minute:${ipKey}`);
-  if (minuteCount > opts.perMinuteLimit) {
+  const minuteWindow = await checkAndTrackIpMinuteRate(`${opts.rateLimitKeyPrefix}minute:${ipKey}`);
+  if (minuteWindow.count > opts.perMinuteLimit) {
+    const retryAfterSeconds = Math.max(1, Math.ceil(minuteWindow.resetInMs / 1000));
     return NextResponse.json(
-      { error: `Rate limit reached: max ${opts.perMinuteLimit} requests per minute per IP.`, code: "RATE_LIMITED" },
-      { status: 429, headers: { "Cache-Control": "no-store" } },
+      {
+        error: `Rate limit reached: max ${opts.perMinuteLimit} requests per minute per IP. Try again in ${retryAfterSeconds}s.`,
+        code: "RATE_LIMITED",
+        retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: { "Cache-Control": "no-store", "Retry-After": String(retryAfterSeconds) },
+      },
     );
   }
 

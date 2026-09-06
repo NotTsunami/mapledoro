@@ -1,9 +1,10 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { ProgressBar } from "../../../components/ProgressBar";
 import HoverTooltip from "../../../components/HoverTooltip";
+import ConfirmModal from "../../../components/ConfirmModal";
 import { SkillIcon } from "./hexa-ui";
 import { fmtNum } from "./hexa-format";
 import type { FdBreakdown, GuideResult, GuideStep, FdNodeContribution } from "./hexa-fd";
@@ -86,7 +87,9 @@ const guideTile: CSSProperties = {
   gap: "3px",
   padding: "6px 7px",
   borderRadius: "8px",
-  cursor: "default",
+  font: "inherit",
+  textAlign: "inherit",
+  cursor: "pointer",
 };
 
 const guideLevelText: CSSProperties = {
@@ -133,10 +136,12 @@ function GuideTip({ step, rank, theme }: { step: GuideStep; rank: number; theme:
   );
 }
 
-function GuideTile({ step, rank, theme }: { step: GuideStep; rank: number; theme: AppTheme }) {
+function GuideTile({ step, rank, theme, onClick }: { step: GuideStep; rank: number; theme: AppTheme; onClick: () => void }) {
   return (
     <HoverTooltip theme={theme} label={<GuideTip step={step} rank={rank} theme={theme} />}>
-      <div
+      <button
+        type="button"
+        onClick={onClick}
         style={{
           ...guideTile,
           background: theme.panel,
@@ -149,20 +154,36 @@ function GuideTile({ step, rank, theme }: { step: GuideStep; rank: number; theme
           <span style={{ color: theme.muted }}>→</span>
           {step.toLevel}
         </span>
-      </div>
+      </button>
     </HoverTooltip>
   );
+}
+
+/** "Sol Janus to Lv 10, Blade Storm to Lv 5 and …": each skill's final level across `steps`. */
+function describeSteps(steps: GuideStep[]): string {
+  const finals = new Map<string, string>();
+  for (const step of steps) finals.set(step.code, `${step.name} to Lv ${step.toLevel}`);
+  const parts = [...finals.values()];
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 export function GuideView({
   theme,
   guide,
   sectionPanel,
+  onApply,
 }: {
   theme: AppTheme;
   guide: GuideResult;
   sectionPanel: CSSProperties;
+  /** Record the given guide steps as leveled in game. */
+  onApply: (steps: GuideStep[]) => void;
 }) {
+  // Rank (1-based) of the clicked tile; confirming applies that step and every one before it.
+  const [pendingRank, setPendingRank] = useState<number | null>(null);
+  const pendingSteps = pendingRank == null ? [] : guide.steps.slice(0, pendingRank);
+
   if (guide.steps.length === 0) {
     return (
       <section className="fade-in panel-card" style={{ ...sectionPanel, textAlign: "center", padding: "3rem 1.5rem" }}>
@@ -186,7 +207,7 @@ export function GuideView({
             Leveling Guide
           </h2>
           <p style={{ ...subStyle, color: theme.muted, margin: "2px 0 0" }}>
-            Level left to right, ordered by final damage per Sol Erda Fragment. Hover a skill for details.
+            Level left to right, ordered by final damage per Sol Erda Fragment. Hover a skill for details, or click one you&apos;ve leveled in game to update your progress.
           </p>
         </div>
         <div className="hexa-header-stat">
@@ -208,7 +229,7 @@ export function GuideView({
       <div style={guideGrid}>
         {guide.steps.map((step, i) => (
           <div key={`${step.code}-${step.toLevel}`} style={guideCell}>
-            <GuideTile step={step} rank={i + 1} theme={theme} />
+            <GuideTile step={step} rank={i + 1} theme={theme} onClick={() => setPendingRank(i + 1)} />
             {i < guide.steps.length - 1 && (
               <span aria-hidden="true" style={{ ...guideArrow, color: theme.muted }}>
                 →
@@ -217,6 +238,21 @@ export function GuideView({
           </div>
         ))}
       </div>
+
+      {pendingRank != null && (
+        <ConfirmModal
+          theme={theme}
+          title={pendingRank === 1 ? "Mark step 1 as done?" : `Mark steps 1 to ${pendingRank} as done?`}
+          description={`This raises ${describeSteps(pendingSteps)} in your tracker.`}
+          warning="Only confirm if you've already leveled these skills in game."
+          confirmLabel="Mark done"
+          onConfirm={() => {
+            onApply(pendingSteps);
+            setPendingRank(null);
+          }}
+          onCancel={() => setPendingRank(null)}
+        />
+      )}
     </section>
   );
 }

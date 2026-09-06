@@ -12,6 +12,30 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-05",
+    changes: [
+      { type: "added", text: "Click a skill in the HEXA Skill Tracker's leveling guide to mark that step and every step before it as done, after confirming you've leveled them in game." },
+    ],
+  },
+  {
+    date: "2026-09-04",
+    changes: [
+      { type: "added", text: "Doro now has a speech bubble on the home page. Poke Doro for a new phrase." },
+    ],
+  },
+  {
+    date: "2026-09-03",
+    changes: [
+      { type: "added", text: "The Liberation Tracker's Astra Secondary tab now lists the meso cost of transferring a Warrior, Mage or Shadower shield, a Kanna talisman or a Dual Blade katara into its Astra version at every star force level." },
+    ],
+  },
+  {
+    date: "2026-09-02",
+    changes: [
+      { type: "fixed", text: "Fixed the character lookup rate limit lasting far longer than a minute." },
+    ],
+  },
+  {
     date: "2026-08-31",
     changes: [
       { type: "added", text: "Erel Light characters now get a Scouter figure, Stat Efficiency and Stat Optimizer results, now that MapleScouter supports the class." },
