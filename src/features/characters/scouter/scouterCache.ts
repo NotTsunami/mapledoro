@@ -405,7 +405,10 @@ export async function refreshScouterResult(character: StoredCharacterRecord): Pr
   }
 
   consecutiveBadResponses.delete(key);
-  storeCacheEntry(character.characterName, hash, fetched.entry, cache);
+  // Re-read rather than reusing `cache` from above -- that snapshot predates the await, so a
+  // write to this character's tools blob during the fetch would otherwise get clobbered by
+  // merging onto stale data here.
+  storeCacheEntry(character.characterName, hash, fetched.entry, readCache(character.characterName));
   return { status: "ok", entry: fetched.entry, stale: false };
 }
 
