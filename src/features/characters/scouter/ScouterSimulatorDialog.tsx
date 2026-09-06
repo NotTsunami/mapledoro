@@ -35,7 +35,7 @@ import {
 } from "./scouterApi";
 import type { ScouterErrorReason } from "./scouterCache";
 import type { ScouterSimulatorApplyResult } from "./useScouterSimulator";
-import { useScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
+import { useScouterSimulatorDraft, type ScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
 import { hexaCoreFields } from "./hexaSimulatorFields";
 
 // Same copy this codebase already uses for the real result's failure states (ScouterFigure.tsx/
@@ -609,6 +609,56 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
   );
 }
 
+/** Which tab's content to render, extracted from the main dialog so its own 4-way branch
+ *  (plus the HEXA tab's own locked-or-not choice) doesn't add to the dialog function's
+ *  control-flow complexity alongside everything else it already coordinates. */
+function TabContent({
+  theme, draft, character, hexaClassDef, primaryStat, statLabels, ozClassInfo, usesMagicWeapon, weaponAttLabel,
+}: {
+  theme: AppTheme;
+  draft: ScouterSimulatorDraft;
+  character: StoredCharacterRecord;
+  hexaClassDef: HexaClassDef | null;
+  primaryStat: ReturnType<typeof primaryStatForClass>;
+  statLabels: ReturnType<typeof simulatorStatLabels>;
+  ozClassInfo: ReturnType<typeof getOzClassStatInfo>;
+  usesMagicWeapon: boolean;
+  weaponAttLabel: string;
+}) {
+  switch (draft.tab) {
+    case "buffs":
+      return <BuffsTab theme={theme} draft={draft.buffsDraft} onChange={draft.setBuffsDraft} primaryStat={primaryStat} jobName={character.jobName} />;
+    case "hexa":
+      return draft.level < 260
+        ? <HexaLockedMessage theme={theme} />
+        : <HexaTab theme={theme} classDef={hexaClassDef} hexaCores={draft.hexaCores} onChange={draft.setHexaCore} />;
+    case "ozRings":
+      return (
+        <OzRingsTab
+          theme={theme}
+          draft={draft.ozRingsDraft}
+          onChange={draft.setOzRingsDraft}
+          weaponJumpLabel={ozClassInfo.weaponJumpLabel}
+          weaponJumpIconId={ozClassInfo.weaponJumpIconId}
+        />
+      );
+    case "input":
+      return (
+        <InputTab
+          theme={theme}
+          finalDmgPercent={draft.finalDmgPercent}
+          onFinalDmgChange={draft.setFinalDmgPercent}
+          input={draft.input}
+          onInputChange={draft.setInputField}
+          statLabels={statLabels}
+          usesMagicWeapon={usesMagicWeapon}
+          weaponAttLabel={weaponAttLabel}
+          realWeaponAtt={character.scouter?.weaponAtt ?? 0}
+        />
+      );
+  }
+}
+
 // ── Main dialog ──────────────────────────────────────────────────────────────
 
 export default function ScouterSimulatorDialog({
@@ -735,35 +785,11 @@ export default function ScouterSimulatorDialog({
       </div>
 
       <div style={{ padding: "0.85rem 1.1rem", overflowY: "auto", flex: 1, minHeight: 0 }}>
-        {draft.tab === "buffs" && <BuffsTab theme={theme} draft={draft.buffsDraft} onChange={draft.setBuffsDraft} primaryStat={primaryStat} jobName={character.jobName} />}
-        {draft.tab === "hexa" && (
-          draft.level < 260
-            ? <HexaLockedMessage theme={theme} />
-            : <HexaTab theme={theme} classDef={hexaClassDef} hexaCores={draft.hexaCores} onChange={draft.setHexaCore} />
-        )}
-        {draft.tab === "ozRings" && (
-          <OzRingsTab
-            theme={theme}
-            draft={draft.ozRingsDraft}
-            onChange={draft.setOzRingsDraft}
-            weaponJumpLabel={ozClassInfo.weaponJumpLabel}
-            weaponJumpIconId={ozClassInfo.weaponJumpIconId}
-          />
-        )}
-        {draft.tab === "input" && (
-          <InputTab
-            theme={theme}
-            finalDmgPercent={draft.finalDmgPercent}
-            onFinalDmgChange={draft.setFinalDmgPercent}
-            input={draft.input}
-            onInputChange={draft.setInputField}
-            statLabels={statLabels}
-            usesMagicWeapon={usesMagicWeapon}
-            weaponAttLabel={weaponAttLabel}
-            realWeaponAtt={character.scouter?.weaponAtt ?? 0}
-          />
-        )}
-
+        <TabContent
+          theme={theme} draft={draft} character={character} hexaClassDef={hexaClassDef}
+          primaryStat={primaryStat} statLabels={statLabels} ozClassInfo={ozClassInfo}
+          usesMagicWeapon={usesMagicWeapon} weaponAttLabel={weaponAttLabel}
+        />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.55rem", padding: "0.8rem 1.1rem", borderTop: `1px solid ${theme.border}` }}>
