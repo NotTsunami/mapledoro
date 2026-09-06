@@ -23,7 +23,7 @@ function isLocalOnlyOverride(overrides: ScouterSimulatorOverrides): boolean {
  *  Sacred Power are MapleDoro-only concepts (never reach MapleScouter's API, pure local
  *  Boss Clear Grid formula math), the rest (finalDmgPercent/hexaCoreOverrides/etc.) become
  *  part of the real request via buildDirectScouterPayload. */
-export interface ScouterSimulatorState {
+interface ScouterSimulatorState {
   overrides: ScouterSimulatorOverrides;
   entry: ScouterResultEntry;
 }

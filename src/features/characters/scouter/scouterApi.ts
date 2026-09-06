@@ -22,6 +22,7 @@ import {
 import { deriveWeaponHandFromWeapon } from "../setup/data/classBranch";
 import { innerAbilityHasData } from "../setup/data/innerAbilityData";
 import { whAutofillSourceFromRoster } from "../setup/data/scouterQuestionsData";
+import type { OzRingId } from "../setup/data/ozRingData";
 import { scouterKoreanClassName } from "./scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY, SCOUTER_UNMODELED_LINK_SKILL_KEYS } from "./scouterLinkSkills";
 import { readCharacterToolData } from "../../tools/characterToolStorage";
@@ -343,8 +344,6 @@ function soulValue(character: StoredCharacterRecord, type: "ephenia" | "mugong")
   if (!soul || soul.type !== type) return "0";
   return soul.soulLevel === 1 || soul.soulLevel === 2 ? String(soul.soulLevel) : "0";
 }
-
-export type OzRingId = "restraint" | "weaponJump" | "totalling" | "continuous";
 
 /** Optional per-ring level overrides for the Scouter Simulator's Oz Rings tab, plus the ring
  *  mode toggle -- undefined/omitted means "use the character's real saved value", matching
