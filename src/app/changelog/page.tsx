@@ -12,6 +12,14 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-06",
+    changes: [
+      { type: "added", text: "Added a simulator to the Scouter bookmark in a character's profile (replacing the Full HEXA toggle), letting you try out \"what if\" changes to your Level, HEXA cores, buffs, Oz Rings, Final Damage, and more, without touching your real saved Scouter result." },
+      { type: "added", text: "The Scouter and Stat Efficiency bookmarks now have their own refresh button, so you don't need to go back to Overview to update your Scouter figure." },
+      { type: "changed", text: "Refreshing your Scouter figure when nothing has changed since your last MapleScouter Setup now tells you it's already up to date, instead of looking like the refresh did nothing." },
+    ],
+  },
+  {
     date: "2026-09-05",
     changes: [
       { type: "added", text: "Click a skill in the HEXA Skill Tracker's leveling guide to mark that step and every step before it as done, after confirming you've leveled them in game." },

@@ -3223,26 +3223,24 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
 // manual-refresh-only by design (see useScouterResult's own doc comment), triggered either from
 // the Scouter figure on Overview or this bookmark's own header below.
 /** The four not-ready states every MapleScouter-backed bookmark shares (class unsupported,
- *  setup incomplete, never calculated, last refresh failed) plus the stale-result banner,
- *  in one place so Scouter and Stat Efficiency can't drift apart on what they say when
- *  there's nothing to show. Also owns this bookmark's page header (label + inline refresh
- *  button): the header has to share the SAME useScouterResult call as the body below it,
- *  not a second independent one, or a refresh triggered from the header wouldn't be
- *  reflected in the body's own error/stale/empty rendering (they'd disagree on what just
- *  happened since each useScouterResult call keeps its own local state). */
+ *  setup incomplete, never calculated, last refresh failed) plus the stale-result banner, in
+ *  one place so Scouter and Stat Efficiency can't drift apart. Also owns this bookmark's page
+ *  header, sharing the SAME useScouterResult call as the body below it -- a second independent
+ *  call would let a header-triggered refresh disagree with the body's own error/stale
+ *  rendering about what just happened. */
 function ScouterResultGate({ theme, character, label, disabled, simulated, onEditStep, children }: {
   theme: Theme; character: StoredCharacterRecord; label: string; disabled: boolean; simulated: boolean;
   onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
   children: (entry: ScouterResultEntry) => ReactNode;
 }) {
-  const { status, loading, canRefresh, refresh, justRefreshed } = useScouterResult(character);
+  const { status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged } = useScouterResult(character);
   const header = (
     <BookmarkPageHeader
       theme={theme}
       label={label}
       onEdit={null}
       disabled={disabled}
-      extraAction={<ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} disabled={simulated} />}
+      extraAction={<ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} justRefreshedUnchanged={justRefreshedUnchanged} disabled={simulated} />}
     />
   );
 

@@ -72,14 +72,19 @@ const STATUS_VALUE: Partial<Record<string, string>> = {
   error: "—",
 };
 
-/** Explains why the button is disabled for the two setup-gated states; every other
- *  state (including "ready") just names the action, since there's nothing to explain. */
-function refreshTooltip(status: ScouterFigureStatus, loading: boolean): string {
+/** Explains why the button is disabled for the two setup-gated states; every other state
+ *  (including "ready") just names the action, since there's nothing to explain.
+ *  justRefreshedUnchanged adds a muted second line explaining why a refresh looked like a
+ *  no-op (the inputs haven't changed, so MapleScouter wasn't actually re-queried). */
+function refreshTooltip(status: ScouterFigureStatus, loading: boolean, justRefreshedUnchanged: boolean, theme: AppTheme): ReactNode {
   if (loading) return "Calculating…";
   if (status.kind === "unsupported") return "MapleScouter doesn't support this class yet.";
   if (status.kind === "incomplete") {
     const area = status.gap === "quickQuestions" ? "Quick Questions" : "Character Info";
     return `Fill out MapleScouter Setup's ${area} before calculating this.`;
+  }
+  if (justRefreshedUnchanged) {
+    return <>Refresh Scouter<br /><span style={{ color: theme.muted }}>Already up to date. Your MapleScouter Setup inputs haven&apos;t changed.</span></>;
   }
   return "Refresh Scouter";
 }
@@ -145,13 +150,12 @@ function figureValueColor(theme: AppTheme, status: ScouterFigureStatus): string 
 }
 
 /** The refresh trigger for a MapleScouter-backed result -- shared between the Overview figure
- *  and any bookmark header that wants the same "recalculate now" action inline, so there's one
- *  place a player can trigger it without needing to know it also lives on Overview. */
-export function ScouterRefreshButton({ theme, status, loading, canRefresh, refresh, justRefreshed, disabled }: {
-  theme: AppTheme; status: ScouterFigureStatus; loading: boolean; canRefresh: boolean; refresh: () => void; justRefreshed: boolean; disabled?: boolean;
+ *  and any bookmark header that wants the same "recalculate now" action inline. */
+export function ScouterRefreshButton({ theme, status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged = false, disabled }: {
+  theme: AppTheme; status: ScouterFigureStatus; loading: boolean; canRefresh: boolean; refresh: () => void; justRefreshed: boolean; justRefreshedUnchanged?: boolean; disabled?: boolean;
 }) {
   return (
-    <HoverTooltip label={refreshTooltip(status, loading)} theme={theme}>
+    <HoverTooltip label={refreshTooltip(status, loading, justRefreshedUnchanged, theme)} theme={theme}>
       <button
         type="button"
         className="tap-target-44"
@@ -167,7 +171,7 @@ export function ScouterRefreshButton({ theme, status, loading, canRefresh, refre
 }
 
 export default function ScouterFigure({ character, theme, simulator }: { character: StoredCharacterRecord; theme: AppTheme; simulator: ScouterSimulatorController }) {
-  const { status, loading, canRefresh, refresh, justRefreshed } = useScouterResult(character);
+  const { status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged } = useScouterResult(character);
   const simulated = simulator.active;
 
   // A simulated result replaces the real figure in place (per the Scouter Simulator plan's
@@ -199,7 +203,7 @@ export default function ScouterFigure({ character, theme, simulator }: { charact
             </button>
           </HoverTooltip>
         ) : (
-          <ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} />
+          <ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} justRefreshedUnchanged={justRefreshedUnchanged} />
         )}
       </div>
       <HoverTooltip label={tooltip} theme={theme}>
