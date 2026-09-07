@@ -144,6 +144,28 @@ function figureValueColor(theme: AppTheme, status: ScouterFigureStatus): string 
   return theme.muted;
 }
 
+/** The refresh trigger for a MapleScouter-backed result -- shared between the Overview figure
+ *  and any bookmark header that wants the same "recalculate now" action inline, so there's one
+ *  place a player can trigger it without needing to know it also lives on Overview. */
+export function ScouterRefreshButton({ theme, status, loading, canRefresh, refresh, justRefreshed, disabled }: {
+  theme: AppTheme; status: ScouterFigureStatus; loading: boolean; canRefresh: boolean; refresh: () => void; justRefreshed: boolean; disabled?: boolean;
+}) {
+  return (
+    <HoverTooltip label={refreshTooltip(status, loading)} theme={theme}>
+      <button
+        type="button"
+        className="tap-target-44"
+        aria-label="Refresh Scouter"
+        disabled={!canRefresh || disabled}
+        onClick={refresh}
+        style={refreshButtonStyle(theme, !canRefresh || Boolean(disabled), justRefreshed)}
+      >
+        <RefreshSpinnerIcon color="currentColor" size={12} />
+      </button>
+    </HoverTooltip>
+  );
+}
+
 export default function ScouterFigure({ character, theme, simulator }: { character: StoredCharacterRecord; theme: AppTheme; simulator: ScouterSimulatorController }) {
   const { status, loading, canRefresh, refresh, justRefreshed } = useScouterResult(character);
   const simulated = simulator.active;
@@ -164,18 +186,21 @@ export default function ScouterFigure({ character, theme, simulator }: { charact
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.muted }}>Scouter</div>
         <InfoTooltip content={SCOUTER_INFO} theme={theme} />
-        <HoverTooltip label={simulated ? "Editing this needs the Scouter Simulator popup, open from the Scouter bookmark." : refreshTooltip(status, loading)} theme={theme}>
-          <button
-            type="button"
-            className="tap-target-44"
-            aria-label="Refresh Scouter"
-            disabled={!canRefresh || simulated !== null}
-            onClick={refresh}
-            style={refreshButtonStyle(theme, !canRefresh || simulated !== null, justRefreshed)}
-          >
-            <RefreshSpinnerIcon color="currentColor" size={12} />
-          </button>
-        </HoverTooltip>
+        {simulated ? (
+          <HoverTooltip label="Editing this needs the Scouter Simulator popup, open from the Scouter bookmark." theme={theme}>
+            <button
+              type="button"
+              className="tap-target-44"
+              aria-label="Refresh Scouter"
+              disabled
+              style={refreshButtonStyle(theme, true, false)}
+            >
+              <RefreshSpinnerIcon color="currentColor" size={12} />
+            </button>
+          </HoverTooltip>
+        ) : (
+          <ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} />
+        )}
       </div>
       <HoverTooltip label={tooltip} theme={theme}>
         <div style={{ fontSize: 20, fontWeight: 800, color: valueColor, lineHeight: 1, fontFamily: "var(--font-heading)" }}>

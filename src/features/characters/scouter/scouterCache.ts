@@ -368,10 +368,48 @@ export function peekScouterLastKnown(character: StoredCharacterRecord): ScouterR
   return cache ? (cache.entries[cache.lastHash] ?? null) : null;
 }
 
+// Tracks a refresh in flight per character (not per hash -- the concern is two buttons for
+// the SAME character firing concurrently, e.g. the Overview figure and a bookmark header,
+// each running their own useScouterResult instance with no shared React state). A second
+// caller while one's already running awaits the same promise instead of firing a duplicate
+// fetch. Same module-level-Map-plus-listeners shape as scouterDevDrill.ts's override store,
+// consumed the same way via useSyncExternalStore.
+const inFlightRefreshes = new Map<string, Promise<ScouterRefreshResult>>();
+const inFlightListeners = new Set<() => void>();
+
+function notifyInFlightChanged() {
+  for (const listener of inFlightListeners) listener();
+}
+
+export function subscribeScouterRefreshInFlight(listener: () => void) {
+  inFlightListeners.add(listener);
+  return () => inFlightListeners.delete(listener);
+}
+
+export function isScouterRefreshInFlight(characterName: string): boolean {
+  return inFlightRefreshes.has(characterName.trim().toLowerCase());
+}
+
 /** Refreshes a character's Scouter figure. Builds the payload fresh each call (so it
  *  always reflects current stored data), hashes it, and either returns a cache hit
- *  instantly or fetches through the proxy route. */
-export async function refreshScouterResult(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
+ *  instantly or fetches through the proxy route. Concurrent calls for the same character
+ *  (e.g. clicking refresh on the bookmark, then swapping to Overview before it resolves)
+ *  share one in-flight request rather than firing a second one. */
+export function refreshScouterResult(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
+  const nameKey = character.characterName.trim().toLowerCase();
+  const existing = inFlightRefreshes.get(nameKey);
+  if (existing) return existing;
+
+  const promise = runScouterRefresh(character).finally(() => {
+    inFlightRefreshes.delete(nameKey);
+    notifyInFlightChanged();
+  });
+  inFlightRefreshes.set(nameKey, promise);
+  notifyInFlightChanged();
+  return promise;
+}
+
+async function runScouterRefresh(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
   const built = buildPayloadAndHash(character);
   if (!built) return { status: "unsupported" };
   const { payload, hash } = built;

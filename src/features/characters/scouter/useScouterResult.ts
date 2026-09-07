@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { findScouterSetupGap, isScouterSupportedClass, type ScouterSetupGap } from "./scouterApi";
 import {
-  autoRefreshScouterResultIfNeeded, peekScouterCache, peekScouterLastKnown, refreshScouterResult,
+  autoRefreshScouterResultIfNeeded, isScouterRefreshInFlight, peekScouterCache, peekScouterLastKnown,
+  refreshScouterResult, subscribeScouterRefreshInFlight,
   type ScouterErrorReason, type ScouterRefreshResult, type ScouterResultEntry,
 } from "./scouterCache";
 import { getScouterDevOverride, subscribeScouterDevOverride } from "./scouterDevDrill";
@@ -109,17 +110,29 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
     return () => { cancelled = true; clearTimeout(timer); };
   }, [status.kind, character]);
 
+  // Reactive read of another useScouterResult instance's in-flight refresh for this SAME
+  // character (e.g. the Overview figure and a bookmark header each run their own instance,
+  // with no shared React state otherwise) -- refreshScouterResult itself already dedupes the
+  // actual network call, but without this a freshly-mounted instance's own `loading` starts
+  // false and its button would look clickable mid-refresh instead of reflecting reality.
+  const refreshInFlightElsewhere = useSyncExternalStore(
+    subscribeScouterRefreshInFlight,
+    () => isScouterRefreshInFlight(character.characterName),
+    () => false,
+  );
+  const effectiveLoading = loading || refreshInFlightElsewhere;
+
   const refresh = useCallback(() => {
-    if (loading) return;
+    if (effectiveLoading) return;
     setLoading(true);
     void refreshScouterResult(character).then((result) => {
       setLoading(false);
       setStatus(resultToStatus(result));
       setJustRefreshed(true);
     });
-  }, [character, loading]);
+  }, [character, effectiveLoading]);
 
-  const canRefresh = !loading && (status.kind === "ready" || status.kind === "empty" || status.kind === "error");
+  const canRefresh = !effectiveLoading && (status.kind === "ready" || status.kind === "empty" || status.kind === "error");
 
   // Dev-only visual QA override (scouterDevDrill.ts) -- reactive via useSyncExternalStore
   // so calling __mapledoroForceScouterStatus in the console updates the figure immediately,
@@ -135,5 +148,5 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
     return { status: devOverride, loading: false, canRefresh: overrideCanRefresh, refresh: () => {}, justRefreshed: false };
   }
 
-  return { status, loading, canRefresh, refresh, justRefreshed };
+  return { status, loading: effectiveLoading, canRefresh, refresh, justRefreshed };
 }

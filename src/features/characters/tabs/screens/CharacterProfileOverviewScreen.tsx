@@ -41,7 +41,7 @@ import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAM
 import { statusText } from "../../../../components/statusColors";
 import { ItemIcon } from "../../../../components/ResourceImage";
 import HoverTooltip from "../../../../components/HoverTooltip";
-import ScouterFigure from "../../scouter/ScouterFigure";
+import ScouterFigure, { ScouterRefreshButton } from "../../scouter/ScouterFigure";
 import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
 import type { ScouterSetupGap } from "../../scouter/scouterApi";
 import BossClearGrid, { type ScouterBookmarkView } from "../../scouter/BossClearGrid";
@@ -149,10 +149,15 @@ function exportCharacterJson(charName: string | undefined) {
   URL.revokeObjectURL(url);
 }
 
-function BookmarkPageHeader({ theme, label, onEdit, disabled }: { theme: Theme; label: string; onEdit: (() => void) | null; disabled: boolean }) {
+function BookmarkPageHeader({ theme, label, onEdit, disabled, extraAction }: {
+  theme: Theme; label: string; onEdit: (() => void) | null; disabled: boolean; extraAction?: ReactNode;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
-      <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>{label}</h3>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>{label}</h3>
+        {extraAction}
+      </div>
       {onEdit !== null && (
         <HoverTooltip label={`Edit ${label}`} theme={theme}>
           <button
@@ -3214,23 +3219,40 @@ function scouterBookmarkHeaderLabel(view: ScouterBookmarkView, defaultLabel: str
   return view === "spotlight" ? spotlightBoss : defaultLabel;
 }
 
-// Read-only display of everything already sitting in ScouterResultEntry -- refreshing only
-// happens via the Scouter figure on Overview (manual-refresh-only by design, see
-// useScouterResult's own doc comment), so neither bookmark below has a pencil/refresh of
-// its own.
+// Read-only display of everything already sitting in ScouterResultEntry -- refreshing is
+// manual-refresh-only by design (see useScouterResult's own doc comment), triggered either from
+// the Scouter figure on Overview or this bookmark's own header below.
 /** The four not-ready states every MapleScouter-backed bookmark shares (class unsupported,
  *  setup incomplete, never calculated, last refresh failed) plus the stale-result banner,
  *  in one place so Scouter and Stat Efficiency can't drift apart on what they say when
- *  there's nothing to show. */
-function ScouterResultGate({ theme, character, onEditStep, children }: {
-  theme: Theme; character: StoredCharacterRecord;
+ *  there's nothing to show. Also owns this bookmark's page header (label + inline refresh
+ *  button): the header has to share the SAME useScouterResult call as the body below it,
+ *  not a second independent one, or a refresh triggered from the header wouldn't be
+ *  reflected in the body's own error/stale/empty rendering (they'd disagree on what just
+ *  happened since each useScouterResult call keeps its own local state). */
+function ScouterResultGate({ theme, character, label, disabled, simulated, onEditStep, children }: {
+  theme: Theme; character: StoredCharacterRecord; label: string; disabled: boolean; simulated: boolean;
   onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
   children: (entry: ScouterResultEntry) => ReactNode;
 }) {
-  const { status } = useScouterResult(character);
+  const { status, loading, canRefresh, refresh, justRefreshed } = useScouterResult(character);
+  const header = (
+    <BookmarkPageHeader
+      theme={theme}
+      label={label}
+      onEdit={null}
+      disabled={disabled}
+      extraAction={<ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} disabled={simulated} />}
+    />
+  );
 
   if (status.kind === "unsupported") {
-    return <GatedFeatureNotice theme={theme} title="Not Available" description="MapleScouter doesn't support this class yet." />;
+    return (
+      <>
+        {header}
+        <GatedFeatureNotice theme={theme} title="Not Available" description="MapleScouter doesn't support this class yet." />
+      </>
+    );
   }
   if (status.kind === "incomplete") {
     const gapLabel = status.gap === "quickQuestions" ? "Quick Questions" : "Character Info";
@@ -3242,45 +3264,59 @@ function ScouterResultGate({ theme, character, onEditStep, children }: {
     // ran Full Setup just clicks through the already-filled steps to get here — a few
     // extra clicks, not a real cost.
     return (
-      <GatedFeatureNotice
-        theme={theme}
-        title="Not Available"
-        description={"Fill out MapleScouter Setup\nbefore viewing this."}
-        action={(
-          <button
-            type="button"
-            className="tool-dialog-btn"
-            style={scouterGapButtonStyle(theme)}
-            onClick={() => onEditStep("maplescouter_setup", scouterGapTargetSubstep(status.gap))}
-          >
-            Go to {gapLabel}
-          </button>
-        )}
-      />
+      <>
+        {header}
+        <GatedFeatureNotice
+          theme={theme}
+          title="Not Available"
+          description={"Fill out MapleScouter Setup\nbefore viewing this."}
+          action={(
+            <button
+              type="button"
+              className="tool-dialog-btn"
+              style={scouterGapButtonStyle(theme)}
+              onClick={() => onEditStep("maplescouter_setup", scouterGapTargetSubstep(status.gap))}
+            >
+              Go to {gapLabel}
+            </button>
+          )}
+        />
+      </>
     );
   }
   if (status.kind === "empty") {
-    return <ScouterBookmarkNotice theme={theme}>Not calculated yet. Refresh the Scouter figure on Overview to see these numbers.</ScouterBookmarkNotice>;
+    return (
+      <>
+        {header}
+        <ScouterBookmarkNotice theme={theme}>Not calculated yet. Refresh your Scouter figure to see these numbers.</ScouterBookmarkNotice>
+      </>
+    );
   }
   if (status.kind === "error") {
     return (
-      <ScouterBookmarkNotice theme={theme}>
-        {status.reason ? SCOUTER_ERROR_REASON_TEXT[status.reason] : "MapleScouter's API didn't respond. Refresh the Scouter figure on Overview to try again."}
-      </ScouterBookmarkNotice>
+      <>
+        {header}
+        <ScouterBookmarkNotice theme={theme}>
+          {status.reason ? SCOUTER_ERROR_REASON_TEXT[status.reason] : "MapleScouter's API didn't respond. Refresh your Scouter figure to try again."}
+        </ScouterBookmarkNotice>
+      </>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
-      {status.stale && (
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
-          {status.reason
-            ? <>Showing the last known values. {SCOUTER_ERROR_REASON_TEXT[status.reason]}</>
-            : "Showing the results for the last known values. Refresh your Scouter figure on Overview to update."}
-        </p>
-      )}
-      {children(status.entry)}
-    </div>
+    <>
+      {header}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
+        {status.stale && (
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: statusText(theme, "warning") }}>
+            {status.reason
+              ? <>Showing the last known values. {SCOUTER_ERROR_REASON_TEXT[status.reason]}</>
+              : "Showing the results for the last known values. Refresh your Scouter figure to update."}
+          </p>
+        )}
+        {children(status.entry)}
+      </div>
+    </>
   );
 }
 
@@ -3293,8 +3329,8 @@ function ScouterResultGate({ theme, character, onEditStep, children }: {
 // the Quick View dropdown (3 ways to do the same thing), and once that got removed the
 // back-only button didn't earn its own dedicated row anymore either, so it moved into
 // BossSpotlight's own header instead.
-function ScouterBookmark({ theme, character, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange, onEditStep, scouterSimulator }: {
-  theme: Theme; character: StoredCharacterRecord; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
+function ScouterBookmark({ theme, character, label, disabled, view, onViewChange, selectedBossIndex, onSelectedBossIndexChange, onEditStep, scouterSimulator }: {
+  theme: Theme; character: StoredCharacterRecord; label: string; disabled: boolean; view: ScouterBookmarkView; onViewChange: (v: ScouterBookmarkView) => void;
   selectedBossIndex: number; onSelectedBossIndexChange: (i: number) => void;
   onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
   scouterSimulator: ScouterSimulatorController;
@@ -3302,7 +3338,7 @@ function ScouterBookmark({ theme, character, view, onViewChange, selectedBossInd
   const [simulatorDialogOpen, setSimulatorDialogOpen] = useState(false);
   const simulated = scouterSimulator.active;
   return (
-    <ScouterResultGate theme={theme} character={character} onEditStep={onEditStep}>
+    <ScouterResultGate theme={theme} character={character} label={label} disabled={disabled} simulated={simulated !== null} onEditStep={onEditStep}>
       {(entry) => (
         <>
           <SimulatedValuesMarker theme={theme} visible={simulated !== null} onReset={scouterSimulator.reset} />
@@ -3378,17 +3414,17 @@ function SimulatedValuesMarker({ theme, visible, onReset }: { theme: Theme; visi
 // Scouter's own figures are all present in that same entry.
 // Keyed by character so the per-stat table's typed amounts and unit choice don't carry over
 // onto the next character the way EquipmentBookmark's own key guards against.
-function StatEfficiencyBookmark({ theme, character, onEditStep }: {
-  theme: Theme; character: StoredCharacterRecord;
+function StatEfficiencyBookmark({ theme, character, label, disabled, onEditStep }: {
+  theme: Theme; character: StoredCharacterRecord; label: string; disabled: boolean;
   onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
 }) {
   return (
-    <ScouterResultGate theme={theme} character={character} onEditStep={onEditStep}>
+    <ScouterResultGate theme={theme} character={character} label={label} disabled={disabled} simulated={false} onEditStep={onEditStep}>
       {(entry) => (entry.specEfficiency ? (
         <StatEfficiencyPanel key={character.characterName} theme={theme} character={character} eff={entry.specEfficiency} />
       ) : (
         <ScouterBookmarkNotice theme={theme}>
-          MapleScouter didn&apos;t return efficiency numbers for this result. Refresh the Scouter figure on Overview to try again.
+          MapleScouter didn&apos;t return efficiency numbers for this result. Refresh your Scouter figure to try again.
         </ScouterBookmarkNotice>
       ))}
     </ScouterResultGate>
@@ -3665,32 +3701,30 @@ function BookmarkPageBody({
   if (active.id === "scouter") {
     const scouterSpotlightBoss = resolveBossDisplayName(groupByBoss(BOSSCUT_DATA), scouterSelectedBossIndex);
     const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel, scouterSpotlightBoss);
+    if (!character) {
+      return <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />;
+    }
     return (
-      <>
-        <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />
-        {character && (
-          <ScouterBookmark
-            theme={theme}
-            character={character}
-            view={scouterView}
-            onViewChange={setScouterView}
-            selectedBossIndex={scouterSelectedBossIndex}
-            onSelectedBossIndexChange={setScouterSelectedBossIndex}
-            onEditStep={onEditStep}
-            scouterSimulator={scouterSimulator}
-          />
-        )}
-      </>
+      <ScouterBookmark
+        theme={theme}
+        character={character}
+        label={scouterHeaderLabel}
+        disabled={setup.isUiLocked}
+        view={scouterView}
+        onViewChange={setScouterView}
+        selectedBossIndex={scouterSelectedBossIndex}
+        onSelectedBossIndexChange={setScouterSelectedBossIndex}
+        onEditStep={onEditStep}
+        scouterSimulator={scouterSimulator}
+      />
     );
   }
 
   if (active.id === "efficiency") {
-    return (
-      <>
-        <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={null} disabled={setup.isUiLocked} />
-        {character && <StatEfficiencyBookmark theme={theme} character={character} onEditStep={onEditStep} />}
-      </>
-    );
+    if (!character) {
+      return <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={null} disabled={setup.isUiLocked} />;
+    }
+    return <StatEfficiencyBookmark theme={theme} character={character} label={active.pageLabel} disabled={setup.isUiLocked} onEditStep={onEditStep} />;
   }
 
   return (
