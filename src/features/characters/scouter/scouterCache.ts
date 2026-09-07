@@ -236,10 +236,17 @@ function parseSpecEfficiency(raw: unknown): ScouterSpecEfficiency | undefined {
 }
 
 /** A 0 for the headline figure is MapleScouter's own known failure signature (e.g. the
- *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result. */
-function parseCalcResponse(data: MapleScouterCalcResponse): ScouterResultEntry | null {
-  const c = data.calculatedData;
+ *  Ephenia Soul "C" tier bug), treat it the same as a network failure, not a real result.
+ *  Exported (unknown-typed) for scouterSimulatorCache.ts's direct-override path, which POSTs
+ *  a mutated ScouterUserStat to this same /api/scouter route (MapleScouter's plain /calc/dmg)
+ *  the real refresh uses, and gets the same calculatedData-wrapped response shape back. */
+export function parseCalcResponse(data: unknown): ScouterResultEntry | null {
+  const c = (data as MapleScouterCalcResponse | null)?.calculatedData;
   if (!c) return null;
+  return parseCalculatedData(c);
+}
+
+function parseCalculatedData(c: NonNullable<MapleScouterCalcResponse["calculatedData"]>): ScouterResultEntry | null {
   const { boss300_stat, boss380_stat, boss300_hexaStat, boss380_hexaStat, exchangePower, exchangePowerHexa, mr_hexaStat } = c;
   if (
     typeof boss300_stat !== "number" || typeof boss380_stat !== "number" ||
@@ -361,10 +368,44 @@ export function peekScouterLastKnown(character: StoredCharacterRecord): ScouterR
   return cache ? (cache.entries[cache.lastHash] ?? null) : null;
 }
 
-/** Refreshes a character's Scouter figure. Builds the payload fresh each call (so it
- *  always reflects current stored data), hashes it, and either returns a cache hit
- *  instantly or fetches through the proxy route. */
-export async function refreshScouterResult(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
+// Tracked per character, not per hash: two refresh buttons for the same character (Overview
+// figure, bookmark header) each run their own useScouterResult instance with no shared React
+// state, so this is what stops them firing duplicate fetches. Same module-level-Map-plus-
+// listeners shape as scouterDevDrill.ts's override store.
+const inFlightRefreshes = new Map<string, Promise<ScouterRefreshResult>>();
+const inFlightListeners = new Set<() => void>();
+
+function notifyInFlightChanged() {
+  for (const listener of inFlightListeners) listener();
+}
+
+export function subscribeScouterRefreshInFlight(listener: () => void) {
+  inFlightListeners.add(listener);
+  return () => inFlightListeners.delete(listener);
+}
+
+export function isScouterRefreshInFlight(characterName: string): boolean {
+  return inFlightRefreshes.has(characterName.trim().toLowerCase());
+}
+
+/** Refreshes a character's Scouter figure. Builds the payload fresh each call, hashes it, and
+ *  either returns a cache hit instantly or fetches through the proxy route. Concurrent calls
+ *  for the same character share one in-flight request. */
+export function refreshScouterResult(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
+  const nameKey = character.characterName.trim().toLowerCase();
+  const existing = inFlightRefreshes.get(nameKey);
+  if (existing) return existing;
+
+  const promise = runScouterRefresh(character).finally(() => {
+    inFlightRefreshes.delete(nameKey);
+    notifyInFlightChanged();
+  });
+  inFlightRefreshes.set(nameKey, promise);
+  notifyInFlightChanged();
+  return promise;
+}
+
+async function runScouterRefresh(character: StoredCharacterRecord): Promise<ScouterRefreshResult> {
   const built = buildPayloadAndHash(character);
   if (!built) return { status: "unsupported" };
   const { payload, hash } = built;
@@ -385,7 +426,10 @@ export async function refreshScouterResult(character: StoredCharacterRecord): Pr
   }
 
   consecutiveBadResponses.delete(key);
-  storeCacheEntry(character.characterName, hash, fetched.entry, cache);
+  // Re-read rather than reusing `cache` from above -- that snapshot predates the await, so a
+  // write to this character's tools blob during the fetch would otherwise get clobbered by
+  // merging onto stale data here.
+  storeCacheEntry(character.characterName, hash, fetched.entry, readCache(character.characterName));
   return { status: "ok", entry: fetched.entry, stale: false };
 }
 

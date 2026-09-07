@@ -9,6 +9,7 @@ import InfoTooltip, { type TooltipContent } from "../setup/components/InfoToolti
 import RefreshSpinnerIcon from "../tabs/components/RefreshSpinnerIcon";
 import { formatFigure } from "./scouterFormat";
 import { useScouterResult, type ScouterErrorReason, type ScouterFigureStatus } from "./useScouterResult";
+import type { ScouterSimulatorController } from "./useScouterSimulator";
 
 // Same glyph as the profile binder's own Setup bookmark tab (CharacterProfileOverviewScreen.tsx's
 // SetupTabIcon), duplicated here rather than exported/shared -- a tiny one-off icon, matching this
@@ -71,14 +72,19 @@ const STATUS_VALUE: Partial<Record<string, string>> = {
   error: "—",
 };
 
-/** Explains why the button is disabled for the two setup-gated states; every other
- *  state (including "ready") just names the action, since there's nothing to explain. */
-function refreshTooltip(status: ScouterFigureStatus, loading: boolean): string {
+/** Explains why the button is disabled for the two setup-gated states; every other state
+ *  (including "ready") just names the action, since there's nothing to explain.
+ *  justRefreshedUnchanged adds a muted second line explaining why a refresh looked like a
+ *  no-op (the inputs haven't changed, so MapleScouter wasn't actually re-queried). */
+function refreshTooltip(status: ScouterFigureStatus, loading: boolean, justRefreshedUnchanged: boolean, theme: AppTheme): ReactNode {
   if (loading) return "Calculating…";
   if (status.kind === "unsupported") return "MapleScouter doesn't support this class yet.";
   if (status.kind === "incomplete") {
     const area = status.gap === "quickQuestions" ? "Quick Questions" : "Character Info";
     return `Fill out MapleScouter Setup's ${area} before calculating this.`;
+  }
+  if (justRefreshedUnchanged) {
+    return <>Refresh Scouter<br /><span style={{ color: theme.muted }}>Already up to date. Your MapleScouter Setup inputs haven&apos;t changed.</span></>;
   }
   return "Refresh Scouter";
 }
@@ -143,31 +149,65 @@ function figureValueColor(theme: AppTheme, status: ScouterFigureStatus): string 
   return theme.muted;
 }
 
-export default function ScouterFigure({ character, theme }: { character: StoredCharacterRecord; theme: AppTheme }) {
-  const { status, loading, canRefresh, refresh, justRefreshed } = useScouterResult(character);
+/** The refresh trigger for a MapleScouter-backed result -- shared between the Overview figure
+ *  and any bookmark header that wants the same "recalculate now" action inline. */
+export function ScouterRefreshButton({ theme, status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged = false, disabled }: {
+  theme: AppTheme; status: ScouterFigureStatus; loading: boolean; canRefresh: boolean; refresh: () => void; justRefreshed: boolean; justRefreshedUnchanged?: boolean; disabled?: boolean;
+}) {
+  return (
+    <HoverTooltip label={refreshTooltip(status, loading, justRefreshedUnchanged, theme)} theme={theme}>
+      <button
+        type="button"
+        className="tap-target-44"
+        aria-label="Refresh Scouter"
+        disabled={!canRefresh || disabled}
+        onClick={refresh}
+        style={refreshButtonStyle(theme, !canRefresh || Boolean(disabled), justRefreshed)}
+      >
+        <RefreshSpinnerIcon color="currentColor" size={12} />
+      </button>
+    </HoverTooltip>
+  );
+}
 
-  const value = status.kind === "ready" ? formatFigure(status.entry.boss380Hexa) : (STATUS_VALUE[status.kind] ?? "—");
+export default function ScouterFigure({ character, theme, simulator }: { character: StoredCharacterRecord; theme: AppTheme; simulator: ScouterSimulatorController }) {
+  const { status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged } = useScouterResult(character);
+  const simulated = simulator.active;
+
+  // A simulated result replaces the real figure in place (per the Scouter Simulator plan's
+  // product decision) -- same rendering path as a real "ready" status, just sourced from
+  // useScouterSimulator instead of useScouterResult, with its own always-warning color and
+  // tooltip so it never reads as an ordinary fresh result.
+  const realValue = status.kind === "ready" ? formatFigure(status.entry.boss380Hexa) : (STATUS_VALUE[status.kind] ?? "—");
+  const value = simulated ? formatFigure(simulated.entry.boss380Hexa) : realValue;
+  const valueColor = simulated ? statusText(theme, "warning") : figureValueColor(theme, status);
+  const tooltip = simulated
+    ? <>Boss 380 HEXA (simulated)<br /><span style={{ color: statusText(theme, "warning") }}>Showing a &quot;what if&quot; from the Scouter Simulator, not your real saved result.</span></>
+    : figureTooltip(status, theme);
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.muted }}>Scouter</div>
         <InfoTooltip content={SCOUTER_INFO} theme={theme} />
-        <HoverTooltip label={refreshTooltip(status, loading)} theme={theme}>
-          <button
-            type="button"
-            className="tap-target-44"
-            aria-label="Refresh Scouter"
-            disabled={!canRefresh}
-            onClick={refresh}
-            style={refreshButtonStyle(theme, !canRefresh, justRefreshed)}
-          >
-            <RefreshSpinnerIcon color="currentColor" size={12} />
-          </button>
-        </HoverTooltip>
+        {simulated ? (
+          <HoverTooltip label="Editing this needs the Scouter Simulator popup, open from the Scouter bookmark." theme={theme}>
+            <button
+              type="button"
+              className="tap-target-44"
+              aria-label="Refresh Scouter"
+              disabled
+              style={refreshButtonStyle(theme, true, false)}
+            >
+              <RefreshSpinnerIcon color="currentColor" size={12} />
+            </button>
+          </HoverTooltip>
+        ) : (
+          <ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} justRefreshedUnchanged={justRefreshedUnchanged} />
+        )}
       </div>
-      <HoverTooltip label={figureTooltip(status, theme)} theme={theme}>
-        <div style={{ fontSize: 20, fontWeight: 800, color: figureValueColor(theme, status), lineHeight: 1, fontFamily: "var(--font-heading)" }}>
+      <HoverTooltip label={tooltip} theme={theme}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: valueColor, lineHeight: 1, fontFamily: "var(--font-heading)" }}>
           {loading ? "…" : value}
         </div>
       </HoverTooltip>

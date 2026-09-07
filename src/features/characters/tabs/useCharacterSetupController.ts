@@ -1188,6 +1188,13 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
   const [characterRoster, setCharacterRoster] = useState<StoredCharacterRecord[]>([]);
   const characterRosterRef = useRef(characterRoster);
   useEffect(() => { characterRosterRef.current = characterRoster; });
+  // Last-seen in-memory `character.tools` reference per character key, so the persistence
+  // effect below can tell "unchanged since our last pass" apart from "this tick's
+  // setCharacterRoster actually changed it". Without that, one roster character's auto-refresh
+  // finishing re-persists EVERY character's tools from memory, clobbering another character's
+  // unrelated out-of-band write (e.g. a Scouter refresh) with memory's now-stale copy. See the
+  // tools merge below for the read side.
+  const lastSeenToolsRef = useRef<Record<string, StoredCharacterRecord["tools"]>>({});
   const [autoRefreshQueue, setAutoRefreshQueue] = useState<StoredCharacterRecord[]>([]);
 
   // Dev-only: surfaces malformed CLASS_SKILL_DATA entries (empty id/nexonJobName,
@@ -1815,8 +1822,15 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       (acc, character) => {
         const id = toCharacterKey(character);
         const existingRecord = existingStore.charactersById[id];
-        acc[id] = {
-          ...character,
+        // Same reference as last pass means nothing in-band changed this character's tools this
+        // tick -- trust disk as-is instead of re-merging, so an unrelated roster update can't
+        // drag it back to a stale memory copy over a newer out-of-band write. Only a character
+        // whose tools reference actually changed (an in-band write, or its first time through)
+        // goes through the disk+memory merge below.
+        const toolsUnchangedSinceLastPass = lastSeenToolsRef.current[id] === character.tools;
+        lastSeenToolsRef.current[id] = character.tools;
+        const mergedTools = toolsUnchangedSinceLastPass && existingRecord
+          ? existingRecord.tools
           // Two independent paths write `tools`: out-of-band, via characterToolStorage.ts's
           // writeCharacterToolData (symbols, liberation, hexa skills, scouterResult, etc.,
           // edited from their own tool pages -- patches disk directly, never syncs back into
@@ -1829,7 +1843,10 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
           // is what caused the original out-of-band-write regression this comment used to
           // describe. Spread disk first so a key only an out-of-band write has survives, then
           // overlay memory so a key the current character object actually carries wins.
-          tools: { ...existingRecord?.tools, ...character.tools },
+          : { ...existingRecord?.tools, ...character.tools };
+        acc[id] = {
+          ...character,
+          tools: mergedTools,
           // `character` (from characterRoster, the in-memory state) is always the
           // authoritative value for these two -- every upsert path already either sets them
           // explicitly (applyGenderDraftToRoster/applyMarriageDraftToRoster, quick/full setup)

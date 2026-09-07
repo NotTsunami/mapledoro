@@ -16,6 +16,9 @@ const CHANGELOG: ChangelogEntry[] = [
     changes: [
       { type: "added", text: "Character Guides now have a full build guide for 27 classes, covering the buff sequence, HEXA leveling order, utility skills, link skill, legion bonus and inner ability." },
       { type: "added", text: "The New Player Guide is now an interactive walkthrough from level 10 to 200 that adapts to your world type and whether you are on Hyper Burning, with checkboxes to track how far you have got." },
+      { type: "added", text: "Added a simulator to the Scouter bookmark in a character's profile (replacing the Full HEXA toggle), letting you try out \"what if\" changes to your Level, HEXA cores, buffs, Oz Rings, Final Damage, and more, without touching your real saved Scouter result." },
+      { type: "added", text: "The Scouter and Stat Efficiency bookmarks now have their own refresh button, so you don't need to go back to Overview to update your Scouter figure." },
+      { type: "changed", text: "Refreshing your Scouter figure when nothing has changed since your last MapleScouter Setup now tells you it's already up to date, instead of looking like the refresh did nothing." },
     ],
   },
   {

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { findScouterSetupGap, isScouterSupportedClass, type ScouterSetupGap } from "./scouterApi";
 import {
-  autoRefreshScouterResultIfNeeded, peekScouterCache, peekScouterLastKnown, refreshScouterResult,
+  autoRefreshScouterResultIfNeeded, isScouterRefreshInFlight, peekScouterCache, peekScouterLastKnown,
+  refreshScouterResult, subscribeScouterRefreshInFlight,
   type ScouterErrorReason, type ScouterRefreshResult, type ScouterResultEntry,
 } from "./scouterCache";
 import { getScouterDevOverride, subscribeScouterDevOverride } from "./scouterDevDrill";
@@ -31,6 +32,10 @@ export interface ScouterFigureState {
   canRefresh: boolean;
   refresh: () => void;
   justRefreshed: boolean;
+  // True briefly after a refresh that returned the exact same cached entry (same computedAt)
+  // -- MapleScouter wasn't actually re-queried, since the inputs haven't changed since the
+  // last calculation. Without this a refresh on unchanged stats looks like it did nothing.
+  justRefreshedUnchanged: boolean;
 }
 
 function resultToStatus(result: ScouterRefreshResult): ScouterFigureStatus {
@@ -70,6 +75,7 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
   // instantly and the figure often shows the same number -- otherwise clicking refresh on an
   // already-cached character looks like the click did nothing at all.
   const [justRefreshed, setJustRefreshed] = useState(false);
+  const [justRefreshedUnchanged, setJustRefreshedUnchanged] = useState(false);
 
   // Re-derive when the viewed character changes, a render-time state adjustment (React's
   // documented pattern for resetting derived state on prop change), not a useEffect, so it
@@ -78,6 +84,7 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
     setCharacterKey(character.characterName);
     setStatus(initialStatus(character));
     setJustRefreshed(false);
+    setJustRefreshedUnchanged(false);
   }
 
   useEffect(() => {
@@ -85,6 +92,15 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
     const t = setTimeout(() => setJustRefreshed(false), 400);
     return () => clearTimeout(t);
   }, [justRefreshed]);
+
+  // Separate, longer-lived timeout than justRefreshed's 400ms button flash -- this drives an
+  // inline note a player needs to actually read, not just notice, so it needs real time on
+  // screen rather than disappearing with the flash.
+  useEffect(() => {
+    if (!justRefreshedUnchanged) return;
+    const t = setTimeout(() => setJustRefreshedUnchanged(false), 4000);
+    return () => clearTimeout(t);
+  }, [justRefreshedUnchanged]);
 
   // Auto-refresh, but only for a genuinely never-seen "empty" state, and only once per
   // hash per browser session (see autoRefreshScouterResultIfNeeded's own comment for why
@@ -109,17 +125,35 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
     return () => { cancelled = true; clearTimeout(timer); };
   }, [status.kind, character]);
 
+  // Reactive read of another useScouterResult instance's in-flight refresh for this SAME
+  // character (e.g. the Overview figure and a bookmark header each run their own instance,
+  // with no shared React state otherwise) -- refreshScouterResult itself already dedupes the
+  // actual network call, but without this a freshly-mounted instance's own `loading` starts
+  // false and its button would look clickable mid-refresh instead of reflecting reality.
+  const refreshInFlightElsewhere = useSyncExternalStore(
+    subscribeScouterRefreshInFlight,
+    () => isScouterRefreshInFlight(character.characterName),
+    () => false,
+  );
+  const effectiveLoading = loading || refreshInFlightElsewhere;
+
   const refresh = useCallback(() => {
-    if (loading) return;
+    if (effectiveLoading) return;
+    // Captured before the fetch so the "unchanged" check has the pre-click timestamp to
+    // compare against, not whatever `status` becomes by the time the promise resolves.
+    const computedAtBeforeRefresh = status.kind === "ready" ? status.entry.computedAt : null;
     setLoading(true);
     void refreshScouterResult(character).then((result) => {
       setLoading(false);
       setStatus(resultToStatus(result));
       setJustRefreshed(true);
+      setJustRefreshedUnchanged(
+        result.status === "ok" && computedAtBeforeRefresh !== null && result.entry.computedAt === computedAtBeforeRefresh,
+      );
     });
-  }, [character, loading]);
+  }, [character, effectiveLoading, status]);
 
-  const canRefresh = !loading && (status.kind === "ready" || status.kind === "empty" || status.kind === "error");
+  const canRefresh = !effectiveLoading && (status.kind === "ready" || status.kind === "empty" || status.kind === "error");
 
   // Dev-only visual QA override (scouterDevDrill.ts) -- reactive via useSyncExternalStore
   // so calling __mapledoroForceScouterStatus in the console updates the figure immediately,
@@ -132,8 +166,8 @@ export function useScouterResult(character: StoredCharacterRecord): ScouterFigur
   );
   if (devOverride) {
     const overrideCanRefresh = devOverride.kind === "ready" || devOverride.kind === "empty" || devOverride.kind === "error";
-    return { status: devOverride, loading: false, canRefresh: overrideCanRefresh, refresh: () => {}, justRefreshed: false };
+    return { status: devOverride, loading: false, canRefresh: overrideCanRefresh, refresh: () => {}, justRefreshed: false, justRefreshedUnchanged: false };
   }
 
-  return { status, loading, canRefresh, refresh, justRefreshed };
+  return { status, loading: effectiveLoading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged };
 }
