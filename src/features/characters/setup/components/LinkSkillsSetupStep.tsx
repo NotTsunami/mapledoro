@@ -181,7 +181,10 @@ function NowrapTokens({ tokens, separator }: { tokens: string[]; separator: stri
 // fix's history).
 const MAX_BTN_FLASH_MS = 180;
 
-function LinkSkillRow({
+/** Exported for the Scouter Simulator's Links tab, which reuses this exact row (icon + name/
+ *  classes + level input) rather than duplicating it -- source/min are setup-step-only
+ *  concepts (propagation source, per-character floor) and stay undefined there. */
+export function LinkSkillRow({
   skill, value, source, onUpdate, theme, fullWidth, min,
 }: {
   skill: LinkSkillDef;

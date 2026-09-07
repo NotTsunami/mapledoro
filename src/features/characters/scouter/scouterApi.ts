@@ -821,6 +821,10 @@ export interface ScouterSimulatorOverrides {
   dopingOverrides?: StoredScouterBuffs;
   ringOverrides?: OzRingOverrides;
   input?: SimulatorInputOverrides;
+  /** Real ScouterUserStat.linkSkill levels, only for the 10 link skills MapleScouter's own
+   *  payload accepts (LINK_SKILL_TO_SCOUTER_KEY) -- absolute levels like hexaCoreOverrides,
+   *  not deltas, matching the level the real Link Skills setup step stores. */
+  linkSkillOverrides?: Partial<Record<LinkSkillId, string>>;
 }
 
 /** The subset of ScouterSimulatorOverrides that has a real 1:1 field on ScouterUserStat
@@ -948,6 +952,12 @@ export function buildDirectScouterPayload(
   if (overrides.hexaCoreOverrides) {
     for (const [field, value] of Object.entries(overrides.hexaCoreOverrides)) {
       if (value !== undefined) userStat.hexa[field as SimulatorHexaCoreField] = value;
+    }
+  }
+  if (overrides.linkSkillOverrides) {
+    for (const [id, value] of Object.entries(overrides.linkSkillOverrides)) {
+      const scouterKey = LINK_SKILL_TO_SCOUTER_KEY[id as LinkSkillId];
+      if (scouterKey && value !== undefined) userStat.linkSkill[scouterKey] = value;
     }
   }
   const classId = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName)?.id;

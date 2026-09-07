@@ -99,16 +99,21 @@ export function PillGroup<T extends string>({
   options,
   value,
   onChange,
+  wrap,
 }: {
   theme: AppTheme;
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
+  /** Lets the pill row wrap onto multiple lines instead of overflowing when there are more
+   *  options than a narrow container can fit on one line. */
+  wrap?: boolean;
 }) {
   return (
     <div
       style={{
         display: "flex",
+        flexWrap: wrap ? "wrap" : "nowrap",
         gap: "4px",
         background: theme.timerBg,
         borderRadius: "10px",

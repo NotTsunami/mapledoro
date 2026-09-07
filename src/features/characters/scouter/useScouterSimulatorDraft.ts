@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { HexaClassDef } from "../../tools/hexa-skills/hexa-classes";
-import type { StoredCharacterRecord } from "../model/charactersStore";
+import type { LinkSkillId, StoredCharacterRecord } from "../model/charactersStore";
 import { readCharactersStore } from "../model/charactersStore";
 import {
   emptyBuffsDraft, storedBuffsToDraft, convertBuffsDraftToStored, type BuffsDraft,
@@ -14,8 +14,11 @@ import {
   buildScouterPayload, type OzRingOverrides, type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInputOverrides,
 } from "./scouterApi";
 import { hexaCoreFields } from "./hexaSimulatorFields";
+import { LINK_SKILL_TO_SCOUTER_KEY } from "./scouterLinkSkills";
 
-export type SimulatorTab = "buffs" | "hexa" | "ozRings" | "input";
+export type SimulatorTab = "buffs" | "hexa" | "ozRings" | "input" | "linkSkills";
+
+const SIMULATOR_LINK_SKILL_IDS = Object.keys(LINK_SKILL_TO_SCOUTER_KEY) as LinkSkillId[];
 
 const EMPTY_INPUT: Record<keyof SimulatorInputOverrides, number> = {
   mainStat: 0, mainStatPer: 0, mainStatAbs: 0, mainStat9Level: 0,
@@ -44,6 +47,8 @@ export interface ScouterSimulatorDraft {
   setOzRingsDraft: (draft: OzRingsDraft) => void;
   input: Record<keyof SimulatorInputOverrides, number>;
   setInputField: (key: keyof SimulatorInputOverrides, value: number) => void;
+  linkSkills: Record<LinkSkillId, number>;
+  setLinkSkill: (id: LinkSkillId, value: number) => void;
   /** False once every field is back to its real starting value -- Apply can skip the request
    *  entirely in that case, since there'd be nothing to simulate. */
   hasChanges: boolean;
@@ -54,6 +59,7 @@ export interface ScouterSimulatorDraft {
   resetHexa: () => void;
   resetOzRings: () => void;
   resetInput: () => void;
+  resetLinkSkills: () => void;
   /** Assembles every draft field into the payload buildDirectScouterPayload expects. */
   buildOverrides: () => ScouterSimulatorOverrides;
 }
@@ -116,6 +122,23 @@ export function useScouterSimulatorDraft(
     }
     return out;
   });
+  const [initialLinkSkills] = useState<Record<LinkSkillId, number>>(() => {
+    const out = {} as Record<LinkSkillId, number>;
+    for (const id of SIMULATOR_LINK_SKILL_IDS) {
+      const scouterKey = LINK_SKILL_TO_SCOUTER_KEY[id];
+      out[id] = realUserStat && scouterKey ? Number(realUserStat.linkSkill[scouterKey]) : 0;
+    }
+    return out;
+  });
+  const [linkSkills, setLinkSkills] = useState<Record<LinkSkillId, number>>(() => {
+    if (!previousOverrides?.linkSkillOverrides) return initialLinkSkills;
+    const out = { ...initialLinkSkills };
+    for (const id of SIMULATOR_LINK_SKILL_IDS) {
+      const override = previousOverrides.linkSkillOverrides[id];
+      if (override !== undefined) out[id] = Number(override);
+    }
+    return out;
+  });
   const [initialBuffsDraft] = useState<BuffsDraft>(() => storedBuffsToDraft(character.scouter?.buffs) ?? emptyBuffsDraft());
   const [buffsDraft, setBuffsDraft] = useState(() =>
     previousOverrides?.dopingOverrides ? storedBuffsToDraft(previousOverrides.dopingOverrides) : initialBuffsDraft);
@@ -136,6 +159,9 @@ export function useScouterSimulatorDraft(
   const setInputField = (key: keyof SimulatorInputOverrides, value: number) => {
     setInput((prev) => ({ ...prev, [key]: value }));
   };
+  const setLinkSkill = (id: LinkSkillId, value: number) => {
+    setLinkSkills((prev) => ({ ...prev, [id]: value }));
+  };
 
   const resetLevelRow = () => {
     setLevel(initialLevel);
@@ -149,6 +175,7 @@ export function useScouterSimulatorDraft(
     setFinalDmgPercent(0);
     setInput(EMPTY_INPUT);
   };
+  const resetLinkSkills = () => setLinkSkills(initialLinkSkills);
 
   // True once every field is back to (or still at) its real starting value -- finalDmgPercent
   // and input have no real baseline to seed from, so they're "unchanged" simply at their 0/
@@ -161,6 +188,7 @@ export function useScouterSimulatorDraft(
     JSON.stringify(hexaCores) !== JSON.stringify(initialHexaCores) ||
     JSON.stringify(buffsDraft) !== JSON.stringify(initialBuffsDraft) ||
     JSON.stringify(ozRingsDraft) !== JSON.stringify(initialOzRingsDraft) ||
+    JSON.stringify(linkSkills) !== JSON.stringify(initialLinkSkills) ||
     Object.values(input).some((v) => v !== 0);
 
   const buildOverrides = (): ScouterSimulatorOverrides => {
@@ -181,6 +209,9 @@ export function useScouterSimulatorDraft(
         useContinuousAsMainRing: ozRingsDraft.ringMode === "continuous",
       },
       input: inputOverrides,
+      linkSkillOverrides: Object.fromEntries(
+        SIMULATOR_LINK_SKILL_IDS.map((id) => [id, String(linkSkills[id])]),
+      ) as Partial<Record<LinkSkillId, string>>,
     };
   };
 
@@ -193,9 +224,10 @@ export function useScouterSimulatorDraft(
     hexaCores, setHexaCore,
     buffsDraft, setBuffsDraft,
     ozRingsDraft, setOzRingsDraft,
+    linkSkills, setLinkSkill,
     input, setInputField,
     hasChanges,
-    resetLevelRow, resetBuffs, resetHexa, resetOzRings, resetInput,
+    resetLevelRow, resetBuffs, resetHexa, resetOzRings, resetInput, resetLinkSkills,
     buildOverrides,
   };
 }

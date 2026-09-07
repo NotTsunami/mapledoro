@@ -10,8 +10,11 @@ import { PillGroup } from "../../tools/shared-ui";
 import { sanitizeDigitsInput, sanitizeDecimalInput, numericKeyDown, decimalKeyDown, clampNumber } from "../../../lib/inputUtils";
 import { SkillIcon } from "../../tools/hexa-skills/hexa-ui";
 import { findClassById, type HexaClassDef } from "../../tools/hexa-skills/hexa-classes";
-import type { StoredCharacterRecord } from "../model/charactersStore";
+import type { LinkSkillId, StoredCharacterRecord } from "../model/charactersStore";
 import { CLASS_SKILL_DATA } from "../setup/data/classSkillData";
+import { LINK_SKILLS } from "../setup/data/linkSkillsData";
+import { LinkSkillRow } from "../setup/components/LinkSkillsSetupStep";
+import { LINK_SKILL_TO_SCOUTER_KEY } from "./scouterLinkSkills";
 import {
   BOOL_BUFFS, BUFF_GROUP_A, BUFF_GROUP_B,
   GUILD_BUFFS, GUILD_BUFF_MAX, RENOWN_STATS, RENOWN_SKILL_ID,
@@ -52,6 +55,7 @@ const TAB_OPTIONS: { value: SimulatorTab; label: string }[] = [
   { value: "buffs", label: "Buffs" },
   { value: "hexa", label: "HEXA" },
   { value: "ozRings", label: "Oz Rings" },
+  { value: "linkSkills", label: "Links" },
   { value: "input", label: "Input" },
 ];
 
@@ -59,6 +63,11 @@ const TAB_OPTIONS: { value: SimulatorTab; label: string }[] = [
 // once HEXA-eligible -- matches useHexaSkillsState.ts's own normalizeLevels
 // (`origin: Math.max(1, clampLevel(...))` vs every other core's plain 0-30 clampLevel).
 const HEXA_CORE_MIN: Partial<Record<SimulatorHexaCoreField, number>> = { skillCore1: 1 };
+
+// Only the link skills MapleScouter's own payload accepts -- same filter the real Link Skills
+// setup step uses (see its own comment: LINK_SKILLS grew far beyond this for the Legion
+// panel's read-only display, but those extra entries have nowhere to go once saved).
+const SIMULATOR_LINK_SKILLS = LINK_SKILLS.filter((s) => s.id in LINK_SKILL_TO_SCOUTER_KEY);
 
 // Real GMS level cap as of v270 -- MapleStory's max character level. Update alongside any
 // future level cap increase (root CLAUDE.md's version-bump checklist doesn't cover this,
@@ -306,6 +315,39 @@ function HexaTab({ theme, classDef, hexaCores, onChange }: {
       <HexaSection theme={theme} label="Mastery" fields={byField(["masteryCore1", "masteryCore2", "masteryCore3", "masteryCore4"])} hexaCores={hexaCores} onChange={onChange} />
       <HexaSection theme={theme} label="Enhancement" fields={byField(["reinCore1", "reinCore2", "reinCore3", "reinCore4"])} hexaCores={hexaCores} onChange={onChange} />
       <HexaSection theme={theme} label="Common" fields={byField(["generalCore2"])} hexaCores={hexaCores} onChange={onChange} />
+    </div>
+  );
+}
+
+// ── Link Skills tab ──────────────────────────────────────────────────────────
+
+// Same maxLevel-3-vs-higher split the real Links setup step uses: single-level skills fill a
+// 2-column grid, the two higher-max skills (Empirical Knowledge, Thief's Cunning) span both
+// columns via LinkSkillRow's own fullWidth prop.
+const SIMULATOR_SINGLE_LINK_SKILLS = SIMULATOR_LINK_SKILLS.filter((s) => s.maxLevel === 3);
+const SIMULATOR_MULTI_LINK_SKILLS = SIMULATOR_LINK_SKILLS.filter((s) => s.maxLevel > 3);
+
+function LinkSkillsTab({ theme, linkSkills, onChange }: {
+  theme: AppTheme; linkSkills: Record<LinkSkillId, number>; onChange: (id: LinkSkillId, value: number) => void;
+}) {
+  const handleUpdate = (id: LinkSkillId, val: string) => onChange(id, Number.parseInt(val, 10) || 0);
+  return (
+    <div className="scouter-sim-link-skills-root">
+      <SectionLabel
+        theme={theme}
+        label="Link Skills"
+        btnStyle={hexaSectionBtnStyle}
+        onMaxAll={() => SIMULATOR_LINK_SKILLS.forEach((s) => onChange(s.id, s.maxLevel))}
+        onClear={() => SIMULATOR_LINK_SKILLS.forEach((s) => onChange(s.id, 0))}
+      />
+      <div className="scouter-sim-link-skills-grid" style={{ display: "grid", gap: "0.5rem" }}>
+        {SIMULATOR_SINGLE_LINK_SKILLS.map((skill) => (
+          <LinkSkillRow key={skill.id} skill={skill} value={String(linkSkills[skill.id])} onUpdate={handleUpdate} theme={theme} />
+        ))}
+        {SIMULATOR_MULTI_LINK_SKILLS.map((skill) => (
+          <LinkSkillRow key={skill.id} skill={skill} value={String(linkSkills[skill.id])} onUpdate={handleUpdate} theme={theme} fullWidth />
+        ))}
+      </div>
     </div>
   );
 }
@@ -642,6 +684,8 @@ function TabContent({
           weaponJumpIconId={ozClassInfo.weaponJumpIconId}
         />
       );
+    case "linkSkills":
+      return <LinkSkillsTab theme={theme} linkSkills={draft.linkSkills} onChange={draft.setLinkSkill} />;
     case "input":
       return (
         <InputTab
@@ -700,7 +744,7 @@ export default function ScouterSimulatorDialog({
   const [error, setError] = useState<ScouterErrorReason | null>(null);
 
   const RESET_BY_TAB: Record<SimulatorTab, () => void> = {
-    buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, input: draft.resetInput,
+    buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, linkSkills: draft.resetLinkSkills, input: draft.resetInput,
   };
 
   const handleApply = () => {
@@ -746,6 +790,15 @@ export default function ScouterSimulatorDialog({
           .scouter-simulator-dialog .scouter-sim-header { padding: 0.7rem 0.85rem 0.55rem; }
           .scouter-simulator-dialog .scouter-sim-level-row { padding: 0.5rem 0.85rem; gap: 0.45rem; }
         }
+        /* The dialog itself is a fixed-width modal narrower than the viewport, so a viewport
+           @media query never crosses on a real phone -- needs its own container query, same
+           fix the real Links setup step's .link-skills-grid already uses (container-type on
+           the wrapping root, not the grid itself, matching that file's own structure). */
+        .scouter-sim-link-skills-root { container-type: inline-size; }
+        .scouter-sim-link-skills-grid { grid-template-columns: 1fr 1fr; }
+        @container (max-width: 480px) {
+          .scouter-sim-link-skills-grid { grid-template-columns: 1fr; }
+        }
       `}</style>
       <div className="scouter-sim-header" style={{ padding: "1rem 1.1rem 0.75rem", borderBottom: `1px solid ${theme.border}` }}>
         <span className="panel-header-title" style={{ color: theme.text, fontSize: "1.05rem" }}>
@@ -778,8 +831,8 @@ export default function ScouterSimulatorDialog({
           </div>
           <ResetLink theme={theme} onReset={draft.resetLevelRow} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <PillGroup theme={theme} options={hexaLegacyBlocked ? TAB_OPTIONS.filter((o) => o.value !== "hexa") : TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} />
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <PillGroup theme={theme} options={hexaLegacyBlocked ? TAB_OPTIONS.filter((o) => o.value !== "hexa") : TAB_OPTIONS} value={draft.tab} onChange={draft.setTab} wrap />
           <ResetLink theme={theme} onReset={RESET_BY_TAB[draft.tab]} label="Reset Tab" />
         </div>
       </div>
