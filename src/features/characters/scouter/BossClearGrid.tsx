@@ -31,12 +31,19 @@ const BOSS_ICON_ID: Record<string, string> = {
   카링: "31", 림보: "33", 발드릭스: "34", 유피테르: "38", 가엔슬: "29", 카이: "36",
 };
 
-const DIFFICULTY_ORDER: Record<string, number> = { Easy: 0, Normal: 1, Hard: 2, Chaos: 3, Extreme: 4, Destiny: 5, Champion: 6 };
+// Easiest to hardest. Champion and Destiny are solo variants of a party tier (nearly always
+// Hard) and sit BELOW Extreme on every boss that has one -- Lotus, Black Mage, Seren, Adversary
+// all read wrong with Extreme ranked under them. Checked per boss against the scraped cut and
+// easyRate, not just assumed from the names.
+const DIFFICULTY_ORDER: Record<string, number> = { Easy: 0, Normal: 1, Hard: 2, Chaos: 3, Champion: 4, Destiny: 5, Extreme: 6 };
 
-// Black Mage is the sole exception to the global ladder above: its Champion (solo Hard, same
-// bossCut) is easier than Extreme, not harder, so it sorts before both Hard and Extreme here.
+// The two bosses whose solo variant doesn't mirror Hard: Kalos's Champion is a solo Normal
+// (same 49800 cut as Normal, about half of Chaos's), and Kaling's Destiny is rated easier than
+// its Hard (same cut, easyRate x1.2 -- confirmed in practice, people do Destiny before soloing
+// Hard). Every other boss follows the global ladder.
 const DIFFICULTY_ORDER_OVERRIDE: Partial<Record<string, Record<string, number>>> = {
-  blackMage: { Champion: 0, Hard: 1, Extreme: 2 },
+  kalos: { Easy: 0, Normal: 1, Champion: 2, Chaos: 3, Destiny: 4, Extreme: 5 },
+  kaling: { Easy: 0, Normal: 1, Destiny: 2, Hard: 3, Extreme: 4 },
 };
 
 // Tag order matches the severity ladder in bossClearFormula.ts's TAG_COLOR (best to worst),
@@ -53,10 +60,13 @@ const QUICK_VIEW_INFO_CONTENT: TooltipContent = {
         <li>90-129%: theoretically possible</li>
         <li>130%+: comfortable</li>
       </ul>
-      <p style={{ margin: 0 }}>
+      <p style={{ margin: "0 0 0.5rem" }}>
         &quot;Min&quot; means the bare minimum to pass, not a comfortable clear. Solo Min is
-        barely soloable, and a Min Cut tag (1p/2p/3p...) shows the smallest party size that can
-        just barely clear it.
+        barely soloable.
+      </p>
+      <p style={{ margin: 0 }}>
+        Party-only bosses use your HEXA alone, never your party members&apos;. A Min Cut tag
+        (1p/2p/3p...) is how many players like you it would take.
       </p>
     </>
   ),
@@ -64,7 +74,24 @@ const QUICK_VIEW_INFO_CONTENT: TooltipContent = {
 
 const BOSS_THRESHOLD_INFO_CONTENT: TooltipContent = {
   title: "Boss thresholds",
-  description: "Boss Clear thresholds from MapleScouter, informally curated by a small group of experienced players rather than measured across the whole playerbase.",
+  description: (
+    <>
+      <p style={{ margin: "0 0 0.5rem" }}>
+        Boss Clear thresholds from MapleScouter, informally curated by a small group of experienced
+        players rather than measured across the whole playerbase.
+      </p>
+      {/* Temporary until GMS gets the 20-minute timer patch: MapleScouter already models every
+          boss on KMS's post-patch 20-minute timer with HP scaled to match, which preserves the
+          required DPS, so the numbers hold for GMS's current timers. Drop this paragraph once
+          the patch lands. (Champion Black Mage, the one exception, explains itself on its own
+          chip -- see bossClearFormula.ts's effectiveEasyRate.) */}
+      <p style={{ margin: 0 }}>
+        MapleScouter already uses the 20-minute boss timers with HP cut to match, so the damage
+        you need per minute is the same as on GMS&apos;s current timers and these numbers still
+        apply.
+      </p>
+    </>
+  ),
 };
 
 // MapleScouter's own "relevant" filter, ported verbatim (confirmed by clicking their own
@@ -288,6 +315,13 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
   }, []);
 }
 
+// Trailing * flags a clear% mapledoro deliberately corrects away from MapleScouter's own figure
+// (Champion Black Mage, see bossClearFormula.ts's effectiveEasyRate) so a player comparing the
+// two sites sees at a glance that the mismatch is intended, with the hover tooltip explaining it.
+function formatClearPercent(result: BossClearResult): string {
+  return `${result.clearRatePercent.toFixed(2)}%${result.scouterClearRatePercent === null ? "" : "*"}`;
+}
+
 // Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill.
 function chipTagColor(theme: AppTheme, status: PillStatus): string {
   if (status === "success") return statusText(theme, "success");
@@ -316,6 +350,14 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <span style={{ color: theme.muted }}>Adjusted HEXA Stat</span>
         <span>{formatFigure(result.bossStat)}</span>
       </div>
+      {/* Whichever scale the chip ISN'T showing -- the party figure once the boss has flipped to
+          solo (also what MapleScouter's own site shows, so the cross-check survives the flip). */}
+      {result.soloScalePercent !== null && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>{result.soloable ? `${result.partyLimit}-player party %` : "Solo %"}</span>
+          <span>{(result.soloable ? result.clearRate * 100 : result.soloScalePercent).toFixed(2)}%</span>
+        </div>
+      )}
       <div style={chipTooltipDividerStyle(theme)} />
       {combinedLossPercent > 0 && (
         <div style={{ color: statusText(theme, "warning"), fontWeight: 800 }}>{combinedLossPercent}% FD Loss</div>
@@ -329,6 +371,16 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
         </div>
       ))}
+      {result.scouterClearRatePercent !== null && (
+        <>
+          <div style={chipTooltipDividerStyle(theme)} />
+          <div style={{ color: theme.muted, fontWeight: 500 }}>
+            Current GMS Scouter incorrectly deflates the Champion Mode Black Mage difficulty. Black
+            Mage values will stabilize after GMS receives the 20-minute change. Adjusted from{" "}
+            {result.scouterClearRatePercent.toFixed(2)}%.
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -356,7 +408,7 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
           <span style={{ fontSize: 12, fontWeight: 800, color: tagColor }}>
             {result.tagEnglish}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{result.clearRatePercent.toFixed(2)}%</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{formatClearPercent(result)}</span>
         </div>
       </div>
     </HoverTooltip>
@@ -811,7 +863,7 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
             become direct grid items the mobile area map can place independently under the
             diff/tag columns on their own row. */}
         <span className="spotlight-tile-cell-numbers" style={{ gridColumn: 4, gridRow: 1, display: "flex", alignItems: "center", justifySelf: "end", gap: 10, minWidth: 0 }}>
-          <span className="spotlight-tile-cell-clear" style={{ fontSize: 12, fontWeight: 700, color: theme.text, whiteSpace: "nowrap" }}>{result.clearRatePercent.toFixed(2)}%</span>
+          <span className="spotlight-tile-cell-clear" style={{ fontSize: 12, fontWeight: 700, color: theme.text, whiteSpace: "nowrap" }}>{formatClearPercent(result)}</span>
           <span className="spotlight-tile-cell-adjusted" style={{ fontSize: 12, color: theme.muted, whiteSpace: "nowrap", flexShrink: 0 }}>
             Adjusted {formatFigure(result.bossStat)}
           </span>

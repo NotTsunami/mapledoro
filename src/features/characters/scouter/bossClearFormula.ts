@@ -15,7 +15,7 @@
     rather than porting that fallback.
 */
 
-import type { BossCutEntry } from "./bosscut-data.generated";
+import { BOSSCUT_DATA, type BossCutEntry } from "./bosscut-data.generated";
 import type { BossClearInputs } from "./scouterCache";
 
 interface Spline {
@@ -190,11 +190,12 @@ function tier(tag: string): BossTier {
 // threshold nobody agreed felt safe. This is a real, intentional divergence from MapleScouter's
 // own displayed tags for the same character, not a bug. Every other breakpoint (Easy, Solo
 // Min's own floor, Party-able, Party Min) is untouched.
+const SOLO_MIN_FLOOR = 0.9;
 const SOLO_TIERS: Record<number, [number, BossTier][]> = {
-  6: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.25, tier("Party-able")], [0.15, tier("Party Min")]],
-  3: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.36, tier("Party-able")], [0.3, tier("Party Min")]],
-  2: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")], [0.55, tier("Party-able")], [0.45, tier("Party Min")]],
-  1: [[2, tier("Easy")], [1.3, tier("Possible")], [0.9, tier("Solo Min")]],
+  6: [[2, tier("Easy")], [1.3, tier("Possible")], [SOLO_MIN_FLOOR, tier("Solo Min")], [0.25, tier("Party-able")], [0.15, tier("Party Min")]],
+  3: [[2, tier("Easy")], [1.3, tier("Possible")], [SOLO_MIN_FLOOR, tier("Solo Min")], [0.36, tier("Party-able")], [0.3, tier("Party Min")]],
+  2: [[2, tier("Easy")], [1.3, tier("Possible")], [SOLO_MIN_FLOOR, tier("Solo Min")], [0.55, tier("Party-able")], [0.45, tier("Party Min")]],
+  1: [[2, tier("Easy")], [1.3, tier("Possible")], [SOLO_MIN_FLOOR, tier("Solo Min")]],
 };
 // Party-only bosses (no solo option at all) use a different, party-size-labeled tag set.
 const PARTY_ONLY_TIERS_BY_LIMIT: Record<number, [number, BossTier][]> = {
@@ -205,6 +206,34 @@ const PARTY_ONLY_TIERS_DEFAULT: [number, BossTier][] = [
 ];
 const IMPOSSIBLE_TIER: BossTier = tier("Impossible");
 const CANNOT_ENTER_TIER: BossTier = tier("Can't Enter");
+
+/** A party-only boss's clearRate is measured against ONE cut-level party member's share, so
+ *  100% there means "you're one member of a full party," not "you can clear it." The "1p Min
+ *  Cut" threshold (the top tier above) is the point where your damage alone covers the whole
+ *  party's requirement -- but it already carries the same 0.9 slack as the solo ladder's Solo
+ *  Min floor (5.1 = 0.9 x 5.667, and 2p/3p/4p follow as 5.667/N x 0.9), so the divisor that
+ *  puts clearRate on the solo scale is threshold / 0.9, which lands 1p Min Cut on exactly 90%
+ *  Solo Min like every other boss. An extrapolation, not a calibration: the constants are
+ *  MapleScouter's own eyeballed ones, nobody is measuring real solo clears of Extreme Kaling. */
+function soloScaleDivisor(partyLimit: number): number {
+  const tiers = PARTY_ONLY_TIERS_BY_LIMIT[partyLimit] ?? PARTY_ONLY_TIERS_DEFAULT;
+  return tiers[0][0] / SOLO_MIN_FLOOR;
+}
+
+/** What the tile shows. A party-only boss stays on the party scale (Np Min Cut tags) until the
+ *  character clears the 1p Min Cut threshold, i.e. can solo it, then flips to the solo scale:
+ *  % against the whole party's cut, Easy/Possible/Solo Min tags. "510% 1p Min Cut" is
+ *  technically right but nobody reads it as "you can solo Extreme Kalos." clearRate itself
+ *  stays on the party scale so the relevance filter's per-partyLimit thresholds keep meaning
+ *  what they did. */
+function presentation(clearRate: number, isPartyBoss: boolean, partyLimit: number): {
+  displayRate: number; soloable: boolean; soloScalePercent: number | null; tier: BossTier;
+} {
+  if (!isPartyBoss) return { displayRate: clearRate, soloable: false, soloScalePercent: null, tier: bossTier(clearRate, false, partyLimit) };
+  const soloScale = clearRate / soloScaleDivisor(partyLimit);
+  if (soloScale >= SOLO_MIN_FLOOR) return { displayRate: soloScale, soloable: true, soloScalePercent: soloScale * 100, tier: bossTier(soloScale, false, 1) };
+  return { displayRate: clearRate, soloable: false, soloScalePercent: soloScale * 100, tier: bossTier(clearRate, true, partyLimit) };
+}
 
 function bossTier(clearRate: number, isPartyBoss: boolean, partyLimit: number): BossTier {
   if (isPartyBoss) {
@@ -218,7 +247,10 @@ function bossTier(clearRate: number, isPartyBoss: boolean, partyLimit: number): 
 // --- Main per-boss calc (MapleScouter module 33528) ------------------------------------------
 
 export interface BossClearResult {
+  /** Always on the party scale for a party-only boss (feeds the relevance filter). */
   clearRate: number;
+  /** The displayed figure: clearRate x100, except a soloable party-only boss shows the solo
+   *  scale instead (see presentation). */
   clearRatePercent: number;
   tagEnglish: string;
   colorTier: ClearColorTier;
@@ -255,10 +287,53 @@ export interface BossClearResult {
   characterArcaneForce: number;
   bossAuthenticForce: number | null;
   characterAuthenticForce: number;
+  /** MapleScouter's own uncorrected clear%, only where mapledoro deliberately diverges from it
+   *  (Champion Black Mage, see effectiveEasyRate) -- null everywhere else. Shown in the chip
+   *  tooltip so a player cross-checking against Scouter's site sees the difference is intended. */
+  scouterClearRatePercent: number | null;
+  /** The party-only boss's clear% on the solo scale (see soloScaleDivisor), null for every
+   *  boss that already has a solo cut. */
+  soloScalePercent: number | null;
+  /** True once a party-only boss has flipped to the solo scale (clearRatePercent and the tag
+   *  are then solo-scale, and the party-scale figure is clearRate x100). */
+  soloable: boolean;
 }
 
 const LEVEL_GAP_CEILING = 1.2;
 const AUTHENTIC_GAP_CEILING = 1.25;
+
+// Champion Black Mage: MapleScouter's own easyRate is Hard's x1.25, but that 1.25 is the -25%
+// Final Damage debuff Champion gets in the 20-minute-timer patch applied as a bonus instead of a
+// penalty, so Champion reads ~25% EASIER than Hard when it's harder. The right factor is 0.75,
+// and it's 0.75 in both eras by coincidence: today (GMS) Champion has Hard's HP on a 45-minute
+// timer vs Hard's 60 (45/60), and after the patch both drop to 1/3 HP on 20 minutes with the
+// -25% debuff as Champion's only difference (1 - 0.25). So the rule is Champion = Hard x0.75
+// regardless of which timer GMS is on. Derived from the Hard entry at compute time rather than
+// a fixed multiplier on Scouter's Champion value, so a future sign fix on their end can't
+// double-dip and a retuned Hard flows through. Re-derive only if Nexon changes Champion's HP
+// relative to Hard's or the debuff percentage.
+const CHAMPION_BLACK_MAGE_VS_HARD = 0.75;
+function effectiveEasyRate(entry: BossCutEntry): number {
+  const scouterRate = entry.easyRate ?? 1;
+  if (entry.name !== "blackMage" || entry.difficulty !== "Champion") return scouterRate;
+  const hard = BOSSCUT_DATA.find((e) => e.name === "blackMage" && e.difficulty === "Hard");
+  return hard ? (hard.easyRate ?? 1) * CHAMPION_BLACK_MAGE_VS_HARD : scouterRate;
+}
+
+/** MapleScouter's Ascent correction on top of the raw damage/cut ratio: Ascent is 3 uses per
+ *  fight (usable any time, not cooldown-gated), and the cut is calibrated for all 3 spread over
+ *  a full-length fight, so a boss that dies sooner gets a bonus for the same 3 uses landing in
+ *  less of its HP. The 20 is their universal 20-minute timer; 5.667 is their pacing assumption
+ *  for how many minutes one use "covers" (20 / 5.667 ~ 3.5, so a full fight is the 3-use
+ *  baseline). Only bites near or above 100%, and only when ascentConst isn't 1 (their "no
+ *  Ascent" sentinel). */
+function timerAdjustedClearRate(entry: BossCutEntry, damageOverCut: number, easyRate: number, ascentConst: number): number {
+  const preTimerClearRate = damageOverCut * easyRate;
+  const ascentR = ascentConst === 1 ? 0 : ascentConst;
+  const timerDivisor = entry.boss === "루시드" && entry.difficulty === "Hard" ? 0.4 : Math.min(3, Math.ceil(20 / preTimerClearRate / 5.667));
+  const timerCorrection = (3 * ascentR) / timerDivisor - ascentR || 0;
+  return preTimerClearRate * (1 + timerCorrection) || 0;
+}
 
 /** Adjusts the character's raw HEXA damage for the handful of bosses whose real fight uses a
  *  different damage figure than the plain 300/380 HEXA number -- Guardian Angel Slime divides
@@ -339,19 +414,22 @@ export function computeBossClear(
   const cutInDamageSpace = splineEval(spline, cutThreshold);
   const bossStat = splineInverse(spline, damage);
 
-  const preTimerClearRate = (damage / (cutInDamageSpace < 0 ? 1e4 : cutInDamageSpace)) * (entry.easyRate ?? 1);
-  const ascentR = inputs.ascentConst === 1 ? 0 : inputs.ascentConst;
-  const timerDivisor = entry.boss === "루시드" && entry.difficulty === "Hard" ? 0.4 : Math.min(3, Math.ceil(20 / preTimerClearRate / 5.667));
-  const timerCorrection = (3 * ascentR) / timerDivisor - ascentR || 0;
-  const clearRate = preTimerClearRate * (1 + timerCorrection) || 0;
+  const damageOverCut = damage / (cutInDamageSpace < 0 ? 1e4 : cutInDamageSpace);
+  const scouterEasyRate = entry.easyRate ?? 1;
+  const easyRate = effectiveEasyRate(entry);
+  const clearRate = timerAdjustedClearRate(entry, damageOverCut, easyRate, inputs.ascentConst);
+  const scouterClearRatePercent = easyRate === scouterEasyRate
+    ? null
+    : timerAdjustedClearRate(entry, damageOverCut, scouterEasyRate, inputs.ascentConst) * 100;
 
   const isPartyBoss = !!entry.partyBossCut;
   const partyLimit = entry.partyLimit || 6;
-  const tier = cannotEnter(entry.boss, entry.difficulty, characterLevel) ? CANNOT_ENTER_TIER : bossTier(clearRate, isPartyBoss, partyLimit);
+  const shown = presentation(clearRate, isPartyBoss, partyLimit);
+  const tier = cannotEnter(entry.boss, entry.difficulty, characterLevel) ? CANNOT_ENTER_TIER : shown.tier;
 
   return {
     clearRate,
-    clearRatePercent: clearRate * 100,
+    clearRatePercent: shown.displayRate * 100,
     tagEnglish: tier.tag,
     colorTier: tier.color,
     isPartyBoss,
@@ -367,5 +445,8 @@ export function computeBossClear(
     ...gapContrastFields(entry, hasArcaneReq, hasAuthenticReq),
     characterArcaneForce: Math.min(characterArcaneForce, 1750),
     characterAuthenticForce,
+    scouterClearRatePercent,
+    soloScalePercent: shown.soloScalePercent,
+    soloable: shown.soloable,
   };
 }

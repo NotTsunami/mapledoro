@@ -12,6 +12,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-08",
+    changes: [
+      { type: "fixed", text: "Fixed the Scouter bookmark showing Champion Black Mage as easier than Hard. It now reads 25% harder than Hard, matching its shorter timer, and the chip tooltip shows MapleScouter's own figure for comparison." },
+      { type: "added", text: "Hovering a party-only boss in the Scouter bookmark (Hard Jupiter, Extreme Adversary, Extreme Kaling, Extreme Kalos) now also shows its clear % on the solo scale, so it can be compared with every other boss." },
+      { type: "changed", text: "The Scouter bookmark now lists each boss's difficulties from easiest to hardest, so Champion and Destiny sit before Extreme instead of after it." },
+      { type: "changed", text: "Party-only bosses in the Scouter bookmark now switch to the solo scale once you can solo them, showing Solo Min, Possible or Easy instead of 1p Min Cut." },
+    ],
+  },
+  {
     date: "2026-09-06",
     changes: [
       { type: "added", text: "Character Guides now have a full build guide for 27 classes, covering the buff sequence, HEXA leveling order, utility skills, link skill, legion bonus and inner ability." },
