@@ -14,17 +14,19 @@
   hard denylist here -- never surfaced, never mapped. See TEMPLATE_JUNK_NOTE.
 */
 
-import type { ScouterUserStat } from "../../scouter/scouterApi";
-import { assignMainSubStats } from "../../scouter/scouterApi";
+import type { ScouterUserStat, ScouterPayloadContext } from "../../scouter/scouterApi";
+import { assignMainSubStats, buildScouterPayload } from "../../scouter/scouterApi";
+import type { StoredCharacterRecord, LinkSkillId } from "../../model/charactersStore";
 import { SCOUTER_CLASS_KOREAN_NAMES } from "../../scouter/scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
-import type { LinkSkillId } from "../../model/charactersStore";
+import { LINK_SKILLS } from "./linkSkillsData";
 import { CLASS_SKILL_DATA } from "./classSkillData";
-import type { TripleStatFieldId } from "./statFields";
+import { TRIPLE_STAT_FIELDS, STAT_LABELS, type TripleStatFieldId } from "./statFields";
 import { serializeStatsStepDraft, type StatsStepDraft, type TripleStatDraft } from "./statsStepDraft";
 import { serializeOzRingsDraft, OZ_RING_MAX_LEVEL, type OzRingId } from "./ozRingData";
-import { serializeBuffsDraft, emptyBuffsDraft, type BuffsDraft } from "./buffsData";
+import { serializeBuffsDraft, emptyBuffsDraft, BOOL_BUFFS, GUILD_BUFFS, RENOWN_STATS, type BuffsDraft } from "./buffsData";
 import { whRankForLevel } from "./scouterQuestionsData";
+import { isRebootWorld } from "./rebootData";
 import type { SetupStepInputById } from "../types";
 
 /** The wrapper MapleScouter's "Save preset" download writes around the ScouterUserStat. */
@@ -78,10 +80,11 @@ export type MapleScouterImportError =
   | "unknown-class"
   | "class-mismatch";
 
-/** A non-blocking "this preset may be out of date" notice shown after a successful parse.
- *  The import still goes through -- the real review is the setup steps themselves. */
+/** A non-blocking "check this" notice shown after a successful parse -- a stale preset, or
+ *  a setting in the export that doesn't match what MapleDoro knows about the character. The
+ *  import still goes through; the real review is the setup steps themselves. */
 export interface ImportStalenessWarning {
-  id: "level-behind" | "level-ahead" | "old-export";
+  id: "level-mismatch" | "old-export" | "reboot-mismatch";
   message: string;
 }
 
@@ -124,29 +127,48 @@ function relativeAge(savedAt: string): { days: number; text: string } | null {
   return { days, text: months === 1 ? "a month ago" : `${months} months ago` };
 }
 
-function buildStalenessWarnings(
-  exportLevel: number,
-  expectedLevel: number | undefined,
-  className: string,
-  savedAt: string | undefined,
-): ImportStalenessWarning[] {
+interface WarningInput {
+  payload: ScouterUserStat;
+  level: number;
+  expectedLevel: number | undefined;
+  expectedWorldId: number | undefined;
+  className: string;
+  savedAt: string | undefined;
+}
+
+function buildImportWarnings({ payload, level, expectedLevel, expectedWorldId, className, savedAt }: WarningInput): ImportStalenessWarning[] {
   const warnings: ImportStalenessWarning[] = [];
 
-  if (expectedLevel && exportLevel && exportLevel !== expectedLevel) {
-    const behind = exportLevel < expectedLevel;
+  if (expectedLevel && level && level !== expectedLevel) {
     warnings.push({
-      id: behind ? "level-behind" : "level-ahead",
-      message: behind
-        ? `This preset is for a Level ${exportLevel} ${className} but yours is Level ${expectedLevel}. It may differ from your current stats, so make sure to double check the values.`
-        : `This preset is for a Level ${exportLevel} ${className} but yours is Level ${expectedLevel}. Make sure you are importing the right preset.`,
+      id: "level-mismatch",
+      message: `This MapleScouter preset is for a Level ${level} ${className} but yours is Level ${expectedLevel}. It may differ from your current stats, so make sure to double check the values.`,
     });
+  }
+
+  // isReboot is a per-world fact -- MapleDoro derives it from the character's world, so a
+  // mismatch means the MapleScouter preset has it set wrong (a common mistake that quietly
+  // adds or drops Reboot's Final Damage bonus).
+  if (expectedWorldId !== undefined) {
+    const worldIsReboot = isRebootWorld(expectedWorldId);
+    if (payload.special.isReboot === true && !worldIsReboot) {
+      warnings.push({
+        id: "reboot-mismatch",
+        message: "This MapleScouter preset is set to Reboot, but this character isn't on a Reboot world.",
+      });
+    } else if (payload.special.isReboot === false && worldIsReboot) {
+      warnings.push({
+        id: "reboot-mismatch",
+        message: "This character is on a Reboot world, but this MapleScouter preset isn't set to Reboot.",
+      });
+    }
   }
 
   const age = savedAt ? relativeAge(savedAt) : null;
   if (age && age.days >= OLD_EXPORT_DAYS) {
     warnings.push({
       id: "old-export",
-      message: `This preset was exported ${age.text}. If you have changed anything since, re-export it and upload the new file.`,
+      message: `This MapleScouter preset was exported ${age.text}. If you have changed anything since, re-export it and upload the new file.`,
     });
   }
 
@@ -155,16 +177,24 @@ function buildStalenessWarnings(
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
-/** Parses and validates a pasted MapleScouter export against the character being set up.
- *  `expectedJobName` is the confirmed character's Nexon jobName -- the export must be for
- *  the same class, or we refuse it (importing a Bishop's numbers onto a Kanna is always a
- *  mistake). `expectedLevel` is the character's live level, only used to flag a stale
- *  preset (a mismatch is a warning, never a rejection). */
+export interface ParseExportContext {
+  /** The confirmed character's Nexon jobName -- the export must be for the same class or
+   *  it's refused (importing a Bishop's numbers onto a Kanna is always a mistake). */
+  jobName: string;
+  /** The character's live level -- only used to flag a stale preset (a warning, never a
+   *  rejection). */
+  level?: number;
+  /** The character's world id -- used to flag a Reboot/Interactive mismatch in the export
+   *  (isReboot is a per-world fact MapleDoro derives, not a per-character setting). */
+  worldId?: number;
+}
+
+/** Parses and validates a pasted MapleScouter export against the character being set up. */
 export function parseMapleScouterExport(
   raw: string,
-  expectedJobName: string,
-  expectedLevel?: number,
+  ctx: ParseExportContext,
 ): MapleScouterImportResult | MapleScouterImportFailure {
+  const { jobName: expectedJobName, level: expectedLevel, worldId: expectedWorldId } = ctx;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -189,13 +219,14 @@ export function parseMapleScouterExport(
   }
 
   const level = Number(payload.stat.level || "0");
+  const className = expectedClass.displayName ?? expectedClass.nexonJobName;
   return {
     ok: true,
     label: typeof file.label === "string" ? file.label : "",
     classId,
-    className: expectedClass.displayName ?? expectedClass.nexonJobName,
+    className,
     level,
-    warnings: buildStalenessWarnings(level, expectedLevel, expectedClass.displayName ?? expectedClass.nexonJobName, file.savedAt),
+    warnings: buildImportWarnings({ payload, level, expectedLevel, expectedWorldId, className, savedAt: file.savedAt }),
     payload,
   };
 }
@@ -259,8 +290,9 @@ function buildStatsDraft(payload: ScouterUserStat, classId: string, requiredStat
   draft.normalEnemyDamage = stat.normalDmg || "0";
   draft.arcanePower = stat.arcaneForce || "0";
   draft.sacredPower = stat.authenticForce || "0";
-
-  if (num(stat.weaponAtk) > 0) draft.weaponAtt = stat.weaponAtk;
+  // stat.weaponAtk is deliberately not mapped: MapleScouter no longer reads it (live-tested
+  // 0 vs a real value vs garbage, byte-identical result). MapleDoro's own Weapon ATT
+  // question/storage/payload plumbing is slated for removal on its own branch.
 
   draft.setupOptions = {
     isLiberated: payload.special.genesis === true ? true : undefined,
@@ -292,8 +324,12 @@ function buildScouterQuestions(payload: ScouterUserStat): StatsStepDraft["scoute
   const { stat } = payload;
   const out: NonNullable<StatsStepDraft["scouterQuestions"]> = {};
 
+  // The export always carries a definite Inner Ability answer -- both flags false means the
+  // player has neither legendary line (a real, committable answer, same as soul's "none"),
+  // not "unanswered". Map it so Quick Questions comes pre-answered either way.
   if (stat.passiveSkillLevelUp) out.innerAbilityLine = "passive";
   else if (stat.increaseTarget) out.innerAbilityLine = "multiTarget";
+  else out.innerAbilityLine = "neither";
 
   const whLevel = num(stat.wildhunterUnion);
   const whRank = whLevel > 0 ? whRankForLevel(whLevel) : null;
@@ -303,7 +339,7 @@ function buildScouterQuestions(payload: ScouterUserStat): StatsStepDraft["scoute
   const artifactFa = num(stat.artifact_finalAttack);
   if (artifactFa > 0) out.artifactFinalAttackDmg = String(artifactFa);
 
-  return Object.keys(out).length > 0 ? out : undefined;
+  return out;
 }
 
 // ── Oz Rings step ───────────────────────────────────────────────────────────
@@ -359,6 +395,16 @@ const RENOWN_PAYLOAD_KEY: Record<keyof NonNullable<BuffsDraft["renown"]>, keyof 
   critDmg: "championCriDmg",
 };
 
+/** Guild buff order in doping.nobless, paired with the on/off boolean MapleScouter keeps
+ *  alongside each. MapleScouter's export retains the LEVEL in `nobless` even when the buff
+ *  is toggled off, so the boolean is the source of truth for "is it active". */
+const GUILD_BUFF_PAYLOAD: { id: keyof NonNullable<BuffsDraft["guild"]>; noblessIndex: number; activeKey: keyof ScouterUserStat["doping"] }[] = [
+  { id: "bossSlayers", noblessIndex: 0, activeKey: "noblessBoss" },
+  { id: "forTheGuild", noblessIndex: 1, activeKey: "noblessDmg" },
+  { id: "hardHitter", noblessIndex: 2, activeKey: "noblessCriDmg" },
+  { id: "undeterred", noblessIndex: 3, activeKey: "noblessIgnore" },
+];
+
 function buildBuffsDraft(payload: ScouterUserStat): BuffsDraft {
   const { doping } = payload;
   const draft = emptyBuffsDraft();
@@ -367,17 +413,17 @@ function buildBuffsDraft(payload: ScouterUserStat): BuffsDraft {
     if (doping[dopingKey as keyof ScouterUserStat["doping"]] === true) draft.bools[boolId] = true;
   }
 
-  // Advanced Stat Potion: the UI only models tier X (+30), so any non-zero value maps to it.
-  if (num(doping.stat) > 0) draft.statPotionTier = "10";
+  // Advanced Stat Potion: gated on the `statPotion` boolean (the `stat` level lingers when
+  // off). The UI only models tier X (+30), so any active potion maps to it.
+  if (doping.statPotion === true) draft.statPotionTier = "10";
 
-  // Guild buffs -- doping.nobless is [bossSlayers, forTheGuild, hardHitter, undeterred].
-  const [bossSlayers, forTheGuild, hardHitter, undeterred] = doping.nobless ?? ["0", "0", "0", "0"];
-  if (num(bossSlayers) > 0) draft.guild.bossSlayers = bossSlayers;
-  if (num(forTheGuild) > 0) draft.guild.forTheGuild = forTheGuild;
-  if (num(hardHitter) > 0) draft.guild.hardHitter = hardHitter;
-  if (num(undeterred) > 0) draft.guild.undeterred = undeterred;
+  // Guild buffs -- active only when the paired boolean is true (see GUILD_BUFF_PAYLOAD).
+  for (const { id, noblessIndex, activeKey } of GUILD_BUFF_PAYLOAD) {
+    const level = doping.nobless?.[noblessIndex] ?? "0";
+    if (doping[activeKey] === true && num(level) > 0) draft.guild[id] = level;
+  }
 
-  // Champion's Renown.
+  // Champion's Renown -- no on/off, just the account-level value.
   for (const [renownId, dopingKey] of Object.entries(RENOWN_PAYLOAD_KEY)) {
     const level = num(doping[dopingKey] as string | undefined);
     if (level > 0) draft.renown[renownId as keyof NonNullable<BuffsDraft["renown"]>] = String(level);
@@ -448,4 +494,186 @@ export function mapImportToDrafts(result: MapleScouterImportResult): MapleScoute
   if (hexa) stepDrafts.hexa_matrix = JSON.stringify(hexa);
 
   return { stepDrafts };
+}
+
+// ── Compare against a character that's already set up ────────────────────────
+//
+// If the character being imported onto already has its own MapleScouter data, show the
+// player which values the export disagrees with -- some people fill both MapleScouter and
+// MapleDoro out by hand and want to confirm nothing drifted. This diffs the export's
+// payload against the one MapleDoro would build from the stored character, over a curated
+// list of the fields a player actually enters (not the always-constant plumbing).
+
+export interface ImportFieldDiff {
+  label: string;
+  /** The value MapleDoro currently has for this character. */
+  mine: string;
+  /** The value in the uploaded export. */
+  imported: string;
+}
+
+/** A ScouterUserStat field worth comparing, with how to read and label it. */
+interface ComparedField {
+  label: string;
+  /** Pulls the comparable value out of a payload as a display string. */
+  read: (p: ScouterUserStat) => string;
+}
+
+/** Normalizes a numeric-ish string so "98.12" and "98.120" or "5" and "5.0" match. */
+const normNum = (v: string): string => {
+  const n = Number(v);
+  return Number.isFinite(n) ? String(n) : (v || "0");
+};
+
+const statNum = (read: (s: ScouterUserStat["stat"]) => string): ComparedField["read"] =>
+  (p) => normNum(read(p.stat));
+
+const tripleStatLabel = (id: TripleStatFieldId): string =>
+  TRIPLE_STAT_FIELDS.find((f) => f.id === id)?.label ?? id.toUpperCase();
+
+/** The three sub-values of a triple stat, labeled as the Stats step labels them. */
+function tripleFields(
+  statLabel: string,
+  base: (s: ScouterUserStat["stat"]) => string,
+  per: (s: ScouterUserStat["stat"]) => string,
+  abs: (s: ScouterUserStat["stat"]) => string,
+): ComparedField[] {
+  return [
+    { label: `${statLabel} (Base Value)`, read: statNum(base) },
+    { label: `${statLabel} (% Value)`, read: statNum(per) },
+    { label: `${statLabel} (% Not Applied)`, read: statNum(abs) },
+  ];
+}
+
+/** The fields to diff, in display order. Class-aware: the main/sub/attack stat labels use
+ *  this class's real stat names (INT vs STR, Magic ATT vs Attack Power), and the labels
+ *  match the Stats setup step's own wording. */
+function comparedFields(classId: string, requiredStats: readonly string[]): ComparedField[] {
+  const tripleIds = requiredStats.filter((s): s is TripleStatFieldId =>
+    s === "str" || s === "dex" || s === "int" || s === "luk");
+  const assignment = assignMainSubStats(classId, tripleIds);
+  const mainField: TripleStatFieldId | "hp" | null = classId === "demon_avenger" ? "hp" : assignment.main;
+  const atkLabel = mainField === "int" ? tripleStatLabel("magicAtt") : tripleStatLabel("attackPower");
+
+  const stat = (id: keyof typeof STAT_LABELS): string => STAT_LABELS[id] ?? String(id);
+
+  return [
+    { label: "Level", read: statNum((s) => s.level) },
+    ...(mainField ? tripleFields(tripleStatLabel(mainField), (s) => s.mainStatBase, (s) => s.mainStatPer, (s) => s.mainStatAbs) : []),
+    ...(assignment.sub ? tripleFields(tripleStatLabel(assignment.sub), (s) => s.subStatBase, (s) => s.subStatPer, (s) => s.subStatAbs) : []),
+    ...(assignment.ssub ? tripleFields(tripleStatLabel(assignment.ssub), (s) => s.ssubStatBase, (s) => s.ssubStatPer, (s) => s.ssubStatAbs) : []),
+    ...tripleFields(atkLabel, (s) => s.atkBase, (s) => s.atkPercent, (s) => s.atkAbs),
+    { label: stat("damage"), read: statNum((s) => s.dmg) },
+    { label: stat("bossDamage"), read: statNum((s) => s.bossDmg) },
+    { label: stat("normalEnemyDamage"), read: statNum((s) => s.normalDmg) },
+    { label: stat("ignoreDefense"), read: statNum((s) => s.ignoreDef) },
+    { label: stat("criticalRate"), read: statNum((s) => s.critical) },
+    { label: stat("criticalDamage"), read: statNum((s) => s.criticalDmg) },
+    { label: stat("buffDuration"), read: statNum((s) => s.buffDuration) },
+    { label: `${stat("cooldownReduction")} (sec)`, read: statNum((s) => s.coolTimeReduce) },
+    { label: `${stat("cooldownReduction")} (%)`, read: statNum((s) => s.coolTimeReducePercent) },
+    { label: stat("cooldownSkip"), read: statNum((s) => s.resetCoolDown) },
+    { label: stat("ignoreElementalResistance"), read: statNum((s) => s.ignoreElementalResist) },
+    { label: stat("additionalStatusDamage"), read: statNum((s) => s.statusAdditionalDmg) },
+    { label: stat("summonDuration"), read: statNum((s) => s.summonPersistTime) },
+    { label: stat("arcanePower"), read: statNum((s) => s.arcaneForce) },
+    { label: stat("sacredPower"), read: statNum((s) => s.authenticForce) },
+    // Weapon ATT deliberately not compared -- MapleScouter ignores it (see buildStatsDraft).
+    { label: "Inner Ability: +1 Passive Skill Level", read: (p) => String(p.stat.passiveSkillLevelUp) },
+    { label: "Inner Ability: +1 Attack Target", read: (p) => String(p.stat.increaseTarget) },
+    { label: "Wild Hunter Legion level", read: statNum((s) => s.wildhunterUnion) },
+    { label: "Legion Artifact: +1 target", read: (p) => String(p.stat.artifact_increaseTarget === true) },
+    { label: "Legion Artifact: Final Attack Damage %", read: (p) => normNum(p.stat.artifact_finalAttack) },
+    { label: "Genesis Liberation", read: (p) => String(p.special.genesis) },
+    { label: "Mu Gong Soul", read: (p) => normNum(p.special.mugongSoul) },
+    { label: "Ephenia Soul", read: (p) => normNum(p.special.epiSoul) },
+    { label: "Ring of Restraint", read: (p) => normNum(p.special.restraintRing) },
+    { label: "Weapon Jump Ring", read: (p) => normNum(p.special.weaponRing) },
+    { label: "Continuous Ring", read: (p) => normNum(p.special.continuosRing) },
+    { label: "HEXA Origin", read: (p) => normNum(p.hexa.skillCore1) },
+    { label: "HEXA Ascent", read: (p) => normNum(p.hexa.skillCore2) },
+    { label: "HEXA Mastery", read: (p) => [p.hexa.masteryCore1, p.hexa.masteryCore2, p.hexa.masteryCore3, p.hexa.masteryCore4].map(normNum).join("/") },
+    { label: "HEXA Enhancement", read: (p) => [p.hexa.reinCore1, p.hexa.reinCore2, p.hexa.reinCore3, p.hexa.reinCore4].map(normNum).join("/") },
+    { label: "Sol Janus", read: (p) => normNum(p.huntSkill?.solJanus ?? "0") },
+    { label: "Sol Hecate", read: (p) => normNum(p.hexa.generalCore2) },
+    ...linkSkillFields(),
+    ...buffFields(),
+  ];
+}
+
+/** One row per link skill MapleScouter accepts (LINK_SKILL_TO_SCOUTER_KEY), labeled with
+ *  its in-game name. */
+function linkSkillFields(): ComparedField[] {
+  return Object.entries(LINK_SKILL_TO_SCOUTER_KEY).map(([linkId, scouterKey]) => {
+    const name = LINK_SKILLS.find((s) => s.id === linkId)?.name ?? linkId;
+    return {
+      label: `Link Skill: ${name}`,
+      read: (p: ScouterUserStat) => normNum(p.linkSkill?.[scouterKey as string] ?? "0"),
+    };
+  });
+}
+
+const boolBuffName = (id: string): string => BOOL_BUFFS.find((b) => b.id === id)?.name ?? id;
+
+const guildBuffName = (id: string): string => GUILD_BUFFS.find((b) => b.id === id)?.name ?? id;
+
+/** One row per buff MapleDoro tracks: the on/off doping flags, guild buff levels, Advanced
+ *  Stat Potion, and Champion's Renown. Mirrors scouterApi.ts's buildDoping. */
+function buffFields(): ComparedField[] {
+  const bools: ComparedField[] = Object.entries(DOPING_BOOL_MAP).map(([dopingKey, boolId]) => ({
+    label: boolBuffName(boolId),
+    read: (p: ScouterUserStat) => String(p.doping[dopingKey as keyof ScouterUserStat["doping"]] === true),
+  }));
+
+  // Guild buffs: MapleScouter keeps the level in `nobless` when the buff is off, so compare
+  // the effective level (0 when the on/off boolean is false), matching how buildBuffsDraft
+  // and scouterApi.ts's buildDoping treat it.
+  const guild: ComparedField[] = GUILD_BUFF_PAYLOAD.map(({ id, noblessIndex, activeKey }) => ({
+    label: `${guildBuffName(id)} (guild)`,
+    read: (p: ScouterUserStat) => (p.doping[activeKey] === true ? normNum(p.doping.nobless?.[noblessIndex] ?? "0") : "0"),
+  }));
+
+  const statPotion: ComparedField = {
+    label: "Advanced Stat Potion",
+    // Gated on the `statPotion` boolean (level lingers when off); MapleDoro only models tier X.
+    read: (p: ScouterUserStat) => String(p.doping.statPotion === true),
+  };
+
+  const renown: ComparedField[] = RENOWN_STATS.map(({ id, shortLabel }) => ({
+    label: `Renown: ${shortLabel}`,
+    read: (p: ScouterUserStat) => normNum(p.doping[RENOWN_PAYLOAD_KEY[id]] as string | undefined ?? "0"),
+  }));
+
+  return [...bools, ...guild, statPotion, ...renown];
+}
+
+/** Diffs an export against the character it's being imported onto. Returns an empty list
+ *  when the character has no MapleScouter data to compare (first-time setup, unsupported
+ *  class, or never set up), or when nothing differs. */
+export function compareImportToStored(
+  result: MapleScouterImportResult,
+  storedCharacter: StoredCharacterRecord,
+  ctx: ScouterPayloadContext,
+): ImportFieldDiff[] {
+  // During first-time setup the "stored" record is a bare lookup result (name/level/job
+  // only, no stats/tools blob) cast to StoredCharacterRecord -- buildScouterPayload reads
+  // character.stats.<field> and would throw. Nothing to compare against anyway.
+  if (!storedCharacter.stats || typeof storedCharacter.stats !== "object") return [];
+
+  const mine = buildScouterPayload(storedCharacter, ctx);
+  if (!mine) return [];
+  // A blank character (added but never set up) has an all-zero payload -- there's nothing
+  // meaningful to compare against, so treat it as "no existing data".
+  if (normNum(mine.stat.mainStatBase) === "0" && normNum(mine.stat.atkBase) === "0") return [];
+
+  const classData = CLASS_SKILL_DATA.find((c) => c.id === result.classId);
+  const fields = comparedFields(result.classId, classData?.requiredStats ?? []);
+  const imported = result.payload;
+  const diffs: ImportFieldDiff[] = [];
+  for (const field of fields) {
+    const a = field.read(mine);
+    const b = field.read(imported);
+    if (a !== b) diffs.push({ label: field.label, mine: a, imported: b });
+  }
+  return diffs;
 }

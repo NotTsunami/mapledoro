@@ -3,10 +3,13 @@
 import { useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
+import type { StoredCharacterRecord, StoredScouterLegion } from "../../model/charactersStore";
 import {
   parseMapleScouterExport,
+  compareImportToStored,
   type MapleScouterImportError,
   type MapleScouterImportResult,
+  type ImportFieldDiff,
 } from "../data/maplescouterImportData";
 import SetupStepFrame from "./SetupStepFrame";
 
@@ -16,6 +19,10 @@ interface MapleScouterImportStepProps {
   totalSteps: number;
   jobName?: string;
   characterLevel?: number;
+  characterRoster?: StoredCharacterRecord[];
+  confirmedCharacterName?: string;
+  confirmedWorldId?: number;
+  worldScouterLegion?: StoredScouterLegion;
   /** The uploaded file's JSON text, persisted as this step's draft so a resumed setup can
    *  re-parse it. The player never sees or edits this directly -- they upload a file. */
   value: string;
@@ -23,8 +30,7 @@ interface MapleScouterImportStepProps {
   onBack: () => void;
   onNext: () => void;
   onFinish: () => void;
-  /** Applies a successfully parsed export to the other steps' drafts (Phase 2 wires the
-   *  real mapping). */
+  /** Applies a successfully parsed export to the other steps' drafts. */
   onImport?: (result: MapleScouterImportResult) => void;
 }
 
@@ -160,6 +166,7 @@ const applyButtonStyle = (theme: AppTheme): CSSProperties => ({
 });
 
 const changeFileButtonStyle = (theme: AppTheme): CSSProperties => ({
+  alignSelf: "flex-start",
   background: "none",
   border: "none",
   padding: 0,
@@ -169,6 +176,7 @@ const changeFileButtonStyle = (theme: AppTheme): CSSProperties => ({
   color: theme.muted,
   textDecoration: "underline",
   textUnderlineOffset: "2px",
+  whiteSpace: "nowrap",
   cursor: "pointer",
 });
 
@@ -195,17 +203,167 @@ const warningNoticeStyle = (theme: AppTheme): CSSProperties => ({
   padding: "0.5rem 0.6rem",
 });
 
+const diffToggleStyle = (theme: AppTheme): CSSProperties => ({
+  background: "none",
+  border: `1px solid ${theme.border}`,
+  borderRadius: 8,
+  padding: "0.5rem 0.6rem",
+  fontFamily: "inherit",
+  fontSize: "0.78rem",
+  fontWeight: 700,
+  color: theme.text,
+  textAlign: "left",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "0.5rem",
+});
+
+const diffRowStyle = (theme: AppTheme): CSSProperties => ({
+  display: "grid",
+  gridTemplateColumns: "1fr 5.5rem 5.5rem",
+  gap: "0.4rem 0.6rem",
+  alignItems: "baseline",
+  fontSize: "0.75rem",
+  padding: "0.35rem 0",
+  borderTop: `1px solid ${theme.border}`,
+});
+
+/** Right-aligned, tabular-figure cell so the digit columns stack cleanly. */
+const diffValueCellStyle: CSSProperties = {
+  textAlign: "right",
+  fontVariantNumeric: "tabular-nums",
+  wordBreak: "break-word",
+};
+
+/** The static "how to export from MapleScouter" instructions. */
+function HowToBox({ theme }: { theme: AppTheme }) {
+  const liStyle: CSSProperties = { fontSize: "0.8rem", color: theme.text, lineHeight: 1.5 };
+  return (
+    <div style={howToBoxStyle(theme)}>
+      <div style={{ ...labelStyle(theme), marginBottom: "0.5rem" }}>How to get the file</div>
+      <ol style={{ margin: 0, paddingLeft: "1.1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <li style={liStyle}>
+          Go to{" "}
+          <a
+            href={MAPLESCOUTER_INPUT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}
+          >
+            MapleScouter&apos;s Input page →
+          </a>
+        </li>
+        <li style={liStyle}>
+          Click <UiChip theme={theme} label="Save Preset" icon={<SavePresetIcon color={theme.text} />} />
+        </li>
+        <li style={liStyle}>
+          Click the export icon{" "}
+          <UiChip theme={theme} icon={<ExportPresetIcon color={theme.text} />} />
+          {" "}for the preset that matches this character.
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+/** The upload target: a drop zone with a file picker, or -- after a rejected upload -- the
+ *  same zone with the error shown inside it and a retry button. */
+function UploadZone({ theme, dragging, error, errorClassName, onPick, onDragOver, onDragLeave, onDrop }: {
+  theme: AppTheme;
+  dragging: boolean;
+  error: MapleScouterImportError | null;
+  errorClassName: string | undefined;
+  onPick: () => void;
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
+  onDragLeave: () => void;
+  onDrop: (e: DragEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div style={dropZoneStyle(theme, dragging, error !== null)} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+      {error ? (
+        <>
+          <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: statusText(theme, "danger") }}>
+            {errorMessage(error, errorClassName)}
+          </p>
+          <button type="button" onClick={onPick} style={pickButtonStyle(theme)}>Choose another file</button>
+        </>
+      ) : (
+        <>
+          <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 700, color: theme.muted }}>
+            Drop your <code style={{ fontSize: "0.78rem" }}>scouter-preset-....json</code> here
+          </p>
+          <button type="button" onClick={onPick} style={pickButtonStyle(theme)}>Choose file</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Collapsible "N values in this preset differ from your saved data" panel, shown when the
+ *  character being imported onto already has its own MapleScouter data that disagrees. */
+function DiffPanel({ theme, diffs }: { theme: AppTheme; diffs: ImportFieldDiff[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button type="button" onClick={() => setOpen((v) => !v)} style={diffToggleStyle(theme)}>
+        <span>
+          {diffs.length} {diffs.length === 1 ? "value in this MapleScouter preset differs" : "values in this MapleScouter preset differ"} from your saved data
+        </span>
+        <span aria-hidden="true" style={{ color: theme.muted }}>{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: "0.4rem" }}>
+          <div style={{ ...diffRowStyle(theme), borderTop: "none", fontWeight: 800, color: theme.muted }}>
+            <span />
+            <span style={diffValueCellStyle}>Yours</span>
+            <span style={diffValueCellStyle}>Import</span>
+          </div>
+          {diffs.map((d) => (
+            <div key={d.label} style={diffRowStyle(theme)}>
+              <span style={{ color: theme.text, fontWeight: 700 }}>{d.label}</span>
+              <span style={{ ...diffValueCellStyle, color: theme.muted }}>{d.mine}</span>
+              <span style={{ ...diffValueCellStyle, color: theme.text, fontWeight: 700 }}>{d.imported}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MapleScouterImportStep({
-  theme, stepNumber, totalSteps, jobName = "", characterLevel, value, onChange, onBack, onNext, onFinish, onImport,
+  theme, stepNumber, totalSteps, jobName = "", characterLevel,
+  characterRoster, confirmedCharacterName, confirmedWorldId, worldScouterLegion,
+  value, onChange, onBack, onNext, onFinish, onImport,
 }: MapleScouterImportStepProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /** The stored record for the character being set up, if it already exists in the roster. */
+  const storedSelf = confirmedCharacterName
+    ? characterRoster?.find((c) => c.characterName.toLowerCase() === confirmedCharacterName.toLowerCase()) ?? null
+    : null;
+
+  const parseCtx = { jobName, level: characterLevel, worldId: confirmedWorldId };
+
+  /** How the export's values differ from what's already saved (empty if the character
+   *  isn't set up yet, or nothing differs). */
+  function diffAgainstStored(parsed: MapleScouterImportResult): ImportFieldDiff[] {
+    if (!storedSelf || confirmedWorldId === undefined) return [];
+    const ctx = { scouterLegionByWorld: worldScouterLegion ? { [String(confirmedWorldId)]: worldScouterLegion } : {} };
+    return compareImportToStored(parsed, storedSelf, ctx);
+  }
   // Re-parse a resumed draft's stored JSON once on mount so its summary card shows again
   // without re-uploading (the file name itself isn't persisted, only its contents).
   const [initialParse] = useState(() =>
-    value.trim() ? parseMapleScouterExport(value.trim(), jobName, characterLevel) : null,
+    value.trim() ? parseMapleScouterExport(value.trim(), parseCtx) : null,
   );
   const [result, setResult] = useState<MapleScouterImportResult | null>(
     initialParse?.ok ? initialParse : null,
+  );
+  const [diffs, setDiffs] = useState<ImportFieldDiff[]>(
+    initialParse?.ok ? diffAgainstStored(initialParse) : [],
   );
   const [error, setError] = useState<MapleScouterImportError | null>(
     initialParse && !initialParse.ok ? initialParse.error : null,
@@ -221,13 +379,15 @@ export default function MapleScouterImportStep({
     onChange(raw);
     setFileName(name);
     setApplied(false);
-    const parsed = parseMapleScouterExport(raw.trim(), jobName, characterLevel);
+    const parsed = parseMapleScouterExport(raw.trim(), parseCtx);
     if (parsed.ok) {
       setResult(parsed);
+      setDiffs(diffAgainstStored(parsed));
       setError(null);
       setErrorClassName(undefined);
     } else {
       setResult(null);
+      setDiffs([]);
       setError(parsed.error);
       setErrorClassName(parsed.foundClassName);
     }
@@ -277,80 +437,36 @@ export default function MapleScouterImportStep({
       nextVariant="quiet"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 520 }}>
-        <div style={howToBoxStyle(theme)}>
-          <div style={{ ...labelStyle(theme), marginBottom: "0.5rem" }}>How to get the file</div>
-          <ol style={{ margin: 0, paddingLeft: "1.1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <li style={{ fontSize: "0.8rem", color: theme.text, lineHeight: 1.5 }}>
-              Go to{" "}
-              <a
-                href={MAPLESCOUTER_INPUT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: theme.accent, fontWeight: 700, textDecoration: "none" }}
-              >
-                MapleScouter&apos;s Input page →
-              </a>
-            </li>
-            <li style={{ fontSize: "0.8rem", color: theme.text, lineHeight: 1.5 }}>
-              Click{" "}
-              <UiChip theme={theme} label="Save Preset" icon={<SavePresetIcon color={theme.text} />} />
-            </li>
-            <li style={{ fontSize: "0.8rem", color: theme.text, lineHeight: 1.5 }}>
-              Click the export icon{" "}
-              <UiChip theme={theme} icon={<ExportPresetIcon color={theme.text} />} />
-              {" "}for the preset that matches this character.
-            </li>
-          </ol>
-        </div>
+        <HowToBox theme={theme} />
 
         {showDropZone && (
-          <div
-            style={dropZoneStyle(theme, dragging, error !== null)}
+          <UploadZone
+            theme={theme}
+            dragging={dragging}
+            error={error}
+            errorClassName={errorClassName}
+            onPick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
-          >
-            {error ? (
-              <>
-                <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 700, color: statusText(theme, "danger") }}>
-                  {errorMessage(error, errorClassName)}
-                </p>
-                <button type="button" onClick={() => fileInputRef.current?.click()} style={pickButtonStyle(theme)}>
-                  Choose another file
-                </button>
-              </>
-            ) : (
-              <>
-                <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 700, color: theme.muted }}>
-                  Drop your <code style={{ fontSize: "0.78rem" }}>scouter-preset-....json</code> here
-                </p>
-                <button type="button" onClick={() => fileInputRef.current?.click()} style={pickButtonStyle(theme)}>
-                  Choose file
-                </button>
-              </>
-            )}
-          </div>
+          />
         )}
 
         <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={handleFileChange} style={{ display: "none" }} />
 
         {result && (
           <div style={summaryCardStyle(theme)}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.6rem" }}>
-              <div>
-                <div style={{ fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>
-                  {result.className} &middot; Lv. {result.level}
-                </div>
-                {result.label && (
-                  <div style={{ fontSize: "0.78rem", color: theme.muted, marginTop: "0.15rem" }}>
-                    Preset: {result.label}{fileName ? ` (${fileName})` : ""}
-                  </div>
-                )}
+            <div>
+              <div style={{ fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>
+                {result.className} &middot; Lv. {result.level}
               </div>
-              <button type="button" onClick={() => fileInputRef.current?.click()} style={changeFileButtonStyle(theme)}>
-                Choose a different file
-              </button>
+              <div style={{ fontSize: "0.78rem", color: theme.muted, marginTop: "0.15rem", wordBreak: "break-word" }}>
+                {result.label ? `Preset: ${result.label}` : fileName ?? "Uploaded file"}
+              </div>
             </div>
+            <button type="button" onClick={() => fileInputRef.current?.click()} style={changeFileButtonStyle(theme)}>
+              Choose a different file
+            </button>
 
             {result.warnings.map((w) => (
               <div key={w.id} style={warningNoticeStyle(theme)}>
@@ -358,6 +474,8 @@ export default function MapleScouterImportStep({
                 <span>{w.message}</span>
               </div>
             ))}
+
+            {diffs.length > 0 && <DiffPanel theme={theme} diffs={diffs} />}
 
             <button type="button" onClick={handleApply} style={applyButtonStyle(theme)}>
               {applied ? "Applied" : "Use these values and continue"}
