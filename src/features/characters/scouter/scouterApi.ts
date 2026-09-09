@@ -22,7 +22,7 @@ import {
 import { deriveWeaponHandFromWeapon } from "../setup/data/classBranch";
 import { innerAbilityHasData } from "../setup/data/innerAbilityData";
 import { whAutofillSourceFromRoster } from "../setup/data/scouterQuestionsData";
-import type { OzRingId } from "../setup/data/ozRingData";
+import { OZ_RING_MAX_LEVEL, type OzRingId } from "../setup/data/ozRingData";
 import { scouterKoreanClassName } from "./scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY, SCOUTER_UNMODELED_LINK_SKILL_KEYS } from "./scouterLinkSkills";
 import { readCharacterToolData } from "../../tools/characterToolStorage";
@@ -97,13 +97,16 @@ export interface ScouterSpecial {
   genesis: boolean;
   oneHandSword: boolean;
   useRuinForceShild: boolean;
-  useContinuousRingAsMainRing: boolean;
+  // Removed from GMS in the ring consolidation (no more standard-vs-continuous choice, no
+  // Totalling Ring). The API still accepts these fields, so they're sent as inert
+  // constants -- same treatment as riskTaker and the non-GMS seed rings below.
+  useContinuousRingAsMainRing: false;
   restraintRing: string;
   weaponRing: string;
-  ringOfSum: string;
+  ringOfSum: "0";
   riskTaker: "0";
-  statThird: string;
-  statFourth: string;
+  statThird: "0";
+  statFourth: "0";
   continuosRing: string;
   challenge: false;
   is30min: false;
@@ -345,21 +348,21 @@ function soulValue(character: StoredCharacterRecord, type: "ephenia" | "mugong")
   return soul.soulLevel === 1 || soul.soulLevel === 2 ? String(soul.soulLevel) : "0";
 }
 
-/** Optional per-ring level overrides for the Scouter Simulator's Oz Rings tab, plus the ring
- *  mode toggle -- undefined/omitted means "use the character's real saved value", matching
- *  every other simulator override in this file. */
+/** Optional per-ring level overrides for the Scouter Simulator's Oz Rings tab --
+ *  undefined/omitted means "use the character's real saved value", matching every other
+ *  simulator override in this file. */
 export interface OzRingOverrides {
   levels?: Partial<Record<OzRingId, number>>;
-  useContinuousAsMainRing?: boolean;
 }
 
 function ozRingLevel(character: StoredCharacterRecord, ring: OzRingId, overrides?: OzRingOverrides): string {
-  const override = overrides?.levels?.[ring];
-  if (override !== undefined) return String(override);
-  return String(character.scouter?.ozRings?.levels[ring] ?? 0);
+  const raw = overrides?.levels?.[ring] ?? character.scouter?.ozRings?.levels[ring] ?? 0;
+  // Clamp to the ring's current max so a pre-consolidation Weapon Jump level above 4,
+  // still sitting in stored data until the character re-saves, isn't sent as-is.
+  return String(Math.min(raw, OZ_RING_MAX_LEVEL[ring]));
 }
 
-function buildSpecial(character: StoredCharacterRecord, offStats: { third: string; fourth: string }, ringOverrides?: OzRingOverrides): ScouterSpecial {
+function buildSpecial(character: StoredCharacterRecord, ringOverrides?: OzRingOverrides): ScouterSpecial {
   return {
     isReboot: isRebootWorld(character.worldID),
     combat: true,
@@ -368,13 +371,13 @@ function buildSpecial(character: StoredCharacterRecord, offStats: { third: strin
     genesis: character.isLiberated === true,
     oneHandSword: character.weaponHand === "1h",
     useRuinForceShild: character.hasRuinForceShield === true,
-    useContinuousRingAsMainRing: ringOverrides?.useContinuousAsMainRing ?? (character.scouter?.ozRings?.ringMode === "continuous"),
+    useContinuousRingAsMainRing: false,
     restraintRing: ozRingLevel(character, "restraint", ringOverrides),
     weaponRing: ozRingLevel(character, "weaponJump", ringOverrides),
-    ringOfSum: ozRingLevel(character, "totalling", ringOverrides),
+    ringOfSum: "0",
     riskTaker: "0",
-    statThird: offStats.third,
-    statFourth: offStats.fourth,
+    statThird: "0",
+    statFourth: "0",
     continuosRing: ozRingLevel(character, "continuous", ringOverrides),
     challenge: false,
     is30min: false,
@@ -398,28 +401,19 @@ interface MainSubAssignment {
   main: TripleStatFieldId | null;
   sub: TripleStatFieldId | null;
   ssub: TripleStatFieldId | null;
-  /** Real stats (str/dex/int/luk) not assigned to main/sub/ssub, feeds statThird/statFourth. */
-  offStats: TripleStatFieldId[];
 }
-
-/** Demon Avenger's kit is fully INT-independent, and its 3 leftover off-stats
- *  (DEX/INT/LUK) don't fit the 2 statThird/statFourth slots, so INT is dropped
- *  entirely rather than picked arbitrarily. */
-const DEMON_AVENGER_DROPPED_OFF_STAT: TripleStatFieldId = "int";
 
 function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
   const realStatSlots = requiredStats.filter((s) => REAL_STATS.includes(s));
   const [first = null, second = null, third = null] = realStatSlots;
-  let offStats = REAL_STATS.filter((s) => !realStatSlots.includes(s));
   if (classId === "demon_avenger") {
-    offStats = offStats.filter((s) => s !== DEMON_AVENGER_DROPPED_OFF_STAT);
     // Demon Avenger's Main Stat is HP (buildStat overrides mainField to "hp" directly),
     // so its one real stat slot (STR, `first`) belongs in Sub, not Main -- otherwise STR
     // gets silently discarded when mainField is overridden and never reaches the payload
     // at all.
-    return { main: null, sub: first, ssub: third, offStats };
+    return { main: null, sub: first, ssub: third };
   }
-  return { main: first, sub: second, ssub: third, offStats };
+  return { main: first, sub: second, ssub: third };
 }
 
 /** Reads a stat's Base/%/Not-Applied triple as MapleScouter's Base/Per/Abs strings.
@@ -428,17 +422,6 @@ function tripleStrings(character: StoredCharacterRecord, field: TripleStatFieldI
   if (!field) return { base: "0", per: "0", abs: "0" };
   const triple = character.stats[field];
   return { base: triple.base || "0", per: triple.percent || "0", abs: triple.percentUnapplied || "0" };
-}
-
-// Off-stat totals live in their own private field (StoredOzRings.totallingStats), not
-// derived from stats.str/dex/int/luk's Base/%/Not Applied triple -- an earlier version
-// computed the Applied Value from that triple, which assumed the Totalling Ring step was
-// writing into Base, silently corrupting a character's real Base stat (see ozRingData.ts's
-// file header for the full story).
-function offStatTotal(character: StoredCharacterRecord, field: TripleStatFieldId | undefined): string {
-  if (!field) return "0";
-  const value = character.scouter?.ozRings?.totallingStats?.[field];
-  return value !== undefined ? String(value) : "0";
 }
 
 function buildStat(
@@ -618,8 +601,10 @@ function buildSeedRing(character: StoredCharacterRecord, ringOverrides?: OzRingO
     // formula; revisit if a real result ever depends on it.
     restraintRing: { level: ozRingLevel(character, "restraint", ringOverrides), efficiency: 0 },
     weaponRing: { level: ozRingLevel(character, "weaponJump", ringOverrides), efficiency: 0 },
-    ringOfSum: { level: ozRingLevel(character, "totalling", ringOverrides), efficiency: 0 },
     continuosRing: { level: ozRingLevel(character, "continuous", ringOverrides), efficiency: 0 },
+    // ringOfSum (Totalling Ring) was removed from GMS in the ring consolidation; the API
+    // still accepts the field so it's sent zeroed, like the non-GMS rings below.
+    ringOfSum: ZERO_RING,
     // Non-GMS rings, mapledoro has no data for these and can't collect any.
     riskTakerRing: ZERO_RING,
     criDamageRing: ZERO_RING,
@@ -739,11 +724,6 @@ export function buildScouterPayload(
   if (!koreanClassName) return null;
 
   const assignment = assignMainSubStats(classData.id, classData.requiredStats.filter(isTripleStatField));
-  const [thirdField, fourthField] = assignment.offStats;
-  const offStats = {
-    third: offStatTotal(character, thirdField),
-    fourth: offStatTotal(character, fourthField),
-  };
 
   const legion = ctx.scouterLegionByWorld[String(character.worldID)];
   const isHexaEligible = character.level >= 260 && !classData.isLegacy;
@@ -752,7 +732,7 @@ export function buildScouterPayload(
   return {
     doping: buildDoping(overrides?.dopingOverrides ?? character.scouter?.buffs),
     linkSkill: buildLinkSkill(character.linkSkills),
-    special: buildSpecial(character, offStats, overrides?.ringOverrides),
+    special: buildSpecial(character, overrides?.ringOverrides),
     stat: buildStat(character, classData.id, koreanClassName, assignment, legion),
     hexa,
     seedRing: buildSeedRing(character, overrides?.ringOverrides),

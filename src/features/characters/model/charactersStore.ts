@@ -40,16 +40,11 @@ export interface StoredHyperStat {
   activePreset: number;
 }
 
-/** Oz ring levels (OzRingId → 1–6), plus the Totalling Ring's off-stat totals
- *  (MainStatId → the character's real current total for that stat -- the ring's own
- *  in-game effect scales off "the sum of all your stats," so this is a real displayed
- *  total, not stats.str/dex/int/luk.base). Kept as its own private value rather than
- *  synced with the Stats step's Base field -- an earlier design did sync them, reverted
- *  after it silently corrupted a character's real Base stats. */
+/** Oz ring levels (OzRingId → 1–6). Older records may also carry a `ringMode` flag and a
+ *  `totallingStats` block from before the ring consolidation removed the Totalling Ring and
+ *  the standard-vs-continuous choice; both are ignored on read and dropped on the next save. */
 export interface StoredOzRings {
-  ringMode: "standard" | "continuous";
   levels: Record<string, number>;
-  totallingStats?: Record<string, number>;
 }
 
 /** Buffs entered in the MapleScouter buffs step. */

@@ -29,7 +29,7 @@ import SectionLabel from "../setup/components/SectionLabel";
 import { statInputStyle, inputSuffixStyle } from "../setup/components/QuestionControls";
 import {
   OZ_RING_MAX_LEVEL, OZ_RING_ICON_IDS,
-  sanitizeOzRingLevel, getOzClassStatInfo, type OzRingsDraft, type OzRingId, type OzRingMode,
+  sanitizeOzRingLevel, getOzWeaponJumpVariant, type OzRingsDraft, type OzRingId,
 } from "../setup/data/ozRingData";
 import { deriveWeaponAttLabel } from "../setup/data/statsStepDraft";
 import {
@@ -354,16 +354,10 @@ function LinkSkillsTab({ theme, linkSkills, onChange }: {
 
 // ── Oz Rings tab ─────────────────────────────────────────────────────────────
 
-const RING_MODE_OPTIONS: { value: OzRingMode; label: string }[] = [
-  { value: "standard", label: "Standard" },
-  { value: "continuous", label: "Continuous" },
-];
-
 function ozRingRows(weaponJumpLabel: string, weaponJumpIconId: string): { id: OzRingId; label: string; iconId: string }[] {
   return [
     { id: "restraint", label: "Ring of Restraint", iconId: OZ_RING_ICON_IDS.restraint },
     { id: "weaponJump", label: weaponJumpLabel, iconId: weaponJumpIconId },
-    { id: "totalling", label: "Totalling Ring", iconId: OZ_RING_ICON_IDS.totalling },
     { id: "continuous", label: "Continuous Ring", iconId: OZ_RING_ICON_IDS.continuous },
   ];
 }
@@ -371,33 +365,22 @@ function ozRingRows(weaponJumpLabel: string, weaponJumpIconId: string): { id: Oz
 function OzRingsTab({ theme, draft, onChange, weaponJumpLabel, weaponJumpIconId }: {
   theme: AppTheme; draft: OzRingsDraft; onChange: (next: OzRingsDraft) => void; weaponJumpLabel: string; weaponJumpIconId: string;
 }) {
-  const setLevel = (id: OzRingId, val: string) => onChange({ ...draft, levels: { ...draft.levels, [id]: sanitizeOzRingLevel(val) } });
+  const setLevel = (id: OzRingId, val: string) => onChange({ ...draft, levels: { ...draft.levels, [id]: sanitizeOzRingLevel(id, val) } });
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
-      <div>
-        <p style={sectionLabelStyle(theme)}>Ring Setup</p>
-        {/* PillGroup's own wrapper has no explicit width, so as a flex (block-level) box it
-            stretches to fill this column -- same fit-content fix as the Buffs tab's pick-one
-            groups. */}
-        <div style={{ width: "fit-content" }}>
-          <PillGroup theme={theme} options={RING_MODE_OPTIONS} value={draft.ringMode} onChange={(v) => onChange({ ...draft, ringMode: v })} />
-        </div>
-      </div>
-      <div>
-        <p style={sectionLabelStyle(theme)}>Ring Levels</p>
-        <div style={tileRowStyle()}>
-          {ozRingRows(weaponJumpLabel, weaponJumpIconId).map(({ id, label, iconId }) => (
-            <LeveledIconTile
-              key={id}
-              icon={<ItemIcon id={iconId} size={32} alt={label} />}
-              name={label}
-              level={draft.levels[id] ?? ""}
-              max={OZ_RING_MAX_LEVEL}
-              onLevel={(v) => setLevel(id, v)}
-              theme={theme}
-            />
-          ))}
-        </div>
+    <div>
+      <p style={sectionLabelStyle(theme)}>Ring Levels</p>
+      <div style={tileRowStyle()}>
+        {ozRingRows(weaponJumpLabel, weaponJumpIconId).map(({ id, label, iconId }) => (
+          <LeveledIconTile
+            key={id}
+            icon={<ItemIcon id={iconId} size={32} alt={label} />}
+            name={label}
+            level={draft.levels[id] ?? ""}
+            max={OZ_RING_MAX_LEVEL[id]}
+            onLevel={(v) => setLevel(id, v)}
+            theme={theme}
+          />
+        ))}
       </div>
     </div>
   );
@@ -663,7 +646,7 @@ function TabContent({
   hexaClassDef: HexaClassDef | null;
   primaryStat: ReturnType<typeof primaryStatForClass>;
   statLabels: ReturnType<typeof simulatorStatLabels>;
-  ozClassInfo: ReturnType<typeof getOzClassStatInfo>;
+  ozClassInfo: ReturnType<typeof getOzWeaponJumpVariant>;
   usesMagicWeapon: boolean;
   weaponAttLabel: string;
 }) {
@@ -680,8 +663,8 @@ function TabContent({
           theme={theme}
           draft={draft.ozRingsDraft}
           onChange={draft.setOzRingsDraft}
-          weaponJumpLabel={ozClassInfo.weaponJumpLabel}
-          weaponJumpIconId={ozClassInfo.weaponJumpIconId}
+          weaponJumpLabel={ozClassInfo.label}
+          weaponJumpIconId={ozClassInfo.iconId}
         />
       );
     case "linkSkills":
@@ -731,7 +714,7 @@ export default function ScouterSimulatorDialog({
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName);
   const primaryStat = primaryStatForClass(classData?.requiredStats ?? []);
   const statLabels = simulatorStatLabels(classData?.id ?? "", classData?.requiredStats ?? []);
-  const ozClassInfo = getOzClassStatInfo(classData?.id, classData?.requiredStats ?? []);
+  const ozClassInfo = getOzWeaponJumpVariant(classData?.requiredStats ?? []);
   // Legacy classes never get HEXA regardless of level, same as flows.ts's own gating. Level
   // alone isn't a hard block here the way it is in the real setup flow -- see
   // HexaLockedMessage's own comment for why.

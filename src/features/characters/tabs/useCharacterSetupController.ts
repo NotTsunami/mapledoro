@@ -1142,9 +1142,7 @@ function buildSeededStepTestByStep(jobName: string, storedCharacter: StoredChara
     familiars: storedCharacter?.familiars ? JSON.stringify(storedCharacter.familiars) : "",
     // Never seeded before (a real gap, not intentional — every other step above is):
     // reopening Oz Rings on a character that already answered it always started blank,
-    // even though the stored ring levels were intact (its own useEffect only backfills
-    // the Totalling Ring's off-stats from stats.str/dex/int/luk, not the ring levels
-    // themselves).
+    // even though the stored ring levels were intact.
     oz_rings: storedCharacter ? serializeOzRingsDraft(storedOzRingsToOzRingsDraft(storedCharacter.scouter?.ozRings)) : "",
   };
 }
