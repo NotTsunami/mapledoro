@@ -57,7 +57,7 @@ export interface SymbolStats {
 
 // -- Constants ----------------------------------------------------------------
 
-const WEEKLY_SYMBOLS = 120;
+export const WEEKLY_SYMBOLS = 240;
 
 // -- Helpers ------------------------------------------------------------------
 

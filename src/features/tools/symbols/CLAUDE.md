@@ -1,7 +1,7 @@
 # Symbols
 
 **Type differences (don't conflate):**
-- **Arcane**: max level 20. `weeklyEnabled` toggles +120/week from weekly dungeons.
+- **Arcane**: max level 20. `weeklyEnabled` toggles +240/week from weekly dungeons (3 runs x 80).
 - **Sacred**: max level 11. `weeklyEnabled` is unused.
 
 Arcane and Sacred share one tool slot (`tools.symbols`) per character — switching type swaps datasets but keeps the same slot. Stored in the character store via `characterToolStorage`.
