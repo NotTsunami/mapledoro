@@ -648,7 +648,12 @@ function linkSkillFields(): ComparedField[] {
   });
 }
 
-const boolBuffName = (id: string): string => BOOL_BUFFS.find((b) => b.id === id)?.name ?? id;
+const boolBuffName = (id: string): string => {
+  // MapleScouter shows "Fish Buff" but GMS uses a different item (i.e: Tree Ornament).
+  // Spell out both so someone cross-checking their MapleScouter setup recognizes the row.
+  if (id === "fishBuff") return "Tree Ornament (Fish Buff)";
+  return BOOL_BUFFS.find((b) => b.id === id)?.name ?? id;
+};
 
 const guildBuffName = (id: string): string => GUILD_BUFFS.find((b) => b.id === id)?.name ?? id;
 
