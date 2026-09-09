@@ -603,7 +603,10 @@ function comparedFields(classId: string, requiredStats: readonly string[]): Comp
     // Weapon ATT deliberately not compared -- MapleScouter ignores it (see buildStatsDraft).
     { label: "Inner Ability: +1 Passive Skill Level", read: (p) => String(p.stat.passiveSkillLevelUp) },
     { label: "Inner Ability: +1 Attack Target", read: (p) => String(p.stat.increaseTarget) },
-    { label: "Wild Hunter Legion level", read: statNum((s) => s.wildhunterUnion) },
+    // Compare the Legion RANK, not the raw union level -- what MapleDoro stores and what
+    // the import maps is the bracket (250 and 255 are both SSS), so raw-level differences
+    // inside the same bracket aren't real.
+    { label: "Wild Hunter Legion rank", read: (p) => whRankForLevel(num(p.stat.wildhunterUnion)) ?? "None" },
     { label: "Legion Artifact: +1 target", read: (p) => String(p.stat.artifact_increaseTarget === true) },
     { label: "Legion Artifact: Final Attack Damage %", read: (p) => normNum(p.stat.artifact_finalAttack) },
     { label: "Genesis Liberation", read: (p) => String(p.special.genesis) },
