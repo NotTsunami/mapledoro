@@ -557,6 +557,10 @@ const normNum = (v: string): string => {
   return Number.isFinite(n) ? String(n) : (v || "0");
 };
 
+/** Boolean as a player-facing word rather than "true"/"false". */
+const onOff = (v: boolean): string => (v ? "On" : "Off");
+const yesNo = (v: boolean): string => (v ? "Yes" : "No");
+
 const statNum = (read: (s: ScouterUserStat["stat"]) => string): ComparedField["read"] =>
   (p) => normNum(read(p.stat));
 
@@ -611,15 +615,15 @@ function comparedFields(classId: string, requiredStats: readonly string[]): Comp
     { label: stat("arcanePower"), read: statNum((s) => s.arcaneForce) },
     { label: stat("sacredPower"), read: statNum((s) => s.authenticForce) },
     // Weapon ATT deliberately not compared -- MapleScouter ignores it (see buildStatsDraft).
-    { label: "Inner Ability: +1 Passive Skill Level", read: (p) => String(p.stat.passiveSkillLevelUp) },
-    { label: "Inner Ability: +1 Attack Target", read: (p) => String(p.stat.increaseTarget) },
+    { label: "Inner Ability: +1 Passive Skill Level", read: (p) => yesNo(p.stat.passiveSkillLevelUp === true) },
+    { label: "Inner Ability: +1 Attack Target", read: (p) => yesNo(p.stat.increaseTarget === true) },
     // Compare the Legion RANK, not the raw union level -- what MapleDoro stores and what
     // the import maps is the bracket (250 and 255 are both SSS), so raw-level differences
     // inside the same bracket aren't real.
     { label: "Wild Hunter Legion rank", read: (p) => whRankForLevel(num(p.stat.wildhunterUnion)) ?? "None" },
-    { label: "Legion Artifact: +1 target", read: (p) => String(p.stat.artifact_increaseTarget === true) },
+    { label: "Legion Artifact: +1 target", read: (p) => yesNo(p.stat.artifact_increaseTarget === true) },
     { label: "Legion Artifact: Final Attack Damage %", read: (p) => normNum(p.stat.artifact_finalAttack) },
-    { label: "Genesis Liberation", read: (p) => String(p.special.genesis) },
+    { label: "Genesis Liberation", read: (p) => yesNo(p.special.genesis === true) },
     { label: "Mu Gong Soul", read: (p) => normNum(p.special.mugongSoul) },
     { label: "Ephenia Soul", read: (p) => normNum(p.special.epiSoul) },
     { label: "Ring of Restraint", read: (p) => normNum(p.special.restraintRing) },
@@ -662,7 +666,7 @@ const guildBuffName = (id: string): string => GUILD_BUFFS.find((b) => b.id === i
 function buffFields(): ComparedField[] {
   const bools: ComparedField[] = Object.entries(DOPING_BOOL_MAP).map(([dopingKey, boolId]) => ({
     label: boolBuffName(boolId),
-    read: (p: ScouterUserStat) => String(p.doping[dopingKey as keyof ScouterUserStat["doping"]] === true),
+    read: (p: ScouterUserStat) => onOff(p.doping[dopingKey as keyof ScouterUserStat["doping"]] === true),
   }));
 
   // Guild buffs: MapleScouter keeps the level in `nobless` when the buff is off, so compare
@@ -676,7 +680,7 @@ function buffFields(): ComparedField[] {
   const statPotion: ComparedField = {
     label: "Advanced Stat Potion",
     // Gated on the `statPotion` boolean (level lingers when off); MapleDoro only models tier X.
-    read: (p: ScouterUserStat) => String(p.doping.statPotion === true),
+    read: (p: ScouterUserStat) => onOff(p.doping.statPotion === true),
   };
 
   const renown: ComparedField[] = RENOWN_STATS.map(({ id, shortLabel }) => ({
