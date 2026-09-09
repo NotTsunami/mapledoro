@@ -34,6 +34,61 @@ function QuietButton({ theme, label, onClick, className }: {
   );
 }
 
+/** The row of progress pips for a step split across multiple substeps. */
+function SubstepPips({ theme, substepIndex, substepCount }: {
+  theme: AppTheme; substepIndex: number; substepCount: number;
+}) {
+  return (
+    <div
+      aria-label={`Part ${substepIndex + 1} of ${substepCount}`}
+      style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginBottom: "0.5rem" }}
+    >
+      {Array.from({ length: substepCount }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            height: 7,
+            width: 28,
+            borderRadius: 4,
+            background: i <= substepIndex ? theme.accent : theme.border,
+            transition: "background 0.2s ease",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** The step's forward button: accent-filled by default, or a quiet text link when the
+ *  variant is "quiet" and it isn't disabled (a Skip that shouldn't out-shout the step body). */
+function NextButton({ theme, label, quiet, disabled, onClick }: {
+  theme: AppTheme; label: string; quiet: boolean; disabled: boolean | undefined; onClick: () => void;
+}) {
+  if (quiet && !disabled) {
+    return <QuietButton theme={theme} label={label} onClick={onClick} />;
+  }
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        border: "none",
+        borderRadius: "10px",
+        background: disabled ? theme.border : theme.accent,
+        color: disabled ? theme.muted : theme.accentOn,
+        fontFamily: "inherit",
+        fontWeight: 800,
+        fontSize: "0.88rem",
+        padding: "0.55rem 0.9rem",
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 interface SetupStepFrameProps {
   theme: AppTheme;
   stepLabel: string;
@@ -95,23 +150,7 @@ export default function SetupStepFrame({
   return (
     <>
       {substepCount > 1 && (
-        <div
-          aria-label={`Part ${substepIndex + 1} of ${substepCount}`}
-          style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginBottom: "0.5rem" }}
-        >
-          {Array.from({ length: substepCount }, (_, i) => (
-            <span
-              key={i}
-              style={{
-                height: 7,
-                width: 28,
-                borderRadius: 4,
-                background: i <= substepIndex ? theme.accent : theme.border,
-                transition: "background 0.2s ease",
-              }}
-            />
-          ))}
-        </div>
+        <SubstepPips theme={theme} substepIndex={substepIndex} substepCount={substepCount} />
       )}
       <h2
         style={{
@@ -147,28 +186,13 @@ export default function SetupStepFrame({
         }}
       >
         <QuietButton theme={theme} label={backLabel} onClick={onBack} className="tap-target-44" />
-        {nextVariant === "quiet" && !nextDisabled ? (
-          <QuietButton theme={theme} label={nextButtonLabel} onClick={isLastStep ? onFinish : onNext} />
-        ) : (
-          <button
-            type="button"
-            disabled={nextDisabled}
-            onClick={isLastStep ? onFinish : onNext}
-            style={{
-              border: "none",
-              borderRadius: "10px",
-              background: nextDisabled ? theme.border : theme.accent,
-              color: nextDisabled ? theme.muted : theme.accentOn,
-              fontFamily: "inherit",
-              fontWeight: 800,
-              fontSize: "0.88rem",
-              padding: "0.55rem 0.9rem",
-              cursor: nextDisabled ? "not-allowed" : "pointer",
-            }}
-          >
-            {nextButtonLabel}
-          </button>
-        )}
+        <NextButton
+          theme={theme}
+          label={nextButtonLabel}
+          quiet={nextVariant === "quiet"}
+          disabled={nextDisabled}
+          onClick={isLastStep ? onFinish : onNext}
+        />
       </div>
     </>
   );
