@@ -12,7 +12,7 @@ import { useMounted } from "../../../lib/useMounted";
 import { formatExpCompact, formatMesoFull, formatPct } from "../format";
 import { formatShortDate } from "../date";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
-import { Field, Toggle, ToolNumberInput } from "../shared-ui";
+import { Field, ToolNumberInput } from "../shared-ui";
 import { toolStyles } from "../tool-styles";
 import { dataTableTh, dropdownShadow } from "../shared-styles";
 import {
@@ -258,8 +258,8 @@ interface ImportedFarmingRate {
   hourlyExp: number;
 }
 
-/** Daily / Weekly plan saved per-character: the Daily Content, Weekly Content, Monster Park, and
- *  Epic Dungeon panels plus target level, burning, and the date window. Current percent comes from
+/** Daily / Weekly plan saved per-character: the Daily Content and Weekly Content and Dungeons
+ *  panels plus target level, burning, and the date window. Current percent comes from
  *  the character record and the current level from `EXP_LEVEL_TOOL_KEY`; event tickets and growth
  *  potions stay in memory by design. */
 type SavedAllInOne = Pick<
@@ -399,6 +399,8 @@ const EXP_NODE_TILES: { label: string; detail: string; short: string; value: num
 
 const DAILY_REGIONS = [...new Set(DAILY_EXP_CONTENT.map((daily) => daily.region))];
 
+const MONSTER_PARK_EXTREME_ICON: IconRef = { type: "item", id: "04001760" }; // Monster Park Extreme Ticket
+
 const iconRowStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
 
 /** The level past which no Burning type grants extra levels. */
@@ -469,10 +471,9 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
       <style>{`
         .exp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
         .exp-coupon-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-        /* The dungeon name plus its Sol Erda icon needs the room; the reward dropdown only ever
-           holds "0x" - "9x", so it gives that room back. */
-        .exp-epic-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.5fr); }
-        .exp-epic-grid-solo { grid-template-columns: minmax(0, 1fr); }
+        /* Fixed at three equal columns so the Monster Park fields fill row one and Extreme opens
+           row two beside Epic Dungeon, instead of auto-fit reflowing the fields across whatever fits. */
+        .exp-dungeon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .exp-duo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
         .exp-tile-row { display: flex; flex-wrap: wrap; gap: 10px; }
         .exp-select-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px; }
@@ -495,6 +496,7 @@ export default function ExpCalculatorWorkspace({ theme }: { theme: AppTheme }) {
         }
         @media (max-width: 760px) {
           .exp-grid { grid-template-columns: 1fr; }
+          .exp-dungeon-grid { grid-template-columns: 1fr; }
           .exp-breakdown-grid { grid-template-columns: 1fr; }
           .exp-select-grid { grid-template-columns: 1fr; }
           .exp-overview-grid { grid-template-columns: 1fr; }
@@ -1287,7 +1289,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
       </div>
 
       <div style={panelStyle}>
-        <SectionTitle theme={theme} label="Weekly Content" />
+        <SectionTitle theme={theme} label="Weekly Content and Monster Park" />
         <div className="exp-tile-row">
           {WEEKLY_EXP_CONTENT.map((weekly) => (
             <IconLevelTile
@@ -1303,58 +1305,51 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             />
           ))}
         </div>
-      </div>
-
-      <div className="exp-duo-grid">
-        <div style={panelStyle}>
-          <SectionTitle theme={theme} label="Monster Park" />
-          <div className="exp-grid">
-            <Field label="Dungeon" style={labelStyle}>
-              <div style={iconRowStyle}>
-                <BuffIcon icon={MONSTER_PARK_ICON} label="Monster Park" />
-                {/* An unset pick shows the dungeon it resolves to rather than a sentinel option.
-                    It stays unset until the player actually changes it, so a plan that levels them
-                    into a better dungeon still upgrades on its own. */}
-                <select className="tool-select" value={input.monsterParkId || bestPark?.id || ""} onChange={(e) => updateInput((state) => ({ ...state, monsterParkId: e.target.value }))} style={selectStyle}>
-                  {eligibleParks.map((park) => <option key={park.id} value={park.id}>{park.label}</option>)}
-                </select>
-              </div>
+        {/* Heroic worlds have no reward multiplier to buy, so that dropdown drops out of the
+            Epic Dungeon row. */}
+        <div className="exp-dungeon-grid" style={{ marginTop: 14 }}>
+          <Field label="Monster Park Dungeon" style={labelStyle}>
+            <div style={iconRowStyle}>
+              <BuffIcon icon={MONSTER_PARK_ICON} label="Monster Park" />
+              {/* An unset pick shows the dungeon it resolves to rather than a sentinel option.
+                  It stays unset until the player actually changes it, so a plan that levels them
+                  into a better dungeon still upgrades on its own. */}
+              <select className="tool-select" value={input.monsterParkId || bestPark?.id || ""} onChange={(e) => updateInput((state) => ({ ...state, monsterParkId: e.target.value }))} style={selectStyle}>
+                {eligibleParks.map((park) => <option key={park.id} value={park.id}>{park.label}</option>)}
+              </select>
+            </div>
+          </Field>
+          <NumberField label="Monster Park Runs / Day" min={0} max={7} value={input.monsterParkRuns} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("monsterParkRuns", value)} />
+          <NumberField label="Monster Park Bonus EXP %" min={0} max={100} value={input.monsterParkBonus} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("monsterParkBonus", value)} />
+          <Field label="Monster Park Extreme" style={labelStyle}>
+            <div style={iconRowStyle}>
+              <BuffIcon icon={MONSTER_PARK_EXTREME_ICON} label="Monster Park Extreme" />
+              <select className="tool-select" value={input.mpeRuns > 0 ? "yes" : "no"} onChange={(e) => updateNumber("mpeRuns", e.target.value === "yes" ? 1 : 0)} style={selectStyle}>
+                <option value="no">No</option>
+                <option value="yes">Yes (1 clear / week)</option>
+              </select>
+            </div>
+          </Field>
+          <Field label="Epic Dungeon" style={labelStyle}>
+            <div style={iconRowStyle}>
+              <BuffIcon icon={SOL_ERDA_ICON} label="Epic Dungeon" />
+              <select className="tool-select" value={input.epicDungeonId} onChange={(e) => updateInput((state) => ({ ...state, epicDungeonId: e.target.value }))} style={selectStyle}>
+                <option value="">No Epic Dungeon</option>
+                {EPIC_DUNGEON_OPTIONS.map((dungeon) => <option key={dungeon.id} value={dungeon.id}>{dungeon.label} (Lv. {dungeon.minLevel})</option>)}
+              </select>
+            </div>
+          </Field>
+          {!heroicWorld && (
+            <Field label="Epic Dungeon Reward" style={labelStyle}>
+              <select className="tool-select" value={input.epicDungeonMultiplier} onChange={(e) => updateNumber("epicDungeonMultiplier", Number(e.target.value))} style={selectStyle}>
+                <option value={0}>0x</option>
+                <option value={1}>1x</option>
+                <option value={5}>5x</option>
+                <option value={9}>9x</option>
+              </select>
             </Field>
-            <NumberField label="Runs / Day" min={0} max={7} value={input.monsterParkRuns} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("monsterParkRuns", value)} />
-            <NumberField label="Bonus EXP %" min={0} max={100} value={input.monsterParkBonus} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("monsterParkBonus", value)} />
-            <Field label="Monster Park Extreme" style={labelStyle}>
-              <Toggle theme={theme} label="1 clear / week" checked={input.mpeRuns > 0} onChange={(checked) => updateNumber("mpeRuns", checked ? 1 : 0)} style={{ height: 35, width: "100%" }} />
-            </Field>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <SectionTitle theme={theme} label="Epic Dungeon" />
-          {/* Heroic worlds have no reward multiplier to buy, so the dropdown drops out. The two
-              remaining fields each get their own row: side by side, the long label and the
-              stepper's buttons crowd the dungeon dropdown. */}
-          <div className={heroicWorld ? "exp-grid exp-epic-grid-solo" : "exp-grid exp-epic-grid"}>
-            <Field label="Epic Dungeon" style={labelStyle}>
-              <div style={iconRowStyle}>
-                <BuffIcon icon={SOL_ERDA_ICON} label="Epic Dungeon" />
-                <select className="tool-select" value={input.epicDungeonId} onChange={(e) => updateInput((state) => ({ ...state, epicDungeonId: e.target.value }))} style={selectStyle}>
-                  <option value="">No Epic Dungeon</option>
-                  {EPIC_DUNGEON_OPTIONS.map((dungeon) => <option key={dungeon.id} value={dungeon.id}>{dungeon.label} (Lv. {dungeon.minLevel})</option>)}
-                </select>
-              </div>
-            </Field>
-            {!heroicWorld && (
-              <Field label="Reward" style={labelStyle}>
-                <select className="tool-select" value={input.epicDungeonMultiplier} onChange={(e) => updateNumber("epicDungeonMultiplier", Number(e.target.value))} style={selectStyle}>
-                  <option value={0}>0x</option>
-                  <option value={1}>1x</option>
-                  <option value={5}>5x</option>
-                  <option value={9}>9x</option>
-                </select>
-              </Field>
-            )}
-            <NumberField label="Bonus Multiplier (1-4x)" min={1} max={4} step="0.5" value={input.epicDungeonExpMultiplier} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("epicDungeonExpMultiplier", value)} />
-          </div>
+          )}
+          <NumberField label="Epic Dungeon Bonus (1-4x)" min={1} max={4} step="0.5" value={input.epicDungeonExpMultiplier} labelStyle={labelStyle} inputStyle={inputStyle} onChange={(value) => updateNumber("epicDungeonExpMultiplier", value)} />
         </div>
       </div>
 
