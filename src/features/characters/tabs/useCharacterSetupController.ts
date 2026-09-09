@@ -54,6 +54,7 @@ import {
   parseStatsStepDraft, serializeStatsStepDraft, storedStatsToStatsStepDraft,
 } from "../setup/data/statsStepDraft";
 import { serializeEquipmentStepDraft, storedEquipmentToDraft } from "../setup/data/equipmentStepDraft";
+import { mapImportToDrafts, type MapleScouterImportResult } from "../setup/data/maplescouterImportData";
 import { convertOzRingsDraftToStored, parseOzRingsDraft, serializeOzRingsDraft, storedOzRingsToOzRingsDraft } from "../setup/data/ozRingData";
 import { convertBuffsDraftToStored, parseBuffsDraft } from "../setup/data/buffsData";
 import {
@@ -2968,6 +2969,18 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
           ...prev,
           [activeSetupStep.id]: value,
         }));
+      },
+      // Applies a parsed MapleScouter export by seeding the other steps' drafts with its
+      // values -- the inverse of buildSeededStepTestByStep. Every later step then just
+      // renders those values for the player to review before Finish. Phase 2 fills in
+      // mapImportToDrafts (currently returns an empty result, so this is a safe no-op);
+      // world-level data (Wild Hunter Legion rank, Legion Artifact) will be handled there
+      // too, since it isn't a per-step draft.
+      applyMapleScouterImport: (result: MapleScouterImportResult) => {
+        const { stepDrafts } = mapImportToDrafts(result);
+        if (Object.keys(stepDrafts).length > 0) {
+          setSetupStepTestByStep((prev) => ({ ...prev, ...stepDrafts }));
+        }
       },
       setSetupStepWithDirection,
       jumpToSubstep,

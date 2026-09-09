@@ -49,7 +49,10 @@ const SETUP_FLOWS = [
     // Skill-window run (link_skills before v_matrix before hexa_matrix, matching the
     // Beginner→V→VI tab order so you never jump backward a tab), then legion_artifacts +
     // buffs last (weakest/most flexible window affinity).
-    steps: ["gender", "marriage", "stats", "equipment", "oz_rings", "familiars", "link_skills", "v_matrix", "hexa_matrix", "legion_artifacts", "buffs"] as const,
+    // maplescouter_import comes first (after gender/marriage): pasting a MapleScouter
+    // export seeds the drafts every later step then just displays for review. Always
+    // skippable — no-op if you don't paste anything.
+    steps: ["gender", "marriage", "maplescouter_import", "stats", "equipment", "oz_rings", "familiars", "link_skills", "v_matrix", "hexa_matrix", "legion_artifacts", "buffs"] as const,
   },
   {
     id: "maplescouter_setup",
@@ -62,7 +65,9 @@ const SETUP_FLOWS = [
     // touch Equipment/Inventory), then an uninterrupted Skill-window run (link_skills
     // before hexa_matrix), with buffs last since it draws from Guild/Skills/Inventory and
     // has no single fixed window affinity.
-    steps: ["stats", "oz_rings", "link_skills", "hexa_matrix", "buffs"] as const,
+    // maplescouter_import first: pasting a MapleScouter export seeds every later step's
+    // draft for review. Always skippable — no-op if you don't paste anything.
+    steps: ["maplescouter_import", "stats", "oz_rings", "link_skills", "hexa_matrix", "buffs"] as const,
   },
   {
     id: "stats_flow",
