@@ -2971,11 +2971,10 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
         }));
       },
       // Applies a parsed MapleScouter export by seeding the other steps' drafts with its
-      // values -- the inverse of buildSeededStepTestByStep. Every later step then just
-      // renders those values for the player to review before Finish. Phase 2 fills in
-      // mapImportToDrafts (currently returns an empty result, so this is a safe no-op);
-      // world-level data (Wild Hunter Legion rank, Legion Artifact) will be handled there
-      // too, since it isn't a per-step draft.
+      // values -- the inverse of buildSeededStepTestByStep. Every later step then renders
+      // those values for the player to review before Finish. The account-level bits (Wild
+      // Hunter Legion rank, Legion Artifact) ride in the stats draft's scouterQuestions
+      // block, which the normal finish path already persists per-world.
       applyMapleScouterImport: (result: MapleScouterImportResult) => {
         const { stepDrafts } = mapImportToDrafts(result);
         if (Object.keys(stepDrafts).length > 0) {

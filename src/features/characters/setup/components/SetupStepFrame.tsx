@@ -1,6 +1,38 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import type { ReactNode } from "react";
 import type { AppTheme } from "../../../../components/themes";
+
+/** The muted text-link style shared by the Back button and a "quiet" Next button. */
+function quietLinkStyle(theme: AppTheme): CSSProperties {
+  return {
+    border: "none",
+    background: "none",
+    color: theme.muted,
+    fontFamily: "inherit",
+    fontWeight: 700,
+    fontSize: "0.85rem",
+    padding: "0.55rem 0.4rem",
+    cursor: "pointer",
+  };
+}
+
+/** A muted text-link button (Back, or a quiet Skip) that brightens to `theme.text` on hover. */
+function QuietButton({ theme, label, onClick, className }: {
+  theme: AppTheme; label: string; onClick: () => void; className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={onClick}
+      style={quietLinkStyle(theme)}
+      onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
+    >
+      {label}
+    </button>
+  );
+}
 
 interface SetupStepFrameProps {
   theme: AppTheme;
@@ -13,6 +45,10 @@ interface SetupStepFrameProps {
   onFinish: () => void;
   /** When provided, always shows this label and always calls onNext (never Finish). */
   nextLabel?: string;
+  /** "primary" (default) is the accent-filled forward button. "quiet" renders it like the
+   *  Back link (muted text, no fill) -- for a forward action that shouldn't compete with a
+   *  more important accent button in the step body, e.g. a "Skip" on an optional step. */
+  nextVariant?: "primary" | "quiet";
   /** Disables the Next/Finish button, e.g. while required questions are unanswered. */
   nextDisabled?: boolean;
   /** Reports this step/substep's own Next-button validity up to the setup controller
@@ -37,6 +73,7 @@ export default function SetupStepFrame({
   onNext,
   onFinish,
   nextLabel,
+  nextVariant = "primary",
   nextDisabled,
   onValidityChange,
   substepIndex = 0,
@@ -44,6 +81,7 @@ export default function SetupStepFrame({
   children,
 }: SetupStepFrameProps) {
   const isLastStep = !nextLabel && stepNumber >= totalSteps;
+  const nextButtonLabel = nextLabel ?? (isLastStep ? "Finish" : "Next Step");
   // "Prev Step" implies an earlier step to go back to — true from step 2 onward, but
   // on step 1 of any flow (single-step or not) there's no previous step within the
   // flow itself; the button still works (it exits back to the profile/intro), it's
@@ -108,43 +146,29 @@ export default function SetupStepFrame({
           marginTop: "0.9rem",
         }}
       >
-        <button
-          type="button"
-          className="tap-target-44"
-          onClick={onBack}
-          style={{
-            border: "none",
-            background: "none",
-            color: theme.muted,
-            fontFamily: "inherit",
-            fontWeight: 700,
-            fontSize: "0.85rem",
-            padding: "0.55rem 0.4rem",
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
-        >
-          {backLabel}
-        </button>
-        <button
-          type="button"
-          disabled={nextDisabled}
-          onClick={isLastStep ? onFinish : onNext}
-          style={{
-            border: "none",
-            borderRadius: "10px",
-            background: nextDisabled ? theme.border : theme.accent,
-            color: nextDisabled ? theme.muted : theme.accentOn,
-            fontFamily: "inherit",
-            fontWeight: 800,
-            fontSize: "0.88rem",
-            padding: "0.55rem 0.9rem",
-            cursor: nextDisabled ? "not-allowed" : "pointer",
-          }}
-        >
-          {nextLabel ?? (isLastStep ? "Finish" : "Next Step")}
-        </button>
+        <QuietButton theme={theme} label={backLabel} onClick={onBack} className="tap-target-44" />
+        {nextVariant === "quiet" && !nextDisabled ? (
+          <QuietButton theme={theme} label={nextButtonLabel} onClick={isLastStep ? onFinish : onNext} />
+        ) : (
+          <button
+            type="button"
+            disabled={nextDisabled}
+            onClick={isLastStep ? onFinish : onNext}
+            style={{
+              border: "none",
+              borderRadius: "10px",
+              background: nextDisabled ? theme.border : theme.accent,
+              color: nextDisabled ? theme.muted : theme.accentOn,
+              fontFamily: "inherit",
+              fontWeight: 800,
+              fontSize: "0.88rem",
+              padding: "0.55rem 0.9rem",
+              cursor: nextDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {nextButtonLabel}
+          </button>
+        )}
       </div>
     </>
   );

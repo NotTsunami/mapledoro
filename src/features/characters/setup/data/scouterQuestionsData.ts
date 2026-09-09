@@ -30,8 +30,10 @@ const WH_RANK_BY_LEVEL: ReadonlyArray<readonly [number, WhLegionRank]> = [
 
 const WILD_HUNTER_JOB_NAME = "Wild Hunter";
 
-/** Maps a character level to its legion grade, or null below grade B (level 60). */
-function whRankForLevel(level: number): WhLegionRank | null {
+/** Maps a character level to its legion grade, or null below grade B (level 60).
+ *  Exported for the MapleScouter import (maplescouterImportData.ts), which reads the raw
+ *  Wild Hunter union level out of an export and needs the grade back. */
+export function whRankForLevel(level: number): WhLegionRank | null {
   for (const [min, rank] of WH_RANK_BY_LEVEL) {
     if (level >= min) return rank;
   }

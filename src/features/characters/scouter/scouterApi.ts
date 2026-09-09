@@ -397,13 +397,17 @@ function isTripleStatField(id: string): id is TripleStatFieldId {
   return TRIPLE_STAT_FIELD_IDS.has(id);
 }
 
-interface MainSubAssignment {
+export interface MainSubAssignment {
   main: TripleStatFieldId | null;
   sub: TripleStatFieldId | null;
   ssub: TripleStatFieldId | null;
 }
 
-function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
+/** Which real stat (STR/DEX/INT/LUK) each of MapleScouter's main/sub/ssub stat slots
+ *  corresponds to for a class. Exported so the reverse direction (importing a MapleScouter
+ *  export back into MapleDoro, see maplescouterImportData.ts) can un-map slot values to
+ *  the right per-stat draft fields. */
+export function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
   const realStatSlots = requiredStats.filter((s) => REAL_STATS.includes(s));
   const [first = null, second = null, third = null] = realStatSlots;
   if (classId === "demon_avenger") {

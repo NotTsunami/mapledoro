@@ -182,8 +182,6 @@ const summaryCardStyle = (theme: AppTheme): CSSProperties => ({
   gap: "0.7rem",
 });
 
-const chipRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "0.4rem" };
-
 const warningNoticeStyle = (theme: AppTheme): CSSProperties => ({
   display: "flex",
   gap: "0.4rem",
@@ -196,21 +194,6 @@ const warningNoticeStyle = (theme: AppTheme): CSSProperties => ({
   borderRadius: 8,
   padding: "0.5rem 0.6rem",
 });
-
-function sectionChipStyle(theme: AppTheme, present: boolean): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.3rem",
-    borderRadius: 999,
-    padding: "0.2rem 0.6rem",
-    fontSize: "0.75rem",
-    fontWeight: 700,
-    border: `1px solid ${present ? statusText(theme, "success") + "55" : theme.border}`,
-    background: present ? statusText(theme, "success") + "18" : "transparent",
-    color: present ? statusText(theme, "success") : theme.muted,
-  };
-}
 
 export default function MapleScouterImportStep({
   theme, stepNumber, totalSteps, jobName = "", characterLevel, value, onChange, onBack, onNext, onFinish, onImport,
@@ -290,7 +273,8 @@ export default function MapleScouterImportStep({
       onBack={onBack}
       onNext={onNext}
       onFinish={onFinish}
-      nextLabel="Skip"
+      nextLabel="Skip this step"
+      nextVariant="quiet"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 520 }}>
         <div style={howToBoxStyle(theme)}>
@@ -374,18 +358,6 @@ export default function MapleScouterImportStep({
                 <span>{w.message}</span>
               </div>
             ))}
-
-            <div>
-              <div style={{ ...labelStyle(theme), marginBottom: "0.35rem" }}>Found in this file</div>
-              <div style={chipRowStyle}>
-                {result.sections.map((s) => (
-                  <span key={s.id} style={sectionChipStyle(theme, s.present)}>
-                    {s.label}
-                    {s.present && s.detail ? ` (${s.detail})` : ""}
-                  </span>
-                ))}
-              </div>
-            </div>
 
             <button type="button" onClick={handleApply} style={applyButtonStyle(theme)}>
               {applied ? "Applied" : "Use these values and continue"}
