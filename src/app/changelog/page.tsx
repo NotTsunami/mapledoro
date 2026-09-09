@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-09",
+    changes: [
+      { type: "changed", text: "Updated the Oz Rings setup step for the v271 Special Skill Ring changes. It now covers just the Ring of Restraint, Weapon Jump (now capped at level 4) and Continuous Ring, and your Scouter figure may shift slightly on your next refresh." },
+    ],
+  },
+  {
     date: "2026-09-08",
     changes: [
       { type: "fixed", text: "Fixed the Scouter bookmark showing Champion Black Mage as easier than Hard. It now reads 25% harder than Hard, matching its shorter timer, and the chip tooltip shows MapleScouter's own figure for comparison." },
