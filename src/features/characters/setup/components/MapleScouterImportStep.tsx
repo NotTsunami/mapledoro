@@ -34,7 +34,7 @@ interface MapleScouterImportStepProps {
   onImport?: (result: MapleScouterImportResult) => void;
 }
 
-function errorMessage(error: MapleScouterImportError, className: string | undefined): string {
+function errorMessage(error: MapleScouterImportError, detail: string | undefined): string {
   switch (error) {
     case "not-json":
       return "That file isn't valid JSON. Upload the .json file MapleScouter downloaded, without editing it.";
@@ -43,13 +43,17 @@ function errorMessage(error: MapleScouterImportError, className: string | undefi
     case "no-data":
       return "This file is missing its character data. Try exporting again from MapleScouter.";
     case "unknown-class":
-      return className
-        ? `MapleDoro doesn't recognize the class "${className}" in this file.`
+      return detail
+        ? `MapleDoro doesn't recognize the class "${detail}" in this file.`
         : "MapleDoro doesn't recognize the class in this file.";
     case "class-mismatch":
-      return className
-        ? `This is a ${className} preset, but you're setting up a different class.`
+      return detail
+        ? `This is a ${detail} preset, but you're setting up a different class.`
         : "This preset is for a different class than the character you're setting up.";
+    case "wrong-region":
+      return detail
+        ? `This preset was made for ${detail}. MapleDoro only supports GMS.`
+        : "This preset wasn't made for GMS. MapleDoro only supports GMS.";
   }
 }
 

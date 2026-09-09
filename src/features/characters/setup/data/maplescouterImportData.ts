@@ -71,6 +71,18 @@ function classIdFromKoreanName(koreanName: string): string | null {
   return KOREAN_NAME_TO_CLASS_ID[koreanName.trim()] ?? null;
 }
 
+// ── Region check ────────────────────────────────────────────────────────────
+
+/** The export flags its region as one of isGMS/isTMS/isJMS/isMSEA; all four false means
+ *  KMS (MapleScouter's default). Returns the non-GMS region's label, or null for GMS. */
+function nonGmsRegionLabel(payload: ScouterUserStat): string | null {
+  const p = payload as unknown as Record<string, unknown>;
+  if (p.isTMS === true) return "Taiwan MapleStory (TMS)";
+  if (p.isJMS === true) return "Japan MapleStory (JMS)";
+  if (p.isMSEA === true) return "MapleStory SEA (MSEA)";
+  return p.isGMS === true ? null : "Korea MapleStory (KMS)";
+}
+
 // ── Parse result ────────────────────────────────────────────────────────────
 
 export type MapleScouterImportError =
@@ -78,7 +90,8 @@ export type MapleScouterImportError =
   | "wrong-file-type"
   | "no-data"
   | "unknown-class"
-  | "class-mismatch";
+  | "class-mismatch"
+  | "wrong-region";
 
 /** A non-blocking "check this" notice shown after a successful parse -- a stale preset, or
  *  a setting in the export that doesn't match what MapleDoro knows about the character. The
@@ -208,6 +221,14 @@ export function parseMapleScouterExport(
   if (!file.data || typeof file.data !== "object") return { ok: false, error: "no-data" };
 
   const payload = file.data as ScouterUserStat;
+
+  // MapleDoro is GMS-only. A non-GMS export is balanced for a different version and can
+  // carry buffs / rings / values that don't exist in GMS, so importing it would seed
+  // garbage -- reject it rather than trying to salvage the fields that happen to overlap.
+  // MapleScouter bakes the region into a saved preset, so there's no "re-export as GMS".
+  const region = nonGmsRegionLabel(payload);
+  if (region) return { ok: false, error: "wrong-region", foundClassName: region };
+
   const koreanName = payload.stat?.myClass ?? "";
   const classId = classIdFromKoreanName(koreanName);
   if (!classId) return { ok: false, error: "unknown-class", foundClassName: koreanName };
