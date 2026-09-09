@@ -2964,17 +2964,14 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       // values -- the inverse of buildSeededStepTestByStep. Every later step then renders
       // those values for the player to review before Finish. The account-level bits (Wild
       // Hunter Legion rank, Legion Artifact) ride in the stats draft's scouterQuestions
-      // block, which the normal finish path already persists per-world. MP / Normal Enemy
-      // Damage aren't in the export and aren't asked in the guided flows, so carry the
-      // character's saved values through or Finish would blank them.
+      // block, which the normal finish path already persists per-world. Passing the stored
+      // record lets the stats draft start from the character's saved stats, so an import
+      // only overwrites what the export actually covers (see mapImportToDrafts).
       applyMapleScouterImport: (result: MapleScouterImportResult) => {
         const existing = confirmedCharacter
           ? selectCharacterById(readCharactersStore(), toCharacterKey(confirmedCharacter))
           : null;
-        const { stepDrafts } = mapImportToDrafts(result, {
-          mp: existing?.stats.mp,
-          normalEnemyDamage: existing?.stats.normalEnemyDamage,
-        });
+        const { stepDrafts } = mapImportToDrafts(result, existing);
         if (Object.keys(stepDrafts).length > 0) {
           setSetupStepTestByStep((prev) => ({ ...prev, ...stepDrafts }));
         }
