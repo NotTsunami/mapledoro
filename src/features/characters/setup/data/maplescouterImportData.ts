@@ -253,16 +253,34 @@ function statTriple(base: string, per: string, abs: string): TripleStatDraft {
 
 // ── Stats step ──────────────────────────────────────────────────────────────
 
+/** The Stats step's Character-Info fields that the export doesn't carry and the guided
+ *  setup flows don't ask for (they're profile-pencil / stats_flow only). Carried forward
+ *  from the character's saved values so an import doesn't blank them on Finish. */
+export interface PreservedStatFields {
+  mp?: string;
+  normalEnemyDamage?: string;
+}
+
 /** Reverses scouterApi.ts's buildStat: the payload carries main/sub/ssub stat SLOTS, so
  *  un-map each slot back to the real stat (STR/DEX/INT/LUK) it belongs to for this class,
  *  and the attack triple back to attackPower or magicAtt. */
-function buildStatsDraft(payload: ScouterUserStat, classId: string, requiredStats: readonly string[]): StatsStepDraft {
+function buildStatsDraft(
+  payload: ScouterUserStat,
+  classId: string,
+  requiredStats: readonly string[],
+  preserve: PreservedStatFields,
+): StatsStepDraft {
   const { stat } = payload;
   const tripleIds = requiredStats.filter((s): s is TripleStatFieldId =>
     s === "str" || s === "dex" || s === "int" || s === "luk");
   const assignment = assignMainSubStats(classId, tripleIds);
 
-  const draft: StatsStepDraft = {};
+  const draft: StatsStepDraft = {
+    // Not in the export and not asked in the guided flows -- keep whatever the character
+    // already has so Finish doesn't clear them.
+    ...(preserve.mp !== undefined ? { mp: preserve.mp } : {}),
+    ...(preserve.normalEnemyDamage !== undefined ? { normalEnemyDamage: preserve.normalEnemyDamage } : {}),
+  };
 
   // Demon Avenger's Main Stat slot is HP (buildStat overrides mainField to "hp"); its one
   // real stat (STR) sits in the Sub slot instead -- assignMainSubStats already encodes that.
@@ -287,12 +305,11 @@ function buildStatsDraft(payload: ScouterUserStat, classId: string, requiredStat
   draft.ignoreElementalResistance = stat.ignoreElementalResist || "0";
   draft.additionalStatusDamage = stat.statusAdditionalDmg || "0";
   draft.summonDuration = stat.summonPersistTime || "0";
-  draft.normalEnemyDamage = stat.normalDmg || "0";
   draft.arcanePower = stat.arcaneForce || "0";
   draft.sacredPower = stat.authenticForce || "0";
-  // stat.weaponAtk is deliberately not mapped: MapleScouter no longer reads it (live-tested
-  // 0 vs a real value vs garbage, byte-identical result). MapleDoro's own Weapon ATT
-  // question/storage/payload plumbing is slated for removal on its own branch.
+  // Not mapped: stat.normalDmg (Normal Enemy Damage) -- the guided setup flows don't ask
+  // for it and MapleScouter's own field is dead (see scouterApi.ts). stat.weaponAtk --
+  // MapleScouter removed the input and ignores the value.
 
   draft.setupOptions = {
     isLiberated: payload.special.genesis === true ? true : undefined,
@@ -472,15 +489,20 @@ export interface MapleScouterImportDrafts {
 
 /** Turns a parsed export into setup-step draft strings. Every step the MapleScouter Setup
  *  and Full Setup flows share gets seeded; the flow's own steps then render these for the
- *  player to review before Finish. */
-export function mapImportToDrafts(result: MapleScouterImportResult): MapleScouterImportDrafts {
+ *  player to review before Finish. `preserve` carries forward the Character-Info fields the
+ *  export doesn't have (MP, Normal Enemy Damage) from an already-set-up character, so
+ *  finishing the import doesn't blank them. */
+export function mapImportToDrafts(
+  result: MapleScouterImportResult,
+  preserve: PreservedStatFields = {},
+): MapleScouterImportDrafts {
   const { payload, classId } = result;
   const classData = CLASS_SKILL_DATA.find((c) => c.id === classId);
   const requiredStats = classData?.requiredStats ?? [];
 
   const stepDrafts: SetupStepInputById = {};
 
-  stepDrafts.stats = serializeStatsStepDraft(buildStatsDraft(payload, classId, requiredStats));
+  stepDrafts.stats = serializeStatsStepDraft(buildStatsDraft(payload, classId, requiredStats, preserve));
 
   const ozRings = buildOzRingsDraft(payload);
   if (Object.keys(ozRings.levels).length > 0) stepDrafts.oz_rings = serializeOzRingsDraft(ozRings);
@@ -565,7 +587,7 @@ function comparedFields(classId: string, requiredStats: readonly string[]): Comp
     ...tripleFields(atkLabel, (s) => s.atkBase, (s) => s.atkPercent, (s) => s.atkAbs),
     { label: stat("damage"), read: statNum((s) => s.dmg) },
     { label: stat("bossDamage"), read: statNum((s) => s.bossDmg) },
-    { label: stat("normalEnemyDamage"), read: statNum((s) => s.normalDmg) },
+    // Normal Enemy Damage deliberately not compared -- not mapped by buildStatsDraft.
     { label: stat("ignoreDefense"), read: statNum((s) => s.ignoreDef) },
     { label: stat("criticalRate"), read: statNum((s) => s.critical) },
     { label: stat("criticalDamage"), read: statNum((s) => s.criticalDmg) },
