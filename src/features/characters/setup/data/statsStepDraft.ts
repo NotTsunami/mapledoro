@@ -390,10 +390,10 @@ export const COMBAT_RIGHT: StatFieldId[] = [
   "damage", "bossDamage", "criticalRate", "criticalDamage", "buffDuration", "ignoreElementalResistance", "summonDuration",
 ];
 
-// Sanity thresholds mirroring MapleScouter's own input validation — catches the most
-// common mix-ups (Total vs. Base, character Magic ATT vs. weapon Magic ATT) before the
-// user ever hits MapleScouter's own (Korean-only) error popups. These are MapleScouter's
-// sanity bounds, not real game caps, so they warn instead of hard-blocking input.
+// Sanity thresholds mirroring MapleScouter's own input validation — catches the Total-vs-
+// Base main-stat mix-up before the user ever hits MapleScouter's own (Korean-only) error
+// popups. These are MapleScouter's sanity bounds, not real game caps, so they warn instead
+// of hard-blocking input.
 export const MAIN_STAT_BASE_VALUE_WARN_AT = 10000;
 export const MAIN_STAT_PERCENT_UNAPPLIED_WARN_AT = 40000;
 

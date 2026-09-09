@@ -30,7 +30,7 @@ import { isRebootWorld } from "./rebootData";
 import type { SetupStepInputById } from "../types";
 
 /** The wrapper MapleScouter's "Save preset" download writes around the ScouterUserStat. */
-export interface MapleScouterExportFile {
+interface MapleScouterExportFile {
   type: string;
   v: number;
   savedAt: string;
@@ -67,7 +67,7 @@ const KOREAN_NAME_TO_CLASS_ID: Record<string, string> = Object.fromEntries(
 );
 
 /** MapleDoro classId for a MapleScouter Korean class name, or null if unrecognized. */
-export function classIdFromKoreanName(koreanName: string): string | null {
+function classIdFromKoreanName(koreanName: string): string | null {
   return KOREAN_NAME_TO_CLASS_ID[koreanName.trim()] ?? null;
 }
 
@@ -83,7 +83,7 @@ export type MapleScouterImportError =
 /** A non-blocking "check this" notice shown after a successful parse -- a stale preset, or
  *  a setting in the export that doesn't match what MapleDoro knows about the character. The
  *  import still goes through; the real review is the setup steps themselves. */
-export interface ImportStalenessWarning {
+interface ImportStalenessWarning {
   id: "level-mismatch" | "old-export" | "reboot-mismatch";
   message: string;
 }

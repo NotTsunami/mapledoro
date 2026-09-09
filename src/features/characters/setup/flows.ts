@@ -7,9 +7,9 @@ import { getSetupStepById, type SetupStepDefinition } from "./steps";
 import { isLegacyClass } from "./data/classSkillData";
 import { isHyperStatEligible, isStatsWindowSubstepValid } from "./data/statsStepDraft";
 
-/** Substep index of the Stats step's "Character Info" screen (main stat/combat/symbol/
- *  weapon-ATT fields) — stable across every flow that includes Stats (see
- *  getStepSubsteps below). The only substep whose validity genuinely differs by flow. */
+/** Substep index of the Stats step's "Character Info" screen (main stat/combat/symbol
+ *  fields) — stable across every flow that includes Stats (see getStepSubsteps below).
+ *  The only substep whose validity genuinely differs by flow. */
 const STATS_WINDOW_SUBSTEP_INDEX = 1;
 
 type GenderOverride = "male" | "female" | "none" | null;
@@ -59,8 +59,8 @@ const SETUP_FLOWS = [
     label: "MapleScouter Setup",
     description: "Collect the inputs MapleScouter needs to rank this character.",
     required: false,
-    // The `stats` step is flow-aware (it adds the scouter questionnaire + weapon ATT);
-    // `hexa_matrix` reuses the full-setup step as-is (auto-skipped below Lv 260).
+    // The `stats` step is flow-aware (it adds the scouter questionnaire); `hexa_matrix`
+    // reuses the full-setup step as-is (auto-skipped below Lv 260).
     // Ordered to minimize in-game window switching: oz_rings right after stats (both
     // touch Equipment/Inventory), then an uninterrupted Skill-window run (link_skills
     // before hexa_matrix), with buffs last since it draws from Guild/Skills/Inventory and
