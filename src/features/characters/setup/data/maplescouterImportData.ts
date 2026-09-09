@@ -22,7 +22,7 @@ import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
 import { LINK_SKILLS } from "./linkSkillsData";
 import { CLASS_SKILL_DATA } from "./classSkillData";
 import { TRIPLE_STAT_FIELDS, STAT_LABELS, type TripleStatFieldId } from "./statFields";
-import { serializeStatsStepDraft, type StatsStepDraft, type TripleStatDraft } from "./statsStepDraft";
+import { serializeStatsStepDraft, storedStatsToStatsStepDraft, type StatsStepDraft, type TripleStatDraft } from "./statsStepDraft";
 import { serializeOzRingsDraft, OZ_RING_MAX_LEVEL, type OzRingId } from "./ozRingData";
 import { serializeBuffsDraft, emptyBuffsDraft, BOOL_BUFFS, GUILD_BUFFS, RENOWN_STATS, type BuffsDraft } from "./buffsData";
 import { whRankForLevel } from "./scouterQuestionsData";
@@ -255,14 +255,25 @@ function statTriple(base: string, per: string, abs: string): TripleStatDraft {
 
 /** Reverses scouterApi.ts's buildStat: the payload carries main/sub/ssub stat SLOTS, so
  *  un-map each slot back to the real stat (STR/DEX/INT/LUK) it belongs to for this class,
- *  and the attack triple back to attackPower or magicAtt. */
-function buildStatsDraft(payload: ScouterUserStat, classId: string, requiredStats: readonly string[]): StatsStepDraft {
+ *  and the attack triple back to attackPower or magicAtt.
+ *
+ *  `base` is the character's already-saved stats as a draft (from storedStatsToStatsStepDraft),
+ *  or an empty draft for a first-time setup. The import only overwrites the fields it
+ *  actually has -- the class's own stat slots plus the always-asked combat stats -- so any
+ *  other value a player entered via the profile Stats pencil (an off-class stat like STR on
+ *  a Kanna, MP, Normal Enemy Damage) survives the import instead of being blanked on Finish. */
+function buildStatsDraft(
+  payload: ScouterUserStat,
+  classId: string,
+  requiredStats: readonly string[],
+  base: StatsStepDraft,
+): StatsStepDraft {
   const { stat } = payload;
   const tripleIds = requiredStats.filter((s): s is TripleStatFieldId =>
     s === "str" || s === "dex" || s === "int" || s === "luk");
   const assignment = assignMainSubStats(classId, tripleIds);
 
-  const draft: StatsStepDraft = {};
+  const draft: StatsStepDraft = { ...base };
 
   // Demon Avenger's Main Stat slot is HP (buildStat overrides mainField to "hp"); its one
   // real stat (STR) sits in the Sub slot instead -- assignMainSubStats already encodes that.
@@ -287,21 +298,24 @@ function buildStatsDraft(payload: ScouterUserStat, classId: string, requiredStat
   draft.ignoreElementalResistance = stat.ignoreElementalResist || "0";
   draft.additionalStatusDamage = stat.statusAdditionalDmg || "0";
   draft.summonDuration = stat.summonPersistTime || "0";
-  draft.normalEnemyDamage = stat.normalDmg || "0";
   draft.arcanePower = stat.arcaneForce || "0";
   draft.sacredPower = stat.authenticForce || "0";
-  // stat.weaponAtk is deliberately not mapped: MapleScouter no longer reads it (live-tested
-  // 0 vs a real value vs garbage, byte-identical result). MapleDoro's own Weapon ATT
-  // question/storage/payload plumbing is slated for removal on its own branch.
+  // Left as-is from `base`: MP and Normal Enemy Damage (not in the export, not asked in the
+  // guided flows, MapleScouter's own field for the latter is dead -- see scouterApi.ts),
+  // and Weapon ATT (MapleScouter removed the input and ignores the value).
 
+  // Overlay only what the export actually determines; keep the rest of base.setupOptions
+  // (e.g. a saved weaponHand -- special.oneHandSword being false doesn't disprove it).
+  // Soul is always overlaid: the export carries a definite answer, "none" included.
   draft.setupOptions = {
-    isLiberated: payload.special.genesis === true ? true : undefined,
-    weaponHand: payload.special.oneHandSword ? "1h" : undefined,
-    hasRuinForceShield: payload.special.useRuinForceShild === true ? true : undefined,
+    ...base.setupOptions,
+    ...(payload.special.genesis === true ? { isLiberated: true } : {}),
+    ...(payload.special.oneHandSword ? { weaponHand: "1h" as const } : {}),
+    ...(payload.special.useRuinForceShild === true ? { hasRuinForceShield: true } : {}),
     ...soulOption(payload),
   };
 
-  draft.scouterQuestions = buildScouterQuestions(payload);
+  draft.scouterQuestions = { ...base.scouterQuestions, ...buildScouterQuestions(payload) };
   return draft;
 }
 
@@ -472,15 +486,33 @@ export interface MapleScouterImportDrafts {
 
 /** Turns a parsed export into setup-step draft strings. Every step the MapleScouter Setup
  *  and Full Setup flows share gets seeded; the flow's own steps then render these for the
- *  player to review before Finish. */
-export function mapImportToDrafts(result: MapleScouterImportResult): MapleScouterImportDrafts {
+ *  player to review before Finish.
+ *
+ *  `storedRecord` is the character being imported onto, if it's already in the roster. The
+ *  stats draft is seeded from its saved stats first, then the import overlays only the
+ *  fields it actually has -- so an off-class stat, MP, Normal Enemy Damage, or anything
+ *  else a player set via the profile Stats pencil survives the import. */
+export function mapImportToDrafts(
+  result: MapleScouterImportResult,
+  storedRecord?: StoredCharacterRecord | null,
+): MapleScouterImportDrafts {
   const { payload, classId } = result;
   const classData = CLASS_SKILL_DATA.find((c) => c.id === classId);
   const requiredStats = classData?.requiredStats ?? [];
 
   const stepDrafts: SetupStepInputById = {};
 
-  stepDrafts.stats = serializeStatsStepDraft(buildStatsDraft(payload, classId, requiredStats));
+  const statsBase: StatsStepDraft = storedRecord
+    ? storedStatsToStatsStepDraft({
+        stats: storedRecord.stats,
+        isLiberated: storedRecord.isLiberated,
+        weaponHand: storedRecord.weaponHand,
+        hasRuinForceShield: storedRecord.hasRuinForceShield,
+        soul: storedRecord.soul,
+        innerAbilityLine: storedRecord.scouter?.innerAbilityLine,
+      })
+    : {};
+  stepDrafts.stats = serializeStatsStepDraft(buildStatsDraft(payload, classId, requiredStats, statsBase));
 
   const ozRings = buildOzRingsDraft(payload);
   if (Object.keys(ozRings.levels).length > 0) stepDrafts.oz_rings = serializeOzRingsDraft(ozRings);
@@ -565,7 +597,7 @@ function comparedFields(classId: string, requiredStats: readonly string[]): Comp
     ...tripleFields(atkLabel, (s) => s.atkBase, (s) => s.atkPercent, (s) => s.atkAbs),
     { label: stat("damage"), read: statNum((s) => s.dmg) },
     { label: stat("bossDamage"), read: statNum((s) => s.bossDmg) },
-    { label: stat("normalEnemyDamage"), read: statNum((s) => s.normalDmg) },
+    // Normal Enemy Damage deliberately not compared -- not mapped by buildStatsDraft.
     { label: stat("ignoreDefense"), read: statNum((s) => s.ignoreDef) },
     { label: stat("criticalRate"), read: statNum((s) => s.critical) },
     { label: stat("criticalDamage"), read: statNum((s) => s.criticalDmg) },
@@ -581,7 +613,10 @@ function comparedFields(classId: string, requiredStats: readonly string[]): Comp
     // Weapon ATT deliberately not compared -- MapleScouter ignores it (see buildStatsDraft).
     { label: "Inner Ability: +1 Passive Skill Level", read: (p) => String(p.stat.passiveSkillLevelUp) },
     { label: "Inner Ability: +1 Attack Target", read: (p) => String(p.stat.increaseTarget) },
-    { label: "Wild Hunter Legion level", read: statNum((s) => s.wildhunterUnion) },
+    // Compare the Legion RANK, not the raw union level -- what MapleDoro stores and what
+    // the import maps is the bracket (250 and 255 are both SSS), so raw-level differences
+    // inside the same bracket aren't real.
+    { label: "Wild Hunter Legion rank", read: (p) => whRankForLevel(num(p.stat.wildhunterUnion)) ?? "None" },
     { label: "Legion Artifact: +1 target", read: (p) => String(p.stat.artifact_increaseTarget === true) },
     { label: "Legion Artifact: Final Attack Damage %", read: (p) => normNum(p.stat.artifact_finalAttack) },
     { label: "Genesis Liberation", read: (p) => String(p.special.genesis) },
