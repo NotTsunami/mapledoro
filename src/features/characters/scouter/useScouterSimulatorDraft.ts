@@ -25,7 +25,7 @@ const EMPTY_INPUT: Record<keyof SimulatorInputOverrides, number> = {
   subStat: 0, subStatPer: 0, subStatAbs: 0, subStat9Level: 0,
   ssubStat: 0, ssubStatPer: 0, ssubStatAbs: 0, ssubStat9Level: 0,
   allStatPer: 0, criRate: 0, buffDuration: 0, coolTimeReduce: 0,
-  atk: 0, atkPer: 0, bossDmg: 0, criDmg: 0, ignoreGuard: 0, resetCoolDown: 0, weaponAtk: 0,
+  atk: 0, atkPer: 0, bossDmg: 0, criDmg: 0, ignoreGuard: 0, resetCoolDown: 0,
 };
 
 export interface ScouterSimulatorDraft {

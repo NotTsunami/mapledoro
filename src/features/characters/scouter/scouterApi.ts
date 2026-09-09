@@ -397,13 +397,17 @@ function isTripleStatField(id: string): id is TripleStatFieldId {
   return TRIPLE_STAT_FIELD_IDS.has(id);
 }
 
-interface MainSubAssignment {
+export interface MainSubAssignment {
   main: TripleStatFieldId | null;
   sub: TripleStatFieldId | null;
   ssub: TripleStatFieldId | null;
 }
 
-function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
+/** Which real stat (STR/DEX/INT/LUK) each of MapleScouter's main/sub/ssub stat slots
+ *  corresponds to for a class. Exported so the reverse direction (importing a MapleScouter
+ *  export back into MapleDoro, see maplescouterImportData.ts) can un-map slot values to
+ *  the right per-stat draft fields. */
+export function assignMainSubStats(classId: string, requiredStats: TripleStatFieldId[]): MainSubAssignment {
   const realStatSlots = requiredStats.filter((s) => REAL_STATS.includes(s));
   const [first = null, second = null, third = null] = realStatSlots;
   if (classId === "demon_avenger") {
@@ -474,7 +478,10 @@ function buildStat(
     // real damage benefit from over-capping crit rate, so that bonus isn't thrown away.
     critical: String(Math.max(Number(character.stats.criticalRate || "0"), 100)),
     criticalDmg: character.stats.criticalDamage || "0",
-    weaponAtk: String(character.scouter?.weaponAtt ?? 0),
+    // MapleScouter removed the Weapon ATT input from its own UI and the API ignores whatever
+    // value it's sent (live-tested: 0 vs a real number vs garbage, byte-identical result).
+    // The field is still accepted, so it's sent as an inert "0", same as ringOfSum/riskTaker.
+    weaponAtk: "0",
     atkPercent: atk.percent || "0",
     coolTimeReducePercent: character.stats.cooldownReduction.percent || "0",
     coolTimeReduce: character.stats.cooldownReduction.seconds || "0",
@@ -639,9 +646,9 @@ function buildLinkSkill(linkSkills: LinkSkillsData | undefined): Record<string, 
  *  the class asks, Wild Hunter Legion rank, Inner Ability line) -- full_setup's own
  *  Quick Questions stays permanently optional (see isScouterQuestionnaireComplete's doc
  *  comment), so this is the one place that data ever gets required at all.
- *  "characterInfo" points at Stats' Character Info substep (STR/DEX/etc, Combat Stats,
- *  Weapon ATT -- the numeric fields Full Setup can silently skip past, see
- *  isStatsSubstepAnyFieldFilled). Checked in the same order the live flow's own substeps
+ *  "characterInfo" points at Stats' Character Info substep (STR/DEX/etc, Combat Stats --
+ *  the numeric fields Full Setup can silently skip past, see isStatsSubstepAnyFieldFilled).
+ *  Checked in the same order the live flow's own substeps
  *  appear (Quick Questions is substep 0, Character Info is substep 1) so a character
  *  missing BOTH reports the one the player would actually hit first, not whichever
  *  happened to be checked first in code -- a totally blank character used to report
@@ -676,10 +683,9 @@ export function findScouterSetupGap(character: StoredCharacterRecord): ScouterSe
     cooldownReduction: stats.cooldownReduction, cooldownSkip: stats.cooldownSkip,
     ignoreElementalResistance: stats.ignoreElementalResistance, additionalStatusDamage: stats.additionalStatusDamage,
     summonDuration: stats.summonDuration, arcanePower: stats.arcanePower, sacredPower: stats.sacredPower,
-    weaponAtt: character.scouter?.weaponAtt !== undefined ? String(character.scouter.weaponAtt) : undefined,
   };
   const characterInfoComplete = isStatsSubstepComplete(
-    draft, tripleIds, true, primaryStat,
+    draft, tripleIds, primaryStat,
     isArcaneEligible(character.level, classData.isLegacy),
     isSacredEligible(character.level, classData.isLegacy),
   );
@@ -776,7 +782,7 @@ export interface SimulatorInputOverrides {
   ssubStat?: string; ssubStatPer?: string; ssubStatAbs?: string; ssubStat9Level?: string;
   allStatPer?: string; criRate?: string; buffDuration?: string; coolTimeReduce?: string;
   atk?: string; atkPer?: string; bossDmg?: string; criDmg?: string; ignoreGuard?: string;
-  resetCoolDown?: string; weaponAtk?: string;
+  resetCoolDown?: string;
 }
 
 export interface ScouterSimulatorOverrides {
@@ -855,11 +861,9 @@ function applyStatFamilyOverrides(stat: ScouterStat, input: SimulatorInputOverri
 }
 
 /** Everything else on the Input tab -- combat percentages, cooldowns, ATT. ignoreGuard is the
- *  one diminishing-stack field (real + (100 - real) * (typed / 100)); the rest, including
- *  weaponAtk, are plain adds -- the popup shows Weapon ATT as a delta on top of the real value
- *  (same UX as every other field), even though MapleScouter's own API wants the resulting
- *  absolute number. criDmg is applied by applyInputOverrides itself, not here, since it needs
- *  to combine with a Final Damage% override on the same field. */
+ *  one diminishing-stack field (real + (100 - real) * (typed / 100)); the rest are plain
+ *  adds. criDmg is applied by applyInputOverrides itself, not here, since it needs to combine
+ *  with a Final Damage% override on the same field. */
 function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverrides): void {
   if (input.criRate) addToStatField(stat, "critical", Number(input.criRate));
   if (input.buffDuration) addToStatField(stat, "buffDuration", Number(input.buffDuration));
@@ -872,7 +876,6 @@ function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverr
     stat.ignoreDef = String(real + (100 - real) * (Number(input.ignoreGuard) / 100));
   }
   if (input.resetCoolDown) addToStatField(stat, "resetCoolDown", Number(input.resetCoolDown));
-  if (input.weaponAtk) addToStatField(stat, "weaponAtk", Number(input.weaponAtk));
 }
 
 /** Applies every Input tab field's confirmed formula onto a real ScouterStat, in place -- see

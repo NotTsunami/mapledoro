@@ -14,6 +14,8 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-09-09",
     changes: [
+      { type: "added", text: "Character setup now has an Import from MapleScouter step. Upload the preset file MapleScouter gives you and it pre-fills your stats, buffs, link skills, Oz Rings and HEXA skills for you to double-check, and flags any value that does not match what you already have saved." },
+      { type: "changed", text: "Removed the Weapon ATT question from character setup and the Scouter simulator, since MapleScouter no longer uses it." },
       { type: "changed", text: "Updated the Oz Rings setup step for the v271 Special Skill Ring changes. It now covers just the Ring of Restraint, Weapon Jump (now capped at level 4) and Continuous Ring, and your Scouter figure may shift slightly on your next refresh." },
     ],
   },

@@ -87,8 +87,6 @@ export interface StoredScouterData {
   /** Scouter-relevant legendary Inner Ability line. "neither" is a real, deliberate answer
    *  (not the same as unanswered/undefined) — must round-trip like any other value. */
   innerAbilityLine?: "passive" | "multiTarget" | "neither";
-  /** Weapon's attack value — the "+X" Attack Power / Magic ATT shown on the weapon tooltip. */
-  weaponAtt?: number;
 }
 
 /** One Familiars preset's slot: a picked familiar plus its rolled lines.
