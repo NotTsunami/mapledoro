@@ -31,7 +31,6 @@ import {
   OZ_RING_MAX_LEVEL, OZ_RING_ICON_IDS,
   sanitizeOzRingLevel, getOzWeaponJumpVariant, type OzRingsDraft, type OzRingId,
 } from "../setup/data/ozRingData";
-import { deriveWeaponAttLabel } from "../setup/data/statsStepDraft";
 import {
   SIMULATOR_HEXA_CORE_MAX, simulatorStatLabels,
   type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInputOverrides,
@@ -393,9 +392,8 @@ function OzRingsTab({ theme, draft, onChange, weaponJumpLabel, weaponJumpIconId 
 const tripleInputGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.35rem" };
 
 /** Real per-field caps and whether MapleScouter's own simulator accepts a decimal for it,
- *  matching maplescouter.com's own Input panel. Every field the Input tab renders is covered
- *  here EXCEPT weaponAtk, which gets a dynamic max instead (see InputTab's own weaponAtk row). */
-const INPUT_FIELD_LIMITS: Record<Exclude<keyof SimulatorInputOverrides, "weaponAtk">, { max: number; decimal: boolean }> = {
+ *  matching maplescouter.com's own Input panel. */
+const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; decimal: boolean }> = {
   mainStat: { max: 3000, decimal: false },
   mainStatPer: { max: 400, decimal: false },
   mainStatAbs: { max: 40000, decimal: false },
@@ -420,7 +418,6 @@ const INPUT_FIELD_LIMITS: Record<Exclude<keyof SimulatorInputOverrides, "weaponA
   resetCoolDown: { max: 27.5, decimal: true },
 };
 
-const WEAPON_ATT_ABSOLUTE_MAX = 1150;
 const FINAL_DMG_LIMIT = { max: 75, decimal: true };
 
 /** A field's numeric bounds for LimitedNumberInput -- max omitted means no real cap. min
@@ -495,7 +492,7 @@ function TripleInputBox({ label, sublabel, value, limit, onChange, inputStyle, t
   );
 }
 
-type StatFamilyInputKey = Exclude<keyof SimulatorInputOverrides, "weaponAtk">;
+type StatFamilyInputKey = keyof SimulatorInputOverrides;
 
 function TripleInputRow({ theme, inputStyle, label, baseKey, percentKey, absKey, per9Key, base, percent, abs, per9Levels, onChange }: {
   theme: AppTheme; inputStyle: CSSProperties; label: string;
@@ -551,13 +548,11 @@ const COMBAT_RIGHT_FIELDS: { key: StatFamilyInputKey; label: string; suffix?: st
   { key: "buffDuration", label: "Buff Duration" },
 ];
 
-function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChange, statLabels, usesMagicWeapon, weaponAttLabel, realWeaponAtt }: {
+function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChange, statLabels, usesMagicWeapon }: {
   theme: AppTheme; finalDmgPercent: number; onFinalDmgChange: (v: number) => void;
   input: Record<keyof SimulatorInputOverrides, number>; onInputChange: (key: keyof SimulatorInputOverrides, value: number) => void;
   statLabels: ReturnType<typeof simulatorStatLabels>;
   usesMagicWeapon: boolean;
-  weaponAttLabel: string;
-  realWeaponAtt: number;
 }) {
   const inputStyle = statInputStyle(theme);
   const field = (key: StatFamilyInputKey, label: string, suffix: string | null = "%") => (
@@ -619,15 +614,13 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
 
       <div>
         <p style={dividedSectionLabelStyle(theme)}>Other</p>
+        {/* Same two-column shape as Combat Stats so "All Stat" lines up with that section's
+            left column instead of spanning the whole width. */}
         <div style={{ display: "flex", minWidth: 0, gap: "1.1rem" }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            <InputGroupField theme={theme} inputStyle={inputStyle} label={weaponAttLabel} value={input.weaponAtk}
-              limit={{ max: Math.max(0, WEAPON_ATT_ABSOLUTE_MAX - realWeaponAtt), decimal: false }}
-              onChange={(v) => onInputChange("weaponAtk", v)} suffix={null} />
-          </div>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {field("allStatPer", "All Stat")}
           </div>
+          <div style={{ flex: 1, minWidth: 0 }} />
         </div>
       </div>
     </div>
@@ -638,7 +631,7 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
  *  (plus the HEXA tab's own locked-or-not choice) doesn't add to the dialog function's
  *  control-flow complexity alongside everything else it already coordinates. */
 function TabContent({
-  theme, draft, character, hexaClassDef, primaryStat, statLabels, ozClassInfo, usesMagicWeapon, weaponAttLabel,
+  theme, draft, character, hexaClassDef, primaryStat, statLabels, ozClassInfo, usesMagicWeapon,
 }: {
   theme: AppTheme;
   draft: ScouterSimulatorDraft;
@@ -648,7 +641,6 @@ function TabContent({
   statLabels: ReturnType<typeof simulatorStatLabels>;
   ozClassInfo: ReturnType<typeof getOzWeaponJumpVariant>;
   usesMagicWeapon: boolean;
-  weaponAttLabel: string;
 }) {
   switch (draft.tab) {
     case "buffs":
@@ -679,8 +671,6 @@ function TabContent({
           onInputChange={draft.setInputField}
           statLabels={statLabels}
           usesMagicWeapon={usesMagicWeapon}
-          weaponAttLabel={weaponAttLabel}
-          realWeaponAtt={character.scouter?.weaponAtt ?? 0}
         />
       );
   }
@@ -720,7 +710,9 @@ export default function ScouterSimulatorDialog({
   // HexaLockedMessage's own comment for why.
   const hexaLegacyBlocked = Boolean(classData?.isLegacy);
   const hexaClassDef = classData && !hexaLegacyBlocked ? findClassById(classData.id) : null;
-  const { usesMagicWeapon, label: weaponAttLabel } = deriveWeaponAttLabel(classData);
+  // Whether the class's attack stat is Magic ATT (used for the Input tab's ATT delta label).
+  const required = classData?.requiredStats ?? [];
+  const usesMagicWeapon = required.includes("magicAtt") && !required.includes("attackPower");
   const inputStyle = statInputStyle(theme);
 
   const draft = useScouterSimulatorDraft(character, hexaClassDef, previousOverrides);
@@ -824,7 +816,7 @@ export default function ScouterSimulatorDialog({
         <TabContent
           theme={theme} draft={draft} character={character} hexaClassDef={hexaClassDef}
           primaryStat={primaryStat} statLabels={statLabels} ozClassInfo={ozClassInfo}
-          usesMagicWeapon={usesMagicWeapon} weaponAttLabel={weaponAttLabel}
+          usesMagicWeapon={usesMagicWeapon}
         />
       </div>
 

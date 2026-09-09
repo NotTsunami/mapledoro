@@ -259,7 +259,6 @@ function applyStatsDraftToRoster(
   const innerAbilityLine = innerAbilityHasData(stats.innerAbility)
     ? (deriveInnerAbilityLine(stats.innerAbility) ?? "neither")
     : scouterQ?.innerAbilityLine;
-  const weaponAtt = scouterQ?.weaponAtt;
   upsertFn({
     ...existing,
     stats: { ...existing.stats, ...stats },
@@ -267,8 +266,8 @@ function applyStatsDraftToRoster(
     weaponHand: deriveWeaponHandFromWeapon(existing.equipment) ?? weaponHand,
     hasRuinForceShield: deriveHasRuinForceShield(existing.equipment) ?? hasRuinForceShield,
     soul,
-    scouter: innerAbilityLine || weaponAtt !== undefined
-      ? { ...existing.scouter, ...(innerAbilityLine ? { innerAbilityLine } : {}), ...(weaponAtt !== undefined ? { weaponAtt } : {}) }
+    scouter: innerAbilityLine
+      ? { ...existing.scouter, innerAbilityLine }
       : existing.scouter,
   });
 }
@@ -549,12 +548,11 @@ function applyMapleScouterFlow(
   const innerAbilityLine = innerAbilityHasData(base.stats.innerAbility)
     ? (deriveInnerAbilityLine(base.stats.innerAbility) ?? "neither")
     : scouterQ?.innerAbilityLine;
-  const scouterPatch = ozRings || buffs || scouterQ || innerAbilityLine
+  const scouterPatch = ozRings || buffs || innerAbilityLine
     ? {
         ...base.scouter,
         ...(ozRings ? { ozRings } : {}),
         ...(buffs ? { buffs } : {}),
-        ...(scouterQ?.weaponAtt !== undefined ? { weaponAtt: scouterQ.weaponAtt } : {}),
         ...(innerAbilityLine !== undefined ? { innerAbilityLine } : {}),
       }
     : base.scouter;
@@ -724,16 +722,9 @@ function buildFullSetupRecord(
   const innerAbilityLine = innerAbilityHasData(stats.innerAbility)
     ? (deriveInnerAbilityLine(stats.innerAbility) ?? "neither")
     : convertScouterQuestionsDraftToStored(statsDraft)?.innerAbilityLine;
-  // Weapon ATT is asked in Character Info (Stats), same as maplescouter_setup/stats_flow
-  // — no longer asked inline in the Equipment step's weapon picker (that field always
-  // wrote against whichever weapon sat in preset 0, wrongly assuming that's the
-  // character's real bossing preset — there's no way to know that during full_setup,
-  // since the active preset is only ever set later).
-  const weaponAtt = convertScouterQuestionsDraftToStored(statsDraft)?.weaponAtt;
   const scouterPatch = {
     ...(ozRings ? { ozRings } : {}),
     ...(buffs ? { buffs } : {}),
-    ...(weaponAtt !== undefined ? { weaponAtt } : {}),
     ...(innerAbilityLine ? { innerAbilityLine } : {}),
   };
 
@@ -760,10 +751,10 @@ function buildFullSetupRecord(
     expHistory: existing ? appendExpHistoryEntry(existing.expHistory, character.level, character.exp) : base.expHistory,
     // Merged against the EXISTING record's scouter (not `base`, which is always a
     // fresh blank object here — see the equipment/familiars/vMatrix comment above for
-    // why that matters): scouterPatch only holds whichever of ozRings/buffs/weaponAtt/
+    // why that matters): scouterPatch only holds whichever of ozRings/buffs/
     // innerAbilityLine actually got recomputed THIS run. Replacing scouter outright
-    // (the old behavior) silently dropped the other three whenever a redo of full
-    // setup didn't happen to revisit Oz Rings/Buffs/Equipment this time.
+    // (the old behavior) silently dropped the others whenever a redo of full setup
+    // didn't happen to revisit Oz Rings/Buffs this time.
     scouter: { ...existing?.scouter, ...scouterPatch },
   };
 }
@@ -1129,7 +1120,6 @@ function buildSeededStepTestByStep(jobName: string, storedCharacter: StoredChara
     stats: storedCharacter
       ? serializeStatsStepDraft(storedStatsToStatsStepDraft({
           ...storedCharacter,
-          weaponAtt: storedCharacter.scouter?.weaponAtt,
           innerAbilityLine: storedCharacter.scouter?.innerAbilityLine,
         }))
       : "",
@@ -2408,11 +2398,11 @@ export function useCharacterSetupController(initialRouteIntent?: InitialRouteInt
       }
 
       // Resyncs every step draft to the just-committed truth — without this, a stale
-      // or stepped-past draft for a DIFFERENT step (e.g. a random Weapon ATT typed
-      // into an abandoned MapleScouter Setup attempt, never cleared) keeps sitting in
-      // memory and can outlive this Finish, surfacing again the next time some other
-      // flow touches that same step this session (only a full page reload used to fix
-      // it, since that's the only other place this same seeding ran).
+      // or stepped-past draft for a DIFFERENT step (e.g. a stat typed into an abandoned
+      // MapleScouter Setup attempt, never cleared) keeps sitting in memory and can
+      // outlive this Finish, surfacing again the next time some other flow touches that
+      // same step this session (only a full page reload used to fix it, since that's the
+      // only other place this same seeding ran).
       if (confirmedCharacter) {
         // Uses the just-upserted record directly (lastUpsertedCharacterRef), NOT a
         // fresh readCharactersStore() read — the actual localStorage write happens in
