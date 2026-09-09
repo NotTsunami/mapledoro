@@ -24,6 +24,7 @@ import {
 import {
   useSymbolState,
   effectiveWeekly,
+  WEEKLY_SYMBOLS,
   type SymbolState,
   type SymbolStats,
 } from "./useSymbolState";
@@ -344,7 +345,7 @@ function SymbolIncomeControls({
             border: `1px solid ${state.weeklyEnabled ? alpha(theme.accent, 0.27) : theme.border}`,
           }}
         >
-          Weekly {state.weeklyEnabled ? "120" : "OFF"}
+          Weekly {state.weeklyEnabled ? WEEKLY_SYMBOLS : "OFF"}
         </button>
       )}
     </div>

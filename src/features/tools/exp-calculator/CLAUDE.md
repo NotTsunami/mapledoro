@@ -4,8 +4,8 @@ Each tab persists per-character under its own tool key via `characterToolStorage
 stays in memory.
 
 - `expFarming` (`SavedExpState`): buff selections, target level, hourly kill count.
-- `expDailyWeekly` (`SavedAllInOne`): the Daily / Weekly / Monster Park / Epic Dungeon panels, plus
-  target level, burning, and the date window.
+- `expDailyWeekly` (`SavedAllInOne`): the Daily Content and Weekly Content and Dungeons panels,
+  plus target level, burning, and the date window.
 - `expLevel`: the character's current level and EXP percent. Deliberately **not** per tab, since
   they are one fact about the character and the two tabs must not disagree about them.
 

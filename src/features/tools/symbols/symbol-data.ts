@@ -42,48 +42,48 @@ export const ARCANE_AREAS: SymbolArea[] = [
   {
     name: "Vanishing Journey",
     itemId: "01712001", // Arcane Symbol: Vanishing Journey
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Erda Spectrum",
     requiredLevel: 200,
   },
   {
     name: "Chu Chu Island",
     itemId: "01712002", // Arcane Symbol: Chu Chu Island
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Hungry Muto",
     requiredLevel: 210,
   },
   {
     name: "Lachelein",
     itemId: "01712003", // Arcane Symbol: Lachelein
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Midnight Chaser",
     requiredLevel: 220,
   },
   {
     name: "Arcana",
     itemId: "01712004", // Arcane Symbol: Arcana
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Spirit Savior",
     requiredLevel: 225,
   },
   {
     name: "Morass",
     itemId: "01712005", // Arcane Symbol: Morass
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Ranheim Defense",
     requiredLevel: 230,
   },
   {
     name: "Esfera",
     itemId: "01712006", // Arcane Symbol: Esfera
-    daily: 20,
-    weekly: 120,
+    daily: 40,
+    weekly: 240,
     weeklyActivity: "Esfera Guardian",
     requiredLevel: 235,
   },
@@ -93,7 +93,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Cernium",
     itemId: "01713000", // Sacred Symbol: Cernium
-    daily: 20,
+    daily: 30,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 260,
@@ -101,7 +101,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Hotel Arcus",
     itemId: "01713001", // Sacred Symbol: Arcus
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 265,
@@ -109,7 +109,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Odium",
     itemId: "01713002", // Sacred Symbol: Odium
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 270,
@@ -117,7 +117,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Shangri-La",
     itemId: "01713003", // Sacred Symbol: Shangri-La
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 275,
@@ -125,7 +125,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Arteria",
     itemId: "01713004", // Sacred Symbol: Arteria
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 280,
@@ -133,7 +133,7 @@ export const SACRED_AREAS: SymbolArea[] = [
   {
     name: "Carcion",
     itemId: "01713005", // Sacred Symbol: Carcion
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 285,
@@ -149,7 +149,7 @@ export const GRAND_SACRED_AREAS: SymbolArea[] = [
   {
     name: "Tallahart",
     itemId: "01714000", // Grand Sacred Symbol: Tallahart
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 290,
@@ -157,7 +157,7 @@ export const GRAND_SACRED_AREAS: SymbolArea[] = [
   {
     name: "Geardock",
     itemId: "01714001", // Grand Sacred Symbol: Geardock
-    daily: 10,
+    daily: 15,
     weekly: 0,
     weeklyActivity: "",
     requiredLevel: 295,
