@@ -68,7 +68,7 @@ const HEXA_CORE_MIN: Partial<Record<SimulatorHexaCoreField, number>> = { skillCo
 // panel's read-only display, but those extra entries have nowhere to go once saved).
 const SIMULATOR_LINK_SKILLS = LINK_SKILLS.filter((s) => s.id in LINK_SKILL_TO_SCOUTER_KEY);
 
-// Real GMS level cap as of v270 -- MapleStory's max character level. Update alongside any
+// Real GMS level cap as of v271 -- MapleStory's max character level. Update alongside any
 // future level cap increase (root CLAUDE.md's version-bump checklist doesn't cover this,
 // it's not manifest-derived).
 const MAX_CHARACTER_LEVEL = 300;

@@ -44,7 +44,7 @@ export const LINK_SKILLS: LinkSkillDef[] = [
   // the site's own summary table, which turned out to have several stale groupings (e.g.
   // claimed all Heroes share "Close Call" and all non-Xenon Resistance demons share
   // "Hybrid Logic" -- both wrong; Aran/Combo Kill Blessing and Demon Slayer/Fury Unleashed
-  // are actually solo). iconId cross-checked against manifests/v270/skill.json by exact
+  // are actually solo). iconId cross-checked against manifests/v271/skill.json by exact
   // name. `branch` per-entry confirmed against grandislibrary.com/classes's own branch
   // headings directly (not guessed).
   { id: "nobleFire",             name: "Noble Fire",              classes: ["Adele"],                                                                          maxLevel: 3,  iconId: "150020241", branch: "Flora" },

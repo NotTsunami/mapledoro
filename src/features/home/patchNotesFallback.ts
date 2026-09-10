@@ -11,24 +11,24 @@ export type PatchNote = { version: string; date: string; title: string; tags: st
 
 export const FALLBACK_PATCH_NOTES: PatchNote[] = [
   {
-    version: "v270",
-    date: "Jul 22",
-    title: "V.270 KNOWN ISSUES",
+    version: "v271",
+    date: "Sep 9",
+    title: "V.271 KNOWN ISSUES",
     tags: ["MAINTENANCE"],
-    url: "https://www.nexon.com/maplestory/news/maintenance/43420/v-270-known-issues",
+    url: "https://www.nexon.com/maplestory/news/maintenance/45226/v-271-known-issues",
   },
   {
     version: "",
-    date: "Jul 22",
-    title: "MYSTIC FRONTIER CHAMPIONS",
+    date: "Sep 9",
+    title: "FRIEREN'S SPELL COLLECTION",
     tags: ["EVENTS"],
-    url: "https://www.nexon.com/maplestory/news/events/42466/mystic-frontier-champions",
+    url: "https://www.nexon.com/maplestory/news/events/44414/frieren-s-spell-collection",
   },
   {
     version: "",
-    date: "Jul 22",
-    title: "KINESIS REDUX!",
+    date: "Sep 9",
+    title: "ADVENTURE WITH FRIEREN'S COMPANIONS",
     tags: ["EVENTS"],
-    url: "https://www.nexon.com/maplestory/news/events/42465/kinesis-redux",
+    url: "https://www.nexon.com/maplestory/news/events/44415/adventure-with-frieren-s-companions",
   },
 ];

@@ -17,39 +17,38 @@ interface EventReset {
   name: string;
   /** UTC day (0 = Sunday) this event's weeklies roll over on. */
   day: number;
+  /** Inclusive: the UTC midnight the event opens on. Omitted when it opened with the patch. */
+  startsAt?: number;
   /** Exclusive: the UTC midnight the event's stated last day rolls into. */
   endsAt: number;
 }
 
-/** v270's event lineup, from the "Ride the Lightning" patch notes. Each entry's
- *  reset day and end date are the ones the notes state for that event, and the
- *  panel drops an event the moment it ends: the Event Reset row disappears once
- *  every event on it is over, and the weekly row's list shrinks the same way. So
- *  the next patch needs this list replaced, not pruned.
+/** v271's event lineup, from the "MapleStory x Frieren" patch notes. Each entry's
+ *  reset day and dates are the ones the notes state for that event, and the panel
+ *  lists an event only while it runs: the Event Reset row disappears once every
+ *  event on it is over, and the weekly row's list shrinks the same way. So the
+ *  next patch needs this list replaced, not pruned.
  *
  *  Nexon writes the ends as "11:59 PM UTC"; each is stored as the following
  *  midnight, which is also the reset the event's final week ends on. */
 const EVENT_RESETS: EventReset[] = [
-  // The notes only say "the weekly reset at 12:00 AM UTC" for this one, never a day;
-  // Wednesday is the observed rollover, matching the rest of the v270 lineup.
-  { name: "Ride or Die", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 2) }, // Sep 1
-  { name: "Operation: Dive", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
-  { name: "Tallahart Fantasia", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
-  { name: "Momentum Pass", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
-  { name: "Frontier Pass", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
-  // The v270 notes still print this one's original "Thursday at 12:00 PM UTC", but the
-  // v269 notes (same event, one continuous run) carry Nexon's 6/23 correction of that
-  // exact line to Wednesday at 12:00 AM UTC.
-  { name: "Phantasmal Echoes", day: EVENT_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
-  { name: "Challenger Pass", day: WEEKLY_RESET_DAY, endsAt: Date.UTC(2026, 8, 9) }, // Sep 8
+  { name: "Frieren's Spell Collection", day: WEEKLY_RESET_DAY, endsAt: Date.UTC(2026, 9, 8) }, // Oct 7
+  // Designer EXP / promotion evaluations.
+  { name: "Mesotron-S Project", day: EVENT_RESET_DAY, startsAt: Date.UTC(2026, 8, 30), endsAt: Date.UTC(2026, 10, 11) }, // Sep 30 - Nov 10
+  { name: "Go Go Sidekick!", day: EVENT_RESET_DAY, startsAt: Date.UTC(2026, 8, 30), endsAt: Date.UTC(2026, 10, 4) }, // Sep 30 - Nov 3
+  { name: "Overclock Mesotron-S", day: EVENT_RESET_DAY, startsAt: Date.UTC(2026, 9, 14), endsAt: Date.UTC(2026, 10, 11) }, // Oct 14 - Nov 10
+  { name: "Festival Guardian", day: EVENT_RESET_DAY, startsAt: Date.UTC(2026, 9, 14), endsAt: Date.UTC(2026, 10, 11) }, // Oct 14 - Nov 10
+  { name: "Night of the Yeti", day: WEEKLY_RESET_DAY, startsAt: Date.UTC(2026, 9, 14), endsAt: Date.UTC(2026, 10, 12) }, // Oct 14 - Nov 11
+  // Carried over from v270; its run outlasts that patch and v271's notes don't restate it.
   { name: "Item Burning Plus challenges", day: WEEKLY_RESET_DAY, endsAt: Date.UTC(2026, 10, 11) }, // Nov 10
 ];
 
-/** Events still running on `nowMs`. A null clock (SSR, pre-mount) passes 0 and gets
- *  the whole lineup, so the server renders every row the client can and the row set
+/** Events running on `nowMs`. A null clock (SSR, pre-mount) passes 0 and gets the
+ *  whole lineup, so the server renders every row the client can and the row set
  *  only ever shrinks after mount. */
 function liveEventNames(day: number, nowMs: number): string[] {
-  return EVENT_RESETS.filter((e) => e.day === day && nowMs < e.endsAt).map((e) => e.name);
+  const isLive = (e: EventReset) => nowMs === 0 || ((e.startsAt ?? 0) <= nowMs && nowMs < e.endsAt);
+  return EVENT_RESETS.filter((e) => e.day === day && isLive(e)).map((e) => e.name);
 }
 
 type RowKey = "daily" | "weekly" | "events" | "ursus";
@@ -180,7 +179,7 @@ function buildRows(now: Date | null): TimerRow[] {
           tooltip: (
             <TooltipBody
               utc="Wednesday, midnight UTC"
-              summary="v270 events that reset off their own day:"
+              summary="v271 events that reset off their own day:"
               events={eventDayEvents}
             />
           ),
