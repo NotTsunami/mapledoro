@@ -20,7 +20,6 @@ export interface StarForceOpts {
   replacementCost: number;
   costDiscount: boolean;   // 30% off Sunny Sunday
   boomReduction: boolean;  // 30% boom reduction Sunny Sunday
-  starCatch: boolean;      // +5% multiplicative success
   safeguard: boolean;      // boom protection at stars 15-17 (3x cost)
   mvp: MvpTier;
   boomTier?: number;       // experimental enhancement mode 1-4 (stars 15-21); 1 = baseline
@@ -225,7 +224,7 @@ interface AdjustedRates {
  *  1. Safeguard (stars 15-17): boom → maintain
  *  2. Boom reduction event (stars ≤ 21): boom *= 0.7, excess → maintain
  *     (stacks on top of the Enhancement Mode rate — base × 0.7 × tier factor)
- *  3. Star catching: success *= 1.05, redistribute leftover proportionally
+ *  3. Star catching (always on since v271): success *= 1.05, redistribute leftover proportionally
  */
 function adjustedRates(star: number, opts: StarForceOpts): AdjustedRates {
   let success = SUCCESS_RATE[star];
@@ -252,17 +251,16 @@ function adjustedRates(star: number, opts: StarForceOpts): AdjustedRates {
     boom *= 0.7;
   }
 
-  // Star catching: +5% multiplicative success, redistribute leftover
-  if (opts.starCatch) {
-    success *= 1.05;
-    const leftover = 1 - success;
-    if (boom === 0) {
-      maintain = leftover;
-    } else {
-      const ratio = maintain / (maintain + boom);
-      maintain = leftover * ratio;
-      boom = leftover - maintain;
-    }
+  // Star catching: +5% multiplicative success, redistribute leftover. The
+  // minigame was removed in v271, so the bonus is always applied.
+  success *= 1.05;
+  const leftover = 1 - success;
+  if (boom === 0) {
+    maintain = leftover;
+  } else {
+    const ratio = maintain / (maintain + boom);
+    maintain = leftover * ratio;
+    boom = leftover - maintain;
   }
 
   return { success, maintain, boom };

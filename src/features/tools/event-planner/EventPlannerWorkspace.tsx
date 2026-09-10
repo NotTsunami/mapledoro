@@ -472,20 +472,18 @@ function CharacterPlanPanel({
 // ── Event settings ───────────────────────────────────────────────────────────
 
 function EventSettingsSection({
-  theme, costDiscount, boomReduction, starCatch, safeguard, mvp, boomTier,
-  setCostDiscount, setBoomReduction, setStarCatch, setSafeguard, setMvp, setBoomTier,
+  theme, costDiscount, boomReduction, safeguard, mvp, boomTier,
+  setCostDiscount, setBoomReduction, setSafeguard, setMvp, setBoomTier,
   selectStyle,
 }: {
   theme: AppTheme;
   costDiscount: boolean;
   boomReduction: boolean;
-  starCatch: boolean;
   safeguard: boolean;
   mvp: MvpTier;
   boomTier: number;
   setCostDiscount: (v: boolean) => void;
   setBoomReduction: (v: boolean) => void;
-  setStarCatch: (v: boolean) => void;
   setSafeguard: (v: boolean) => void;
   setMvp: (v: MvpTier) => void;
   setBoomTier: (v: number) => void;
@@ -508,7 +506,6 @@ function EventSettingsSection({
       </div>
       <div className="ep-setting-row" style={rowStyle}>
         <span className="section-label" style={labelStyle}>Options</span>
-        <Toggle theme={theme} label="Star Catching" checked={starCatch} style={toggleControlStyle} onChange={setStarCatch} />
         <Toggle theme={theme} label="Safeguard (15-17)" checked={safeguard} disabled={tierActive} style={toggleControlStyle} onChange={setSafeguard} />
       </div>
       <div className="ep-setting-row" style={rowStyle}>
@@ -715,13 +712,11 @@ export default function EventPlannerWorkspace({ theme }: { theme: AppTheme }) {
             theme={theme}
             costDiscount={state.costDiscount}
             boomReduction={state.boomReduction}
-            starCatch={form.starCatch}
             safeguard={form.safeguard}
             mvp={state.mvp}
             boomTier={form.boomTier}
             setCostDiscount={setCostDiscount}
             setBoomReduction={setBoomReduction}
-            setStarCatch={(v) => dispatchForm({ type: "setStarCatch", value: v })}
             setSafeguard={(v) => dispatchForm({ type: "setSafeguard", value: v })}
             setMvp={setMvp}
             setBoomTier={(v) => dispatchForm({ type: "setBoomTier", value: v })}
