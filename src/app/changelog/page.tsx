@@ -14,6 +14,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-09-10",
     changes: [
+      { type: "changed", text: "Removed the Star Catching toggle from the Star Force Calculator and Event Planner, since v271 removed it." },
       { type: "added", text: "Added support for the 3rd Common Node in the HEXA Skill Tracker, with its own cost table." },
       { type: "added", text: "HEXA Stat nodes now show in the HEXA Skill Tracker's leveling guide, and can be marked done from the Overview tab." },
       { type: "changed", text: "Refreshed the HEXA Skill Tracker's final damage values and leveling order for v271." },

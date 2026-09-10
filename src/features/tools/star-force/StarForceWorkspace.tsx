@@ -447,7 +447,6 @@ interface CalcState {
   replacementCost: number;
   costDiscount: boolean;
   boomReduction: boolean;
-  starCatch: boolean;
   safeguard: boolean;
   mvp: MvpTier;
   boomTier: number;
@@ -461,7 +460,6 @@ type CalcAction =
   | { type: "setReplacementCost"; value: number }
   | { type: "setCostDiscount"; value: boolean }
   | { type: "setBoomReduction"; value: boolean }
-  | { type: "setStarCatch"; value: boolean }
   | { type: "setSafeguard"; value: boolean }
   | { type: "setMvp"; value: MvpTier }
   | { type: "setBoomTier"; value: number }
@@ -476,7 +474,6 @@ function reducer(state: CalcState, action: CalcAction): CalcState {
     case "setReplacementCost": return { ...state, replacementCost: action.value };
     case "setCostDiscount": return { ...state, costDiscount: action.value };
     case "setBoomReduction": return { ...state, boomReduction: action.value };
-    case "setStarCatch": return { ...state, starCatch: action.value };
     case "setSafeguard": return { ...state, safeguard: action.value };
     case "setMvp": return { ...state, mvp: action.value };
     case "setBoomTier": return { ...state, boomTier: action.value };
@@ -709,7 +706,6 @@ function StarForceForm({
           <span className="section-label sf-label" style={{ color: theme.muted, marginBottom: 0 }}>
             Options
           </span>
-          <Toggle theme={theme} label="Star Catching" checked={calc.starCatch} style={toggleControlStyle} onChange={(v) => dispatch({ type: "setStarCatch", value: v })} />
           <Toggle theme={theme} label="Safeguard (15-17)" checked={calc.safeguard} disabled={tierActive} style={toggleControlStyle} onChange={(v) => dispatch({ type: "setSafeguard", value: v })} />
         </div>
       </div>
@@ -794,7 +790,6 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
     replacementCost: 0,
     costDiscount: false,
     boomReduction: false,
-    starCatch: true,
     safeguard: false,
     mvp: "none" as MvpTier,
     boomTier: 1,
@@ -815,12 +810,11 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
       replacementCost: calc.replacementCost,
       costDiscount: calc.costDiscount,
       boomReduction: calc.boomReduction,
-      starCatch: calc.starCatch,
       safeguard: tierActive ? false : calc.safeguard,
       mvp: calc.mvp,
       boomTier: calc.boomTier,
     }),
-    [calc.level, calc.startStar, calc.targetStar, calc.replacementCost, calc.costDiscount, calc.boomReduction, calc.starCatch, calc.safeguard, calc.mvp, calc.boomTier, tierActive],
+    [calc.level, calc.startStar, calc.targetStar, calc.replacementCost, calc.costDiscount, calc.boomReduction, calc.safeguard, calc.mvp, calc.boomTier, tierActive],
   );
 
   // Closed form, cheap, always live. Only the Monte Carlo run is gated.

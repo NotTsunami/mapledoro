@@ -8,7 +8,7 @@ triples cost.
 
 **Enhancement Mode** (`StarForceOpts.boomTier`, 1-4; default/undefined = 1 = baseline): Tespia
 boom-reduction for stars 15-21. Tier > 1 overrides base success/boom from `BOOM_TIER_SUCCESS_RATES` /
-`BOOM_TIER_DESTROY_RATES` (applied first in `adjustedRates`, before safeguard/event/star-catch) and
+`BOOM_TIER_DESTROY_RATES` (applied first in `adjustedRates`, before safeguard/event/star-catch; star catching is always applied since v271) and
 multiplies cost by `1 + BOOM_TIER_COST_MULT_INCREASE`. Tier 1 reproduces the default tables exactly.
 The 30% off / 30% boom-reduction events **stack** with it: events apply to the base cost/boom first,
 then Enhancement Mode (cost multiplies the discounted base; boom resolves to `base x 0.7 x tier

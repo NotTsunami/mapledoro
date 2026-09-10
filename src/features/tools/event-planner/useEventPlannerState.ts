@@ -22,13 +22,12 @@ export interface PlannerEntry {
   currentStar: number;
   targetStar: number;
   replacementCost: number;
-  starCatch: boolean;
   safeguard: boolean;
   boomTier: number; // experimental enhancement mode (1 = baseline)
 }
 
-// Events and MVP are global (they apply to every entry); star catch, safeguard,
-// and boom tier are per-entry, captured from the add form.
+// Events and MVP are global (they apply to every entry); safeguard and boom
+// tier are per-entry, captured from the add form.
 interface SavedState {
   costDiscount: boolean;
   boomReduction: boolean;
@@ -36,12 +35,11 @@ interface SavedState {
   entries: PlannerEntry[];
 }
 
-// Saves predating per-entry options stored star catch / boom tier globally and
-// their entries lack those fields.
-type LegacyEntry = Omit<PlannerEntry, "starCatch" | "boomTier"> &
-  Partial<Pick<PlannerEntry, "starCatch" | "boomTier">>;
+// Saves predating per-entry options stored boom tier globally and their
+// entries lack the field. (Entries may also carry a stale `starCatch` from
+// before v271 removed the minigame; it is ignored.)
+type LegacyEntry = Omit<PlannerEntry, "boomTier"> & Partial<Pick<PlannerEntry, "boomTier">>;
 type LegacySavedState = Partial<Omit<SavedState, "entries">> & {
-  starCatch?: boolean;
   boomTier?: number;
   entries?: LegacyEntry[];
 };
@@ -80,7 +78,6 @@ function computeEntryCost(entry: PlannerEntry, settings: SavedState): EntryCost 
     replacementCost: entry.replacementCost,
     costDiscount: settings.costDiscount,
     boomReduction: settings.boomReduction,
-    starCatch: entry.starCatch,
     safeguard: !tierActive && entry.safeguard,
     mvp: settings.mvp,
     boomTier: entry.boomTier,
@@ -111,10 +108,9 @@ export function useEventPlannerState() {
       costDiscount: saved?.costDiscount ?? defaults.costDiscount,
       boomReduction: saved?.boomReduction ?? defaults.boomReduction,
       mvp: saved?.mvp ?? defaults.mvp,
-      // Older saves stored star catch / boom tier globally — fold them into
-      // each entry; entries that already carry their own values win.
+      // Older saves stored boom tier globally: fold it into each entry;
+      // entries that already carry their own value win.
       entries: (saved?.entries ?? []).map((e) => ({
-        starCatch: saved?.starCatch ?? true,
         boomTier: saved?.boomTier ?? 1,
         ...e,
       })),
