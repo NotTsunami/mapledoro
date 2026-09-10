@@ -865,7 +865,13 @@ function applyStatFamilyOverrides(stat: ScouterStat, input: SimulatorInputOverri
  *  adds. criDmg is applied by applyInputOverrides itself, not here, since it needs to combine
  *  with a Final Damage% override on the same field. */
 function applyCombatFieldOverrides(stat: ScouterStat, input: SimulatorInputOverrides): void {
-  if (input.criRate) addToStatField(stat, "critical", Number(input.criRate));
+  if (input.criRate) {
+    // Floor to 100 after the delta, same as buildScouterPayload does for the base value:
+    // MapleScouter's API rejects a payload with critical < 100 (its formulas assume you always
+    // crit), and its own site floors the field before POSTing too -- so a negative delta that
+    // would push the total below 100 lands at exactly 100 rather than 400ing the request.
+    stat.critical = String(Math.max(Number(stat.critical) + Number(input.criRate), 100));
+  }
   if (input.buffDuration) addToStatField(stat, "buffDuration", Number(input.buffDuration));
   if (input.coolTimeReduce) addToStatField(stat, "coolTimeReduce", Number(input.coolTimeReduce));
   if (input.atk) addToStatField(stat, "atkBase", Number(input.atk));

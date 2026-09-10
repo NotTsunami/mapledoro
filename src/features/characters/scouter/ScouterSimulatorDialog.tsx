@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type KeyboardEvent } from "react";
 import ModalShell from "../../../components/ModalShell";
 import { dialogBtnColors, dialogPrimaryBtnColors, type AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
@@ -392,8 +392,10 @@ function OzRingsTab({ theme, draft, onChange, weaponJumpLabel, weaponJumpIconId 
 const tripleInputGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.35rem" };
 
 /** Real per-field caps and whether MapleScouter's own simulator accepts a decimal for it,
- *  matching maplescouter.com's own Input panel. */
-const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; decimal: boolean }> = {
+ *  matching maplescouter.com's own Input panel. Every field here is a delta added on top of
+ *  the character's current stats, so all of them accept a negative value (clamped to -max),
+ *  the same as maplescouter.com -- see the `signed` spread below. */
+const INPUT_FIELD_CAPS: Record<keyof SimulatorInputOverrides, { max: number; decimal: boolean }> = {
   mainStat: { max: 3000, decimal: false },
   mainStatPer: { max: 400, decimal: false },
   mainStatAbs: { max: 40000, decimal: false },
@@ -418,23 +420,39 @@ const INPUT_FIELD_LIMITS: Record<keyof SimulatorInputOverrides, { max: number; d
   resetCoolDown: { max: 27.5, decimal: true },
 };
 
-const FINAL_DMG_LIMIT = { max: 75, decimal: true };
+const INPUT_FIELD_LIMITS = Object.fromEntries(
+  Object.entries(INPUT_FIELD_CAPS).map(([key, cap]) => [key, { ...cap, signed: true }]),
+) as Record<keyof SimulatorInputOverrides, InputLimit>;
+
+const FINAL_DMG_LIMIT: InputLimit = { max: 75, decimal: true, signed: true };
 
 /** A field's numeric bounds for LimitedNumberInput -- max omitted means no real cap. min
- *  defaults to 0 (every field but Level, which can't go below 1). */
-interface InputLimit { max?: number; min?: number; decimal: boolean }
+ *  defaults to 0 (Level can't go below 1). `signed` fields (the whole Input tab, whose
+ *  values are deltas added on top of current stats) accept a leading "-" and clamp to
+ *  [-max, max], matching maplescouter.com -- you can simulate -10 Final Damage there. */
+interface InputLimit { max?: number; min?: number; decimal: boolean; signed?: boolean }
+
+/** Lower bound: an explicit `min`, else -max for a signed field, else 0. */
+function limitMin(limit: InputLimit): number {
+  if (limit.min !== undefined) return limit.min;
+  return limit.signed === true && limit.max !== undefined ? -limit.max : 0;
+}
 
 /** Sanitizes AND clamps a raw text-input value to the field's real cap, same logic as
  *  StatsSetupStep.tsx's own clampIgnoreDefense/clampIgnoreElementalResist -- reformats down
  *  to the max only once the typed number actually exceeds it, never mid-decimal-typing
  *  ("27." stays "27." rather than getting stripped to "27"), so the displayed box itself
- *  can't be typed past its cap the way ToolNumberInput's plain commit-time clamp could. */
+ *  can't be typed past its cap the way ToolNumberInput's plain commit-time clamp could. A
+ *  signed field keeps a leading "-" (its values are deltas that can go negative). */
 function sanitizeLimitedInput(raw: string, limit: InputLimit): string {
-  const sanitized = limit.decimal ? sanitizeDecimalInput(raw) : sanitizeDigitsInput(raw);
-  if (sanitized === "" || sanitized.endsWith(".")) return sanitized;
-  if (limit.max !== undefined && Number(sanitized) > limit.max) return String(limit.max);
-  if (limit.min !== undefined && Number(sanitized) < limit.min) return String(limit.min);
-  return sanitized;
+  const sign = limit.signed === true && raw.trimStart().startsWith("-") ? "-" : "";
+  const body = sign ? raw.replace("-", "") : raw;
+  const cleaned = limit.decimal ? sanitizeDecimalInput(body) : sanitizeDigitsInput(body);
+  if (cleaned === "" || cleaned.endsWith(".")) return sign + cleaned;
+  const n = Number(sign + cleaned);
+  if (limit.max !== undefined && n > limit.max) return String(limit.max);
+  if (n < limitMin(limit)) return String(limitMin(limit));
+  return sign + cleaned;
 }
 
 /** Draft-while-focused text input, shared by the Input tab's own fields and the Level/Arcane
@@ -452,19 +470,26 @@ function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }:
   // An emptied field commits as 0 (this popup's own "no override" value), rather than
   // silently keeping the last real number -- clearing the box and clicking away should
   // leave it empty, not snap back to whatever was typed before.
+  // "-", "." and "-." are half-typed states that carry no number yet -- treat as "no override".
   const commit = (raw: string) => {
     const sanitized = sanitizeLimitedInput(raw, limit);
-    if (sanitized === "" || sanitized === ".") {
+    if (sanitized === "" || sanitized === "." || sanitized === "-" || sanitized === "-.") {
       onChange(0);
       return;
     }
-    onChange(clampNumber(Number(sanitized), limit.max ?? Infinity, limit.min ?? 0));
+    onChange(clampNumber(Number(sanitized), limit.max ?? Infinity, limitMin(limit)));
+  };
+  const keyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // Allow a leading "-" on signed fields; the shared handlers block it outright.
+    if (limit.signed === true && e.key === "-" && e.currentTarget.selectionStart === 0
+      && !e.currentTarget.value.startsWith("-")) return;
+    (limit.decimal ? decimalKeyDown : numericKeyDown)(e);
   };
   return (
     <input
       type="text" inputMode={limit.decimal ? "decimal" : "numeric"} aria-label={ariaLabel}
       value={draft ?? (value === 0 ? "" : String(value))} placeholder="0" style={style}
-      onKeyDown={limit.decimal ? decimalKeyDown : numericKeyDown}
+      onKeyDown={keyDown}
       onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; e.currentTarget.select(); }}
       onChange={(e) => {
         const sanitized = sanitizeLimitedInput(e.target.value, limit);
@@ -482,7 +507,7 @@ function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }:
 
 function TripleInputBox({ label, sublabel, value, limit, onChange, inputStyle, theme }: {
   theme: AppTheme; inputStyle: CSSProperties; label: string; sublabel: string; value: number;
-  limit: { max: number; decimal: boolean }; onChange: (v: number) => void;
+  limit: InputLimit; onChange: (v: number) => void;
 }) {
   return (
     <div>
@@ -519,7 +544,7 @@ function TripleInputRow({ theme, inputStyle, label, baseKey, percentKey, absKey,
 // label-above-input stacking, which reads far taller/looser than the real setup step.
 function InputGroupField({ theme, inputStyle, label, value, limit, onChange, suffix = "%" }: {
   theme: AppTheme; inputStyle: CSSProperties; label: string; value: number;
-  limit: { max: number; decimal: boolean }; onChange: (v: number) => void; suffix?: string | null;
+  limit: InputLimit; onChange: (v: number) => void; suffix?: string | null;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
