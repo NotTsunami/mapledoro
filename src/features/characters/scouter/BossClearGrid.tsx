@@ -22,7 +22,7 @@ import { computeBossClear, type BossClearResult, type ClearColorTier } from "./b
 import { formatFigure } from "./scouterFormat";
 import type { ScouterResultEntry } from "./scouterCache";
 
-// Icon ids hand-looked-up from manifests/v270/ui-boss.json (renamed from boss.json as of v269
+// Icon ids hand-looked-up from manifests/v271/ui-boss.json (renamed from boss.json as of v269
 // -- see root CLAUDE.md "Image Policy"), cross-checked against the same bosses already mapped in
 // liberation-data.ts and trace-restoration-data.ts.
 const BOSS_ICON_ID: Record<string, string> = {

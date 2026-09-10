@@ -548,7 +548,7 @@ interface TreasureBox {
 }
 
 /** Hunting-ground treasure boxes. Each grade pays a fixed multiple of base monster EXP and takes no
- *  EXP buffs at all. The icons are the EXP Gem the box drops (manifests/v270/item.json); the boxes
+ *  EXP buffs at all. The icons are the EXP Gem the box drops (manifests/v271/item.json); the boxes
  *  themselves have no item icon. */
 const TREASURE_BOXES: TreasureBox[] = [
   {

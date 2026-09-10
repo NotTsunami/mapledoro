@@ -22,7 +22,7 @@ these are in-game loops, not songs with an ending. The parent keys it by puzzle 
 gets a fresh element.
 
 **Puzzle payload** (`puzzle-data.generated.ts`) is AUTO-GENERATED — never hand-edit. Regenerate with
-`node scripts/generate-bgm-guesser-data.mjs` (needs dev-only `manifests/v270/bgm.json` +
+`node scripts/generate-bgm-guesser-data.mjs` (needs dev-only `manifests/v271/bgm.json` +
 `ui-mark.json`, and network access to fetch maplebgm-db). It exports base64(XOR(json)) of
 `[group, track, title, answer]` tuples, plus the plain `BGM_GUESSER_ANSWER_DATA` pool
 (`[name, ui-mark id, isBoss]`) — the picker needs every answer anyway, so only the day's answer is
