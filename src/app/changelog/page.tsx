@@ -17,6 +17,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "added", text: "Character setup now has an Import from MapleScouter step. Upload the preset file MapleScouter gives you and it pre-fills your stats, buffs, link skills, Oz Rings and HEXA skills for you to double-check, and flags any value that does not match what you already have saved." },
       { type: "added", text: "The Scouter simulator now shows how much each power figure changed. The Boss 300, Boss 380, Converted and Dojo numbers get a green or red delta while a simulation is applied, hover for the original value, and Boss 300 and Boss 380 also show the change as an FD equivalent percentage." },
       { type: "added", text: "The Scouter simulator's HEXA tab now lets you try out different levels for your 3rd Common Node." },
+      { type: "added", text: "The Scouter simulator's new Extras tab lets you try out your weapon soul, Inner Ability line, Genesis Liberation, weapon type, Legion Artifacts and Wild Hunter Legion rank." },
       { type: "added", text: "Added support for the 3rd Common Node in the HEXA Skill Tracker, with its own cost table." },
       { type: "added", text: "HEXA Stat nodes now show in the HEXA Skill Tracker's leveling guide, and can be marked done from the Overview tab." },
       { type: "added", text: "Added the Crucible Badge to the familiar badge picker in character setup." },

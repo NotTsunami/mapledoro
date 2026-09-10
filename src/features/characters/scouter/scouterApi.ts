@@ -10,7 +10,7 @@
   available for this class" state rather than attempting a fetch with nowhere to route to.
 */
 
-import type { StoredCharacterRecord, StoredScouterLegion, StoredScouterBuffs, LinkSkillsData, LinkSkillId } from "../model/charactersStore";
+import type { CharacterSoul, StoredCharacterRecord, StoredScouterLegion, StoredScouterBuffs, LinkSkillsData, LinkSkillId, WhLegionRank } from "../model/charactersStore";
 import { readCharactersStore, selectCharactersList } from "../model/charactersStore";
 import { CLASS_SKILL_DATA, getRequiredStatsForClass } from "../setup/data/classSkillData";
 import type { TripleStatFieldId } from "../setup/data/statFields";
@@ -341,9 +341,10 @@ function buildDoping(buffs: StoredScouterBuffs | undefined): ScouterDoping {
 // ── Special ──────────────────────────────────────────────────────────────────
 
 /** Ephenia/Mu Gong soul level as MapleScouter's string encoding, capped at "2" —
- *  never send "C": live-tested to zero out the whole result. */
-function soulValue(character: StoredCharacterRecord, type: "ephenia" | "mugong"): string {
-  const soul = character.soul;
+ *  never send "C": live-tested to zero out the whole result. The simulator's Info tab can
+ *  override the character's real soul with a pure what-if (`infoSoul`). */
+function soulValue(character: StoredCharacterRecord, type: "ephenia" | "mugong", infoSoul?: CharacterSoul): string {
+  const soul = infoSoul ?? character.soul;
   if (!soul || soul.type !== type) return "0";
   return soul.soulLevel === 1 || soul.soulLevel === 2 ? String(soul.soulLevel) : "0";
 }
@@ -362,15 +363,15 @@ function ozRingLevel(character: StoredCharacterRecord, ring: OzRingId, overrides
   return String(Math.min(raw, OZ_RING_MAX_LEVEL[ring]));
 }
 
-function buildSpecial(character: StoredCharacterRecord, ringOverrides?: OzRingOverrides): ScouterSpecial {
+function buildSpecial(character: StoredCharacterRecord, ringOverrides?: OzRingOverrides, info?: SimulatorInfoOverrides): ScouterSpecial {
   return {
     isReboot: isRebootWorld(character.worldID),
     combat: true,
-    epiSoul: soulValue(character, "ephenia"),
-    mugongSoul: soulValue(character, "mugong"),
-    genesis: character.isLiberated === true,
-    oneHandSword: character.weaponHand === "1h",
-    useRuinForceShild: character.hasRuinForceShield === true,
+    epiSoul: soulValue(character, "ephenia", info?.soul),
+    mugongSoul: soulValue(character, "mugong", info?.soul),
+    genesis: info?.isLiberated ?? character.isLiberated === true,
+    oneHandSword: (info?.weaponHand ?? character.weaponHand) === "1h",
+    useRuinForceShild: info?.hasRuinForceShield ?? character.hasRuinForceShield === true,
     useContinuousRingAsMainRing: false,
     restraintRing: ozRingLevel(character, "restraint", ringOverrides),
     weaponRing: ozRingLevel(character, "weaponJump", ringOverrides),
@@ -434,7 +435,16 @@ function buildStat(
   koreanClassName: string,
   assignment: MainSubAssignment,
   legion: StoredScouterLegion | undefined,
+  info: SimulatorInfoOverrides | undefined,
 ): ScouterStat {
+  // Info-tab what-ifs for the account-level fields: undefined falls back to the real
+  // per-world value, exactly as the non-simulated payload reads it.
+  const innerAbilityLine = info?.innerAbilityLine ?? character.scouter?.innerAbilityLine;
+  const artifactExtraTarget = info?.artifactExtraTarget ?? legion?.artifactExtraTarget === true;
+  const artifactFinalAttackDmg = info?.artifactFinalAttackDmg ?? legion?.artifactFinalAttackDmg ?? 0;
+  const wildhunterUnion = info?.wildHunterRank !== undefined
+    ? wildHunterUnionLevelForRank(info.wildHunterRank)
+    : wildHunterUnionLevel(legion);
   const mainField = classId === "demon_avenger" ? "hp" : assignment.main;
   const main = tripleStrings(character, mainField);
   const sub = tripleStrings(character, assignment.sub);
@@ -485,18 +495,18 @@ function buildStat(
     atkPercent: atk.percent || "0",
     coolTimeReducePercent: character.stats.cooldownReduction.percent || "0",
     coolTimeReduce: character.stats.cooldownReduction.seconds || "0",
-    wildhunterUnion: String(wildHunterUnionLevel(legion)),
+    wildhunterUnion: String(wildhunterUnion),
     resetCoolDown: character.stats.cooldownSkip || "0",
     statusAdditionalDmg: character.stats.additionalStatusDamage || "0",
     // The two Inner Ability lines MapleScouter cares about (scouterQuestionsData.ts's
     // IA_LINE_OPTIONS) -- previously hardcoded false, so innerAbilityLine was collected
     // and gated on but never actually reached the payload.
-    passiveSkillLevelUp: character.scouter?.innerAbilityLine === "passive",
-    increaseTarget: character.scouter?.innerAbilityLine === "multiTarget",
+    passiveSkillLevelUp: innerAbilityLine === "passive",
+    increaseTarget: innerAbilityLine === "multiTarget",
     summonPersistTime: character.stats.summonDuration || "0",
     // Real MapleScouter capture sends this as an actual boolean, not "1"/"0".
-    artifact_increaseTarget: legion?.artifactExtraTarget === true,
-    artifact_finalAttack: String(legion?.artifactFinalAttackDmg ?? 0),
+    artifact_increaseTarget: artifactExtraTarget,
+    artifact_finalAttack: String(artifactFinalAttackDmg),
     subStat_hyper: "",
     subStat_ability: "",
     subStat_union: "",
@@ -519,9 +529,12 @@ function buildStat(
  *  MapleScouter's own site uses as the union-effect input, not the letter grade. */
 const WH_RANK_TO_LEVEL: Record<string, number> = { B: 60, A: 100, S: 140, SS: 200, SSS: 250 };
 
+function wildHunterUnionLevelForRank(rank: WhLegionRank | "none" | undefined): number {
+  return rank && rank !== "none" ? (WH_RANK_TO_LEVEL[rank] ?? 0) : 0;
+}
+
 function wildHunterUnionLevel(legion: StoredScouterLegion | undefined): number {
-  const rank = legion?.wildHunterRank;
-  return rank ? (WH_RANK_TO_LEVEL[rank] ?? 0) : 0;
+  return wildHunterUnionLevelForRank(legion?.wildHunterRank);
 }
 
 // ── Hexa ─────────────────────────────────────────────────────────────────────
@@ -725,7 +738,7 @@ export interface ScouterPayloadContext {
 export function buildScouterPayload(
   character: StoredCharacterRecord,
   ctx: ScouterPayloadContext,
-  overrides?: Pick<ScouterSimulatorOverrides, "dopingOverrides" | "ringOverrides">,
+  overrides?: Pick<ScouterSimulatorOverrides, "dopingOverrides" | "ringOverrides" | "infoOverrides">,
 ): ScouterUserStat | null {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName);
   if (!classData) return null;
@@ -741,8 +754,8 @@ export function buildScouterPayload(
   return {
     doping: buildDoping(overrides?.dopingOverrides ?? character.scouter?.buffs),
     linkSkill: buildLinkSkill(character.linkSkills),
-    special: buildSpecial(character, overrides?.ringOverrides),
-    stat: buildStat(character, classData.id, koreanClassName, assignment, legion),
+    special: buildSpecial(character, overrides?.ringOverrides, overrides?.infoOverrides),
+    stat: buildStat(character, classData.id, koreanClassName, assignment, legion, overrides?.infoOverrides),
     hexa,
     seedRing: buildSeedRing(character, overrides?.ringOverrides),
     entireStat: ZERO_ENTIRE_STAT,
@@ -789,6 +802,30 @@ export interface SimulatorInputOverrides {
   resetCoolDown?: string;
 }
 
+/** The Scouter Simulator's "Info" tab -- the discrete character/account answers MapleScouter
+ *  Setup's Quick Questions step collects. Every field is an absolute override (not a delta):
+ *  undefined means "use the character's real saved value", matching hexaCoreOverrides/
+ *  linkSkillOverrides. The account-level fields (artifact*, wildHunterRank) are pure what-ifs
+ *  here -- they never write back to scouterLegionByWorld, only this one simulation's payload. */
+export interface SimulatorInfoOverrides {
+  /** {type, soulLevel} the character's weapon soul -- type "none" simulates removing it. */
+  soul?: CharacterSoul;
+  /** Genesis Liberation complete (special.genesis). */
+  isLiberated?: boolean;
+  /** One-handed weapon (special.oneHandSword) -- only meaningful for weaponType classes. */
+  weaponHand?: "1h" | "2h";
+  /** Ruin Force Shield equipped (special.useRuinForceShild) -- Demon Slayer/Avenger only. */
+  hasRuinForceShield?: boolean;
+  /** Legendary Inner Ability line MapleScouter models (stat.passiveSkillLevelUp/increaseTarget). */
+  innerAbilityLine?: "passive" | "multiTarget" | "neither";
+  /** Legion Artifact "+1 target" effect (stat.artifact_increaseTarget). */
+  artifactExtraTarget?: boolean;
+  /** Legion Artifact "Damage of Final Attack Skills" percent, 0-30 (stat.artifact_finalAttack). */
+  artifactFinalAttackDmg?: number;
+  /** Wild Hunter Legion grade (stat.wildhunterUnion), or "none" for no Wild Hunter. */
+  wildHunterRank?: WhLegionRank | "none";
+}
+
 export interface ScouterSimulatorOverrides {
   /** MapleDoro-only, local Boss Clear Grid gap math -- never reaches the API at all.
    *  computeBossClear uses this in place of character.level when set. Live-confirmed a Level
@@ -815,6 +852,10 @@ export interface ScouterSimulatorOverrides {
    *  payload accepts (LINK_SKILL_TO_SCOUTER_KEY) -- absolute levels like hexaCoreOverrides,
    *  not deltas, matching the level the real Link Skills setup step stores. */
   linkSkillOverrides?: Partial<Record<LinkSkillId, string>>;
+  /** The Info tab -- MapleScouter Setup's Quick Questions answers as pure what-ifs. Applied
+   *  in buildScouterPayload (buildSpecial/buildStat), same as dopingOverrides/ringOverrides,
+   *  so it needs no special handling in buildDirectScouterPayload. */
+  infoOverrides?: SimulatorInfoOverrides;
 }
 
 /** The subset of ScouterSimulatorOverrides that has a real 1:1 field on ScouterUserStat
