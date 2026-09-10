@@ -11,7 +11,7 @@ import { sanitizeDigitsInput, sanitizeDecimalInput, numericKeyDown, decimalKeyDo
 import { SkillIcon } from "../../tools/hexa-skills/hexa-ui";
 import { findClassById, type HexaClassDef } from "../../tools/hexa-skills/hexa-classes";
 import type { LinkSkillId, StoredCharacterRecord } from "../model/charactersStore";
-import { CLASS_SKILL_DATA } from "../setup/data/classSkillData";
+import { CLASS_SKILL_DATA, type ClassSetupOptionsDef } from "../setup/data/classSkillData";
 import { LINK_SKILLS } from "../setup/data/linkSkillsData";
 import { LinkSkillRow } from "../setup/components/LinkSkillsSetupStep";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "./scouterLinkSkills";
@@ -26,7 +26,8 @@ import { BuffIconImage, BoolBuffTile, RenownCol } from "../setup/components/Buff
 import { boolTileStyle, pickOneGroupStyle, pickOneLabelStyle, buffIconOverride, buffSecondIconOverride, boolBuffLabel } from "../setup/components/buffTileHelpers";
 import { LeveledIconTile } from "../setup/components/LeveledIconTile";
 import SectionLabel from "../setup/components/SectionLabel";
-import { statInputStyle, inputSuffixStyle } from "../setup/components/QuestionControls";
+import { statInputStyle, inputSuffixStyle, ChecklistCheckbox, ChecklistGroup } from "../setup/components/QuestionControls";
+import { IA_LINE_OPTIONS, LEGION_ARTIFACT_FINAL_ATK_LIMIT, WH_RANK_OPTIONS } from "../setup/data/scouterQuestionsData";
 import {
   OZ_RING_MAX_LEVEL, OZ_RING_ICON_IDS,
   sanitizeOzRingLevel, getOzWeaponJumpVariant, type OzRingsDraft, type OzRingId,
@@ -37,7 +38,7 @@ import {
 } from "./scouterApi";
 import type { ScouterErrorReason } from "./scouterCache";
 import type { ScouterSimulatorApplyResult } from "./useScouterSimulator";
-import { useScouterSimulatorDraft, type ScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
+import { useScouterSimulatorDraft, type InfoDraft, type ScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
 import { hexaCoreFields } from "./hexaSimulatorFields";
 
 // Same copy this codebase already uses for the real result's failure states (ScouterFigure.tsx/
@@ -55,6 +56,7 @@ const TAB_OPTIONS: { value: SimulatorTab; label: string }[] = [
   { value: "hexa", label: "HEXA" },
   { value: "ozRings", label: "Oz Rings" },
   { value: "linkSkills", label: "Links" },
+  { value: "extras", label: "Extras" },
   { value: "input", label: "Input" },
 ];
 
@@ -652,11 +654,147 @@ function InputTab({ theme, finalDmgPercent, onFinalDmgChange, input, onInputChan
   );
 }
 
+// ── Info tab ─────────────────────────────────────────────────────────────────
+
+// Genesis Liberation is a real API field (special.genesis), unlike Level. Gated on the
+// SIMULATED level, same "what if I were also higher level" reasoning as the HEXA tab's
+// 260 gate -- below 255 there's genuinely no liberation to have.
+const GENESIS_LIBERATION_LEVEL = 255;
+
+const FINAL_ATTACK_LIMIT: InputLimit = { max: LEGION_ARTIFACT_FINAL_ATK_LIMIT, decimal: false };
+
+// Flat radio value <-> {soulType, soulLevel}, same encoding SetupOptionsSection uses. The
+// simulator seeds soulLevel to a real 1/2 always, so "none" just ignores it.
+function soulRadioValue(soulType: InfoDraft["soulType"], soulLevel: 1 | 2): string {
+  return soulType === "none" ? "none" : `${soulType}_${soulLevel}`;
+}
+function soulFromRadioValue(val: string | null): { soulType: InfoDraft["soulType"]; soulLevel: 1 | 2 } {
+  if (val === "mugong_1") return { soulType: "mugong", soulLevel: 1 };
+  if (val === "mugong_2") return { soulType: "mugong", soulLevel: 2 };
+  if (val === "ephenia_1") return { soulType: "ephenia", soulLevel: 1 };
+  if (val === "ephenia_2") return { soulType: "ephenia", soulLevel: 2 };
+  return { soulType: "none", soulLevel: 1 };
+}
+
+const MU_GONG_SOUL_OPTIONS = [
+  { value: "mugong_1", label: "Mu Gong Soul Lv 1" },
+  { value: "mugong_2", label: "Mu Gong Soul Lv 2" },
+  { value: "none", label: "Neither", standalone: true },
+];
+const EPHENIA_SOUL_OPTIONS = [
+  { value: "ephenia_1", label: "Ephenia Lv 1" },
+  { value: "ephenia_2", label: "Ephenia Lv 2" },
+  ...MU_GONG_SOUL_OPTIONS,
+];
+
+const WEAPON_HAND_OPTIONS = [
+  { value: "1h", label: "One-Handed" },
+  { value: "2h", label: "Two-Handed" },
+];
+
+function InfoTab({ theme, info, onChange, simulatedLevel, showWeaponHand, showRuinForceShield, showEpheniaSoul }: {
+  theme: AppTheme;
+  info: InfoDraft;
+  onChange: <K extends keyof InfoDraft>(key: K, value: InfoDraft[K]) => void;
+  simulatedLevel: number;
+  showWeaponHand: boolean;
+  showRuinForceShield: boolean;
+  showEpheniaSoul: boolean;
+}) {
+  const setSoul = (val: string | null) => {
+    const { soulType, soulLevel } = soulFromRadioValue(val);
+    onChange("soulType", soulType);
+    if (soulType !== "none") onChange("soulLevel", soulLevel);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+      <div>
+        <p style={dividedSectionLabelStyle(theme)}>Character Info</p>
+        {simulatedLevel >= GENESIS_LIBERATION_LEVEL && (
+          <ChecklistCheckbox
+            label="Genesis Liberation complete"
+            checked={info.isLiberated}
+            onToggle={(v) => onChange("isLiberated", v)}
+            theme={theme}
+          />
+        )}
+        {showRuinForceShield && (
+          <ChecklistCheckbox
+            label="Ruin Force Shield equipped"
+            checked={info.hasRuinForceShield}
+            onToggle={(v) => onChange("hasRuinForceShield", v)}
+            theme={theme}
+          />
+        )}
+        {showWeaponHand && (
+          <ChecklistGroup
+            question="Weapon type"
+            options={WEAPON_HAND_OPTIONS}
+            value={info.weaponHand}
+            onToggle={(v) => onChange("weaponHand", (v as "1h" | "2h") ?? info.weaponHand)}
+            theme={theme}
+          />
+        )}
+        <ChecklistGroup
+          question={showEpheniaSoul ? "Mu Gong or Ephenia Soul on your weapon" : "Mu Gong Soul on your weapon"}
+          options={showEpheniaSoul ? EPHENIA_SOUL_OPTIONS : MU_GONG_SOUL_OPTIONS}
+          value={soulRadioValue(info.soulType, info.soulLevel)}
+          onToggle={setSoul}
+          theme={theme}
+        />
+        <ChecklistGroup
+          question="Inner Ability line"
+          options={IA_LINE_OPTIONS}
+          value={info.innerAbilityLine}
+          onToggle={(v) => onChange("innerAbilityLine", (v as InfoDraft["innerAbilityLine"]) ?? "neither")}
+          theme={theme}
+        />
+      </div>
+
+      <div>
+        <p style={dividedSectionLabelStyle(theme)}>Account</p>
+        <ChecklistCheckbox
+          label="Legion Artifact: +1 target on multi-target skills"
+          checked={info.artifactExtraTarget}
+          onToggle={(v) => onChange("artifactExtraTarget", v)}
+          theme={theme}
+        />
+        {/* Label-above-a-narrow-box, same shape as the real Quick Questions step's
+            LegionFinalAttackField -- just without its "?" tooltip, which renders dead
+            inside a modal (its portal-to-body popup lands behind the dialog). */}
+        <div style={{ marginTop: "0.6rem", marginBottom: "0.9rem" }}>
+          <p style={{ margin: "0 0 0.4rem", fontSize: "0.88rem", fontWeight: 800, color: theme.muted }}>
+            Final Attack Skill Damage
+          </p>
+          <div style={{ position: "relative", width: "5rem" }}>
+            <LimitedNumberInput
+              theme={theme}
+              value={info.artifactFinalAttackDmg}
+              limit={FINAL_ATTACK_LIMIT}
+              onChange={(v) => onChange("artifactFinalAttackDmg", v)}
+              ariaLabel="Final Attack Skill Damage"
+              style={{ ...statInputStyle(theme), width: "100%", paddingRight: "1.15rem" }}
+            />
+            <span style={inputSuffixStyle(theme)}>%</span>
+          </div>
+        </div>
+        <ChecklistGroup
+          question="Wild Hunter Legion"
+          options={WH_RANK_OPTIONS}
+          value={info.wildHunterRank}
+          onToggle={(v) => onChange("wildHunterRank", (v as InfoDraft["wildHunterRank"]) ?? "none")}
+          theme={theme}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Which tab's content to render, extracted from the main dialog so its own 4-way branch
  *  (plus the HEXA tab's own locked-or-not choice) doesn't add to the dialog function's
  *  control-flow complexity alongside everything else it already coordinates. */
 function TabContent({
-  theme, draft, character, hexaClassDef, primaryStat, statLabels, ozClassInfo, usesMagicWeapon,
+  theme, draft, character, hexaClassDef, primaryStat, statLabels, ozClassInfo, usesMagicWeapon, setupOptionsDef,
 }: {
   theme: AppTheme;
   draft: ScouterSimulatorDraft;
@@ -666,6 +804,7 @@ function TabContent({
   statLabels: ReturnType<typeof simulatorStatLabels>;
   ozClassInfo: ReturnType<typeof getOzWeaponJumpVariant>;
   usesMagicWeapon: boolean;
+  setupOptionsDef: ClassSetupOptionsDef | undefined;
 }) {
   switch (draft.tab) {
     case "buffs":
@@ -686,6 +825,18 @@ function TabContent({
       );
     case "linkSkills":
       return <LinkSkillsTab theme={theme} linkSkills={draft.linkSkills} onChange={draft.setLinkSkill} />;
+    case "extras":
+      return (
+        <InfoTab
+          theme={theme}
+          info={draft.info}
+          onChange={draft.setInfoField}
+          simulatedLevel={draft.level}
+          showWeaponHand={setupOptionsDef?.weaponType === true}
+          showRuinForceShield={setupOptionsDef?.ruinForceShield === true}
+          showEpheniaSoul={setupOptionsDef?.epheniaSoul === true}
+        />
+      );
     case "input":
       return (
         <InputTab
@@ -744,7 +895,7 @@ export default function ScouterSimulatorDialog({
   const [error, setError] = useState<ScouterErrorReason | null>(null);
 
   const RESET_BY_TAB: Record<SimulatorTab, () => void> = {
-    buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, linkSkills: draft.resetLinkSkills, input: draft.resetInput,
+    buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, linkSkills: draft.resetLinkSkills, extras: draft.resetInfo, input: draft.resetInput,
   };
 
   const handleApply = () => {
@@ -841,7 +992,7 @@ export default function ScouterSimulatorDialog({
         <TabContent
           theme={theme} draft={draft} character={character} hexaClassDef={hexaClassDef}
           primaryStat={primaryStat} statLabels={statLabels} ozClassInfo={ozClassInfo}
-          usesMagicWeapon={usesMagicWeapon}
+          usesMagicWeapon={usesMagicWeapon} setupOptionsDef={classData?.setupOptionsDef}
         />
       </div>
 

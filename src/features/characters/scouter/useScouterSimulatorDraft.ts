@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { HexaClassDef } from "../../tools/hexa-skills/hexa-classes";
-import type { LinkSkillId, StoredCharacterRecord } from "../model/charactersStore";
+import type { LinkSkillId, StoredCharacterRecord, WhLegionRank } from "../model/charactersStore";
 import { readCharactersStore } from "../model/charactersStore";
 import {
   emptyBuffsDraft, storedBuffsToDraft, convertBuffsDraftToStored, type BuffsDraft,
@@ -11,12 +11,28 @@ import {
   storedOzRingsToOzRingsDraft, convertOzRingsDraftToStored, type OzRingId, type OzRingsDraft,
 } from "../setup/data/ozRingData";
 import {
-  buildScouterPayload, type OzRingOverrides, type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInputOverrides,
+  buildScouterPayload, type OzRingOverrides, type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInfoOverrides, type SimulatorInputOverrides,
 } from "./scouterApi";
 import { hexaCoreFields } from "./hexaSimulatorFields";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "./scouterLinkSkills";
 
-export type SimulatorTab = "buffs" | "hexa" | "ozRings" | "input" | "linkSkills";
+export type SimulatorTab = "buffs" | "hexa" | "ozRings" | "input" | "linkSkills" | "extras";
+
+/** The Info tab's editable state -- every field resolved to a concrete value (seeded from the
+ *  character's real saved answers, or their "none"/"neither" equivalent), never undefined, so
+ *  the radio/checkbox controls always have a definite selection. `buildOverrides` diffs this
+ *  against `initialInfo` and only emits the fields that actually changed. */
+export interface InfoDraft {
+  soulType: "mugong" | "ephenia" | "none";
+  soulLevel: 1 | 2;
+  isLiberated: boolean;
+  weaponHand: "1h" | "2h";
+  hasRuinForceShield: boolean;
+  innerAbilityLine: "passive" | "multiTarget" | "neither";
+  artifactExtraTarget: boolean;
+  artifactFinalAttackDmg: number;
+  wildHunterRank: WhLegionRank | "none";
+}
 
 const SIMULATOR_LINK_SKILL_IDS = Object.keys(LINK_SKILL_TO_SCOUTER_KEY) as LinkSkillId[];
 
@@ -49,6 +65,8 @@ export interface ScouterSimulatorDraft {
   setInputField: (key: keyof SimulatorInputOverrides, value: number) => void;
   linkSkills: Record<LinkSkillId, number>;
   setLinkSkill: (id: LinkSkillId, value: number) => void;
+  info: InfoDraft;
+  setInfoField: <K extends keyof InfoDraft>(key: K, value: InfoDraft[K]) => void;
   /** False once every field is back to its real starting value -- Apply can skip the request
    *  entirely in that case, since there'd be nothing to simulate. */
   hasChanges: boolean;
@@ -60,8 +78,77 @@ export interface ScouterSimulatorDraft {
   resetOzRings: () => void;
   resetInput: () => void;
   resetLinkSkills: () => void;
+  resetInfo: () => void;
   /** Assembles every draft field into the payload buildDirectScouterPayload expects. */
   buildOverrides: () => ScouterSimulatorOverrides;
+}
+
+/** The character's real Info-tab answers, as a fully-resolved InfoDraft. A missing weapon
+ *  soul / IA line / Wild Hunter answer seeds to its explicit "none"/"neither" so the radios
+ *  render with a definite (if empty-meaning) selection rather than nothing checked. */
+function realInfoDraft(character: StoredCharacterRecord): InfoDraft {
+  const soul = character.soul;
+  const legion = readCharactersStore().scouterLegionByWorld[String(character.worldID)];
+  return {
+    soulType: soul?.type === "mugong" || soul?.type === "ephenia" ? soul.type : "none",
+    soulLevel: soul?.soulLevel === 2 ? 2 : 1,
+    isLiberated: character.isLiberated === true,
+    weaponHand: character.weaponHand === "1h" ? "1h" : "2h",
+    hasRuinForceShield: character.hasRuinForceShield === true,
+    innerAbilityLine: character.scouter?.innerAbilityLine ?? "neither",
+    artifactExtraTarget: legion?.artifactExtraTarget === true,
+    artifactFinalAttackDmg: legion?.artifactFinalAttackDmg ?? 0,
+    wildHunterRank: legion?.wildHunterRank ?? "none",
+  };
+}
+
+/** Overlays a previously-applied simulation's infoOverrides onto the real InfoDraft, so
+ *  reopening the popup starts from what was simulated rather than the character's real
+ *  answers. */
+function overriddenSoulType(info: SimulatorInfoOverrides, fallback: InfoDraft["soulType"]): InfoDraft["soulType"] {
+  const t = info.soul?.type;
+  if (t === "mugong" || t === "ephenia" || t === "none") return t;
+  return fallback;
+}
+
+function overriddenSoulLevel(info: SimulatorInfoOverrides, fallback: 1 | 2): 1 | 2 {
+  if (!info.soul) return fallback;
+  return info.soul.soulLevel === 2 ? 2 : 1;
+}
+
+function infoDraftFromOverrides(character: StoredCharacterRecord, info: SimulatorInfoOverrides | undefined): InfoDraft {
+  const real = realInfoDraft(character);
+  if (!info) return real;
+  return {
+    soulType: overriddenSoulType(info, real.soulType),
+    soulLevel: overriddenSoulLevel(info, real.soulLevel),
+    isLiberated: info.isLiberated ?? real.isLiberated,
+    weaponHand: info.weaponHand ?? real.weaponHand,
+    hasRuinForceShield: info.hasRuinForceShield ?? real.hasRuinForceShield,
+    innerAbilityLine: info.innerAbilityLine ?? real.innerAbilityLine,
+    artifactExtraTarget: info.artifactExtraTarget ?? real.artifactExtraTarget,
+    artifactFinalAttackDmg: info.artifactFinalAttackDmg ?? real.artifactFinalAttackDmg,
+    wildHunterRank: info.wildHunterRank ?? real.wildHunterRank,
+  };
+}
+
+/** Diffs an InfoDraft against the character's real answers, emitting only the fields that
+ *  changed -- an all-unchanged draft returns undefined so `hasChanges` stays false. */
+function infoOverridesFromDraft(draft: InfoDraft, real: InfoDraft): SimulatorInfoOverrides | undefined {
+  const out: SimulatorInfoOverrides = {};
+  if (draft.soulType !== real.soulType || (draft.soulType !== "none" && draft.soulLevel !== real.soulLevel)) {
+    out.soul = draft.soulType === "none"
+      ? { type: "none", soulLevel: null }
+      : { type: draft.soulType, soulLevel: draft.soulLevel };
+  }
+  if (draft.isLiberated !== real.isLiberated) out.isLiberated = draft.isLiberated;
+  if (draft.weaponHand !== real.weaponHand) out.weaponHand = draft.weaponHand;
+  if (draft.hasRuinForceShield !== real.hasRuinForceShield) out.hasRuinForceShield = draft.hasRuinForceShield;
+  if (draft.innerAbilityLine !== real.innerAbilityLine) out.innerAbilityLine = draft.innerAbilityLine;
+  if (draft.artifactExtraTarget !== real.artifactExtraTarget) out.artifactExtraTarget = draft.artifactExtraTarget;
+  if (draft.artifactFinalAttackDmg !== real.artifactFinalAttackDmg) out.artifactFinalAttackDmg = draft.artifactFinalAttackDmg;
+  if (draft.wildHunterRank !== real.wildHunterRank) out.wildHunterRank = draft.wildHunterRank;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Builds the OzRingsDraft a previously-applied simulation's ringOverrides represents, so
@@ -147,6 +234,8 @@ export function useScouterSimulatorDraft(
     }
     return out;
   });
+  const [initialInfo] = useState<InfoDraft>(() => realInfoDraft(character));
+  const [info, setInfo] = useState<InfoDraft>(() => infoDraftFromOverrides(character, previousOverrides?.infoOverrides));
 
   const setHexaCore = (field: SimulatorHexaCoreField, value: number) => {
     setHexaCores((prev) => ({ ...prev, [field]: value }));
@@ -156,6 +245,9 @@ export function useScouterSimulatorDraft(
   };
   const setLinkSkill = (id: LinkSkillId, value: number) => {
     setLinkSkills((prev) => ({ ...prev, [id]: value }));
+  };
+  const setInfoField = <K extends keyof InfoDraft>(key: K, value: InfoDraft[K]) => {
+    setInfo((prev) => ({ ...prev, [key]: value }));
   };
 
   const resetLevelRow = () => {
@@ -171,6 +263,7 @@ export function useScouterSimulatorDraft(
     setInput(EMPTY_INPUT);
   };
   const resetLinkSkills = () => setLinkSkills(initialLinkSkills);
+  const resetInfo = () => setInfo(initialInfo);
 
   // True once every field is back to (or still at) its real starting value -- finalDmgPercent
   // and input have no real baseline to seed from, so they're "unchanged" simply at their 0/
@@ -184,7 +277,8 @@ export function useScouterSimulatorDraft(
     JSON.stringify(buffsDraft) !== JSON.stringify(initialBuffsDraft) ||
     JSON.stringify(ozRingsDraft) !== JSON.stringify(initialOzRingsDraft) ||
     JSON.stringify(linkSkills) !== JSON.stringify(initialLinkSkills) ||
-    Object.values(input).some((v) => v !== 0);
+    Object.values(input).some((v) => v !== 0) ||
+    infoOverridesFromDraft(info, initialInfo) !== undefined;
 
   const buildOverrides = (): ScouterSimulatorOverrides => {
     const inputOverrides: SimulatorInputOverrides = Object.fromEntries(
@@ -206,6 +300,7 @@ export function useScouterSimulatorDraft(
       linkSkillOverrides: Object.fromEntries(
         SIMULATOR_LINK_SKILL_IDS.map((id) => [id, String(linkSkills[id])]),
       ) as Partial<Record<LinkSkillId, string>>,
+      infoOverrides: infoOverridesFromDraft(info, initialInfo),
     };
   };
 
@@ -220,8 +315,9 @@ export function useScouterSimulatorDraft(
     ozRingsDraft, setOzRingsDraft,
     linkSkills, setLinkSkill,
     input, setInputField,
+    info, setInfoField,
     hasChanges,
-    resetLevelRow, resetBuffs, resetHexa, resetOzRings, resetInput, resetLinkSkills,
+    resetLevelRow, resetBuffs, resetHexa, resetOzRings, resetInput, resetLinkSkills, resetInfo,
     buildOverrides,
   };
 }
