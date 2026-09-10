@@ -20,12 +20,12 @@
  *   coupons/boxes also start with those words but aren't part of this weapon lineage).
  *
  * Usage:
- *   node scripts/gen-equipment.mjs manifests/v270/item.json
+ *   node scripts/gen-equipment.mjs manifests/v271/item.json
  *
  * Set EQUIP_ICON_DIR to the local WZ image dump's `item/` dir to enable icon-based
  * dedup, applied to every slot (collapses look-alike name reissues; keeps distinct
  * same-name entries that just happen to share a display name and/or icon):
- *   EQUIP_ICON_DIR=/path/to/dump/item node scripts/gen-equipment.mjs manifests/v270/item.json
+ *   EQUIP_ICON_DIR=/path/to/dump/item node scripts/gen-equipment.mjs manifests/v271/item.json
  *
  * Set EQUIP_DEDUP_VERDICTS to the manual dedup audit's verdicts file (see
  * F:\mapledoro-image\tools\equipment\dedup-verdicts.json / its README) to apply
@@ -44,7 +44,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { createHash } from "crypto";
 
-const manifestPath = process.argv[2] ?? "manifests/v270/item.json";
+const manifestPath = process.argv[2] ?? "manifests/v271/item.json";
 const OUTPUT_DIR = resolve("public/data/equipment");
 
 // Local WZ image dump (dev-only, not in-repo, machine-specific path) used to dedupe
@@ -350,6 +350,33 @@ const SLOT_FILTERS = {
   petequip:  { cats: ["Character/PetEquip"] },
 };
 
+// Raw item ids to drop outright: dev placeholders and never-released stubs that leak into
+// the WZ manifest with a junk name but a real category, so no other filter catches them.
+const DROP_IDS = new Set([
+  "5002901", // pet, name "aa" -- placeholder, no real pet behind it
+]);
+
+// Item names to override. The WZ extraction that feeds item.json drops non-ASCII Latin
+// letters to a literal "?" (not recoverable mojibake -- the byte is gone), so some real
+// in-game names arrive corrupted (Übel -> "?bel", the é French cosmetics -> "Glac?" etc.).
+// Keyed by raw id; the value is the correct display name as it reads in-game (Übelroid / Lil
+// Übel verified against a live character). Applied before dedup/labels so the corrected name
+// flows through name-keyed grouping.
+//
+// This list is deliberately short: almost every "?"-corrupted item -- all the Übel/Lügner
+// GEAR (clothes/shoes/gloves/hat/staff) and every French cosmetic set (Marron Glacé,
+// Mise-en-Scène, Soufflé, Écarlate) -- is a `cash: true` overlay that isCashCosmetic drops
+// before it can reach a picker, so it needs no entry. Only the android (no cash flag) and
+// the pets (pet/petequip are cash-exempt slots) actually get served corrupted. Genuine "?"
+// in a name ("Pretentious, Much?", "Stop? Go!") is left alone.
+const NAME_OVERRIDES = {
+  "5002831": "Lil Übel",           // pet, was "Lil ?bel"
+  "5004050": "Lil Übel",           // pet (other-world SKU), was "Lil ?bel"
+  "01662272": "Übelroid",          // android, was "?belroid"
+  "01803151": "Lil Übel's Staff",  // petequip, was "Lil ?bel's Staff"
+  "01803250": "Lil Übel's Staff",  // petequip (other-world SKU), was "Lil ?bel's Staff"
+};
+
 /** @type {Record<string, Array<[string, string] | [string, string, object]>>} */
 const outputs = {};
 
@@ -358,8 +385,10 @@ for (const [slot, filter] of Object.entries(SLOT_FILTERS)) {
 
   for (const [rawId, entry] of Object.entries(entries)) {
     if (!entry.name) continue;
+    if (DROP_IDS.has(rawId)) continue;
     if (!CASH_FILTER_EXEMPT_SLOTS.has(slot) && isCashCosmetic(rawId)) continue;
-    const stats = servedStats(rawId, entry.name);
+    const name = NAME_OVERRIDES[rawId] ?? entry.name;
+    const stats = servedStats(rawId, name);
     if (filter.where) {
       if (!filter.where(rawId, entry, stats)) continue;
     } else {
@@ -367,7 +396,7 @@ for (const [slot, filter] of Object.entries(SLOT_FILTERS)) {
       if (filter.prefixes && !filter.prefixes.some((p) => rawId.startsWith(p))) continue;
     }
     const combined = stats || wearableLinks(slot, entry) ? { ...stats, ...wearableLinks(slot, entry) } : undefined;
-    items.push(combined ? [rawId, entry.name, combined] : [rawId, entry.name]);
+    items.push(combined ? [rawId, name, combined] : [rawId, name]);
   }
 
   outputs[slot] = items;
