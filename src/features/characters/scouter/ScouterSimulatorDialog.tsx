@@ -313,7 +313,7 @@ function HexaTab({ theme, classDef, hexaCores, onChange }: {
       <HexaSection theme={theme} label="Origin & Ascent" fields={byField(["skillCore1", "skillCore2"])} hexaCores={hexaCores} onChange={onChange} />
       <HexaSection theme={theme} label="Mastery" fields={byField(["masteryCore1", "masteryCore2", "masteryCore3", "masteryCore4"])} hexaCores={hexaCores} onChange={onChange} />
       <HexaSection theme={theme} label="Enhancement" fields={byField(["reinCore1", "reinCore2", "reinCore3", "reinCore4"])} hexaCores={hexaCores} onChange={onChange} />
-      <HexaSection theme={theme} label="Common" fields={byField(["generalCore2"])} hexaCores={hexaCores} onChange={onChange} />
+      <HexaSection theme={theme} label="Common" fields={byField(["generalCore2", "generalCore3"])} hexaCores={hexaCores} onChange={onChange} />
     </div>
   );
 }

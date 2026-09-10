@@ -759,16 +759,17 @@ export function buildScouterPayload(
 // ── Simulator ────────────────────────────────────────────────────────────────
 
 /** The HEXA core fields MapleDoro can override in a simulator run -- everything
- *  hexaCoreLevels/buildHexa can produce. Deliberately excludes skillCore3-6/generalCore3-4
+ *  hexaCoreLevels/buildHexa can produce. Deliberately excludes skillCore3-6/generalCore4
  *  (unreleased GMS content, no real value to simulate), generalCore1 (MapleScouter's own
  *  request omits it entirely, see buildHexa's comment), and solJanus (doesn't factor into
  *  the boss380_hexaStat calculation at all -- confirmed it has no effect on the result, so
- *  there's nothing to simulate by editing it despite huntSkill.solJanus being sent). */
+ *  there's nothing to simulate by editing it despite huntSkill.solJanus being sent).
+ *  generalCore3 is the 3rd Common Node v271 gave every class, so it IS simulatable. */
 export type SimulatorHexaCoreField =
   | "skillCore1" | "skillCore2"
   | "masteryCore1" | "masteryCore2" | "masteryCore3" | "masteryCore4"
   | "reinCore1" | "reinCore2" | "reinCore3" | "reinCore4"
-  | "generalCore2";
+  | "generalCore2" | "generalCore3";
 
 /** Every core capped at 30 -- confirmed against useHexaSkillsState.ts's own clampLevel,
  *  which caps Origin/Ascent/Mastery/Enhancement identically. No per-core-type cap exists

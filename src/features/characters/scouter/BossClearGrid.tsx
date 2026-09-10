@@ -449,31 +449,108 @@ function BossQuickViewRow({
   );
 }
 
-function PowerStripItem({ theme, label, value, sub }: { theme: AppTheme; label: string; value: number; sub?: number }) {
+/** The (+X) / (-X) chip next to a simulated power figure. Rounds both sides before diffing so
+ *  it never shows a delta the displayed (rounded) numbers don't actually support. */
+function PowerStripDelta({ theme, value, realValue }: { theme: AppTheme; value: number; realValue: number }) {
+  const diff = Math.round(value) - Math.round(realValue);
+  if (diff === 0) return null;
+  const up = diff > 0;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 800, color: statusText(theme, up ? "success" : "danger"), fontFamily: "var(--font-heading)", whiteSpace: "nowrap" }}>
+      {up ? "+" : "-"}{formatFigure(Math.abs(diff))}
+    </span>
+  );
+}
+
+/** The FD-equivalent of a simulation for one boss -- (simulated raw HEXA damage / real, minus
+ *  one), the same figure MapleScouter's own "Additional Spec Simulation" cards show as "FD %".
+ *  Sits under the (+X) chip on the Boss 300 / Boss 380 cells, so it's self-labelled by which
+ *  cell it's in. Null when either result predates the Boss Clear fields, or rounds to nothing. */
+function fdEquivalentPercent(realDamage?: number, simDamage?: number): number | null {
+  if (!realDamage || !simDamage) return null;
+  const pct = (simDamage / realDamage - 1) * 100;
+  return Math.abs(pct) < 0.05 ? null : pct;
+}
+
+function PowerStripFdEquiv({ theme, pct }: { theme: AppTheme; pct: number }) {
+  const up = pct > 0;
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, color: theme.muted, whiteSpace: "nowrap" }}>
+      <span style={{ fontWeight: 800, color: statusText(theme, up ? "success" : "danger") }}>
+        {up ? "+" : "-"}{Math.abs(pct).toFixed(2)}%
+      </span>
+      {" "}FD eq.
+    </span>
+  );
+}
+
+function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
+  theme: AppTheme; label: string; value: number; sub?: number;
+  /** The character's real (pre-simulation) figure for this slot. Set only while a Scouter
+   *  Simulator "what if" is applied -- drives the (+X)/(-X) chip and the "was" tooltip line. */
+  realValue?: number;
+  /** This boss's FD-equivalent % for the simulation (Boss 300 / Boss 380 only). */
+  fdEquiv?: number | null;
+}) {
   const content = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: theme.muted }}>{label}</span>
+      {/* Value and delta stack rather than sit side by side -- Converted's 9-digit figure plus
+          its own 9-digit delta can't share one line inside a 2-column strip at 360px. */}
       <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>
+      {realValue !== undefined && <PowerStripDelta theme={theme} value={value} realValue={realValue} />}
+      {fdEquiv != null && <PowerStripFdEquiv theme={theme} pct={fdEquiv} />}
     </div>
   );
-  if (sub === undefined) return content;
-  return <HoverTooltip theme={theme} label={`Normal: ${formatFigure(sub)}`}>{content}</HoverTooltip>;
+  // "Normal" alone (no simulation): the old single-line tooltip, unchanged.
+  if (realValue === undefined) {
+    if (sub === undefined) return content;
+    return <HoverTooltip theme={theme} label={`Normal: ${formatFigure(sub)}`}>{content}</HoverTooltip>;
+  }
+  // Simulated: the strip itself already shows the current figure and its (+X)/(-X) chip, so the
+  // tooltip only carries what the strip can't -- the pre-simulation value ("was", muted since
+  // it's history) and the Normal-tier figure, if any (full weight, still a current number).
+  return (
+    <HoverTooltip
+      theme={theme}
+      label={
+        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>
+          <span style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>
+          {sub !== undefined && <span>Normal: {formatFigure(sub)}</span>}
+        </span>
+      }
+    >
+      {content}
+    </HoverTooltip>
+  );
 }
 
 // The old ScouterSummaryView's 3 StatBlocks, collapsed into one compact strip that sits above
 // the boss table instead of behind a separate page -- these are the raw power figures that feed
 // every row below it, so they read as this view's header now instead of an unrelated sibling.
-function PowerStrip({ theme, entry }: { theme: AppTheme; entry: ScouterResultEntry }) {
+function PowerStrip({ theme, entry, realEntry }: { theme: AppTheme; entry: ScouterResultEntry; realEntry?: ScouterResultEntry }) {
+  // A level/Arcane Force/Sacred Power-only simulation reuses the character's cached result
+  // untouched (those fields never reach MapleScouter), so the power figures are identical --
+  // skip the "was" tooltip line and the always-zero chip in that case.
+  const showDeltas = realEntry !== undefined && (
+    Math.round(entry.boss300Hexa) !== Math.round(realEntry.boss300Hexa) ||
+    Math.round(entry.boss380Hexa) !== Math.round(realEntry.boss380Hexa) ||
+    Math.round(entry.convertedPowerHexa) !== Math.round(realEntry.convertedPowerHexa) ||
+    Math.round(entry.dojoPower) !== Math.round(realEntry.dojoPower)
+  );
+  const real = showDeltas ? realEntry : undefined;
+  const fdEquiv300 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage300, entry.bossClearInputs?.calculatedHexaDamage300) : null;
+  const fdEquiv380 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage380, entry.bossClearInputs?.calculatedHexaDamage380) : null;
   return (
     <div className="power-strip" style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
       {/* Grid, not flex-wrap: Converted's long value skews flex column widths. 4 columns on
           desktop, 2 on narrow panels (.power-strip-grid's container query in styles.ts). */}
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 / Converted shown as HEXA</span>
       <div className="power-strip-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} />
-        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} />
-        <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} />
-        <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} />
+        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} />
+        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} />
+        <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} realValue={real?.convertedPowerHexa} />
+        <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} realValue={real?.dojoPower} />
       </div>
     </div>
   );
@@ -618,9 +695,9 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
 // unmounts BossQuickView entirely, see the view === "quickView" conditional render) resets it for
 // free -- nobody's profile should stay stuck in the expanded layout after they navigate away.
 function BossQuickView({
-  theme, entry, grouped, filter, onFilterChange, level, arcaneForce, authenticForce, inputs, onSelectBoss, simulated, onOpenSimulator,
+  theme, entry, realEntry, grouped, filter, onFilterChange, level, arcaneForce, authenticForce, inputs, onSelectBoss, simulated, onOpenSimulator,
 }: {
-  theme: AppTheme; entry: ScouterResultEntry; grouped: BossEntryList[]; filter: BossFilter;
+  theme: AppTheme; entry: ScouterResultEntry; realEntry?: ScouterResultEntry; grouped: BossEntryList[]; filter: BossFilter;
   onFilterChange: (v: BossFilter) => void;
   level: number; arcaneForce: number; authenticForce: number;
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onSelectBoss: (boss: string) => void;
@@ -635,7 +712,7 @@ function BossQuickView({
   const quickViewListMask = edgeFadeMask(quickViewAtStart, quickViewAtEnd, 28, "vertical");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <PowerStrip theme={theme} entry={entry} />
+      <PowerStrip theme={theme} entry={entry} realEntry={realEntry} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <PillGroup theme={theme} options={BOSS_FILTER_OPTIONS} value={filter} onChange={onFilterChange} />
@@ -1007,12 +1084,15 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  the page header can read the same value directly instead of BossClearGrid reporting it back
  *  up through an effect -- see resolveBossDisplayName's own comment. */
 export default function BossClearGrid({
-  theme, character, entry, view, onViewChange, selectedIndex, onSelectedIndexChange,
+  theme, character, entry, realEntry, view, onViewChange, selectedIndex, onSelectedIndexChange,
   levelOverride, arcaneForceOverride, authenticForceOverride, simulated, onOpenSimulator,
 }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
   entry: ScouterResultEntry;
+  /** The character's real Scouter result, passed only while `simulated` is true, so the Quick
+   *  View power strip can show each figure's (+X)/(-X) change from the real value. */
+  realEntry?: ScouterResultEntry;
   view: ScouterBookmarkView;
   onViewChange: (v: ScouterBookmarkView) => void;
   selectedIndex: number;
@@ -1062,6 +1142,7 @@ export default function BossClearGrid({
         <BossQuickView
           theme={theme}
           entry={entry}
+          realEntry={realEntry}
           grouped={grouped}
           filter={filter}
           onFilterChange={setFilter}
