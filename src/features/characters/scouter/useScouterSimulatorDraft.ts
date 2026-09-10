@@ -265,42 +265,54 @@ export function useScouterSimulatorDraft(
   const resetLinkSkills = () => setLinkSkills(initialLinkSkills);
   const resetInfo = () => setInfo(initialInfo);
 
-  // True once every field is back to (or still at) its real starting value -- finalDmgPercent
-  // and input have no real baseline to seed from, so they're "unchanged" simply at their 0/
-  // empty default. Lets the dialog skip sending an Apply request that would be a no-op.
-  const hasChanges =
-    level !== initialLevel ||
-    arcaneForce !== initialArcaneForce ||
-    authenticForce !== initialAuthenticForce ||
-    finalDmgPercent !== 0 ||
-    JSON.stringify(hexaCores) !== JSON.stringify(initialHexaCores) ||
-    JSON.stringify(buffsDraft) !== JSON.stringify(initialBuffsDraft) ||
-    JSON.stringify(ozRingsDraft) !== JSON.stringify(initialOzRingsDraft) ||
-    JSON.stringify(linkSkills) !== JSON.stringify(initialLinkSkills) ||
-    Object.values(input).some((v) => v !== 0) ||
-    infoOverridesFromDraft(info, initialInfo) !== undefined;
+  // Per-tab "has this group been touched at all" flags. finalDmgPercent and input have no
+  // real baseline to seed from, so "unchanged" for them is simply their 0/empty default.
+  const hexaChanged = JSON.stringify(hexaCores) !== JSON.stringify(initialHexaCores);
+  const buffsChanged = JSON.stringify(buffsDraft) !== JSON.stringify(initialBuffsDraft);
+  const ozRingsChanged = JSON.stringify(ozRingsDraft) !== JSON.stringify(initialOzRingsDraft);
+  const linkSkillsChanged = JSON.stringify(linkSkills) !== JSON.stringify(initialLinkSkills);
+  const inputChanged = finalDmgPercent !== 0 || Object.values(input).some((v) => v !== 0);
+  const infoOverrides = infoOverridesFromDraft(info, initialInfo);
+  // Level/Arcane Force/Sacred Power are local-only (never reach the API) -- deliberately NOT
+  // part of localOnly, which is the "changed something, but only client-side-computable
+  // things" signal the dialog uses to skip the network request entirely.
+  const localOnly = !hexaChanged && !buffsChanged && !ozRingsChanged && !linkSkillsChanged
+    && !inputChanged && infoOverrides === undefined;
+  const levelRowChanged = level !== initialLevel || arcaneForce !== initialArcaneForce || authenticForce !== initialAuthenticForce;
+
+  // False once every field is back to (or still at) its real starting value -- lets the
+  // dialog skip an Apply that would be a no-op.
+  const hasChanges = !localOnly || levelRowChanged;
 
   const buildOverrides = (): ScouterSimulatorOverrides => {
     const inputOverrides: SimulatorInputOverrides = Object.fromEntries(
       Object.entries(input).map(([key, v]) => [key, String(v)]),
     ) as unknown as SimulatorInputOverrides;
+    // Each tab group is emitted only when actually touched. An omitted group is identical
+    // to one whose every value matches the character's real stats (both produce the same
+    // payload), but omitting it keeps the cache hash clean and lets isLocalOnlyOverride
+    // (useScouterSimulator.ts) recognize a Level-only what-if and skip the API call.
     return {
       level,
       arcaneForceOverride: arcaneForce,
       authenticForceOverride: authenticForce,
-      finalDmgPercent: finalDmgPercent.toFixed(5),
-      hexaCoreOverrides: Object.fromEntries(
-        hexaCoreFields(hexaClassDef).map(({ field }) => [field, String(hexaCores[field])]),
-      ) as Partial<Record<SimulatorHexaCoreField, string>>,
-      dopingOverrides: convertBuffsDraftToStored(buffsDraft) ?? undefined,
-      ringOverrides: {
-        levels: convertOzRingsDraftToStored(ozRingsDraft)?.levels,
-      },
-      input: inputOverrides,
-      linkSkillOverrides: Object.fromEntries(
-        SIMULATOR_LINK_SKILL_IDS.map((id) => [id, String(linkSkills[id])]),
-      ) as Partial<Record<LinkSkillId, string>>,
-      infoOverrides: infoOverridesFromDraft(info, initialInfo),
+      finalDmgPercent: inputChanged ? finalDmgPercent.toFixed(5) : undefined,
+      hexaCoreOverrides: hexaChanged
+        ? Object.fromEntries(
+            hexaCoreFields(hexaClassDef).map(({ field }) => [field, String(hexaCores[field])]),
+          ) as Partial<Record<SimulatorHexaCoreField, string>>
+        : undefined,
+      dopingOverrides: buffsChanged ? (convertBuffsDraftToStored(buffsDraft) ?? undefined) : undefined,
+      ringOverrides: ozRingsChanged
+        ? { levels: convertOzRingsDraftToStored(ozRingsDraft)?.levels }
+        : undefined,
+      input: inputChanged ? inputOverrides : undefined,
+      linkSkillOverrides: linkSkillsChanged
+        ? Object.fromEntries(
+            SIMULATOR_LINK_SKILL_IDS.map((id) => [id, String(linkSkills[id])]),
+          ) as Partial<Record<LinkSkillId, string>>
+        : undefined,
+      infoOverrides,
     };
   };
 

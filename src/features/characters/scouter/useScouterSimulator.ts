@@ -10,12 +10,17 @@ import { peekScouterLastKnown, type ScouterErrorReason, type ScouterResultEntry 
 /** True when the override combo only touches level/Arcane Force/Sacred Power -- fields that
  *  never reach MapleScouter's API at all (pure local Boss Clear Grid gap math, see
  *  ScouterSimulatorOverrides' own field comments). Applying one of these alone needs no fresh
- *  API result -- the character's real, already-cached entry is exactly as accurate. */
+ *  API result -- the character's real, already-cached entry is exactly as accurate.
+ *
+ *  buildOverrides (useScouterSimulatorDraft.ts) omits every tab group that hasn't been
+ *  touched, so an absent group here means "unchanged" -- this is just a presence check. */
 function isLocalOnlyOverride(overrides: ScouterSimulatorOverrides): boolean {
-  return (
-    !overrides.finalDmgPercent ||
-    Number(overrides.finalDmgPercent) === 0
-  ) && !overrides.hexaCoreOverrides && !overrides.dopingOverrides && !overrides.ringOverrides
+  return (!overrides.finalDmgPercent || Number(overrides.finalDmgPercent) === 0)
+    && !overrides.hexaCoreOverrides
+    && !overrides.dopingOverrides
+    && !overrides.ringOverrides
+    && !overrides.linkSkillOverrides
+    && !overrides.infoOverrides
     && Object.values(overrides.input ?? {}).every((v) => v === undefined || Number(v) === 0);
 }
 
