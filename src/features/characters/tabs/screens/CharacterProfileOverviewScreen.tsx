@@ -3341,6 +3341,7 @@ function ScouterBookmark({ theme, character, label, disabled, view, onViewChange
             theme={theme}
             character={character}
             entry={simulated?.entry ?? entry}
+            realEntry={simulated ? entry : undefined}
             view={view}
             onViewChange={onViewChange}
             selectedIndex={selectedBossIndex}

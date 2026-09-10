@@ -865,7 +865,10 @@ export const HEXA_STAT_SKILLS: HexaSkillDef[] = [
   shape the game actually has and it reads against the patch notes directly.
 
   Icons are the `hexa-skill` 4000xxxx series added in v271. The manifest lists one id per
-  class, but they're the same skill and the same art, so each branch uses its first id.
+  class; a branch usually shares one piece of art, so most rows below just use the branch's
+  first id. Not always though -- Hayato and Kanna share HEXA Twilight Bloom the skill but
+  have visibly different in-game icons (40000050 is swords, 40000051 is Kanna's), so that
+  row is split per class. Verify a branch's art in-game before collapsing it to one id.
   Explorers split five ways, so `group` alone can't key this.
 
   SHINE classes get the Erda Link equivalent instead (a 3rd Skill Stone, SHINE Tree of Stars),
@@ -886,7 +889,8 @@ const COMMON3_BY_BRANCH: { skill: HexaSkillDef; classNames: string[] }[] = [
   { skill: s("HEXA Afterimage of the Otherworld", "40000041"), classNames: ["Kinesis"] },
   { skill: s("HEXA Conversion Overdrive", "40000042"), classNames: ["Adele", "Illium", "Khali", "Ark"] },
   { skill: s("HEXA Lotus Flower", "40000046"), classNames: ["Lara", "Hoyoung", "Ren"] },
-  { skill: s("HEXA Twilight Bloom", "40000050"), classNames: ["Hayato", "Kanna"] },
+  { skill: s("HEXA Twilight Bloom", "40000050"), classNames: ["Hayato"] },
+  { skill: s("HEXA Twilight Bloom", "40000051"), classNames: ["Kanna"] },
   { skill: s("HEXA Ring of Samsara", "40000052"), classNames: ["Lynn", "Mo Xuan"] },
   { skill: su("SHINE Tree of Stars", "erda-skill", "18112/skill/111"), classNames: ["Sia Astelle", "Erel Light"] },
 ];
