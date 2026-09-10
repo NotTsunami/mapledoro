@@ -1,5 +1,9 @@
 function normalizeSearchText(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // NFD + strip combining marks (U+0300-U+036F) folds accented Latin letters to their base
+  // (Uebel spelled with U-umlaut -> ubel, Marron Glace with an acute -> marronglace) so a
+  // plain-ASCII query still matches. The a-z0-9 filter then drops everything else,
+  // punctuation and unfoldable scripts alike.
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function queryTokens(query: string): string[] {

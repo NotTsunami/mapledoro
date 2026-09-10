@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
   Regenerates Mastery%/Final Damage% baselines for the 53 non-legacy classes from
-  manifests/v270/skill-formulas.json.
+  manifests/v271/skill-formulas.json.
 
   Each class's baseline is pinned by skill id (RECIPES below) rather than resolved by name at
   runtime — same pattern as gen-vmatrix.mjs's EXCLUDED_NODE_IDS. Every pinned entry also carries
@@ -26,7 +26,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const MANIFEST_PATH = path.join(ROOT, "manifests/v270/skill-formulas.json");
+const MANIFEST_PATH = path.join(ROOT, "manifests/v271/skill-formulas.json");
 const DATA_DIR = path.join(ROOT, "src/features/characters/setup/data");
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
@@ -594,13 +594,13 @@ function writeTieredGenerated(fileName, exportName, comment, data) {
 writeTieredGenerated(
   "masteryData.generated.ts",
   "BASE_MASTERY_PERCENT",
-  "Weapon Mastery% per class (v270), level-30 base plus Combat-Orders-family tiers.",
+  "Weapon Mastery% per class (v271), level-30 base plus Combat-Orders-family tiers.",
   masteryOut,
 );
 writeTieredGenerated(
   "finalDamageData.generated.ts",
   "BASE_FINAL_DAMAGE_PERCENT",
-  "Always-on Final Damage% per class (v270), before Genesis Liberation, level-30 base plus Combat-Orders-family tiers.",
+  "Always-on Final Damage% per class (v271), before Genesis Liberation, level-30 base plus Combat-Orders-family tiers.",
   finalDamageOut,
 );
 

@@ -3,11 +3,11 @@
  * Generates per-class V Matrix node catalogs from the WZ-dumped manifest.
  * Output: public/data/vmatrix/<classId>.json
  *   { job: Node[], boost: Node[], common: Node[] }  where Node = [id, displayName, maxLevel].
- *   id is the manifests/v270/v-matrix.json entry id, used directly for the
+ *   id is the manifests/v271/v-matrix.json entry id, used directly for the
  *   haku.network v-matrix icon (resourceImageUrl("v-matrix", id, "icon.png")).
  *   maxLevel is per-entry, read from the manifest (job=30, boost=60, common=30).
  *
- * Source: manifests/v270/v-matrix.json `entries`, each keyed by id:
+ * Source: manifests/v271/v-matrix.json `entries`, each keyed by id:
  *   - type 0 with `className`, id >= 10010000: job nodes (jobs === [class's own job code])
  *   - type 1 with `className` set: boost nodes (already fused per matrix slot)
  *   - type 0 without `className`: common nodes — universal (jobs === ["all"])
@@ -27,7 +27,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
 
-const manifestPath = process.argv[2] ?? "manifests/v270/v-matrix.json";
+const manifestPath = process.argv[2] ?? "manifests/v271/v-matrix.json";
 const OUTPUT_DIR = resolve("public/data/vmatrix");
 
 const SLUG_OVERRIDES = { Bowmaster: "bow_master", "Dual Blade": "blade_master" };

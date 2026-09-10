@@ -19,10 +19,13 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "added", text: "The Scouter simulator's HEXA tab now lets you try out different levels for your 3rd Common Node." },
       { type: "added", text: "Added support for the 3rd Common Node in the HEXA Skill Tracker, with its own cost table." },
       { type: "added", text: "HEXA Stat nodes now show in the HEXA Skill Tracker's leveling guide, and can be marked done from the Overview tab." },
+      { type: "added", text: "Added the Crucible Badge to the familiar badge picker in character setup." },
       { type: "changed", text: "Refreshed the HEXA Skill Tracker's final damage values and leveling order for v271." },
       { type: "changed", text: "Updated the Oz Rings setup step for the v271 Special Skill Ring changes. It now covers just the Ring of Restraint, Weapon Jump (now capped at level 4) and Continuous Ring, and your Scouter figure may shift slightly on your next refresh." },
       { type: "changed", text: "Removed the Weapon ATT question from character setup and the Scouter simulator, since MapleScouter no longer uses it." },
       { type: "changed", text: "Removed the Star Catching toggle from the Star Force Calculator and Event Planner, since v271 removed it." },
+      { type: "changed", text: "Updated character data for the v271 patch, including new Geardock familiars and item names." },
+      { type: "fixed", text: "Fixed some familiar and item names with accented letters showing a question mark, like Lil Übel. Searching with a plain letter (\"ubel\") still finds them." },
     ],
   },
   {

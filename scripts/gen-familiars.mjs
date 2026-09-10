@@ -1,23 +1,29 @@
 #!/usr/bin/env node
 /**
- * Regenerates the FAMILIARS array in familiarsData.ts from a familiar manifest.
+ * Regenerates the FAMILIARS array (and the badge constants) in familiarsData.ts from the
+ * WZ manifests.
  *
  * Usage:
- *   node scripts/gen-familiars.mjs manifests/v270/familiar.json
+ *   node scripts/gen-familiars.mjs manifests/v271/familiar.json
  *
  * Set FAMILIAR_DUMP_DIR to the local WZ image dump's output root (the dir containing
  * `mob/`, `familiar/`, etc.) to enable pixel-hash dedup of same-name familiars that
  * render an identical sprite (e.g. card reissues): the redundant entries get a
  * `duplicateOf` pointer instead of being removed, so old saved characters that
  * picked one still resolve fine — they just stop showing up as a second picker result.
- *   FAMILIAR_DUMP_DIR=/path/to/dump node scripts/gen-familiars.mjs manifests/v270/familiar.json
+ *   FAMILIAR_DUMP_DIR=/path/to/dump node scripts/gen-familiars.mjs manifests/v271/familiar.json
  *
- * The script splices only the FAMILIARS constant — everything else in the
- * file (types, tier data, helper functions) is left untouched.
+ * It splices three constants and leaves everything else (types, tier data, helpers) alone:
+ *   - FAMILIARS       — from the familiar.json passed as the arg
+ *   - BADGE_ID_MAP    — name → ui/familiar icon id, rebuilt wholesale from the sibling
+ *                       ui-familiar.json (its entry keys ARE the icon ids)
+ *   - BADGE_NAMES     — the picker's display order. NOT derivable from the manifest (it's a
+ *                       hand-curated progression order), so the existing order is kept as-is
+ *                       and any manifest badge missing from it is appended to the end.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve, join } from "path";
+import { resolve, join, dirname } from "path";
 import { createHash } from "crypto";
 
 const manifestPath = process.argv[2];
@@ -108,34 +114,77 @@ for (const [rawId, entry] of entryList) {
   lines.push(`  {id:${id},name:${JSON.stringify(name)},mobId:${JSON.stringify(mobId)},cardId:${JSON.stringify(cardId)}${spriteField}${dupField}}`);
 }
 
-const block = `export const FAMILIARS: readonly FamiliarEntry[] = [\n${lines.join(",\n")}\n]`;
+const familiarsBlock = `export const FAMILIARS: readonly FamiliarEntry[] = [\n${lines.join(",\n")}\n]`;
 
 const targetPath = resolve("src/features/characters/setup/data/familiarsData.ts");
-const source = readFileSync(targetPath, "utf8");
+let source = readFileSync(targetPath, "utf8");
 
-const startMarker = "export const FAMILIARS: readonly FamiliarEntry[] = [";
-const startIdx = source.indexOf(startMarker);
-if (startIdx === -1) {
-  console.error("Could not find FAMILIARS array in familiarsData.ts");
-  process.exit(1);
-}
-
-// Find the opening `[` of the array value (after the `=`)
-const eqIdx = source.indexOf("= [", startIdx);
-const openIdx = source.indexOf("[", eqIdx);
-
-// Find the matching closing `]`
-let depth = 0;
-let endIdx = openIdx;
-for (let i = openIdx; i < source.length; i++) {
-  if (source[i] === "[") depth++;
-  else if (source[i] === "]") {
-    depth--;
-    if (depth === 0) { endIdx = i; break; }
+/**
+ * Replaces the whole `export const <name> = <value>` statement whose declaration line
+ * starts with `declPrefix` (everything up to and including the `=`). `openChar`/`closeChar`
+ * are the value's brackets ("[" "]" for an array, "{" "}" for an object); the replacement
+ * runs from `declPrefix`'s start through the matching close bracket. Bails if not found.
+ */
+function spliceConst(src, declPrefix, openChar, closeChar, replacement) {
+  const startIdx = src.indexOf(declPrefix);
+  if (startIdx === -1) {
+    console.error(`Could not find "${declPrefix}" in familiarsData.ts`);
+    process.exit(1);
   }
+  const openIdx = src.indexOf(openChar, startIdx + declPrefix.length);
+  let depth = 0;
+  let endIdx = openIdx;
+  for (let i = openIdx; i < src.length; i++) {
+    if (src[i] === openChar) depth++;
+    else if (src[i] === closeChar) {
+      depth--;
+      if (depth === 0) { endIdx = i; break; }
+    }
+  }
+  return src.slice(0, startIdx) + replacement + src.slice(endIdx + 1);
 }
 
-const updated = source.slice(0, startIdx) + block + source.slice(endIdx + 1);
-writeFileSync(targetPath, updated, "utf8");
+source = spliceConst(source, "export const FAMILIARS: readonly FamiliarEntry[] =", "[", "]", familiarsBlock);
 
-console.log(`Written ${lines.length} familiars to familiarsData.ts`);
+// ── Badge constants (from ui-familiar.json, the sibling of familiar.json) ─────────────────
+// Its entry keys are the ui/familiar icon ids; the values carry the badge name. BADGE_ID_MAP
+// is a straight name→id dump. BADGE_NAMES keeps its existing hand-curated progression order
+// (not in the manifest) and only gains entries: any manifest badge not already listed is
+// appended, so a new badge shows up at the end of the picker rather than going missing.
+const uiFamiliarPath = resolve(dirname(resolve(manifestPath)), "ui-familiar.json");
+const uiFamiliar = JSON.parse(readFileSync(uiFamiliarPath, "utf8"));
+const badgeEntries = Object.entries(uiFamiliar.entries ?? uiFamiliar)
+  .filter(([, v]) => typeof v?.name === "string" && /Badge$/.test(v.name))
+  .map(([id, v]) => [Number(id), v.name]);
+
+// Read the current BADGE_NAMES to preserve its hand-curated order.
+const namesBlockMatch = source.match(/export const BADGE_NAMES: readonly string\[\] = \[([\s\S]*?)\];/);
+const currentNames = namesBlockMatch
+  ? [...namesBlockMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  : [];
+const manifestNames = new Set(badgeEntries.map(([, n]) => n));
+const orderedNames = [
+  ...currentNames.filter((n) => manifestNames.has(n)), // keep curated order, drop any removed
+  ...badgeEntries.map(([, n]) => n).filter((n) => !currentNames.includes(n)), // append new
+];
+
+const namesLines = [];
+for (let i = 0; i < orderedNames.length; i += 5) {
+  namesLines.push("  " + orderedNames.slice(i, i + 5).map((n) => JSON.stringify(n)).join(", ") + ",");
+}
+// No trailing ";" -- spliceConst replaces only through the "]", keeping the original ";".
+const namesBlock = `export const BADGE_NAMES: readonly string[] = [\n${namesLines.join("\n")}\n]`;
+
+const idMapLines = [];
+const sortedById = [...badgeEntries].sort((a, b) => a[0] - b[0]);
+for (let i = 0; i < sortedById.length; i += 4) {
+  idMapLines.push("  " + sortedById.slice(i, i + 4).map(([id, n]) => `${JSON.stringify(n)}: ${id}`).join(", ") + ",");
+}
+const idMapBlock = `export const BADGE_ID_MAP: Record<string, number> = {\n${idMapLines.join("\n")}\n}`;
+
+source = spliceConst(source, "export const BADGE_NAMES: readonly string[] =", "[", "]", namesBlock);
+source = spliceConst(source, "export const BADGE_ID_MAP: Record<string, number> =", "{", "}", idMapBlock);
+
+writeFileSync(targetPath, source, "utf8");
+
+console.log(`Written ${lines.length} familiars, ${orderedNames.length} badges to familiarsData.ts`);
