@@ -119,11 +119,11 @@ export function useCharacterLookup({
     return false;
   };
 
-  // Returns whether the character was found, so callers (e.g. a stale-draft
-  // resume re-fetch) can fall back to other data when a lookup fails.
-  // eslint-disable-next-line sonarjs/cognitive-complexity
-  const runLookup = async (name: string): Promise<boolean> => {
-    const normalized = name.toLowerCase();
+  // Resolves whatever can be answered without a network request: an invalid name, a fresh
+  // cache hit, a cooldown still counting down, or a lookup already in flight. Returns the
+  // found/not-found boolean once one of those applies, or null when runLookup should proceed
+  // to the real fetch. Also drops an expired cache entry as a side effect of checking it.
+  const resolveWithoutFetch = (name: string, normalized: string): boolean | null => {
     if (!CHARACTER_NAME_REGEX.test(name)) {
       setStatusTone("error");
       setStatusMessage(getInvalidIgnMessage(MIN_QUERY_LENGTH, MAX_QUERY_LENGTH));
@@ -145,6 +145,16 @@ export function useCharacterLookup({
       return false;
     }
     if (isSearching) return false;
+
+    return null;
+  };
+
+  // Returns whether the character was found, so callers (e.g. a stale-draft
+  // resume re-fetch) can fall back to other data when a lookup fails.
+  const runLookup = async (name: string): Promise<boolean> => {
+    const normalized = name.toLowerCase();
+    const resolved = resolveWithoutFetch(name, normalized);
+    if (resolved !== null) return resolved;
 
     setIsSearching(true);
     setStatusTone("neutral");
