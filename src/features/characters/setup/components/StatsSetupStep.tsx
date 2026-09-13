@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { numericKeyDown, sanitizeDigitsInput, decimalKeyDown, sanitizeDecimalInput } from "../../../../lib/inputUtils";
+import { numericKeyDown, sanitizeDigitsInput, decimalKeyDown, sanitizeDecimalInput, clampNumber } from "../../../../lib/inputUtils";
 import { joinWithAnd } from "../../../../lib/textUtils";
 import type { CSSProperties } from "react";
 import Image from "next/image";
@@ -144,6 +144,17 @@ function clampIgnoreDefense(raw: string): string {
   if (sanitized === "" || sanitized.endsWith(".")) return sanitized;
   if (Number(sanitized) > IGNORE_DEFENSE_MAX) return String(IGNORE_DEFENSE_MAX);
   return sanitized;
+}
+
+// Cooldown Reduction's own real caps, matching the Scouter Simulator's coolTimeReduce limit
+// (ScouterSimulatorDialog.tsx) for seconds and the in-game percent cap.
+const COOLDOWN_REDUCTION_SECONDS_MAX = 7;
+const COOLDOWN_REDUCTION_PERCENT_MAX = 6;
+
+function clampCooldownReductionInput(raw: string, max: number): string {
+  const digits = sanitizeDigitsInput(raw);
+  if (digits === "") return digits;
+  return String(clampNumber(Number(digits), max));
 }
 
 interface ConfinableFrameProps {
@@ -349,6 +360,10 @@ function BuffGuide({ classData, theme, characterLevel }: { classData: ClassSkill
 // rather than letting the remaining columns stretch to fill the row.
 const tripleStatGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.35rem" };
 
+// Flat data-table construction, not real control flow: a handful of independent booleans
+// (hidePercentUnapplied, showBaseWarning, showPercentUnappliedWarning) computed once and read
+// straight into one JSX return, mirroring the in-game Character Info row shape.
+// react-doctor-disable-next-line no-high-complexity-react-function
 function TripleStatRow({
   id, draft, onUpdate, theme, isMainStat, requireFilled, showHpPercentUnapplied,
 }: {
@@ -488,6 +503,47 @@ function HyperStatCell({
   );
 }
 
+/** Cooldown Reduction's own two-input (seconds + percent) shape, split out of CombatStatCell
+ *  since it doesn't share that function's single-input layout. */
+function CooldownReductionCell({
+  label, draft, onUpdateCooldown, theme, requireFilled,
+}: {
+  label: string;
+  draft: StatsStepDraft;
+  onUpdateCooldown: (field: "seconds" | "percent", val: string) => void;
+  theme: AppTheme;
+  requireFilled: boolean;
+}) {
+  const cd = draft.cooldownReduction ?? { seconds: "", percent: "" };
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
+      <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
+        <div style={{ position: "relative" }}>
+          <input type="text" inputMode="numeric" aria-label={`${label} seconds`} value={cd.seconds} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
+            data-flagged-field={requireFilled && !cd.seconds.trim() ? "true" : undefined}
+            onChange={(e) => onUpdateCooldown("seconds", sanitizeDigitsInput(e.target.value))}
+            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
+            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
+            onKeyDown={numericKeyDown}
+          />
+          <span style={inputSuffixStyle(theme)}>s</span>
+        </div>
+        <div style={{ position: "relative" }}>
+          <input type="text" inputMode="numeric" aria-label={`${label} percent`} value={cd.percent} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
+            data-flagged-field={requireFilled && !cd.percent.trim() ? "true" : undefined}
+            onChange={(e) => onUpdateCooldown("percent", sanitizeDigitsInput(e.target.value))}
+            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
+            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
+            onKeyDown={numericKeyDown}
+          />
+          <span style={inputSuffixStyle(theme)}>%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CombatStatCell({
   id, draft, onUpdate, onUpdateCooldown, theme, requireFilled,
 }: {
@@ -502,34 +558,7 @@ function CombatStatCell({
   const label = STAT_LABELS[id] ?? id;
 
   if (id === "cooldownReduction") {
-    const cd = draft.cooldownReduction ?? { seconds: "", percent: "" };
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
-        <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
-          <div style={{ position: "relative" }}>
-            <input type="text" inputMode="numeric" aria-label={`${label} seconds`} value={cd.seconds} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
-              data-flagged-field={requireFilled && !cd.seconds.trim() ? "true" : undefined}
-              onChange={(e) => onUpdateCooldown("seconds", sanitizeDigitsInput(e.target.value))}
-              onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-              onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
-              onKeyDown={numericKeyDown}
-            />
-            <span style={inputSuffixStyle(theme)}>s</span>
-          </div>
-          <div style={{ position: "relative" }}>
-            <input type="text" inputMode="numeric" aria-label={`${label} percent`} value={cd.percent} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
-              data-flagged-field={requireFilled && !cd.percent.trim() ? "true" : undefined}
-              onChange={(e) => onUpdateCooldown("percent", sanitizeDigitsInput(e.target.value))}
-              onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-              onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
-              onKeyDown={numericKeyDown}
-            />
-            <span style={inputSuffixStyle(theme)}>%</span>
-          </div>
-        </div>
-      </div>
-    );
+    return <CooldownReductionCell label={label} draft={draft} onUpdateCooldown={onUpdateCooldown} theme={theme} requireFilled={requireFilled} />;
   }
 
   const raw = (draft as Record<string, unknown>)[id];
@@ -585,6 +614,55 @@ function soulPatchForValue(val: string | null): Partial<NonNullable<StatsStepDra
   if (val === "ephenia_1") return { soulType: "ephenia", soulLevel: 1 };
   if (val === "ephenia_2") return { soulType: "ephenia", soulLevel: 2 };
   return { soulType: "none", soulLevel: undefined };
+}
+
+/** The weapon-type question's two shapes: a locked single-option display when the active
+ *  Equipment preset's weapon already answers it, or the normal editable choice otherwise.
+ *  Split out of SetupOptionsSection since it's the one question here with its own internal
+ *  branch, unlike the section's other checkboxes/groups, which are one ChecklistX call each. */
+function WeaponTypeQuestion({
+  derivedWeaponHand, opts, onUpdate, theme, required,
+}: {
+  derivedWeaponHand: "1h" | "2h" | undefined;
+  opts: NonNullable<StatsStepDraft["setupOptions"]>;
+  onUpdate: (patch: Partial<NonNullable<StatsStepDraft["setupOptions"]>>) => void;
+  theme: AppTheme;
+  required?: boolean;
+}) {
+  if (derivedWeaponHand !== undefined) {
+    return (
+      <ChecklistGroup
+        question="What weapon type are you using?"
+        options={[{ value: derivedWeaponHand, label: derivedWeaponHand === "1h" ? "One-Handed" : "Two-Handed" }]}
+        value={derivedWeaponHand}
+        onToggle={() => {}}
+        theme={theme}
+        disabled
+        tooltip={{
+          title: "Weapon Type",
+          description: "Hover over your weapon in your equipment inventory and look to the right of the item icon to find your weapon type.",
+        }}
+        lockTooltip={{
+          title: "Why this is locked",
+          description: "Auto-filled from your active Equipment preset's weapon.",
+        }}
+      />
+    );
+  }
+  return (
+    <ChecklistGroup
+      question="What weapon type are you using?"
+      options={[{ value: "1h", label: "One-Handed" }, { value: "2h", label: "Two-Handed" }]}
+      value={opts.weaponHand ?? null}
+      onToggle={(v) => onUpdate({ weaponHand: (v as "1h" | "2h") ?? undefined })}
+      theme={theme}
+      required={required}
+      tooltip={{
+        title: "Weapon Type",
+        description: "Hover over your weapon in your equipment inventory and look to the right of the item icon to find your weapon type.",
+      }}
+    />
+  );
 }
 
 function SetupOptionsSection({
@@ -681,37 +759,7 @@ function SetupOptionsSection({
         />
       )}
       {optsDef?.weaponType && (
-        derivedWeaponHand !== undefined ? (
-          <ChecklistGroup
-            question="What weapon type are you using?"
-            options={[{ value: derivedWeaponHand, label: derivedWeaponHand === "1h" ? "One-Handed" : "Two-Handed" }]}
-            value={derivedWeaponHand}
-            onToggle={() => {}}
-            theme={theme}
-            disabled
-            tooltip={{
-              title: "Weapon Type",
-              description: "Hover over your weapon in your equipment inventory and look to the right of the item icon to find your weapon type.",
-            }}
-            lockTooltip={{
-              title: "Why this is locked",
-              description: "Auto-filled from your active Equipment preset's weapon.",
-            }}
-          />
-        ) : (
-          <ChecklistGroup
-            question="What weapon type are you using?"
-            options={[{ value: "1h", label: "One-Handed" }, { value: "2h", label: "Two-Handed" }]}
-            value={opts.weaponHand ?? null}
-            onToggle={(v) => onUpdate({ weaponHand: (v as "1h" | "2h") ?? undefined })}
-            theme={theme}
-            required={required}
-            tooltip={{
-              title: "Weapon Type",
-              description: "Hover over your weapon in your equipment inventory and look to the right of the item icon to find your weapon type.",
-            }}
-          />
-        )
+        <WeaponTypeQuestion derivedWeaponHand={derivedWeaponHand} opts={opts} onUpdate={onUpdate} theme={theme} required={required} />
       )}
       <ChecklistGroup
         question={soulQuestion}
@@ -999,6 +1047,47 @@ function statsSubstepDescription(isScouter: boolean): string {
 // component rather than left inline like substeps 0 and 2, purely to keep the main component's
 // cognitive complexity under the sonarjs cap, which MapleScouter's completion gating pushed it
 // over.
+/** The substep's validation state: which symbol columns show, and whether every field or just
+ *  a sane subset is required. Split out of StatsWindowSubstep since these derivations chain off
+ *  each other (showArcanePower/showSacredPower feed anyFieldFilled, which feeds requireComplete,
+ *  which feeds statsComplete) independently of anything about rendering. */
+function deriveStatsSubstepValidation({
+  characterLevel, classData, isScouter, showAllStats, draft, tripleIds, primaryStat,
+}: {
+  characterLevel: number | undefined;
+  classData: ClassSkillData | undefined;
+  isScouter: boolean;
+  showAllStats: boolean;
+  draft: StatsStepDraft;
+  tripleIds: TripleStatFieldId[];
+  primaryStat: TripleStatFieldId | undefined;
+}) {
+  const showArcanePower = isArcaneEligible(characterLevel, classData?.isLegacy);
+  const showSacredPower = isSacredEligible(characterLevel, classData?.isLegacy);
+  const symbolIds = ([showArcanePower && "arcanePower", showSacredPower && "sacredPower"] as const).filter(Boolean) as StatFieldId[];
+  // full_setup stays skippable while untouched, but once a player starts filling it in this
+  // treats it like MapleScouter's every-field-required rule. See isStatsSubstepAnyFieldFilled's
+  // doc comment for why: players who missed one field and finished setup were confused that
+  // MapleScouter could not calculate.
+  //
+  // stats_flow, the profile's standalone Stats tab and showAllStats here, is excluded. Unlike
+  // full_setup it opens pre-seeded from the character's saved stats (see
+  // buildSeededStepTestByStep), so any-field-filled would trip on open whether or not anything
+  // was touched this session. There is no reliable just-typed signal to gate on, so it stays
+  // sanity-only.
+  const anyFieldFilled = !isScouter && !showAllStats
+    && isStatsSubstepAnyFieldFilled(draft, tripleIds, showArcanePower, showSacredPower);
+  const requireComplete = isScouter || anyFieldFilled;
+  const statsComplete = requireComplete
+    ? isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower)
+    : isStatsSubstepSane(draft, tripleIds, primaryStat);
+  return { showHpPercentUnapplied: requiredStatsSetHasHp(classData), symbolIds, anyFieldFilled, requireComplete, statsComplete };
+}
+
+function requiredStatsSetHasHp(classData: ClassSkillData | undefined): boolean {
+  return new Set(classData?.requiredStats ?? []).has("hp");
+}
+
 function StatsWindowSubstep({
   theme, stepNumber, totalSteps, substep, substepCount, substepAnimStyle,
   goToSubstep, hasMoreSubsteps, onNext, onFinish, onValidityChange,
@@ -1043,27 +1132,9 @@ function StatsWindowSubstep({
   const combatRightIds: StatFieldId[] = showAllStats
     ? [...COMBAT_RIGHT.slice(0, 2), "normalEnemyDamage", ...COMBAT_RIGHT.slice(2)]
     : COMBAT_RIGHT;
-  const requiredStatsSet = new Set(classData?.requiredStats ?? []);
-  const showHpPercentUnapplied = requiredStatsSet.has("hp");
-  const showArcanePower = isArcaneEligible(characterLevel, classData?.isLegacy);
-  const showSacredPower = isSacredEligible(characterLevel, classData?.isLegacy);
-  const symbolIds = ([showArcanePower && "arcanePower", showSacredPower && "sacredPower"] as const).filter(Boolean) as StatFieldId[];
-  // full_setup stays skippable while untouched, but once a player starts filling it in this
-  // treats it like MapleScouter's every-field-required rule. See isStatsSubstepAnyFieldFilled's
-  // doc comment for why: players who missed one field and finished setup were confused that
-  // MapleScouter could not calculate.
-  //
-  // stats_flow, the profile's standalone Stats tab and showAllStats here, is excluded. Unlike
-  // full_setup it opens pre-seeded from the character's saved stats (see
-  // buildSeededStepTestByStep), so any-field-filled would trip on open whether or not anything
-  // was touched this session. There is no reliable just-typed signal to gate on, so it stays
-  // sanity-only.
-  const anyFieldFilled = !isScouter && !showAllStats
-    && isStatsSubstepAnyFieldFilled(draft, tripleIds, showArcanePower, showSacredPower);
-  const requireComplete = isScouter || anyFieldFilled;
-  const statsComplete = requireComplete
-    ? isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower)
-    : isStatsSubstepSane(draft, tripleIds, primaryStat);
+  const { showHpPercentUnapplied, symbolIds, anyFieldFilled, requireComplete, statsComplete } = deriveStatsSubstepValidation({
+    characterLevel, classData, isScouter, showAllStats, draft, tripleIds, primaryStat,
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const frame = confinableFrameProps(confineToSubstep, onExitStep, onFinish, {
     substepIndex: substep,
@@ -1487,6 +1558,11 @@ function InnerAbilitySubstep({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// A flat substep dispatch (if substep === N return <SubstepComponent/>), each branch its own
+// cohesive, self-contained substep; splitting further would just move the same branches into an
+// equally-long if/else chain of function calls, the same shape as BookmarkPageBody
+// (CharacterProfileOverviewScreen.tsx).
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function StatsSetupStep({
   theme, flowId, stepNumber, totalSteps, jobName = "", direction = "forward", targetSubstep, confineToSubstep, onValidityChange, onSubstepChange, characterLevel, characterRoster, confirmedWorldId, confirmedCharacterName, worldScouterLegion, worldLegionArtifact, equipmentRawValue, legionArtifactsRawValue, value, onChange, onBack, onNext, onFinish,
 }: StatsSetupStepProps) {
@@ -1524,7 +1600,8 @@ export default function StatsSetupStep({
 
   function handleCooldownUpdate(field: "seconds" | "percent", val: string) {
     const cd = draft.cooldownReduction ?? { seconds: "", percent: "" };
-    updateDraft({ cooldownReduction: { ...cd, [field]: val } });
+    const max = field === "seconds" ? COOLDOWN_REDUCTION_SECONDS_MAX : COOLDOWN_REDUCTION_PERCENT_MAX;
+    updateDraft({ cooldownReduction: { ...cd, [field]: clampCooldownReductionInput(val, max) } });
   }
 
   function handleSetupOptUpdate(patch: Partial<NonNullable<StatsStepDraft["setupOptions"]>>) {
