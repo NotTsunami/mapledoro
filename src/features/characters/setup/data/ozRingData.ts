@@ -117,6 +117,25 @@ export function convertOzRingsDraftToStored(draft: OzRingsDraft): StoredOzRings 
   return { levels };
 }
 
+/**
+ * Converts a draft to Scouter Simulator override levels. Unlike convertOzRingsDraftToStored,
+ * a typed "0" is kept as a real 0 rather than treated as unset: the simulator needs to
+ * represent "what if this ring were removed" as distinct from "this ring was never touched",
+ * and ozRingLevel (scouterApi.ts) falls back to the character's real stored level whenever a
+ * ring's key is absent here, so dropping a typed 0 would silently resurrect the real level
+ * instead of simulating its removal.
+ */
+export function convertOzRingsDraftToOverrideLevels(draft: OzRingsDraft): Partial<Record<OzRingId, number>> {
+  const levels: Partial<Record<OzRingId, number>> = {};
+  for (const ring of ALL_RING_IDS) {
+    const raw = draft.levels[ring];
+    if (!raw) continue;
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) levels[ring] = Math.min(n, OZ_RING_MAX_LEVEL[ring]);
+  }
+  return levels;
+}
+
 /** Reverse of convertOzRingsDraftToStored. Seeds the step's draft from what's already
  *  stored, so reopening Oz Rings on a character that already answered it doesn't start
  *  blank. Tolerates legacy stored fields (ringMode, totalling level, totallingStats) by

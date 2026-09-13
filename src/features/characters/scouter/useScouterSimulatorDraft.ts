@@ -8,7 +8,7 @@ import {
   emptyBuffsDraft, storedBuffsToDraft, convertBuffsDraftToStored, type BuffsDraft,
 } from "../setup/data/buffsData";
 import {
-  storedOzRingsToOzRingsDraft, convertOzRingsDraftToStored, type OzRingId, type OzRingsDraft,
+  storedOzRingsToOzRingsDraft, convertOzRingsDraftToOverrideLevels, type OzRingId, type OzRingsDraft,
 } from "../setup/data/ozRingData";
 import {
   buildScouterPayload, type OzRingOverrides, type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInfoOverrides, type SimulatorInputOverrides,
@@ -160,7 +160,7 @@ function ozRingOverridesToDraft(character: StoredCharacterRecord, overrides: OzR
   if (!overrides) return real;
   const levels: Partial<Record<OzRingId, string>> = { ...real.levels };
   for (const [ring, level] of Object.entries(overrides.levels ?? {})) {
-    if (level !== undefined) levels[ring as OzRingId] = String(level);
+    levels[ring as OzRingId] = String(level);
   }
   return { levels };
 }
@@ -305,7 +305,7 @@ export function useScouterSimulatorDraft(
         : undefined,
       dopingOverrides: buffsChanged ? (convertBuffsDraftToStored(buffsDraft) ?? undefined) : undefined,
       ringOverrides: ozRingsChanged
-        ? { levels: convertOzRingsDraftToStored(ozRingsDraft)?.levels }
+        ? { levels: convertOzRingsDraftToOverrideLevels(ozRingsDraft) }
         : undefined,
       input: inputChanged ? inputOverrides : undefined,
       linkSkillOverrides: linkSkillsChanged
