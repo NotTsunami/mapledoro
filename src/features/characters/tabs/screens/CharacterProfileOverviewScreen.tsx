@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { classPortraitUrl } from "../../../../lib/classPortraits";
 import { worldIconUrl } from "../../../../lib/mapleResource";
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { useMounted } from "../../../../lib/useMounted";
 import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import type { SetupFlowId } from "../../setup/flows";
@@ -27,6 +27,7 @@ import { isExpTrackingAvailable, resolveExpDelta, characterExpPercent, netExpGai
 import ExpDeltaBadge from "../components/ExpDeltaBadge";
 import { formatExpCompact } from "../../../tools/format";
 import { PillGroup } from "../../../tools/shared-ui";
+import { useLazyChart } from "../../../tools/useLazyChart";
 import type { Chart, ChartData, ChartOptions, ChartType, Plugin, TooltipItem } from "chart.js";
 import { SetupFlowButtons } from "./QuickSetupIntroScreen";
 import { STAT_LABELS } from "../../setup/data/statFields";
@@ -2749,12 +2750,9 @@ const EXP_RANGE_OPTIONS: { value: ExpRangeDays; label: string }[] = [
 ];
 type ExpRangeDays = "7" | "14" | "30" | "90";
 
-type LineChartComponent = (typeof import("react-chartjs-2"))["Line"];
-type BarChartComponent = (typeof import("react-chartjs-2"))["Bar"];
+type LineChartComponent = ComponentType<{ data: ChartData<"line">; options: ChartOptions<"line">; ref?: Ref<Chart<"line">> }>;
+type BarChartComponent = ComponentType<{ data: ChartData<"bar">; options: ChartOptions<"bar">; plugins?: Plugin<"bar">[]; ref?: Ref<Chart<"bar">> }>;
 
-// Dynamically imports chart.js and react-chartjs-2 rather than importing them statically,
-// mirroring StarForceWorkspace's HistogramPanel, so the chart libraries stay out of every
-// profile load for characters that never open this bookmark.
 interface ExpChartPoint {
   x: number;
   y: number;
@@ -2862,22 +2860,12 @@ function useDismissChartTooltipOnOutsideTap<TType extends ChartType>(chartRef: R
 }
 
 function ExpChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistoryEntry[]; anchor: ExpHistoryEntry | null }) {
-  const [Line, setLine] = useState<LineChartComponent | null>(null);
+  const charts = useLazyChart(["Line"], (c) => [
+    c.LinearScale, c.PointElement, c.LineElement, c.Tooltip, c.Filler,
+  ]);
+  const Line = (charts?.Line ?? null) as LineChartComponent | null;
   const chartRef = useRef<Chart<"line"> | null>(null);
   useDismissChartTooltipOnOutsideTap(chartRef);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadChart() {
-      const [chartModule, lineModule] = await Promise.all([import("chart.js"), import("react-chartjs-2")]);
-      chartModule.Chart.register(
-        chartModule.LinearScale, chartModule.PointElement, chartModule.LineElement, chartModule.Tooltip, chartModule.Filler,
-      );
-      if (mounted) setLine(() => lineModule.Line as LineChartComponent);
-    }
-    loadChart();
-    return () => { mounted = false; };
-  }, []);
 
   const points = useMemo(() => computeExpChartPoints(entries, anchor), [entries, anchor]);
 
@@ -3004,22 +2992,12 @@ function formatSignedExp(n: number): string {
 }
 
 function ExpGainBarChart({ theme, entries, anchor }: { theme: Theme; entries: ExpHistoryEntry[]; anchor: ExpHistoryEntry | null }) {
-  const [Bar, setBar] = useState<BarChartComponent | null>(null);
+  const charts = useLazyChart(["Bar"], (c) => [
+    c.CategoryScale, c.LinearScale, c.BarElement, c.Tooltip,
+  ]);
+  const Bar = (charts?.Bar ?? null) as BarChartComponent | null;
   const chartRef = useRef<Chart<"bar"> | null>(null);
   useDismissChartTooltipOnOutsideTap(chartRef);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadChart() {
-      const [chartModule, barModule] = await Promise.all([import("chart.js"), import("react-chartjs-2")]);
-      chartModule.Chart.register(
-        chartModule.CategoryScale, chartModule.LinearScale, chartModule.BarElement, chartModule.Tooltip,
-      );
-      if (mounted) setBar(() => barModule.Bar as BarChartComponent);
-    }
-    loadChart();
-    return () => { mounted = false; };
-  }, []);
 
   const points = useMemo(() => aggregateDailyExpGain(entries, anchor), [entries, anchor]);
 
