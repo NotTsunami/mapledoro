@@ -665,9 +665,8 @@ interface CharacterDirectoryScreenProps {
 // Legion panel, the real directory) and the directory itself branches again on All
 // Worlds versus single-world. Each conditional here is already its own cohesive,
 // single-purpose branch, with the merged-groups computation and the world-import file state
-// extracted into buildAllWorldsMergedGroups and useWorldImportFile above. Splitting further
-// would relocate the same branch count into more functions rather than remove any.
-// eslint-disable-next-line sonarjs/cognitive-complexity
+// extracted into buildAllWorldsMergedGroups and useWorldImportFile above.
+/* eslint-disable-next-line sonarjs/cognitive-complexity */ /* react-doctor-disable-next-line no-high-complexity-react-function */
 export default function CharacterDirectoryScreen({
   model, actions, directorySortBy, onDirectorySortByChange,
   directoryWorldFilter, onDirectoryWorldFilterChange, directoryRevealPhase,

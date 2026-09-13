@@ -42,6 +42,48 @@ type ImportState =
   | { status: "conflict"; existing: StoredCharacterRecord; imported: StoredCharacterRecord }
   | { status: "championSwap"; record: StoredCharacterRecord; champions: StoredCharacterRecord[] };
 
+/** The same preview card serves readyToAdd, conflict and championSwap. For conflict it shows
+ *  the imported file's own data rather than the existing character it collides with, since that
+ *  is what's being proposed. Without this the screen behind those dialogs goes blank, with no
+ *  indication of which character is being imported. Split out of ImportModeScreen's render. */
+function previewRecordForState(state: ImportState): StoredCharacterRecord | null {
+  if (state.status === "readyToAdd" || state.status === "championSwap") return state.record;
+  if (state.status === "conflict") return state.imported;
+  return null;
+}
+
+function ImportPreviewCard({ theme, record }: { theme: SearchPaneModel["theme"]; record: StoredCharacterRecord }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.65rem",
+        padding: "0.65rem",
+        border: `1px solid ${theme.border}`,
+        borderRadius: "12px",
+        marginBottom: "0.75rem",
+      }}
+    >
+      <CharacterAvatar
+        src={record.characterImgURL}
+        alt=""
+        width={40}
+        height={40}
+        style={{ display: "block", borderRadius: "8px", objectFit: "contain", objectPosition: "center bottom" }}
+      />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: "0.84rem", color: theme.text }}>
+          {record.characterName}
+        </div>
+        <div style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted }}>
+          {resolveDisplayJobName(record.jobName)} · Lv. {record.level}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function readImportFile(file: File): Promise<ImportState> {
   let parsedJson: unknown;
   try {
@@ -69,6 +111,11 @@ async function readImportFile(file: File): Promise<ImportState> {
     : { status: "readyToAdd", record };
 }
 
+// Nesting depth 1 throughout: handleAddCharacter is a flat chain of early returns over the
+// import state machine, and the render is a series of independent `state.status === "..."`
+// sibling checks, not nested control flow. The preview-card derivation is already split out
+// above (previewRecordForState/ImportPreviewCard).
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function ImportModeScreen({ model, actions }: ImportModeScreenProps) {
   const { theme, shell, search, profile } = model;
   const [state, setState] = useState<ImportState>({ status: "idle" });
@@ -143,6 +190,8 @@ export default function ImportModeScreen({ model, actions }: ImportModeScreenPro
     if (state.status === "championSwap") setState({ status: "readyToAdd", record: state.record });
   }
 
+  const previewRecord = previewRecordForState(state);
+
   return (
     <>
       <div style={{ marginBottom: "1rem" }}>
@@ -200,45 +249,7 @@ export default function ImportModeScreen({ model, actions }: ImportModeScreenPro
         </p>
       )}
 
-      {(() => {
-        // The same preview card serves readyToAdd, conflict and championSwap. For conflict it
-        // shows the imported file's own data rather than the existing character it collides
-        // with, since that is what's being proposed. Without this the screen behind those
-        // dialogs goes blank, with no indication of which character is being imported.
-        let previewRecord: StoredCharacterRecord | null = null;
-        if (state.status === "readyToAdd" || state.status === "championSwap") previewRecord = state.record;
-        else if (state.status === "conflict") previewRecord = state.imported;
-        if (!previewRecord) return null;
-        return (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.65rem",
-              padding: "0.65rem",
-              border: `1px solid ${theme.border}`,
-              borderRadius: "12px",
-              marginBottom: "0.75rem",
-            }}
-          >
-            <CharacterAvatar
-              src={previewRecord.characterImgURL}
-              alt=""
-              width={40}
-              height={40}
-              style={{ display: "block", borderRadius: "8px", objectFit: "contain", objectPosition: "center bottom" }}
-            />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 800, fontSize: "0.84rem", color: theme.text }}>
-                {previewRecord.characterName}
-              </div>
-              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted }}>
-                {resolveDisplayJobName(previewRecord.jobName)} · Lv. {previewRecord.level}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {previewRecord && <ImportPreviewCard theme={theme} record={previewRecord} />}
 
       {profile.isAddingCharacter && (state.status === "readyToAdd" || state.status === "championSwap") && (
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>

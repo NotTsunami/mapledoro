@@ -370,52 +370,28 @@ function petEquipCompatible(petId: string, equipId: string): boolean {
   return equip?.wearablePets?.includes(petId) ?? false;
 }
 
-function ItemPicker({
-  slot, current, theme, files, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty,
-  onSelect, onClose, onAdvance, onPrev, onNext,
+/** Loads (with the module-level cache) and filters one slot group's item catalog, and derives
+ *  the search-debounced display list. Split out of ItemPicker so that component is left with
+ *  rendering and keyboard wiring only. */
+function useItemPickerCatalog({
+  files, current, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty, query,
 }: {
-  slot: SlotKey;
-  current: EquipmentItem | null | undefined;
-  theme: AppTheme;
   files: string[];
+  current: EquipmentItem | null | undefined;
   itemFilter: (item: CatalogItem) => boolean;
   maxLevel?: number;
-  /** Item ids already placed in sibling slots (e.g. other rings); onlyEquip items among them are hidden. */
   excludeIds?: ReadonlySet<string>;
-  /** Preset 1's item for this slot, pinned at the top when editing an overridden preset slot. */
   presetBaseItem?: EquipmentItem | null;
-  /** Show the full filtered list before any search (for slots whose filtered catalog is already small, e.g. pet equips). */
   showAllWhenEmpty?: boolean;
-  onSelect: (item: EquipmentItem | null) => void;
-  onClose: () => void;
-  /** Called (instead of onClose) after an actual pick, for slots that belong to a chained
-   *  group (e.g. Title → Totems, Pet 1 → Pet Equip 1 → Pet 2 → …). viaKeyboard distinguishes
-   *  an Enter-driven pick from a mouse click. Only a keyboard pick jumps slots, since a
-   *  mouse click means the cursor is staying local. Slots outside a chain (the main
-   *  equipment grid) don't pass this, so a pick there closes the picker. */
-  onAdvance?: (viaKeyboard: boolean) => void;
-  onPrev?: () => void;
-  onNext?: () => void;
+  query: string;
 }) {
   const [loadedItems, setLoadedItems] = useState<CatalogItem[] | null>(null);
-  const [query, setQuery] = useState("");
   // Trails `query` by SEARCH_DEBOUNCE_MS; drives the result list (and everything that has to
   // stay in sync with it) so the icon requests land once per pause, not once per keystroke.
   const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const isAndroid = slot === "android";
-
-  function selectItem(item: EquipmentItem, viaKeyboard: boolean) {
-    onSelect(item);
-    if (onAdvance) { onAdvance(viaKeyboard); } else { onClose(); }
-  }
 
   const cacheKey = files.join("+");
   const items = cachedSlotItems[cacheKey] ?? loadedItems;
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(query), SEARCH_DEBOUNCE_MS);
@@ -457,6 +433,53 @@ function ItemPicker({
     excludeIds?.has(presetBaseItem.id) &&
     items?.some((it) => it.id === presetBaseItem.id && it.onlyEquip)
   );
+
+  return { items, displayed, searchQuery, presetBaseConflicts };
+}
+
+function ItemPicker({
+  slot, current, theme, files, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty,
+  onSelect, onClose, onAdvance, onPrev, onNext,
+}: {
+  slot: SlotKey;
+  current: EquipmentItem | null | undefined;
+  theme: AppTheme;
+  files: string[];
+  itemFilter: (item: CatalogItem) => boolean;
+  maxLevel?: number;
+  /** Item ids already placed in sibling slots (e.g. other rings); onlyEquip items among them are hidden. */
+  excludeIds?: ReadonlySet<string>;
+  /** Preset 1's item for this slot, pinned at the top when editing an overridden preset slot. */
+  presetBaseItem?: EquipmentItem | null;
+  /** Show the full filtered list before any search (for slots whose filtered catalog is already small, e.g. pet equips). */
+  showAllWhenEmpty?: boolean;
+  onSelect: (item: EquipmentItem | null) => void;
+  onClose: () => void;
+  /** Called (instead of onClose) after an actual pick, for slots that belong to a chained
+   *  group (e.g. Title → Totems, Pet 1 → Pet Equip 1 → Pet 2 → …). viaKeyboard distinguishes
+   *  an Enter-driven pick from a mouse click. Only a keyboard pick jumps slots, since a
+   *  mouse click means the cursor is staying local. Slots outside a chain (the main
+   *  equipment grid) don't pass this, so a pick there closes the picker. */
+  onAdvance?: (viaKeyboard: boolean) => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isAndroid = slot === "android";
+
+  function selectItem(item: EquipmentItem, viaKeyboard: boolean) {
+    onSelect(item);
+    if (onAdvance) { onAdvance(viaKeyboard); } else { onClose(); }
+  }
+
+  const { items, displayed, searchQuery, presetBaseConflicts } = useItemPickerCatalog({
+    files, current, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty, query,
+  });
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
     items: displayed ?? [],

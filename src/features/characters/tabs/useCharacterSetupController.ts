@@ -1122,6 +1122,10 @@ function buildSeededStepTestByStep(jobName: string, storedCharacter: StoredChara
   };
 }
 
+// The central state-owning hook for the whole setup flow: dozens of useState/useCallback/
+// useEffect calls, several depending on same-tick state timing documented at their own
+// definition sites (e.g. upsertRosterCharacter's create-then-read constraint).
+// react-doctor-disable-next-line no-high-complexity-react-function
 export function useCharacterSetupController(initialRouteIntent?: InitialRouteIntent) {
   // Frozen at mount via the lazy useState initializer (only evaluated once): once the
   // URL-sync effect in CharacterSetupFlow.tsx starts mirroring in-app navigation back into

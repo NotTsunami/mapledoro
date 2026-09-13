@@ -584,6 +584,11 @@ function partitionWorldImportPayload(payload: WorldExportPayload): {
   return { newCharacters: newChars, conflicts: conflictEntries, worldDataConflict: hasWorldData, worldResidents: residents };
 }
 
+// Already decomposed into ConflictsSection/NewCharactersSection/ResidentsSection/
+// CapSummarySection plus useWorldImportConflictState; what remains here is prop-threading
+// between them (20+ destructured values) and one flat legion-data-conflict block, not nested
+// control flow.
+// react-doctor-disable-next-line no-high-complexity-react-function
 function WorldImportConflictView({ theme, isUiLocked, payload, onImportWorldBulk, onChooseDifferentFile }: WorldImportConflictViewProps) {
 
   // Partitioned once per loaded file, not on every render. selectCharacterByIgn reads the

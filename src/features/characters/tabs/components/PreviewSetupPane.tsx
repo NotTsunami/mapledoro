@@ -88,6 +88,55 @@ function getSetupPanelInlineStyle(
   };
 }
 
+/** The directory panel's staggered reveal: main character, then champions, then mules, each
+ *  fading in at its own delay while the directory view is active, reset to 0 the moment it
+ *  isn't. Split out of PreviewSetupPane since the two effects' timer sequencing is a cohesive
+ *  concern on its own, independent of the rest of the pane's model/class-name derivation. */
+function useDirectoryRevealPhase(inCharacterDirectoryView: boolean, setup: PreviewPaneModel["setup"], hasChampionSection: boolean) {
+  const [directoryRevealPhase, setDirectoryRevealPhase] = useState(0);
+  const getRevealDelays = useEffectEvent(() =>
+    getDirectoryRevealDelays(setup.fastDirectoryRevealOnce, hasChampionSection),
+  );
+
+  useEffect(() => {
+    if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) {
+      const resetPhaseTimer = window.setTimeout(() => {
+        setDirectoryRevealPhase(0);
+      }, 0);
+      return () => clearTimeout(resetPhaseTimer);
+    }
+  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on the narrowed `setup.isSwitchingToDirectory` primitive, not the whole `setup` object, to avoid re-running when unrelated fields change
+  }, [inCharacterDirectoryView, setup.isSwitchingToDirectory]);
+
+  useEffect(() => {
+    if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) return;
+    const startPhaseTimer = window.setTimeout(() => {
+      setDirectoryRevealPhase(0);
+    }, 0);
+    const { mainDelay, championDelay, mulesDelay } = getRevealDelays();
+    const mainTimer = window.setTimeout(() => setDirectoryRevealPhase(1), mainDelay);
+    const championsTimer = window.setTimeout(() => setDirectoryRevealPhase(2), championDelay);
+    const mulesTimer = window.setTimeout(() => setDirectoryRevealPhase(3), mulesDelay);
+    return () => {
+      clearTimeout(startPhaseTimer);
+      clearTimeout(mainTimer);
+      clearTimeout(championsTimer);
+      clearTimeout(mulesTimer);
+    };
+  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on narrowed `setup.*` primitives, not the whole `setup` object, to avoid re-running when unrelated fields change
+  }, [
+    inCharacterDirectoryView,
+    setup.fastDirectoryRevealOnce,
+    setup.isSwitchingToDirectory,
+  ]);
+
+  return directoryRevealPhase;
+}
+
+// Nesting depth 1: a long but flat chain of independent derived values (directory world
+// filter, active screen id/class names, panel styles) feeding one render, not nested control
+// flow. The reveal-phase timer sequencing is already split into useDirectoryRevealPhase above.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
   const { theme, setup, directory, preview } = model;
   const [directorySortBy, setDirectorySortBy] = useState<DirectorySortBy>("name");
@@ -120,12 +169,8 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     maxCharacters: directory.maxCharacters,
   }).hasChampionSection;
 
-  const getRevealDelays = useEffectEvent(() =>
-    getDirectoryRevealDelays(setup.fastDirectoryRevealOnce, hasChampionSection),
-  );
-
-  const [directoryRevealPhase, setDirectoryRevealPhase] = useState(0);
   const inCharacterDirectoryView = setup.showFlowOverview && setup.showCharacterDirectory;
+  const directoryRevealPhase = useDirectoryRevealPhase(inCharacterDirectoryView, setup, hasChampionSection);
   const shouldShowDirectoryPanel =
     inCharacterDirectoryView &&
     !setup.isSwitchingToDirectory &&
@@ -166,38 +211,6 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     writeStoredWorldFilter(worldId);
     actions.queueWorldRefresh(worldId);
   };
-
-  useEffect(() => {
-    if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) {
-      const resetPhaseTimer = window.setTimeout(() => {
-        setDirectoryRevealPhase(0);
-      }, 0);
-      return () => clearTimeout(resetPhaseTimer);
-    }
-  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on the narrowed `setup.isSwitchingToDirectory` primitive, not the whole `setup` object, to avoid re-running when unrelated fields change
-  }, [inCharacterDirectoryView, setup.isSwitchingToDirectory]);
-
-  useEffect(() => {
-    if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) return;
-    const startPhaseTimer = window.setTimeout(() => {
-      setDirectoryRevealPhase(0);
-    }, 0);
-    const { mainDelay, championDelay, mulesDelay } = getRevealDelays();
-    const mainTimer = window.setTimeout(() => setDirectoryRevealPhase(1), mainDelay);
-    const championsTimer = window.setTimeout(() => setDirectoryRevealPhase(2), championDelay);
-    const mulesTimer = window.setTimeout(() => setDirectoryRevealPhase(3), mulesDelay);
-    return () => {
-      clearTimeout(startPhaseTimer);
-      clearTimeout(mainTimer);
-      clearTimeout(championsTimer);
-      clearTimeout(mulesTimer);
-    };
-  // react-doctor-disable-next-line exhaustive-deps -- deliberately depends on narrowed `setup.*` primitives, not the whole `setup` object, to avoid re-running when unrelated fields change
-  }, [
-    inCharacterDirectoryView,
-    setup.fastDirectoryRevealOnce,
-    setup.isSwitchingToDirectory,
-  ]);
 
   return (
     <div className="preview-pane">

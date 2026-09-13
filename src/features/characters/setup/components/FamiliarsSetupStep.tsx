@@ -581,6 +581,48 @@ function TierPickerView({ entry, theme, onBack, onSelect }: {
   );
 }
 
+/** Debounced search + filtered results + keyboard nav wiring for the familiar search picker.
+ *  Split out of FamiliarSlotCard so that component is left with rendering only. */
+function useFamiliarSearchPicker({
+  isOpen, query, familiarId, pendingEntry, inputRef, onSetPending, onClosePicker,
+}: {
+  isOpen: boolean;
+  query: string;
+  familiarId: number | null;
+  pendingEntry: FamiliarEntry | null;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onSetPending: (entry: FamiliarEntry | null) => void;
+  onClosePicker: () => void;
+}) {
+  // Trails `query` by SEARCH_DEBOUNCE_MS; drives the result list (and everything that has
+  // to stay in sync with it) so sprite requests land once per pause, not once per keystroke.
+  const [searchQuery, setSearchQuery] = useState(query);
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const filtered = useMemo(() => isOpen ? filterFamiliars(searchQuery, familiarId) : [], [isOpen, searchQuery, familiarId]);
+  useEffect(() => {
+    if (isOpen && !pendingEntry) inputRef.current?.focus();
+  }, [isOpen, pendingEntry, inputRef]);
+
+  const nav = useKeyboardListNav({
+    items: filtered,
+    resetKey: searchQuery,
+    onSelect: (entry) => onSetPending(entry),
+    onClose: onClosePicker,
+  });
+
+  return { searchQuery, filtered, ...nav };
+}
+
+// The card display, the two-step popover (search then tier pick), and the Tab-chaining keyboard
+// wiring between this slot's own line pickers and the next slot are all genuinely interdependent
+// here (onNextCard, backToTierPicker, the shared isOpen/pendingEntry state), not independent
+// branches that happen to share a function. The search/debounce logic is already split out into
+// useFamiliarSearchPicker above; further splitting the render would mean threading most of this
+// function's props through an extra layer for no real gain in clarity.
+// react-doctor-disable-next-line no-high-complexity-react-function
 function FamiliarSlotCard({
   slot, slotId, openId, query, pendingEntry, theme,
   onOpen, onQueryChange, onSelect, onClear, onLineChange, onSetPending,
@@ -612,23 +654,9 @@ function FamiliarSlotCard({
   const spriteMobId = matchedEntry?.spriteMobId ?? slot.mobId;
   const inputRef = useRef<HTMLInputElement>(null);
   const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, FAM_PICKER_WIDTH);
-  // Trails `query` by SEARCH_DEBOUNCE_MS; drives the result list (and everything that has
-  // to stay in sync with it) so sprite requests land once per pause, not once per keystroke.
-  const [searchQuery, setSearchQuery] = useState(query);
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(query), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query]);
-  const filtered = useMemo(() => isOpen ? filterFamiliars(searchQuery, slot.familiarId) : [], [isOpen, searchQuery, slot.familiarId]);
-  useEffect(() => {
-    if (isOpen && !pendingEntry) inputRef.current?.focus();
-  }, [isOpen, pendingEntry]);
 
-  const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
-    items: filtered,
-    resetKey: searchQuery,
-    onSelect: (entry) => onSetPending(entry),
-    onClose: onClosePicker,
+  const { searchQuery, filtered, highlightedIndex, onKeyDown: navKeyDown, itemRef } = useFamiliarSearchPicker({
+    isOpen, query, familiarId: slot.familiarId, pendingEntry, inputRef, onSetPending, onClosePicker,
   });
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

@@ -21,6 +21,10 @@ interface CharacterSetupFlowProps {
   initialAction?: string;
 }
 
+// Almost entirely flat model/actions assembly (searchPaneModel, searchPaneActions,
+// previewPaneModel) for the two child panes, one real effect for URL sync. The boolean
+// derivations feeding each model field are independent of each other, not nested control flow.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function CharacterSetupFlow({ theme, initialCharacterName, initialAction }: CharacterSetupFlowProps) {
   // initialCharacterName/initialAction (URL search params read once in page.tsx) are resolved
   // directly during the controller's hydration, landing on the right screen on first paint
@@ -70,12 +74,12 @@ export default function CharacterSetupFlow({ theme, initialCharacterName, initia
   ]);
 
   const confirmedCharacterKey = state.confirmedCharacter
-      ? toCharacterKey(state.confirmedCharacter)
-      : null;
-    const confirmedStoredCharacter = confirmedCharacterKey !== null
-      ? (state.characterRoster.find((r) => toCharacterKey(r) === confirmedCharacterKey) ??
-        (state.confirmedCharacter as unknown as StoredCharacterRecord))
-      : null;
+    ? toCharacterKey(state.confirmedCharacter)
+    : null;
+  const confirmedStoredCharacter = confirmedCharacterKey !== null
+    ? (state.characterRoster.find((r) => toCharacterKey(r) === confirmedCharacterKey) ??
+      (state.confirmedCharacter as unknown as StoredCharacterRecord))
+    : null;
   const currentCharacterHasCompletedRequiredFlow = state.completedFlowIds.includes(
     state.requiredFlowId,
   );

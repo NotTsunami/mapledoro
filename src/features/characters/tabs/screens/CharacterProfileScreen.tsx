@@ -170,6 +170,10 @@ interface CharacterProfileScreenProps {
   actions: SearchPaneActions;
 }
 
+// Mostly flat JSX markup: a handful of derived values, then several independent optional
+// sections (role chips, updated line, refresh button) each gated by its own `&&`, not nested
+// control flow.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function CharacterProfileScreen({
   model,
   actions,
