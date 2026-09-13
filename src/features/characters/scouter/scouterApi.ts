@@ -984,13 +984,13 @@ export function buildDirectScouterPayload(
   // should not have.
   if (overrides.hexaCoreOverrides) {
     for (const [field, value] of Object.entries(overrides.hexaCoreOverrides)) {
-      if (value !== undefined) userStat.hexa[field as SimulatorHexaCoreField] = value;
+      userStat.hexa[field as SimulatorHexaCoreField] = value;
     }
   }
   if (overrides.linkSkillOverrides) {
     for (const [id, value] of Object.entries(overrides.linkSkillOverrides)) {
       const scouterKey = LINK_SKILL_TO_SCOUTER_KEY[id as LinkSkillId];
-      if (scouterKey && value !== undefined) userStat.linkSkill[scouterKey] = value;
+      if (scouterKey) userStat.linkSkill[scouterKey] = value;
     }
   }
   const classId = CLASS_SKILL_DATA.find((c) => c.nexonJobName === character.jobName)?.id;

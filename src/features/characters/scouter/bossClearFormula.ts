@@ -397,7 +397,7 @@ export function computeBossClear(
 ): BossClearResult | null {
   if (entry.guard !== 300 && entry.guard !== 380) return null;
   const cutThreshold = entry.bossCut ?? entry.partyBossCut;
-  if (cutThreshold === null || cutThreshold === undefined) return null;
+  if (cutThreshold === null) return null;
 
   const hasArcaneReq = !!entry.arcaneForce && entry.arcaneForce > 0;
   const hasAuthenticReq = !!entry.authenticForce && entry.authenticForce > 0;

@@ -158,7 +158,7 @@ export function toStoredLegionCrystals(
   if (!crystals) return undefined;
   return crystals.map((c, index) => {
     if (!isCrystalUnlocked(index, artifactLevel)) return { level: 0, stats: [null, null, null] };
-    const hasRealStats = c?.stats?.some((s) => s !== null && s !== undefined) ?? false;
+    const hasRealStats = c?.stats?.some((s) => s !== null) ?? false;
     return {
       level: sanitizeCrystalLevel(c?.level),
       stats: hasRealStats

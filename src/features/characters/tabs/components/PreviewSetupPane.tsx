@@ -28,7 +28,7 @@ function getActiveScreenId(setup: PreviewPaneModel["setup"]): PreviewScreenId {
   if (inCharacterDirectoryView) return "directory";
   if (!hasCompletedRequiredFlow && setup.setupStepIndex === 0) return "quick-setup-intro";
   if (setup.setupStepIndex > 0) return "setup-flow";
-  if (hasCompletedRequiredFlow && !inCharacterDirectoryView) return "profile-overview";
+  if (hasCompletedRequiredFlow) return "profile-overview";
   return "none";
 }
 

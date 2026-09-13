@@ -11,7 +11,7 @@ import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import type { SetupFlowId } from "../../setup/flows";
 import type { SetupStepId } from "../../setup/steps";
 import type { PreviewPaneActions, PreviewPaneModel } from "../paneModels";
-import { primaryButtonStyle, secondaryButtonStyle, successButtonStyle } from "../components/uiStyles";
+import { secondaryButtonStyle, successButtonStyle } from "../components/uiStyles";
 import { findClassById, commonSkillsFor, type HexaSkillDef, type HexaSkillLevels, type HexaMasteryNode } from "../../../tools/hexa-skills/hexa-classes";
 import { NavChevron } from "../../DropdownChevron";
 import { SkillIcon as HexaSkillTileIcon } from "../../../tools/hexa-skills/hexa-ui";
@@ -171,25 +171,6 @@ function BookmarkPageHeader({ theme, label, onEdit, disabled, extraAction }: {
             <PencilIcon />
           </button>
         </HoverTooltip>
-      )}
-    </div>
-  );
-}
-
-function EmptyBookmarkState({ theme, label, onSetup, disabled }: { theme: Theme; label: string; onSetup: (() => void) | null; disabled: boolean }) {
-  return (
-    <div style={{ display: "grid", gap: 10, padding: "0.4rem 0 1rem", justifyItems: "start" }}>
-      <p style={{ margin: 0, fontSize: 13, color: theme.muted, fontWeight: 700 }}>Not set up yet.</p>
-      {onSetup !== null && (
-        <button
-          type="button"
-          className="tap-target-44"
-          disabled={disabled}
-          onClick={onSetup}
-          style={{ ...primaryButtonStyle(theme, "0.45rem 0.8rem"), fontSize: "0.8rem" }}
-        >
-          {`Set up ${label}`}
-        </button>
       )}
     </div>
   );
@@ -538,12 +519,6 @@ function readSymbolLevels(charName: string | undefined): Record<string, SymbolSt
   if (!charName) return null;
   const saved = readCharacterToolData<{ symbols?: Record<string, SymbolState> }>(charName, "symbols");
   return saved?.symbols ?? null;
-}
-
-function isStatsFilled(character: StoredCharacterRecord | null): boolean {
-  if (!character) return false;
-  const s = character.stats;
-  return Boolean(s.attackPower.base || s.bossDamage || s.str.base || s.dex.base || s.int.base || s.luk.base || s.hp.base);
 }
 
 // Pre-mount fallback for ScouterFigure (scouter/ScouterFigure.tsx) while `mounted` and
@@ -3393,43 +3368,6 @@ function StatEfficiencyBookmark({ theme, character, label, disabled, onEditStep 
   );
 }
 
-function isHexaMatrixFilled(character: StoredCharacterRecord, mounted: boolean): boolean {
-  if (character.level < 260) return false;
-  if (isLegacyClass(character.jobName)) return true;
-  if (!mounted) return false;
-  const fromState = (character.tools?.hexaSkills as { levels?: HexaSkillLevels } | undefined)?.levels;
-  return Boolean(fromState ?? readHexaLevels(character.characterName));
-}
-
-function isBookmarkFilled(id: BookmarkId, character: StoredCharacterRecord | null, mounted: boolean): boolean {
-  if (!character) return false;
-  switch (id) {
-    case "overview": return true;
-    case "gender_marriage": return character.gender !== null || (character.marriage !== null && character.marriage.isMarried !== null);
-    case "stats": return isStatsFilled(character);
-    case "equipment": {
-      const equip = character.equipment;
-      const preset = equip?.presets?.[equip.activePreset] ?? equip?.presets?.[0];
-      return Boolean(equip?.title || preset && Object.values(preset).some((v) => v && typeof v === "object" && "name" in v && v.name));
-    }
-    case "familiars": {
-      const preset = character.familiars?.presets?.[character.familiars.activePreset];
-      return Boolean(preset && (preset.familiars.some((f) => f.name) || preset.badges.length > 0));
-    }
-    case "v_matrix": {
-      const levels = character.vMatrix?.levels;
-      return Boolean(levels && Object.values(levels).some((v) => v > 0));
-    }
-    case "hexa_matrix": return isHexaMatrixFilled(character, mounted);
-    case "exp": return true;
-    case "scouter": return true;
-    case "efficiency": return true;
-    default: return false;
-  }
-}
-
-const BOOKMARK_CONTENT: Record<Exclude<BookmarkId, "overview" | "setup" | "gender_marriage" | "stats" | "equipment" | "v_matrix" | "hexa_matrix" | "familiars" | "exp" | "scouter" | "efficiency">, (props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode> = {};
-
 function SetupBookmark({ model, actions }: { model: PreviewPaneModel; actions: PreviewPaneActions }) {
   const { theme } = model;
   return (
@@ -3484,13 +3422,11 @@ function hexaMatrixTargetSubstep(view: HexaBookmarkView): number {
 // chain of function calls.
 // eslint-disable-next-line sonarjs/cognitive-complexity
 function BookmarkPageBody({
-  model, actions, active, filled, ContentComponent, onEdit, onEditStep, onNavigateToBookmark, onNavigateToGearSlot, highlightSlotKey, onHighlightSlotConsumed,
+  model, actions, active, onEdit, onEditStep, onNavigateToBookmark, onNavigateToGearSlot, highlightSlotKey, onHighlightSlotConsumed,
 }: {
   model: PreviewPaneModel;
   actions: PreviewPaneActions;
   active: BookmarkDef;
-  filled: boolean;
-  ContentComponent: ((props: { theme: Theme; character: StoredCharacterRecord | null }) => ReactNode) | null;
   onEdit: () => void;
   onEditStep: (flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) => void;
   onNavigateToBookmark: (id: BookmarkId, subView?: string) => void;
@@ -3679,13 +3615,9 @@ function BookmarkPageBody({
     return <StatEfficiencyBookmark theme={theme} character={character} label={active.pageLabel} disabled={setup.isUiLocked} onEditStep={onEditStep} />;
   }
 
-  return (
-    <>
-      <BookmarkPageHeader theme={theme} label={active.pageLabel} onEdit={filled ? onEdit : null} disabled={setup.isUiLocked} />
-      {filled && ContentComponent ? <ContentComponent theme={theme} character={character} /> : null}
-      {!filled && <EmptyBookmarkState theme={theme} label={active.pageLabel} onSetup={onEdit} disabled={setup.isUiLocked} />}
-    </>
-  );
+  // Every BookmarkId is handled by an explicit branch above; TS can't prove that
+  // exhaustiveness from a chain of separate `if`s, so a fallback return is still required.
+  return null;
 }
 
 function BookmarkSpine({
@@ -3808,7 +3740,6 @@ export default function CharacterProfileOverviewScreen({
 }: CharacterProfileOverviewScreenProps) {
   const { theme, profile } = model;
   const character = profile.confirmedCharacter;
-  const mounted = useMounted();
 
   const bookmarks = ALL_BOOKMARKS;
   // Restores whichever bookmark was active before an optional flow started from here. This
@@ -3829,9 +3760,6 @@ export default function CharacterProfileOverviewScreen({
   // and only activeId changes, which is why the effect keys off it.
   // react-doctor-disable-next-line no-prop-callback-in-effect, no-pass-live-state-to-parent
   useEffect(() => { actions.clearRestoredBookmark(); }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const filled = isBookmarkFilled(active.id, character, mounted);
-  const ContentComponent = active.id === "overview" || active.id === "setup" || active.id === "gender_marriage" || active.id === "stats" || active.id === "equipment" || active.id === "v_matrix" || active.id === "hexa_matrix" || active.id === "familiars" || active.id === "exp" || active.id === "scouter" || active.id === "efficiency" ? null : BOOKMARK_CONTENT[active.id];
 
   function startOptionalFlowRemembered(flowId: SetupFlowId, targetSubstep?: number, confineToSubstep?: boolean, subView?: string) {
     actions.rememberActiveBookmark(active.id, subView);
@@ -3873,8 +3801,6 @@ export default function CharacterProfileOverviewScreen({
             model={model}
             actions={actions}
             active={active}
-            filled={filled}
-            ContentComponent={ContentComponent}
             onEdit={handleEdit}
             onEditStep={startOptionalFlowRemembered}
             onNavigateToBookmark={navigateToBookmark}
