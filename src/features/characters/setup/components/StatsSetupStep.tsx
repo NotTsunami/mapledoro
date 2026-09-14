@@ -666,19 +666,23 @@ function WeaponTypeQuestion({
 }
 
 function SetupOptionsSection({
-  optsDef, draft, onUpdate, theme, characterLevel, required, existingEquipment,
+  optsDef, draft, onUpdate, theme, characterLevel, isLegacy, required, existingEquipment,
 }: {
   optsDef: ClassSetupOptionsDef | undefined;
   draft: StatsStepDraft;
   onUpdate: (patch: Partial<NonNullable<StatsStepDraft["setupOptions"]>>) => void;
   theme: AppTheme;
   characterLevel?: number;
+  isLegacy?: boolean;
   required?: boolean;
   existingEquipment?: EquipmentLike | null;
 }) {
   const opts = draft.setupOptions ?? {};
   const isDA = Boolean(optsDef?.epheniaSoul);
-  const isLiberationEligible = characterLevel === undefined || characterLevel >= GENESIS_LIBERATION_LEVEL;
+  // Legacy classes (pre-5th-job, no Arcane River access) can't reach Limina to start the
+  // liberation questline at all, so the question never applies regardless of level.
+  const isLiberationEligible = !isLegacy
+    && (characterLevel === undefined || characterLevel >= GENESIS_LIBERATION_LEVEL);
   // A weapon on file at the active preset is definitive proof either way. Genesis Liberation's
   // Final Damage bonus lives on the weapon item, so a non-Genesis weapon there proves not
   // liberated as surely as a Genesis or Destiny one proves liberated. So the question shows
@@ -1352,6 +1356,7 @@ function QuickQuestionsSubstep({
             onUpdate={handleSetupOptUpdate}
             theme={theme}
             characterLevel={characterLevel}
+            isLegacy={classData?.isLegacy}
             required={isScouter}
             existingEquipment={effectiveEquipment}
           />
