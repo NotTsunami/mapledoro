@@ -7,8 +7,15 @@ hints, one mode. Puzzle rollover, replay arrows, archive routing, share squares 
 The puzzle advances at **00:00:00 UTC**; puzzle #1 is the `EPOCH_UTC_MS` day in `puzzles.ts`
 (2026-08-04), and day N maps to payload index `(N-1) % length`.
 
-**The guess picker portals its menu to `<body>`** via `usePickerCoords`, matching the character-setup
-and Mystic Frontier pickers. It has to: `.panel-card` sets `overflow: hidden`, so an
+**Shared game chrome** lives one level up in `games/`: `DailyGameWorkspace` (header arrows, date,
+UTC rollover, archive routing, mount gate), `GuessControls` (searchable picker + Guess button, or View
+Results once done), `shared-ui.tsx` (`GuessSlots`, `StatsPanel`), `ResultsDialog` (share text,
+squares, countdown) and `dailyGame.ts` (`GuessResult`, `applyGuess`, `computeGuessStats`,
+`makePuzzleClock`). This workspace only supplies the player, the answer pool with its mark icons, and
+the reveal card contents.
+
+**The shared guess picker portals its menu to `<body>`** via `usePickerCoords`, matching the
+character-setup and Mystic Frontier pickers. It has to: `.panel-card` sets `overflow: hidden`, so an
 absolutely-positioned menu gets cut off by the panel's bottom edge, and this panel is short enough
 (no hint cards, only 3 guess slots) that the menu never fits below the input. Menu width is measured
 off the input when it opens instead of being a constant, and the outside-click handler has to check

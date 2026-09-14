@@ -8,6 +8,13 @@ Daily game: guess which class learns the shown skill icon in 5 tries. The puzzle
 payload index `(N-1) % length`. Players can replay earlier days via header arrows, clamped between #1
 and today; the workspace keys `PuzzleView` by puzzle number so each day re-reads its own results.
 
+**Shared game chrome** lives one level up in `games/`: `DailyGameWorkspace` (header arrows, date,
+UTC rollover, archive routing, mount gate), `GuessControls` (searchable picker + Guess button, or View
+Results once done; keyed by mode here so the search resets with the answer pool), `shared-ui.tsx`
+(`GuessSlots`, `StatsPanel`), `ResultsDialog` (share text, squares, countdown) and `dailyGame.ts`
+(`GuessResult`, `applyGuess`, `computeGuessStats`, `makePuzzleClock`). Mode tabs, hint cards and the
+skill-name reveal rule are Mapledle's own.
+
 **Archive routing** is shared with BGM Guesser by `../usePuzzleRoute.ts`. Each game has two routes:
 the bare path (always today) and `<base>/<n>` for one earlier day, both rendering the same workspace
 with the segment only seeding `puzzleNumber`. Validation is necessarily client-side, since `today`
