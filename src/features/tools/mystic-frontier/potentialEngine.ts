@@ -237,6 +237,7 @@ function poolRarities(rarity: MfRarity): readonly MfRarity[] {
 export function potentialsForRarity(rarity: MfRarity): ResolvedPotential[] {
   const pool = poolRarities(rarity);
   return allResolvedPotentials()
+    // react-doctor-disable-next-line js-set-map-lookups -- pool holds one or two rarities (see poolRarities); a Set is more work than the comparison.
     .filter((p) => pool.includes(p.rarity) && !EVENT_PREFIX.test(p.label))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

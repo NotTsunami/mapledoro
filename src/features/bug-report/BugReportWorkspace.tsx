@@ -72,6 +72,7 @@ function toPayload(draft: Draft, character: StoredCharacterRecord | null, theme:
 
 async function sendReport(payload: BugReportPayload): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
+    // react-doctor-disable-next-line no-fetch-response-used-without-status-check -- res.ok is checked first; the body is read only on the failure path, deliberately, to surface the API's error message, and that read is guarded with .catch.
     const res = await fetch("/api/bug-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

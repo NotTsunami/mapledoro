@@ -84,6 +84,7 @@ function exportData() {
 const CLOCK_SLACK_MS = 60_000;
 
 function formatSyncTime(ms: number): string {
+  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: every caller is behind DriveSyncPanel's `mounted` gate or inside DriveCompareModal, which only opens after a user-triggered Drive action, and readDriveSyncState returns the disconnected state (lastSyncedAt null) on the server. The viewer's own zone is the point of a backup timestamp, so no fixed timeZone.
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
@@ -387,6 +388,7 @@ function DriveSyncPanel({
   };
 
   const handleConnect = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- not a setState updater: runDriveAction is an async action runner (above) that awaits this callback exactly once, so React never replays it and the nested setSync/setStatus calls run once.
     runDriveAction(async () => {
       setSync(await connectDrive());
       setStatus("Connected to Google Drive.");
@@ -405,6 +407,7 @@ function DriveSyncPanel({
      comparison is the guard, not a heuristic. Nothing in Drive yet means
      nothing can be lost, so the first backup skips straight through. */
   const handleBackup = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
       if (meta === null) {
@@ -416,6 +419,7 @@ function DriveSyncPanel({
     });
 
   const handleRestore = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
       if (meta === null) {
@@ -434,6 +438,7 @@ function DriveSyncPanel({
     if (!pending) return;
     setPending(null);
     if (pending.mode === "backup") {
+      // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
       runDriveAction(() => performBackup(pending.existing));
       return;
     }

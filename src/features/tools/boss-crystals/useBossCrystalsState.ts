@@ -109,6 +109,7 @@ export function useBossCrystalsState(mounted: boolean) {
     (updater: (prev: CharacterEntry[]) => CharacterEntry[]) => {
       setCharacters((prev) => {
         const next = updater(prev);
+        // react-doctor-disable-next-line no-side-effect-in-state-updater-function -- called from inside the setState updater by project convention (see root CLAUDE.md), so the write stays atomic with the state change rather than trailing it in an effect. Writing the same derived state twice on a replay is idempotent.
         saveState(server, next);
         return next;
       });

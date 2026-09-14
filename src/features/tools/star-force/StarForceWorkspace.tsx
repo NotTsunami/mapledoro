@@ -705,6 +705,7 @@ function StarForceForm({
         </InputRow>
 
         <InputRow label="Replace Cost" theme={theme}>
+          {/* react-doctor-disable-next-line no-placeholder-only-field -- InputRow renders a wrapping <label>, so its visible "Replace Cost" text is this input's accessible name; the rule can't see through the component boundary. */}
           <input
             className="tool-input"
             type="number"

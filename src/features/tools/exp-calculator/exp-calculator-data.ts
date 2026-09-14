@@ -902,6 +902,7 @@ function selectedDailyExp(level: number, input: AllInOneInput): number {
     Tenebris: input.arcaneRiverBonus,
     Grandis: input.grandisBonus,
   };
+  // react-doctor-disable-next-line js-set-map-lookups -- DAILY_EXP_CONTENT has 17 entries and dailyIds at most that many; building a Set on every simulated day would cost more than the scan.
   return DAILY_EXP_CONTENT.filter((daily) => input.dailyIds.includes(daily.id) && level >= daily.minLevel)
     .reduce((total, daily) => total + dailyExpWithBonus(daily, bonuses), 0);
 }

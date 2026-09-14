@@ -1236,6 +1236,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             {/* Deliberately not level-gated: the plan can carry the character past a daily's
                 unlock level, and the simulation already skips it until they get there. */}
             {DAILY_EXP_CONTENT.filter((daily) => daily.region === region).map((daily) => {
+              // react-doctor-disable-next-line js-set-map-lookups -- dailyIds is the player's pick from DAILY_EXP_CONTENT's 17 entries, checked once per tile per render; a Set per render would cost more than the scan.
               const selected = input.dailyIds.includes(daily.id);
               return (
                 <HoverTooltip
