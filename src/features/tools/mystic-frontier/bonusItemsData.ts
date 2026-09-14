@@ -47,8 +47,9 @@ export const MF_BONUS_FAMILY_DESC: Record<MfBonusFamily, string> = {
   Holy: "Dice Total +1 and Final Multiplier",
 };
 
-export function getBonusItem(family: MfBonusFamily, color: MfBonusColor): MfBonusItem | undefined {
-  return MF_BONUS_ITEMS.find((b) => b.family === family && b.color === color);
+/** MF_BONUS_ITEMS holds every family x color pair, so a typed lookup always hits. */
+export function getBonusItem(family: MfBonusFamily, color: MfBonusColor): MfBonusItem {
+  return MF_BONUS_ITEMS.find((b) => b.family === family && b.color === color) as MfBonusItem;
 }
 
 export function getBonusItemById(id: string): MfBonusItem | undefined {

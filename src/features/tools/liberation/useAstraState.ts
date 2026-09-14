@@ -97,7 +97,7 @@ function accumulateBossIncome(
     const tracesPerClear = Math.floor(diff.traces / sel.partySize);
     weeklyTraces += tracesPerClear;
 
-    const voucherFrags = diff.hasVoucher ? sel.vouchersKept * (diff.voucherValue ?? 0) : 0;
+    const voucherFrags = diff.hasVoucher ? sel.vouchersKept * diff.voucherValue : 0;
     weeklyVoucherFragments += voucherFrags;
 
     if (!sel.clearedThisWeek) {

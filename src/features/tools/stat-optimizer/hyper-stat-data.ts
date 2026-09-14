@@ -78,6 +78,10 @@ export const HYPER_VALUES: Record<HyperLineId, number[]> = Object.fromEntries(
   HYPER_LINES.map((line) => [line.id, line.values]),
 ) as Record<HyperLineId, number[]>;
 
+export const HYPER_LABELS: Record<HyperLineId, string> = Object.fromEntries(
+  HYPER_LINES.map((line) => [line.id, line.label]),
+) as Record<HyperLineId, string>;
+
 /** Demon Avenger's main line grants HP% instead of flat stat (scouter's ve table). */
 export const HYPER_DA_MAIN_VALUES: number[] = linear(2);
 

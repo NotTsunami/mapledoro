@@ -30,7 +30,7 @@ import type {
   OptimizeTarget,
   TripleStat,
 } from "./damage-formula";
-import { HYPER_LINES, HYPER_MAX_LEVEL, type HyperLineId } from "./hyper-stat-data";
+import { HYPER_LABELS, HYPER_MAX_LEVEL, type HyperLineId } from "./hyper-stat-data";
 import type { HyperResult, HyperAllocation } from "./hyper-stat-engine";
 import { HEXA_CORE_TOTAL, HEXA_MAX_LINE_LEVEL, type HexaCore, type HexaLine, type HexaResult } from "./hexa-stat-engine";
 import type { CalibrationNotice } from "./stat-optimizer-character";
@@ -371,7 +371,7 @@ const APPLY_NOTE: CSSProperties = { fontSize: "0.78rem", fontWeight: 600, lineHe
  * the stat window the apply just wrote rather than computed here.
  */
 function ApplyOutcomeLine({ theme, run }: { theme: AppTheme; run: ApplyRun }) {
-  if (run.status === "applying" || !run.outcome) {
+  if (run.status === "applying") {
     return <div style={{ ...APPLY_NOTE, color: theme.muted }}>Recalculating Boss 380 HEXA…</div>;
   }
   const outcome = run.outcome;
@@ -696,7 +696,7 @@ function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile, standalone
   if (id === "subStat") return statLabel("Secondary Stat", profile.subStat, standalone);
   if (id === "subStat2") return statLabel("Secondary Stat II", profile.subStat2, standalone);
   if (id === "attack") return profile.usesMagic ? "Magic ATT" : "ATT";
-  return HYPER_LINES.find((l) => l.id === id)?.label ?? id;
+  return HYPER_LABELS[id];
 }
 
 /* The Now/Best table is real tabular data, so it's a real <table>: the stat name is

@@ -16,6 +16,8 @@ import {
   ARMOR_LEVELS,
   WEAPON_LEVELS,
   GRANULAR_LEVELS,
+  type ItemLevel,
+  type WeaponLevel,
   computeFlameResults,
   computeFlameScore,
   defaultEquivalences,
@@ -41,8 +43,8 @@ interface CalcState {
   flameClass: FlameClass;
   itemType: ItemType;
   flameType: FlameType;
-  itemLevel: string;
-  weaponLevel: string;
+  itemLevel: ItemLevel;
+  weaponLevel: WeaponLevel;
   baseAttack: number;
   flameAdvantaged: boolean;
   desiredStat: number;
@@ -55,8 +57,8 @@ type CalcAction =
   | { type: "setClass"; value: FlameClass }
   | { type: "setItemType"; value: ItemType }
   | { type: "setFlameType"; value: FlameType }
-  | { type: "setItemLevel"; value: string }
-  | { type: "setWeaponLevel"; value: string }
+  | { type: "setItemLevel"; value: ItemLevel }
+  | { type: "setWeaponLevel"; value: WeaponLevel }
   | { type: "setBaseAttack"; value: number }
   | { type: "setFlameAdvantaged"; value: boolean }
   | { type: "setDesiredStat"; value: number }
@@ -232,7 +234,7 @@ function FlameSettingsPanel({
               id={`${uid}-item-level`}
               className="tool-select"
               value={state.weaponLevel}
-              onChange={(e) => dispatch({ type: "setWeaponLevel", value: e.target.value })}
+              onChange={(e) => dispatch({ type: "setWeaponLevel", value: e.target.value as WeaponLevel })}
               style={selectStyle}
             >
               {WEAPON_LEVELS.map((l) => (
@@ -244,7 +246,7 @@ function FlameSettingsPanel({
               id={`${uid}-item-level`}
               className="tool-select"
               value={state.itemLevel}
-              onChange={(e) => dispatch({ type: "setItemLevel", value: e.target.value })}
+              onChange={(e) => dispatch({ type: "setItemLevel", value: e.target.value as ItemLevel })}
               style={selectStyle}
             >
               {levelOptions.map((l) => (

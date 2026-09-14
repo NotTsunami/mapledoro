@@ -14,6 +14,7 @@ import {
   availableDesiredTiers,
   buildStatOptions,
   cubingCost,
+  CUBE_LABELS,
   CUBE_TYPES,
   DMT_CUBES,
   geoDistrQuantile,
@@ -27,6 +28,7 @@ import {
   translateDesiredStat,
   type CubeKey,
   type ItemCategory,
+  type StatTypeKey,
   type QuantileResult,
   type TierStep,
 } from "./cubing-types";
@@ -39,7 +41,7 @@ interface FormState {
   currentTier: number;
   desiredTier: number;
   itemLevel: number;
-  statType: string;
+  statType: StatTypeKey;
   desiredStat: string;
   dmt: boolean;
 }
@@ -50,7 +52,7 @@ type FormAction =
   | { type: "setCurrentTier"; value: number }
   | { type: "setDesiredTier"; value: number }
   | { type: "setItemLevel"; value: number }
-  | { type: "setStatType"; value: string }
+  | { type: "setStatType"; value: StatTypeKey }
   | { type: "setDesiredStat"; value: string }
   | { type: "setDmt"; value: boolean };
 
@@ -366,7 +368,7 @@ export default function CubingWorkspace({ theme }: { theme: AppTheme }) {
   const hintStyle: CSSProperties = { margin: "4px 0 0", fontSize: "0.75rem", fontWeight: 600, color: theme.muted, lineHeight: 1.4 };
   const errorStyle: CSSProperties = { ...hintStyle, fontWeight: 700, color: statusText(theme, "danger") };
 
-  const cubeLabel = CUBE_TYPES.find((c) => c.value === deferred.cubeType)?.label ?? deferred.cubeType;
+  const cubeLabel = CUBE_LABELS[deferred.cubeType];
 
   const tieringUp = currentTier < desiredTier;
   const dmtHint = dmtDisabledReason(cubeType, tieringUp);
@@ -484,7 +486,7 @@ export default function CubingWorkspace({ theme }: { theme: AppTheme }) {
                 className="tool-select"
                 value={statType}
                 disabled={!canPickStat}
-                onChange={(e) => dispatch({ type: "setStatType", value: e.target.value })}
+                onChange={(e) => dispatch({ type: "setStatType", value: e.target.value as StatTypeKey })}
                 style={{ ...controlStyle, opacity: canPickStat ? 1 : 0.5 }}
               >
                 {STAT_TYPES.map((s) => (

@@ -12,13 +12,10 @@ export interface AstraMission {
   fragmentsRequired: number;
 }
 
-interface AstraDifficulty {
+type AstraDifficulty = {
   label: string;
   traces: number;
-  hasVoucher: boolean;
-  voucherCount?: number;
-  voucherValue?: number;
-}
+} & ({ hasVoucher: false } | { hasVoucher: true; voucherCount: number; voucherValue: number });
 
 export interface AstraBoss {
   name: string;

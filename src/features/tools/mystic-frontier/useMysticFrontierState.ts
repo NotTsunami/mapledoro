@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { usePerCharacterToolState } from "../usePerCharacterToolState";
 import { getMfFamiliar } from "./familiars";
 import {
-  getBonusItem, getBonusItemById, type MfBonusColor, type MfBonusFamily, type MfBonusItem,
+  MF_BONUS_ITEMS, getBonusItem, getBonusItemById, type MfBonusColor, type MfBonusFamily, type MfBonusItem,
 } from "./bonusItemsData";
 import {
   calculateScore,
@@ -67,10 +67,7 @@ function parseBonus(raw: unknown): string[] {
   }
   if (!raw || typeof raw !== "object") return [];
   return Object.entries(raw as Record<string, unknown>).flatMap(([family, color]) => {
-    const item =
-      typeof color === "string"
-        ? getBonusItem(family as MfBonusFamily, color as MfBonusColor)
-        : undefined;
+    const item = MF_BONUS_ITEMS.find((b) => b.family === family && b.color === color);
     return item ? [item.id] : [];
   });
 }
@@ -179,18 +176,14 @@ export function useMysticFrontierState() {
   const setLine = (index: number, id: number | null) => patchSlot(index, { line: id });
   const setDie = (index: number, die: number) => patchSlot(index, { die });
 
-  function addBonus(family: MfBonusFamily, color: MfBonusColor): void {
-    const item = getBonusItem(family, color);
-    if (!item) return;
-    update((prev) => ({ ...prev, bonus: [...prev.bonus, item.id] }));
-  }
+  const addBonus = (family: MfBonusFamily, color: MfBonusColor) =>
+    update((prev) => ({ ...prev, bonus: [...prev.bonus, getBonusItem(family, color).id] }));
 
   const removeBonus = (index: number) =>
     update((prev) => ({ ...prev, bonus: prev.bonus.filter((_, i) => i !== index) }));
 
   const setTarget = (target: number) => update((prev) => updateActiveWave(prev, (w) => ({ ...w, target })));
-  const setActiveWave = (i: number) =>
-    update((prev) => ({ ...prev, activeWave: Math.min(Math.max(0, i), WAVE_COUNT - 1) }));
+  const setActiveWave = (i: number) => update((prev) => ({ ...prev, activeWave: i }));
   const reset = () => update((prev) => updateActiveWave(prev, emptyWave));
 
   // ── derived (active wave) ──────────────────────────────────────────────────
