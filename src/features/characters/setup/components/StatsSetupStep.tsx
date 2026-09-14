@@ -124,39 +124,46 @@ const NO_DECIMAL_STAT_IDS = new Set<StatFieldId>(["summonDuration", "buffDuratio
 // stable limit worth hard-clamping (unlike the sanity thresholds above).
 const IGNORE_ELEMENTAL_RESIST_MAX = 15;
 
-function clampIgnoreElementalResist(raw: string): string {
-  const sanitized = sanitizeDecimalInput(raw);
-  if (sanitized === "" || sanitized.endsWith(".")) return sanitized;
-  // Only reformat when actually over the cap. Round-tripping every keystroke through Number()
-  // and String() strips trailing zeros, turning "5.0" into "5" and fighting the user mid-type
-  // whenever they enter a decimal.
-  if (Number(sanitized) > IGNORE_ELEMENTAL_RESIST_MAX) return String(IGNORE_ELEMENTAL_RESIST_MAX);
-  return sanitized;
-}
-
 // Ignore DEF compounds as 100 minus 100 times the product of each source's remainder, which
 // approaches but never exceeds 100% from real sources. The since-removed Quick Reload node
 // granted a flat 100% for its duration, so 100 is a real ceiling worth hard-clamping the same
 // way as Ignore Elemental Resistance.
 const IGNORE_DEFENSE_MAX = 100;
 
-function clampIgnoreDefense(raw: string): string {
+// Real in-game ceilings for these combat stats, found by spamming a large number into
+// official MapleScouter's own input and reading back what it clamps to.
+const COMBAT_STAT_MAX: Partial<Record<StatFieldId, number>> = {
+  additionalStatusDamage: 30,
+  bossDamage: 750,
+  criticalDamage: 251,
+  buffDuration: 400,
+  summonDuration: 42,
+  arcanePower: 1750,
+  sacredPower: 1750,
+  damage: 999,
+  criticalRate: 999,
+};
+
+function clampDecimalStatInput(raw: string, max: number): string {
   const sanitized = sanitizeDecimalInput(raw);
   if (sanitized === "" || sanitized.endsWith(".")) return sanitized;
-  if (Number(sanitized) > IGNORE_DEFENSE_MAX) return String(IGNORE_DEFENSE_MAX);
+  // Only reformat when actually over the cap. Round-tripping every keystroke through Number()
+  // and String() strips trailing zeros, turning "5.0" into "5" and fighting the user mid-type
+  // whenever they enter a decimal.
+  if (Number(sanitized) > max) return String(max);
   return sanitized;
+}
+
+function clampIntegerStatInput(raw: string, max: number): string {
+  const digits = sanitizeDigitsInput(raw);
+  if (digits === "") return digits;
+  return String(clampNumber(Number(digits), max));
 }
 
 // Cooldown Reduction's own real caps, matching the Scouter Simulator's coolTimeReduce limit
 // (ScouterSimulatorDialog.tsx) for seconds and the in-game percent cap.
 const COOLDOWN_REDUCTION_SECONDS_MAX = 7;
 const COOLDOWN_REDUCTION_PERCENT_MAX = 6;
-
-function clampCooldownReductionInput(raw: string, max: number): string {
-  const digits = sanitizeDigitsInput(raw);
-  if (digits === "") return digits;
-  return String(clampNumber(Number(digits), max));
-}
 
 interface ConfinableFrameProps {
   substepIndex: number;
@@ -574,8 +581,10 @@ function CombatStatCell({
           style={isRaw ? statInputStyle(theme, "4.6rem") : { ...statInputStyle(theme, "4.6rem"), paddingRight: "1.15rem" }}
           data-flagged-field={requireFilled && !val.trim() ? "true" : undefined}
           onChange={(e) => {
-            if (id === "ignoreElementalResistance") onUpdate(id, clampIgnoreElementalResist(e.target.value));
-            else if (id === "ignoreDefense") onUpdate(id, clampIgnoreDefense(e.target.value));
+            const max = COMBAT_STAT_MAX[id];
+            if (id === "ignoreElementalResistance") onUpdate(id, clampDecimalStatInput(e.target.value, IGNORE_ELEMENTAL_RESIST_MAX));
+            else if (id === "ignoreDefense") onUpdate(id, clampDecimalStatInput(e.target.value, IGNORE_DEFENSE_MAX));
+            else if (max !== undefined) onUpdate(id, allowsDecimal ? clampDecimalStatInput(e.target.value, max) : clampIntegerStatInput(e.target.value, max));
             else if (allowsDecimal) onUpdate(id, sanitizeDecimalInput(e.target.value));
             else onUpdate(id, sanitizeDigitsInput(e.target.value));
           }}
@@ -1604,7 +1613,7 @@ export default function StatsSetupStep({
   function handleCooldownUpdate(field: "seconds" | "percent", val: string) {
     const cd = draft.cooldownReduction ?? { seconds: "", percent: "" };
     const max = field === "seconds" ? COOLDOWN_REDUCTION_SECONDS_MAX : COOLDOWN_REDUCTION_PERCENT_MAX;
-    updateDraft({ cooldownReduction: { ...cd, [field]: clampCooldownReductionInput(val, max) } });
+    updateDraft({ cooldownReduction: { ...cd, [field]: clampIntegerStatInput(val, max) } });
   }
 
   function handleSetupOptUpdate(patch: Partial<NonNullable<StatsStepDraft["setupOptions"]>>) {
