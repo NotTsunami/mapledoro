@@ -22,7 +22,6 @@ import {
   EVENT_ITEMS,
   EVENT_ITEMS_BY_ID,
   ITEM_CATEGORIES,
-  categoryLabel,
   type EventItem,
 } from "./event-items";
 import { useEventPlannerState, type PlannerEntry, type EntryCost } from "./useEventPlannerState";
@@ -55,23 +54,14 @@ function ItemSelector({
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matches = q
-      ? EVENT_ITEMS.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            item.slot.toLowerCase().includes(q) ||
-            categoryLabel(item.category).toLowerCase().includes(q),
-        )
-      : EVENT_ITEMS;
-    const groups = new Map<string, EventItem[]>();
-    for (const item of matches) {
-      const arr = groups.get(item.category) ?? [];
-      arr.push(item);
-      groups.set(item.category, arr);
-    }
     return ITEM_CATEGORIES.flatMap((cat) => {
-      const items = groups.get(cat.id);
-      return items && items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
+      const labelMatches = cat.label.toLowerCase().includes(q);
+      const items = EVENT_ITEMS.filter(
+        (item) =>
+          item.category === cat.id &&
+          (labelMatches || item.name.toLowerCase().includes(q) || item.slot.toLowerCase().includes(q)),
+      );
+      return items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
     });
   }, [search]);
 

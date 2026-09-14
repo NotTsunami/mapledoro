@@ -448,9 +448,7 @@ export function useDailiesState() {
   const setCounter = useCallback(
     (index: number, id: string, value: number, charMax: number, worldMax: number) => {
       commit((prev) => {
-        const target = prev[index];
-        if (!target) return prev;
-        const worldKey = worldKeyOf(target.name, storeByName);
+        const worldKey = worldKeyOf(prev[index].name, storeByName);
         const others = sumOthersCounter(prev, index, worldKey, id, storeByName);
         const remaining = Math.max(0, worldMax - others);
         const clamped = Math.min(remaining, Math.max(0, Math.min(charMax, value)));
@@ -467,11 +465,9 @@ export function useDailiesState() {
   const setAllTasks = useCallback(
     (index: number, done: boolean) => {
       commit((prev) => {
-        const target = prev[index];
-        if (!target) return prev;
         const nextState = done
-          ? applyCheckAll(target.state, index, prev, storeByName)
-          : clearAllTasks(target.state);
+          ? applyCheckAll(prev[index].state, index, prev, storeByName)
+          : clearAllTasks(prev[index].state);
         return prev.map((c, i) => (i === index ? { ...c, state: nextState } : c));
       });
     },

@@ -387,7 +387,7 @@ function SymbolCard({
   if (isMaxed) levelPct = 100;
   else if (levelMax > 0) levelPct = (state.current / levelMax) * 100;
   else levelPct = 0;
-  const areaPct = totalForOneArea > 0 ? (consumed / totalForOneArea) * 100 : 0;
+  const areaPct = (consumed / totalForOneArea) * 100;
   const isSacred = type === "sacred";
   const isGrand = isSacred && isGrandSacredArea(area);
   const dailyMax = area.daily + (isSacred ? SACRED_DAILY_EVENT_BONUS : ARCANE_DAILY_EVENT_BONUS);

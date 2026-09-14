@@ -588,7 +588,7 @@ function StarForceForm({
   calc: CalcState;
   dispatch: React.ActionDispatch<[action: CalcAction]>;
   previewCost: number;
-  previewResult: StarResult | null;
+  previewResult: StarResult;
   inputStyle: React.CSSProperties;
   selectStyle: React.CSSProperties;
   runControls: React.ReactNode;
@@ -747,17 +747,13 @@ function StarForceForm({
         <span>
           Next try: <span style={{ color: theme.text }}>{formatMesoFull(previewCost)} mesos</span>
         </span>
-        {previewResult && (
-          <>
-            <span>
-              Success: <span style={{ color: theme.text }}>{pct(previewResult.success)}</span>
-            </span>
-            {previewResult.destroy > 0 && (
-              <span>
-                Destroy: <span style={{ color: boomRed }}>{pct(previewResult.destroy)}</span>
-              </span>
-            )}
-          </>
+        <span>
+          Success: <span style={{ color: theme.text }}>{pct(previewResult.success)}</span>
+        </span>
+        {previewResult.destroy > 0 && (
+          <span>
+            Destroy: <span style={{ color: boomRed }}>{pct(previewResult.destroy)}</span>
+          </span>
         )}
       </div>
 
@@ -820,7 +816,7 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
   // Closed form, cheap, always live. Only the Monte Carlo run is gated.
   const results = useMemo(() => computeExpectedCosts(opts), [opts]);
   const previewCost = useMemo(() => attemptCost(calc.level, calc.startStar, opts), [calc.level, calc.startStar, opts]);
-  const previewResult = results.length > 0 ? results[0] : null;
+  const previewResult = results[0];
 
   const estimate: RunEstimate = useMemo(() => {
     const attempts = expectedAttempts(opts) * trials;
@@ -973,7 +969,7 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
           </div>
         )}
 
-        {results.length > 0 && <BreakdownTable theme={theme} results={results} />}
+        <BreakdownTable theme={theme} results={results} />
       </div>
     </div>
   );

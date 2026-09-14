@@ -241,7 +241,7 @@ export function optimizeHyper({
   let remaining = availablePoints;
   for (;;) {
     const pick = bestStep(alloc, lineIds, remaining, score);
-    if (pick === null || remaining - HYPER_STEP_COSTS[alloc[pick] + 1] < 0) break;
+    if (pick === null) break;
     remaining -= HYPER_STEP_COSTS[alloc[pick] + 1];
     alloc[pick] += 1;
   }

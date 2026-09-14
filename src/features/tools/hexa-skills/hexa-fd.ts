@@ -15,7 +15,6 @@ import {
   ORIGIN_COSTS,
   MASTERY_COSTS,
   ENHANCEMENT_COSTS,
-  COMMON_COSTS,
   COMMON_COST_TABLES,
   type LevelCost,
 } from "./hexa-costs";
@@ -104,8 +103,8 @@ function buildNodes(
       iconUrl: node.iconUrl,
       curve: fd.mastery[i] ?? [],
       costs: MASTERY_COSTS,
-      level: levels.mastery[i] ?? 0,
-      desired: desired.mastery[i] ?? 0,
+      level: levels.mastery[i],
+      desired: desired.mastery[i],
     });
   });
 
@@ -119,8 +118,8 @@ function buildNodes(
       iconUrl: skill.iconUrl,
       curve: fd.enhancement[i] ?? [],
       costs: ENHANCEMENT_COSTS,
-      level: levels.enhancement[i] ?? 0,
-      desired: desired.enhancement[i] ?? 0,
+      level: levels.enhancement[i],
+      desired: desired.enhancement[i],
     });
   });
 
@@ -133,9 +132,9 @@ function buildNodes(
       iconId: skill.iconId,
       iconUrl: skill.iconUrl,
       curve: fd.common[i] ?? [],
-      costs: COMMON_COST_TABLES[i] ?? COMMON_COSTS,
-      level: levels.common[i] ?? 0,
-      desired: desired.common[i] ?? 0,
+      costs: COMMON_COST_TABLES[i],
+      level: levels.common[i],
+      desired: desired.common[i],
     });
   });
 
@@ -407,7 +406,7 @@ export function applyGuideSteps(levels: HexaSkillLevels, steps: GuideStep[]): He
     common: [...levels.common],
   };
   const raise = (arr: number[], idx: number, to: number) => {
-    arr[idx] = Math.max(arr[idx] ?? 0, to);
+    arr[idx] = Math.max(arr[idx], to);
   };
   for (const step of steps) {
     const idx = Number(step.code.slice(1));

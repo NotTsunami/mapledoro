@@ -777,7 +777,7 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
 
   let dialogCharName = "";
   if (dialog?.type === "add-tasks") dialogCharName = dialog.name;
-  else if (dialog?.type === "edit") dialogCharName = characters[dialog.index]?.name ?? "";
+  else if (dialog?.type === "edit") dialogCharName = characters[dialog.index].name;
 
   return (
     <>

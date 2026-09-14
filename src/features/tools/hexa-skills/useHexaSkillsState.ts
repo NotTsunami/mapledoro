@@ -13,7 +13,6 @@ import {
   ORIGIN_COSTS,
   ENHANCEMENT_COSTS,
   MASTERY_COSTS,
-  COMMON_COSTS,
   COMMON_COST_TABLES,
   getCostRange,
   type LevelCost,
@@ -134,7 +133,7 @@ function sectionCost(levels: number[], desired: number[], tableAt: (i: number) =
   return { perSkill, total };
 }
 
-const commonCostTable = (i: number): readonly LevelCost[] => COMMON_COST_TABLES[i] ?? COMMON_COSTS;
+const commonCostTable = (i: number): readonly LevelCost[] => COMMON_COST_TABLES[i];
 
 function singleCost(level: number, desired: number, costTable: readonly LevelCost[]): SectionCost {
   const cost = getCostRange(costTable, level, desired);

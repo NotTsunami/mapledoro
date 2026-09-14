@@ -205,7 +205,7 @@ export function useBossCrystalsState(mounted: boolean) {
   }, [dialog, dialogPreview, totalCrystals, visibleCharacters]);
   let dialogTitle = "";
   if (dialog?.type === "add-bosses") dialogTitle = `Select Bosses \u2014 ${dialog.name}`;
-  else if (dialog?.type === "edit") dialogTitle = `Edit Bosses \u2014 ${characters[dialog.index]?.name ?? ""}`;
+  else if (dialog?.type === "edit") dialogTitle = `Edit Bosses \u2014 ${characters[dialog.index].name}`;
 
   const showBossDialog = dialog?.type === "add-bosses" || dialog?.type === "edit";
 

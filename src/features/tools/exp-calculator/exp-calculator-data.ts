@@ -233,6 +233,28 @@ const EXP_TO_NEXT_LEVEL_VALUES = [
   1053187790325841, 1158506569358425, 1737759854037637,
 ];
 
+export const ADDITIVE_BUFF_GROUP: CheckBuffGroup = {
+  id: "additive",
+  section: "Additive Buffs",
+  mode: "multi",
+  buffs: [
+    { id: "eap", label: "EXP Accumulation Potion (+10%)", value: 10, icon: { type: "item", id: "02003550" }, excludes: ["small-eap"] },
+    { id: "small-eap", label: "Small Concentrated EXP Accumulation Potion (+20%)", value: 20, icon: { type: "item", id: "02003612" }, excludes: ["eap"] },
+    { id: "extreme-gold", label: "Extreme Gold Potion (+10%)", value: 10, icon: { type: "item", id: "02023128" } },
+    { id: "vip-exp", label: "VIP Buff (EXP) (+15%)", value: 15, icon: { type: "item", id: "02024164", shadow: true } },
+    { id: "mvp-50", label: "MVP 50% Bonus EXP (+50%)", value: 50, icon: { type: "item", id: "02023926" }, excludes: ["mvp-70"] },
+    { id: "mvp-70", label: "MVP 70% Bonus EXP (+70%)", value: 70, icon: { type: "item", id: "02024275" }, excludes: ["mvp-50"] },
+    { id: "exp-boost-ring-15", label: "EXP Boost Ring (+15%)", value: 15, icon: { type: "item", id: "01114326" } },
+    { id: "spirit", label: "Pendant of the Spirit (+30%)", value: 30, icon: { type: "item", id: "01122017" } },
+    { id: "aut-cernium", label: "Sacred Symbol: Cernium MAX (+10%)", value: 10, icon: { type: "item", id: "01713000" } },
+    { id: "aut-arcs", label: "Sacred Symbol: Arcus MAX (+10%)", value: 10, icon: { type: "item", id: "01713001" } },
+    { id: "aut-odium", label: "Sacred Symbol: Odium MAX (+10%)", value: 10, icon: { type: "item", id: "01713002" } },
+    { id: "aut-shangri-la", label: "Sacred Symbol: Shangri-La MAX (+10%)", value: 10, icon: { type: "item", id: "01713003" } },
+    { id: "aut-arteria", label: "Sacred Symbol: Arteria MAX (+10%)", value: 10, icon: { type: "item", id: "01713004" } },
+    { id: "aut-carcion", label: "Sacred Symbol: Carcion MAX (+10%)", value: 10, icon: { type: "item", id: "01713005" } },
+  ],
+};
+
 export const CHECK_BUFF_GROUPS: CheckBuffGroup[] = [
   {
     id: "cash",
@@ -260,27 +282,7 @@ export const CHECK_BUFF_GROUPS: CheckBuffGroup[] = [
       { id: "use-4x", label: "4x EXP", value: 4, icon: { type: "item", id: "02450187" } },
     ],
   },
-  {
-    id: "additive",
-    section: "Additive Buffs",
-    mode: "multi",
-    buffs: [
-      { id: "eap", label: "EXP Accumulation Potion (+10%)", value: 10, icon: { type: "item", id: "02003550" }, excludes: ["small-eap"] },
-      { id: "small-eap", label: "Small Concentrated EXP Accumulation Potion (+20%)", value: 20, icon: { type: "item", id: "02003612" }, excludes: ["eap"] },
-      { id: "extreme-gold", label: "Extreme Gold Potion (+10%)", value: 10, icon: { type: "item", id: "02023128" } },
-      { id: "vip-exp", label: "VIP Buff (EXP) (+15%)", value: 15, icon: { type: "item", id: "02024164", shadow: true } },
-      { id: "mvp-50", label: "MVP 50% Bonus EXP (+50%)", value: 50, icon: { type: "item", id: "02023926" }, excludes: ["mvp-70"] },
-      { id: "mvp-70", label: "MVP 70% Bonus EXP (+70%)", value: 70, icon: { type: "item", id: "02024275" }, excludes: ["mvp-50"] },
-      { id: "exp-boost-ring-15", label: "EXP Boost Ring (+15%)", value: 15, icon: { type: "item", id: "01114326" } },
-      { id: "spirit", label: "Pendant of the Spirit (+30%)", value: 30, icon: { type: "item", id: "01122017" } },
-      { id: "aut-cernium", label: "Sacred Symbol: Cernium MAX (+10%)", value: 10, icon: { type: "item", id: "01713000" } },
-      { id: "aut-arcs", label: "Sacred Symbol: Arcus MAX (+10%)", value: 10, icon: { type: "item", id: "01713001" } },
-      { id: "aut-odium", label: "Sacred Symbol: Odium MAX (+10%)", value: 10, icon: { type: "item", id: "01713002" } },
-      { id: "aut-shangri-la", label: "Sacred Symbol: Shangri-La MAX (+10%)", value: 10, icon: { type: "item", id: "01713003" } },
-      { id: "aut-arteria", label: "Sacred Symbol: Arteria MAX (+10%)", value: 10, icon: { type: "item", id: "01713004" } },
-      { id: "aut-carcion", label: "Sacred Symbol: Carcion MAX (+10%)", value: 10, icon: { type: "item", id: "01713005" } },
-    ],
-  },
+  ADDITIVE_BUFF_GROUP,
 ];
 
 export const SELECT_BUFFS: SelectBuff[] = [

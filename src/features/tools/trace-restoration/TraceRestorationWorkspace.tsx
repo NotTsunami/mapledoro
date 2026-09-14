@@ -387,7 +387,7 @@ function CrystalSection({
   const result = computeEstimate(count, targetCost, weeklyGain, monthlyGain);
 
   const remaining = Math.max(0, targetCost - count);
-  const progress = targetCost > 0 ? Math.min(1, count / targetCost) : 0;
+  const progress = Math.min(1, count / targetCost);
 
   return (
     <div className="fade-in panel-card" style={styles.sectionPanel}>
@@ -641,7 +641,7 @@ function TraceRestorationTab({ theme }: { theme: AppTheme }) {
   const { weekly, monthly } = computeWeeklyPointGain(state.selectedMissions, TRACE_BOSSES);
   const result = computeEstimate(state.currentPoints, targetItem.points, weekly, monthly);
   const remaining = Math.max(0, targetItem.points - state.currentPoints);
-  const progress = targetItem.points > 0 ? Math.min(1, state.currentPoints / targetItem.points) : 0;
+  const progress = Math.min(1, state.currentPoints / targetItem.points);
 
   return (
     <>

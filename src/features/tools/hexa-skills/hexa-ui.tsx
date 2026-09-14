@@ -321,8 +321,6 @@ export function SkillSection({
   sectionPanel: React.CSSProperties;
   inputStyle: React.CSSProperties;
 }) {
-  if (skills.length === 0) return null;
-
   return (
     <div className="fade-in panel-card" style={sectionPanel}>
       <SectionHeader

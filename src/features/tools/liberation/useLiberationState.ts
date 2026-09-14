@@ -149,7 +149,7 @@ function buildQuestThresholds(
 
 function weeksFromStart(start: Date, eventDate: Date): number {
   const diffDays = Math.round((eventDate.getTime() - start.getTime()) / 86400000);
-  return Math.max(0, Math.ceil(diffDays / 7));
+  return Math.ceil(diffDays / 7);
 }
 
 interface SimSchedule {

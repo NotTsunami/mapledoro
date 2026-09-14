@@ -219,8 +219,8 @@ function simulateAstra(p: SimParams): SimResult {
 
   const final = missionResults[missionResults.length - 1];
   return {
-    completionDate: final?.completionDate ?? "Never",
-    weeksToComplete: final?.weeksFromStart ?? Infinity,
+    completionDate: final.completionDate,
+    weeksToComplete: final.weeksFromStart,
     missionResults,
   };
 }

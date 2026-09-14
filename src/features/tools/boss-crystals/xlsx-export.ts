@@ -125,7 +125,7 @@ function isFormula(v: Cell): v is FormulaCell {
 }
 
 function cellToXml(v: Cell, ref: string, strings: Map<string, number>): string {
-  if (v === null || v === undefined) return "";
+  if (v === null) return "";
   if (isFormula(v)) {
     if (v.array) {
       return `<c r="${ref}" s="1"><f t="array" ref="${ref}">${escapeXml(v.formula)}</f></c>`;

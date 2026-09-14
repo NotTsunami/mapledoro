@@ -15,7 +15,7 @@ import {
   useHexaSkillsState,
   type SkillCostSummary,
 } from "./useHexaSkillsState";
-import { COMMON_COSTS, MAX_SKILL_LEVEL, getCostRange } from "./hexa-costs";
+import { COMMON_COSTS, getCostRange } from "./hexa-costs";
 import { SkillSection, MasterySection, HexaStatSection } from "./hexa-ui";
 import { GuideView, FdBreakdownView } from "./hexa-fd-ui";
 import { hasFdData, computeGuide, computeFdBreakdown } from "./hexa-fd";
@@ -327,10 +327,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
     // Found by name: COMMON_SKILLS' order is data, and an index would silently
     // start subtracting Sol Hecate if the list were ever reordered.
     const janusIdx = COMMON_SKILLS.findIndex((s) => s.name === "Sol Janus");
-    const janusCost = costs.common.perSkill[janusIdx] ?? { solErda: 0, fragments: 0 };
-    const janusMaxCost = janusIdx < 0
-      ? { solErda: 0, fragments: 0 }
-      : getCostRange(COMMON_COSTS, 0, desiredLevels.common[janusIdx] ?? MAX_SKILL_LEVEL);
+    const janusCost = costs.common.perSkill[janusIdx];
+    const janusMaxCost = getCostRange(COMMON_COSTS, 0, desiredLevels.common[janusIdx]);
     const grand = {
       solErda: costs.grand.solErda - janusCost.solErda,
       fragments: costs.grand.fragments - janusCost.fragments,
@@ -440,11 +438,11 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
 
         {!classDef && <EmptyState theme={theme} sectionPanel={sectionPanel} />}
 
-        {classDef && activeTab === "guide" && guide && (
+        {activeTab === "guide" && guide && (
           <GuideView theme={theme} guide={guide} sectionPanel={sectionPanel} onApply={applyGuide} />
         )}
 
-        {classDef && activeTab === "fd" && breakdown && (
+        {activeTab === "fd" && breakdown && (
           <FdBreakdownView theme={theme} breakdown={breakdown} sectionPanel={sectionPanel} />
         )}
 

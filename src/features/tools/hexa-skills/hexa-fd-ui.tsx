@@ -189,7 +189,7 @@ function GuideTile({ step, rank, theme, onClick }: { step: GuideStep; rank: numb
 
 /** "Sol Hecate", or "Sol Hecate and HEXA Twilight Bloom". */
 function listNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? "";
+  if (names.length <= 1) return names[0];
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
@@ -202,7 +202,7 @@ function describeSteps(steps: GuideStep[]): string {
     finals.set(step.code, `${step.name} to Lv ${step.toLevel}`);
   }
   const parts = [...finals.values()];
-  if (parts.length <= 1) return parts[0] ?? "";
+  if (parts.length <= 1) return parts[0];
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 

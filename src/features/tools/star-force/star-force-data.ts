@@ -395,8 +395,7 @@ export interface SimulationResult {
 }
 
 function percentile(sorted: Float64Array, p: number): number {
-  const idx = Math.ceil(p * sorted.length) - 1;
-  return sorted[Math.max(0, idx)];
+  return sorted[Math.ceil(p * sorted.length) - 1];
 }
 
 /** A simulation that can be advanced in slices and abandoned part-way. */
@@ -423,7 +422,7 @@ const DEADLINE_CHECK_INTERVAL = 4096;
  */
 export function startSimulation(opts: StarForceOpts, trials: number): SimulationRun {
   const { level, startStar, targetStar, replacementCost } = opts;
-  const total = startStar >= targetStar ? 0 : Math.max(0, trials);
+  const total = trials;
 
   // Per-star lookup tables. `keep` is the roll below which the item survives,
   // i.e. 1 - boom: success and maintain both land under it. Precomputing it

@@ -286,7 +286,7 @@ export default function LiberationWorkspace({ theme }: { theme: AppTheme }) {
       return;
     }
     setShowAstra(false);
-    if (type !== tab) switchType(tab);
+    switchType(tab);
   };
 
   const styles = toolStyles(theme);

@@ -17,6 +17,7 @@ import { toolStyles } from "../tool-styles";
 import { dataTableTh, dropdownShadow } from "../shared-styles";
 import {
   ADV_EXP_TICKET_ICON,
+  ADDITIVE_BUFF_GROUP,
   CHECK_BUFF_GROUPS,
   DAILY_EXP_CONTENT,
   DEFAULT_BUFF_STATE,
@@ -378,8 +379,6 @@ const EXCLUSIVE_BUFF_SECTIONS = CHECK_BUFF_GROUPS.filter((group) => group.mode =
   return sections;
 }, []);
 
-const ADDITIVE_GROUP = CHECK_BUFF_GROUPS.find((group) => group.mode === "multi");
-
 const INPUT_BUFF_PANELS = [
   { title: "Skill Levels", buffs: LEVEL_INPUT_BUFFS },
   { title: "Others", buffs: INPUT_BUFFS },
@@ -602,8 +601,7 @@ function BuffsTab({
   const toggleExpNode = (value: number) => {
     updateSelectBuff("exp-node", (buffs.selects["exp-node"] ?? 0) === value ? 0 : value);
   };
-  const updateInputBuff = (buff: InputBuff, raw: number) => {
-    const value = Math.min(buff.max, Math.max(0, raw));
+  const updateInputBuff = (buff: InputBuff, value: number) => {
     updateBuffs((state) => ({ ...state, inputs: { ...state.inputs, [buff.id]: value } }));
   };
   const updateCharacter = (name: string | null) => {
@@ -707,29 +705,27 @@ function BuffsTab({
         ))}
       </div>
 
-      {ADDITIVE_GROUP && (
-        <div style={panelStyle}>
-          <SectionTitle theme={theme} label={ADDITIVE_GROUP.section} />
-          <div className="exp-tile-row">
-            {ADDITIVE_GROUP.buffs.map((buff) => {
-              const selected = Boolean(buffs.additive[buff.id]);
-              return (
-                <HoverTooltip key={buff.id} theme={theme} label={buff.label}>
-                  <button
-                    type="button"
-                    aria-label={buff.label}
-                    aria-pressed={selected}
-                    onClick={() => updateBuffs((state) => toggleAdditiveBuff(state, buff, !selected))}
-                    style={dailyTileStyle(theme, selected)}
-                  >
-                    <BuffIcon icon={buff.icon} label={buff.label} />
-                  </button>
-                </HoverTooltip>
-              );
-            })}
-          </div>
+      <div style={panelStyle}>
+        <SectionTitle theme={theme} label={ADDITIVE_BUFF_GROUP.section} />
+        <div className="exp-tile-row">
+          {ADDITIVE_BUFF_GROUP.buffs.map((buff) => {
+            const selected = Boolean(buffs.additive[buff.id]);
+            return (
+              <HoverTooltip key={buff.id} theme={theme} label={buff.label}>
+                <button
+                  type="button"
+                  aria-label={buff.label}
+                  aria-pressed={selected}
+                  onClick={() => updateBuffs((state) => toggleAdditiveBuff(state, buff, !selected))}
+                  style={dailyTileStyle(theme, selected)}
+                >
+                  <BuffIcon icon={buff.icon} label={buff.label} />
+                </button>
+              </HoverTooltip>
+            );
+          })}
         </div>
-      )}
+      </div>
 
       <div style={panelStyle}>
         <SectionTitle theme={theme} label="Selectable Buffs" />
@@ -1584,8 +1580,8 @@ function ResourceChartView({ theme, chart, level }: { theme: AppTheme; chart: Re
 
   useEffect(() => {
     const container = scrollRef.current;
-    const row = container?.querySelector<HTMLElement>("[data-current='true']");
     if (!container) return;
+    const row = container.querySelector<HTMLElement>("[data-current='true']");
     // A level off the chart (under its first row) has nothing to centre on, so open at the top.
     container.scrollTop = row ? row.offsetTop - container.clientHeight / 2 + row.offsetHeight / 2 : 0;
   }, [chart, level]);
