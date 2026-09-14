@@ -108,7 +108,10 @@ function computeEstimate(
   const weekDate = new Date(nextThurs);
   const monthDate = new Date(nextMonth);
 
-  for (let i = 0; i < 1000; i++) {
+  // Terminates: whichever branch runs adds a positive gain (the zero-gain case
+  // returned above), and a 2,500-point target at 1 point a week needs more
+  // iterations than a fixed cap would comfortably allow.
+  for (;;) {
     const useWeekly = weeklyGain > 0 && (monthlyGain === 0 || weekDate <= monthDate);
 
     if (useWeekly) {
@@ -121,8 +124,6 @@ function computeEstimate(
       monthDate.setUTCMonth(monthDate.getUTCMonth() + 1);
     }
   }
-
-  return null;
 }
 
 function computeWeeklyPointGain(selectedMissions: string[], bosses: TraceBoss[]): { weekly: number; monthly: number } {
