@@ -7,6 +7,16 @@
   between two evaluations are meaningful; constant factors (final damage,
   skill %, mastery) are omitted because they cancel.
 
+  Shape: statFactor × attack × critBucket × dmgBucket × iedBucket, where
+    statFactor = (4*main + sub)/100
+                 (Xenon: (4*main + (sub + sub2)*4)/100; Demon Avenger: HP-based,
+                 floor(x/3.5) + 0.8*floor((HP-x)/3.5) + sub with x = 90*level + 545)
+    attack     = (base + 20 + dpmAtk + Δatk) * (1 + (atk% + dpmAtkPer)/100) + flat
+    critBucket = (1-cr) + cr*(1.35 + critDmg%), cr = min(1, critRate/100)
+    dmgBucket  = 1 + (dmg% + boss% + dpmBossDmg + Δ)/100
+    iedBucket  = 1 - PDR%*(1 - ied)/100
+  A level term dpmMainStat*(5*level+18) sits inside the main stat base.
+
   Stat fields are the in-game tooltip triple: Base Value, % Value, and
   % Value Not Applied (a FLAT amount the % does not multiply):
   total = floor(base * (1 + %/100)) + notApplied.

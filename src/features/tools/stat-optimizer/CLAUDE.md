@@ -11,34 +11,25 @@ two exceptions: the level, saved per character under the `statOptimizer` tool ke
 (see "Point budget"), and an explicit **Apply** (see "Applying a recommendation").
 
 ## Damage kernel (`damage-formula.ts`, scouter's `A`/n8/Ng/gt/h2/_M/VQ)
-`computeScouterDamage` = statFactor × attack × critBucket × dmgBucket × iedBucket.
-Only ratios between two evaluations matter (final damage / skill % cancel), but
-the buckets contain scouter's per-class passive constants (`scouter-class-data.ts`,
-vendored from their GMS table) because additive constants inside a bucket change
-marginal values and therefore recommendations.
+`computeScouterDamage` = statFactor × attack × critBucket × dmgBucket × iedBucket;
+the formulas are in that file's header. Only ratios between two evaluations
+matter (final damage / skill % cancel), but the buckets contain scouter's
+per-class passive constants (`scouter-class-data.ts`, vendored from their GMS
+table) because additive constants inside a bucket change marginal values and
+therefore recommendations. Rules not visible from the arithmetic:
 
-- Stat inputs are the in-game tooltip triple; a stat's total is
-  `floor(base * (1 + %/100)) + %NotApplied` (the last is a FLAT amount).
-- **statFactor** `(4*main + sub)/100` (Xenon: `(4*main + (sub + sub2)*4)/100`;
-  Demon Avenger: HP-based `floor(x/3.5) + 0.8*floor((HP-x)/3.5) + sub`,
-  `x = 90*level + 545`). A level term `dpmMainStat*(5*level+18)` sits inside the
-  main stat base.
-- **attack** `(base + 20 + dpmAtk + Δatk) * (1 + (atk% + dpmAtkPer)/100) + flat` —
-  the flat `+20` is always present on the live site; added ATT from hyper/HEXA
-  lands inside the multiplied base. Added main/sub stat lands in the flat bucket
-  (the game puts it in "% Not Applied").
-- **critBucket** `(1-cr) + cr*(1.35 + critDmg%)`, **rounded to 4 decimals** like
-  the site; `cr = min(1, critRate/100)`. HEXA evaluations force `cr = 1`. Crit rate
-  past 100% is not discarded for archers, it converts into crit damage instead
-  (`excessCritDamage`) -- see "Excess crit rate" below.
-- **dmgBucket** `1 + (dmg% + boss% + dpmBossDmg + Δ)/100`.
-- **iedBucket** `1 - PDR%*(1 - ied)/100`; sources stack multiplicatively with
-  scouter's exact stack/un-stack arithmetic (`stackIedSources`/`applyIed`,
-  including their odd mixed-sign combine). `dpmIgnoreGuard` is stacked in.
-- Boss PDR is a two-option picker, 300% (where most early-game bosses sit) or
-  380% (the real endgame bosses), defaulting to `DEFAULT_BOSS_PDR` = 380.
-  Scouter offers the full 50-380 range; the kernel still takes any number, so
-  widening it is a UI change only.
+- The flat `+20` in the attack term is always present on the live site. Added
+  ATT from hyper/HEXA lands inside the multiplied base; added main/sub stat lands
+  in the flat bucket (the game puts it in "% Not Applied").
+- critBucket is **rounded to 4 decimals** like the site. HEXA evaluations force
+  `cr = 1`. Crit rate past 100% converts into crit damage for archers
+  (`excessCritDamage`, see "Excess crit rate" below).
+- IED sources stack multiplicatively with scouter's exact stack/un-stack
+  arithmetic (`stackIedSources`/`applyIed`, including their odd mixed-sign
+  combine). `dpmIgnoreGuard` is stacked in.
+- Boss PDR is a two-option picker, 300% (most early-game bosses) or 380% (the
+  real endgame bosses), defaulting to `DEFAULT_BOSS_PDR` = 380. Scouter offers
+  50-380; the kernel takes any number, so widening it is a UI change only.
 
 ## Strip-then-optimize
 Stored character stats are displayed totals that already include the current
@@ -179,13 +170,8 @@ Three consequences to keep in mind (a fourth, the mobbing target, is above):
 ## Matching maplescouter exactly
 Given identical inputs, recommendations match the live site, with the single
 documented exception above. The `dpm*` class constants must be refreshed if scouter
-rebalances its class data.
-
-Both modes need this equally. Scouter's HEXA optimizer (`async function G`) evaluates
-candidates through the same kernel `A` the hyper path uses, differing only by a mode
-string, and `specEfficiency` appears nowhere in that chunk: it's a *derived* table
-computed in the store module from the same buffed state, which is why inverting it
-recovers the buckets. So neither optimizer reads the efficiency table and both need the
+rebalances its class data. Both of scouter's optimizers evaluate through the same
+kernel and neither reads `specEfficiency` (a derived table), so both modes need the
 same calibration; `optimizeHexa` takes the same `KernelCalibration`.
 
 **Buffed-state calibration (`scouter-calibration.ts`).** Our stat inputs are the
@@ -218,22 +204,10 @@ scouter's live answer exactly (ATT 8 / dmg 13 / crit dmg 15 / IED 6) at both 300
 380 PDR; uncalibrated it does not come close.
 
 ## Now/Best table
-The hyper lines are a real `<table>` (`HYPER_TABLE_CSS`), not a CSS grid: each stat is
-a `<th scope="row">` whose text is the `<label htmlFor>` for that row's input, which
-both names the input and lets a screen reader place the recommended value
-("Critical Damage, Best, 15"). Consequences worth keeping:
-- The header cells must NOT use `.tool-field-label` — its `display: block` collapses
-  the header row. Their typography is duplicated in `HYPER_TABLE_CSS` instead.
-- Row cards need `border-collapse: separate` + `border-spacing` for the gap, so the
-  border and radius are painted per cell (`th` left, `td.hyper-best` right).
-- The changed/unchanged split is carried by weight AND color, plus an `.sr-only`
-  suffix. Don't reintroduce a `→` glyph; screen readers announce it inconsistently.
-
-The HEXA core cards follow the same rules in their own shape: each line's role text
-is the `<label htmlFor>` for its stat `<select>` and "Lv" is the one for its level
-input, each completing its accessible name with an `.sr-only` span (the visible
-words alone don't say which core they belong to). The recommendation line reads
-"Best: ..." for the same reason the arrow went: a `★` announced inconsistently.
+The hyper lines are a real `<table>`, not a CSS grid: each stat's row header doubles
+as the `<label>` for that row's input so a screen reader can place the recommended
+value. The markup and accessibility rules are commented at `HYPER_TABLE_CSS` in the
+workspace; the HEXA core cards follow the same labelling rules in their own shape.
 
 ## Point budget
 The character level seeds from the stored record but stays editable, since a

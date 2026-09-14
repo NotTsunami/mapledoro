@@ -705,7 +705,12 @@ function hyperLineLabel(id: HyperLineId, profile: ClassDamageProfile, standalone
    text floating beside an input. Shape lives here; colors stay inline per theme.
    `border-spacing` reproduces the old 0.4rem gap between row cards, which needs
    `border-collapse: separate`, so each row's border is painted per cell with the
-   radius split across the first and last one. */
+   radius split across the first and last one. Header cells must NOT use
+   `.tool-field-label` (its `display: block` collapses the header row), so their
+   typography is duplicated here. The changed/unchanged split is carried by weight
+   AND color plus an `.sr-only` suffix; don't reintroduce a `→` glyph, screen readers
+   announce it inconsistently (the HEXA cards say "Best:" instead of `★` for the same
+   reason). */
 const HYPER_TABLE_CSS = `
   .hyper-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 0.4rem; }
   .hyper-table thead th { padding: 0 0.7rem 0.2rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }

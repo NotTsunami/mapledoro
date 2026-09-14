@@ -1,25 +1,10 @@
 # BGM Guesser
 
 Daily game: hear a MapleStory BGM track, name the **area or boss** it plays for in 3 tries. No
-hints, one mode. Puzzle rollover, replay arrows, archive routing, share squares and the countdown all mirror
-[Mapledle](../skill-guesser/CLAUDE.md); only the differences are documented here.
-
-The puzzle advances at **00:00:00 UTC**; puzzle #1 is the `EPOCH_UTC_MS` day in `puzzles.ts`
-(2026-08-04), and day N maps to payload index `(N-1) % length`.
-
-**Shared game chrome** lives one level up in `games/`: `DailyGameWorkspace` (header arrows, date,
-UTC rollover, archive routing, mount gate), `GuessControls` (searchable picker + Guess button, or View
-Results once done), `shared-ui.tsx` (`GuessSlots`, `StatsPanel`), `ResultsDialog` (share text,
-squares, countdown) and `dailyGame.ts` (`GuessResult`, `applyGuess`, `computeGuessStats`,
-`makePuzzleClock`). This workspace only supplies the player, the answer pool with its mark icons, and
-the reveal card contents.
-
-**The shared guess picker portals its menu to `<body>`** via `usePickerCoords`, matching the
-character-setup and Mystic Frontier pickers. It has to: `.panel-card` sets `overflow: hidden`, so an
-absolutely-positioned menu gets cut off by the panel's bottom edge, and this panel is short enough
-(no hint cards, only 3 guess slots) that the menu never fits below the input. Menu width is measured
-off the input when it opens instead of being a constant, and the outside-click handler has to check
-the portal too, since the menu is no longer a DOM descendant of the anchor.
+hints, one mode. Shared chrome, puzzle numbering, archive routing, payload encoding and results
+storage are in [`../CLAUDE.md`](../CLAUDE.md); only the differences are here. Puzzle #1 is
+2026-08-04. This workspace supplies the player, the answer pool with its mark icons, and the reveal
+card contents.
 
 **Audio** streams from haku.network's `bgm` namespace via `bgmTrackUrl(group, track)`. The manifest
 key is `{group}/{trackName}` and **track names are not unique across groups** (32 collisions), so
@@ -28,13 +13,12 @@ events (no effects, no mount-time setState), sets the starting volume in a callb
 these are in-game loops, not songs with an ending. The parent keys it by puzzle number so a new day
 gets a fresh element.
 
-**Puzzle payload** (`puzzle-data.generated.ts`) is AUTO-GENERATED — never hand-edit. Regenerate with
-`node scripts/generate-bgm-guesser-data.mjs` (needs dev-only `manifests/v271/bgm.json` +
-`ui-mark.json`, and network access to fetch maplebgm-db). It exports base64(XOR(json)) of
-`[group, track, title, answer]` tuples, plus the plain `BGM_GUESSER_ANSWER_DATA` pool
-(`[name, ui-mark id, isBoss]`) — the picker needs every answer anyway, so only the day's answer is
-worth hiding. The XOR key in `puzzles.ts` must match the script's. **Don't change the generator's
-`SEED` or reorder `ANSWERS`** — that reshuffles the daily order and breaks streaks mid-run.
+**Puzzle payload:** regenerate with `node scripts/generate-bgm-guesser-data.mjs` (needs the dev-only
+`manifests/v270/bgm.json` + `ui-mark.json`, pinned by the script's `MANIFEST_VERSION`, and network
+access to fetch maplebgm-db). It exports `[group, track, title, answer]` tuples, plus the plain
+`BGM_GUESSER_ANSWER_DATA` pool (`[name, ui-mark id, isBoss]`) — the picker needs every answer anyway,
+so only the day's answer is worth hiding. Adding or removing an answer reshuffles every day, since
+`answerOrder` is a shuffle of the whole key set.
 
 **Answers come from a hand-curated allowlist** (`ANSWERS` in the generator), not from any rule the
 data could supply: the manifest has no map names at all, and
@@ -62,15 +46,8 @@ The generator **fails loudly** rather than silently shrinking the pool: it exits
 curated track is missing from the manifest, an answer has no tracks, or an answer's `mark` is not in
 `ui-mark.json`. Each answer carries a `ui-mark` icon id shown in the picker and on reveal, so adding
 an answer means finding its mark in that manifest. Note the mark id is the WZ asset name, not the
-answer label — Geardock's mark is `Geardrak`, Karote's is `karotte`.
+answer label — Geardock's mark is `Geardrak`, Karote's is `karotte`. The round-robin balancer trims
+the pool to 365 puzzles so the daily sequence is exactly a year before it repeats, and the largest
+pools give up their surplus first.
 
-The pool is **386 curated tracks across 131 answers, trimmed to 365 puzzles** by the round-robin
-balancer, so the daily sequence is exactly a year before it repeats and the largest pools give up
-their surplus first. Adding or removing an answer reshuffles every day, since `answerOrder` is a
-shuffle of the whole key set.
-
-**Results** live in `mapledoro_games_v1` under a `bgmGuesser` section, sharing the key (and its
-version 2 schema) with the Skill Guesser. Reads/writes go through `games/gamesStore.ts`
-(`readGameSection`/`writeGameSection`), which owns the key and preserves other games' sections.
-**Never touch `mapledoro_games_v1` directly from a game module** — when both modules owned the whole
-key, each rebuilt it from the sections it knew, so the second game played erased the other's history.
+**Results** live under the `bgmGuesser` section of the shared games key.
