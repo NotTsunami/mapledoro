@@ -415,12 +415,13 @@ export function computeBossClear(
   const bossStat = splineInverse(spline, damage);
 
   const damageOverCut = damage / (cutInDamageSpace < 0 ? 1e4 : cutInDamageSpace);
+  const isChampionBlackMage = entry.name === "blackMage" && entry.difficulty === "Champion";
   const scouterEasyRate = entry.easyRate ?? 1;
   const easyRate = effectiveEasyRate(entry);
   const clearRate = timerAdjustedClearRate(entry, damageOverCut, easyRate, inputs.ascentConst);
-  const scouterClearRatePercent = easyRate === scouterEasyRate
-    ? null
-    : timerAdjustedClearRate(entry, damageOverCut, scouterEasyRate, inputs.ascentConst) * 100;
+  const scouterClearRatePercent = isChampionBlackMage
+    ? timerAdjustedClearRate(entry, damageOverCut, scouterEasyRate, inputs.ascentConst) * 100
+    : null;
 
   const isPartyBoss = !!entry.partyBossCut;
   const partyLimit = entry.partyLimit || 6;

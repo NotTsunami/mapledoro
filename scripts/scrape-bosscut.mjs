@@ -28,6 +28,11 @@ const CUT_FINGERPRINT = new RegExp(
 );
 const PHYSICS_FINGERPRINT = new RegExp(`=(\\{\\w+:\\{(?:${DIFFICULTIES}):\\{level:\\d+)`);
 
+// Captures the region-1 (gms/tms/msea) array's name from MapleScouter's own region ternary
+// (`X=1===Y?Z:2===Y?W.V:...`)
+// region codes: {kms:0, gms:1, tms:1, msea:1, jms:2}.
+const REGION_ARRAY_SELECTOR = /(\w+)=1===(\w+)\?(\w+):2===\2\?(\w+)\.(\w+):/;
+
 async function fetchText(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} -> ${res.status}`);
@@ -70,22 +75,8 @@ function matchEnclosing(src, start) {
   return src.slice(start, i);
 }
 
-// The literals reference a couple of outer tables via whatever single-letter name the minifier
-// happened to pick that build -- some genuinely don't matter (a boss-physics lookup for the cut
-// array, meso/hp/reward tables for the physics object), but at least one DOES: the cut array's
-// own module defines a local percentage-adjustment table (`let o={...}`, real numeric-expression
-// values, e.g. easyRate:.9792*o["노스우"]) immediately before the array itself, and stubbing it
-// away silently zeroes out easyRate for every entry that references it instead of throwing --
-// wrong data with no error, not caught until Normal Lotus was noticed reading "Impossible" for
-// an endgame character. So on an unresolved identifier, don't stub blindly: first search the
-// SAME module's source for that
-// identifier's own `let X={...}`/`const X={...}` declaration and try to resolve it for real,
-// only falling back to an inert stub if no such declaration exists (a genuinely unneeded table)
-// or it fails to evaluate on its own.
-// Takes the LAST (closest-to-point-of-use) match in the window, not the first -- short minified
-// names like `s`/`o` get reused across many unrelated closures earlier in the same window, and
-// the relevant declaration is the one immediately preceding where the identifier is actually
-// referenced (e.g. `let o={...},c=[...]`), not whichever same-named var happens to appear first.
+// Resolves an unbound identifier (e.g. a percentage-adjustment table) to its own declaration
+// instead of stubbing it blindly, which previously zeroed out easyRate silently.
 function findLocalDeclaration(moduleSrc, name) {
   const re = new RegExp(`(?:let|const|var)\\s+${name}=(\\{|\\[)`, "g");
   let last = null;
@@ -130,19 +121,8 @@ function safeEvalLiteral(literalSrc, moduleSrc = "") {
   throw new Error("safeEvalLiteral: too many unresolved identifiers");
 }
 
-// Webpack bundles every module as `},moduleId:(params)=>{body}` chained in one big object
-// literal -- `},\d+:\(` reliably marks where one module's body ends and the next begins. Used
-// to scope the search for a referenced identifier's own local declaration (e.g. the `let
-// o={...}` percentage table the cut array's easyRate values reference) to the SAME module the
-// reference actually lives in, not the whole (multi-module) chunk file. A fixed character window
-// isn't safe here: short minified names like `s`/`o` get reused across many unrelated closures
-// in completely different modules within the same file, and a same-named-but-unrelated literal
-// from another module (e.g. module 33528's own local `s`, a Korean strategy-note lookup table
-// that happens to share the letter `s` with module 39159's own `s`, an actual import alias) can
-// fall inside a fixed window and get wrongly bound -- caught live when this returned a resolved
-// object instead of falling through to the inert stub, and the array's own `s.N6.jupiter...`
-// access threw instead of silently stubbing (a loud, easy-to-notice failure -- much better than
-// the original silent-zero bug this whole fix exists for).
+// Scopes a declaration search to the same module the reference lives in, not the whole chunk --
+// short minified names get reused across unrelated modules, so a fixed window isn't safe.
 function moduleStartBefore(src, pos) {
   const re = /\},(\d+):\(/g;
   let last = null;
@@ -161,6 +141,31 @@ function findCutArrayInSource(src) {
   return safeEvalLiteral(matchEnclosing(src, start), searchWindow);
 }
 
+/** Like findLocalDeclaration, but also matches a name inside a comma-separated declaration list
+ *  (`let el={...},es=[...]`), which only the first name there gets a `let`/`const`/`var` for. */
+function findLocalOrListDeclaration(moduleSrc, name) {
+  const direct = findLocalDeclaration(moduleSrc, name);
+  if (direct) return direct;
+  const re = new RegExp(`,${name}=(\\{|\\[)`, "g");
+  let last = null;
+  let m;
+  while ((m = re.exec(moduleSrc)) !== null) last = m;
+  if (!last) return null;
+  return matchEnclosing(moduleSrc, last.index + last[0].length - 1);
+}
+
+/** Finds the region-1 (gms/tms/msea) boss-cut array, not whichever array CUT_FINGERPRINT matches
+ *  first. Returns null if REGION_ARRAY_SELECTOR or the named array's declaration isn't found. */
+function findGmsCutArrayInSource(src) {
+  const sel = REGION_ARRAY_SELECTOR.exec(src);
+  if (!sel) return null;
+  const arrayName = sel[3];
+  const searchWindow = src.slice(moduleStartBefore(src, sel.index), sel.index);
+  const decl = findLocalOrListDeclaration(searchWindow, arrayName);
+  if (!decl) return null;
+  return safeEvalLiteral(decl, searchWindow);
+}
+
 function findPhysicsObjectInSource(src) {
   const m = PHYSICS_FINGERPRINT.exec(src);
   if (!m) return null;
@@ -170,17 +175,9 @@ function findPhysicsObjectInSource(src) {
 }
 
 async function scanChunks(chunkUrls) {
-  // MapleScouter's own client code picks between THREE differently-shaped boss-cut arrays at
-  // runtime depending on the viewer's region (`0!==regionConfig[region] ? mainArray : isChallengers
-  // ? challengersArray : fallbackArray`, decoded from the actual result-page call site). All three
-  // pass our generic shape fingerprint, but only `mainArray` -- the one used for every real,
-  // recognized region (gms/kms/tms/jms/msea) -- is trustworthy; the fallback array is a *different*
-  // dataset with different bossCut/easyRate numbers (confirmed empirically: it disagreed with a
-  // live GMS character's real displayed result on this exact boss+difficulty). `mainArray` is
-  // always defined locally inside the /result route's own page chunk (never imported from a
-  // shared chunk), so restrict the cut-array search to that chunk specifically rather than "first
-  // match wins" across the whole chunk list -- the physics table has no such per-region split and
-  // is safe to find anywhere.
+  // All regions' boss-cut arrays pass the generic shape fingerprint, but only region 1's is
+  // correct for GMS/TMS/MSEA, see REGION_ARRAY_SELECTOR. The array is always
+  // defined locally inside the /result route's own page chunk, never a shared one.
   const resultPageChunks = chunkUrls.filter((u) => u.includes("/result/page-"));
   if (resultPageChunks.length === 0) {
     throw new Error(
@@ -193,10 +190,24 @@ async function scanChunks(chunkUrls) {
   let cutEntries = null;
   for (const url of resultPageChunks) {
     const src = await fetchText(url);
-    cutEntries = findCutArrayInSource(src);
+    cutEntries = findGmsCutArrayInSource(src);
     if (cutEntries) {
-      console.log(`  bossCut table found in ${url} (${cutEntries.length} entries)`);
+      console.log(`  GMS-specific bossCut table found in ${url} (${cutEntries.length} entries)`);
       break;
+    }
+  }
+  if (!cutEntries) {
+    console.warn(
+      "\nWARNING: REGION_ARRAY_SELECTOR didn't match -- falling back to the generic fingerprint, " +
+        "which may grab the wrong region's array. Investigate before trusting this run's output."
+    );
+    for (const url of resultPageChunks) {
+      const src = await fetchText(url);
+      cutEntries = findCutArrayInSource(src);
+      if (cutEntries) {
+        console.log(`  bossCut table found in ${url} (${cutEntries.length} entries) [fallback, region unverified]`);
+        break;
+      }
     }
   }
   if (!cutEntries) {
