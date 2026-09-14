@@ -67,7 +67,7 @@ function ChoiceRow({
           onClick={() => onChange("imported")}
           style={pillStyle(theme, value === "imported")}
         >
-          {CHARACTERS_COPY.importConflict.useImported}
+          {CHARACTERS_COPY.importConflict.takeImported}
         </button>
       </div>
     </div>
@@ -173,7 +173,7 @@ export default function ImportConflictDialog({
           className="tool-btn tool-dialog-btn"
           style={{ ...dialogBtnColors(theme), color: theme.text }}
         >
-          {CHARACTERS_COPY.importConflict.useAllImported}
+          {CHARACTERS_COPY.importConflict.takeAllImported}
         </button>
       </div>
 

@@ -169,34 +169,42 @@ export function useCharacterLookup({
     }, LOOKUP_SLOW_NOTICE_MS);
     const timeoutTimer = setTimeout(() => controller.abort(), LOOKUP_REQUEST_TIMEOUT_MS);
 
+    const failLookup = (message: string) => {
+      clearLookupTimers(slowTimer, timeoutTimer);
+      setStatusTone("error");
+      onFoundCharacterChange(null);
+      setStatusMessage(message);
+    };
+
+    // Neither a `finally` nor a `throw` inside the `try`: the React Compiler
+    // can't lower either yet and would leave the whole hook unmemoized. An HTTP
+    // error is handled in place, and the catch covers network and abort errors.
+    let found = false;
     try {
       const response = await fetch(
         `/api/characters/lookup?character_name=${encodeURIComponent(name)}&schema_version=${LOOKUP_RESPONSE_SCHEMA_VERSION}`,
         { cache: "no-store", signal: controller.signal },
       );
       clearLookupTimers(slowTimer, timeoutTimer);
-      if (!response.ok) {
+      if (response.ok) {
+        const result = (await response.json()) as LookupResponse;
+        found = applyLookupResult(name, normalized, result);
+      } else {
         const errorPayload = (await response.json().catch(() => null)) as
           | { error?: string; degradedCode?: string }
           | null;
         if (errorPayload?.degradedCode) setDegradedCode(errorPayload.degradedCode);
-        throw new Error(errorPayload?.error ?? `Lookup failed with status ${response.status}`);
+        failLookup(errorPayload?.error ?? `Lookup failed with status ${response.status}`);
       }
-      const result = (await response.json()) as LookupResponse;
-      return applyLookupResult(name, normalized, result);
     } catch (error) {
-      clearLookupTimers(slowTimer, timeoutTimer);
-      setStatusTone("error");
-      onFoundCharacterChange(null);
       if (error instanceof Error && error.name === "AbortError") {
-        setStatusMessage(LOOKUP_MESSAGES.timeout);
-        return false;
+        failLookup(LOOKUP_MESSAGES.timeout);
+      } else {
+        failLookup(error instanceof Error ? error.message : LOOKUP_MESSAGES.failed);
       }
-      setStatusMessage(error instanceof Error ? error.message : LOOKUP_MESSAGES.failed);
-      return false;
-    } finally {
-      setIsSearching(false);
     }
+    setIsSearching(false);
+    return found;
   };
 
   return {
