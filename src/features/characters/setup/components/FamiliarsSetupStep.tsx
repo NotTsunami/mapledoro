@@ -17,7 +17,8 @@ import {
   FAMILIARS, getFamiliarDisplayLabel,
   type FamiliarTier, type FamiliarEntry,
 } from "../data/familiarsData";
-import { resourceImageUrl, familiarBadgeUrl } from "../../../../lib/mapleResource";
+import { familiarBadgeUrl } from "../../../../lib/mapleResource";
+import { FamiliarCardSprite } from "../../../../components/FamiliarCardSprite";
 import SetupStepFrame from "./SetupStepFrame";
 import { CopyFromPreset } from "./CopyFromPreset";
 
@@ -250,58 +251,8 @@ const presetSquareStyle = (theme: AppTheme, active: boolean): CSSProperties => (
   cursor: "pointer",
 });
 
-// Familiar sprite: sequential source fallback (mob → familiar → card), swapped via onError.
-// Exported for the profile Familiars bookmark's read-only cards.
-
-export function FamiliarCardSprite({ mobId, familiarId, cardId, name, size, theme, fill }: { mobId: string; familiarId: number | null; cardId: string; name: string; size: number; theme: AppTheme; fill?: boolean }) {
-  const sources = [
-    resourceImageUrl("mob", mobId, "sprite.png"),
-    // "familiar" sprites are keyed by the familiar's own id, not mobId. These are the
-    // direct-sprite familiars (spriteFrom: "familiar") with no real monster to borrow a
-    // mob sprite from.
-    ...(familiarId !== null ? [resourceImageUrl("familiar", String(familiarId), "sprite.png")] : []),
-    ...(cardId ? [resourceImageUrl("item", cardId, "icon.png")] : []),
-  ];
-  // `fill` sizes the sprite off its flex-grown container instead of a fixed px square. The
-  // read-only profile card uses it so the sprite expands into whatever vertical space the
-  // card has left over, rather than sitting at a fixed size with dead space around it.
-  const dims: CSSProperties = fill ? { width: "100%", height: "100%" } : { width: size, height: size };
-  return (
-    <span style={{ ...dims, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}{/* react-doctor-disable-next-line nextjs-no-img-element -- needs a sequential onError fallback chain (mob -> familiar -> card) that next/image's declarative API can't express */}
-      <img
-        key={`${mobId}/${familiarId}/${cardId}`}
-        src={sources[0]}
-        alt=""
-        width={fill ? undefined : size}
-        height={fill ? undefined : size}
-        style={{ objectFit: "contain", ...dims, display: "block" }}
-        onError={(e) => {
-          const img = e.currentTarget;
-          const next = Number(img.dataset.step ?? "0") + 1;
-          if (next < sources.length) {
-            img.dataset.step = String(next);
-            img.src = sources[next];
-          } else {
-            img.style.display = "none";
-            const ph = img.nextElementSibling as HTMLElement | null;
-            if (ph) ph.style.display = "flex";
-          }
-        }}
-      />
-      <span aria-hidden style={{
-        display: "none", alignItems: "center", justifyContent: "center", ...dims,
-        borderRadius: 6, fontWeight: 800, fontSize: Math.max(12, size * 0.35),
-        background: "rgba(127,127,127,0.18)", color: theme.muted,
-      }}>
-        {name.match(/[a-zA-Z0-9]/)?.[0] ?? "?"}
-      </span>
-    </span>
-  );
-}
-
 // A missing/failed badge icon falls back to the badge's name-initial (mirrors
-// FamiliarCardSprite's treatment above) instead of a stray broken-image glyph. Used both
+// FamiliarCardSprite's treatment) instead of a stray broken-image glyph. Used both
 // as a plain square (currently-selected header, picker rows) and inside a pentagon-clipped
 // tile (BadgeSlot/ReadOnlyBadgeSlot). The parent's own clip-path handles the pentagon
 // shape either way, so this stays a plain rounded box. `pentagon` nudges the letter down

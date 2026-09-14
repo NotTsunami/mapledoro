@@ -7,7 +7,7 @@ Two triggers, one per group below: a game version bump for the manifest generato
 ## Manifest generators (version bump)
 
 - **Bumping the version:** every `gen-*.mjs`/`generate-*.mjs` has its own hardcoded manifest path. Grep `scripts/` for the old version string and update every hit together, or a generator silently keeps reading the old manifest and masks real data drift.
-- **After bumping, actually re-run each generator** — repointing isn't regenerating. At minimum: `gen-equipment.mjs` (needs `EQUIP_ICON_DIR` + `EQUIP_DEDUP_VERDICTS`, see its doc comment), `gen-familiars.mjs` (needs `FAMILIAR_DUMP_DIR` for reissue dedup; without it, duplicate picker rows return), `gen-vmatrix.mjs`, `gen-stat-baselines.mjs`. Diff before committing; a same-id-count regen can still hide real stat/name changes.
+- **After bumping, actually re-run each generator** — repointing isn't regenerating. At minimum: `gen-equipment.mjs` (needs `EQUIP_ICON_DIR` + `EQUIP_DEDUP_VERDICTS`, see its doc comment), `gen-familiars.mjs` (needs `FAMILIAR_DUMP_DIR` for reissue dedup; without it, duplicate picker rows return), `gen-familiar-traits.mjs` (Mystic Frontier joins its output with `gen-familiars.mjs`'s by id, so run both), `gen-vmatrix.mjs`, `gen-stat-baselines.mjs`. Diff before committing; a same-id-count regen can still hide real stat/name changes.
 - **The daily games' generators are excluded** — regenerating a puzzle payload reshuffles the daily order and breaks in-flight streaks, so a version bump is not a reason to re-run them (Mapledle's payload is still v269 on purpose; see its feature doc).
 
 ## External data scrapers (own trigger)

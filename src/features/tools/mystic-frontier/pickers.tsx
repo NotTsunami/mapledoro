@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObjec
 import { createPortal } from "react-dom";
 import type { AppTheme } from "../../../components/themes";
 import { usePickerCoords } from "./usePickerCoords";
-import { resourceImageUrl } from "../../../lib/mapleResource";
 import { ItemIcon } from "../../../components/ResourceImage";
+import { FamiliarCardSprite } from "../../../components/FamiliarCardSprite";
 import { MF_FAMILIARS, type MfFamiliar } from "./familiars";
 import { potentialsForRarity, type ResolvedPotential } from "./potentialEngine";
 import {
@@ -26,58 +26,6 @@ function matchesQuery(candidate: string, query: string): boolean {
   const norm = normalize(candidate);
   const tokens = query.trim().split(/\s+/).map(normalize).filter(Boolean);
   return tokens.length > 0 && tokens.every((t) => norm.includes(t));
-}
-
-// ── sprite ────────────────────────────────────────────────────────────────────
-// Robust familiar portrait: walks mob sprite → own-id familiar sprite → card icon →
-// "?" placeholder, one request at a time. A single raw <img> advances its `src` on
-// error via a `dataset.step` counter (per CLAUDE.md image policy: swap on error, no
-// re-render/state), so a spriteless familiar settles on its card icon or the "?"
-// instead of re-fetching a broken URL forever. Sprite id comes from the familiar's
-// `spriteMobId` override, falling back to mobId.
-//
-// NOTE: `familiar` sprites are keyed by the familiar's OWN id, not mobId — those are
-// "direct sprite" familiars with no monster to borrow from.
-
-export function FamiliarSprite({ fam, size, theme }: { fam: MfFamiliar; size: number; theme: AppTheme }) {
-  const spriteMobId = fam.spriteMobId ?? fam.mobId;
-  const sources = [
-    resourceImageUrl("mob", spriteMobId, "sprite.png"),
-    resourceImageUrl("familiar", String(fam.id), "sprite.png"),
-    ...(fam.cardId ? [resourceImageUrl("item", fam.cardId, "icon.png")] : []),
-  ];
-  return (
-    <span style={{ width: size, height: size, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={`${spriteMobId}/${fam.id}/${fam.cardId}`}
-        src={sources[0]}
-        alt=""
-        width={size}
-        height={size}
-        // The picker lists up to 50 familiars with roughly a viewport's worth on
-        // screen, so without this every row fetches a sprite the moment the
-        // dropdown opens. The onError fallback chain below still runs normally
-        // for whichever ones the browser actually loads.
-        loading="lazy"
-        decoding="async"
-        style={{ objectFit: "contain", width: size, height: size, display: "block" }}
-        onError={(e) => {
-          const img = e.currentTarget;
-          const next = Number(img.dataset.step ?? "0") + 1;
-          if (next < sources.length) {
-            img.dataset.step = String(next);
-            img.src = sources[next];
-          } else {
-            img.style.display = "none";
-            const ph = img.nextElementSibling as HTMLElement | null;
-            if (ph) ph.style.display = "block";
-          }
-        }}
-      />
-      <span aria-hidden style={{ display: "none", fontSize: size * 0.5, fontWeight: 400, lineHeight: 1, color: theme.muted }}>?</span>
-    </span>
-  );
 }
 
 // ── shared popover behavior ───────────────────────────────────────────────────
@@ -169,10 +117,14 @@ function ClearRow({ theme, label, onClear }: { theme: AppTheme; label: string; o
 
 const FAM_PICKER_WIDTH = 260;
 
+// Same-name reissues (`duplicateOf`) stay in MF_FAMILIARS so saved lineups still resolve,
+// but are hidden from the picker like the character setup flow's SELECTABLE_FAMILIARS.
+const SELECTABLE_FAMILIARS = MF_FAMILIARS.filter((f) => f.duplicateOf === undefined);
+
 function filterFamiliars(query: string): MfFamiliar[] {
-  if (!query.trim()) return MF_FAMILIARS.slice(0, 50);
+  if (!query.trim()) return SELECTABLE_FAMILIARS.slice(0, 50);
   const out: MfFamiliar[] = [];
-  for (const f of MF_FAMILIARS) {
+  for (const f of SELECTABLE_FAMILIARS) {
     if (out.length >= 50) break;
     if (matchesQuery(f.label, query)) out.push(f);
   }
@@ -246,7 +198,7 @@ export function FamiliarPicker({
                   onClick={() => select(f.id)}
                   style={optionButtonStyle(theme)}
                 >
-                  <FamiliarSprite fam={f} size={28} theme={theme} />
+                  <FamiliarCardSprite mobId={f.spriteMobId ?? f.mobId} familiarId={f.id} cardId={f.cardId} name={f.label} size={28} theme={theme} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
                 </button>
               ))}
