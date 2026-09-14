@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-// useLayoutEffect warns when it runs during SSR; this codebase's setup steps are all
+// useLayoutEffect warns when it runs during SSR; every picker using this hook is
 // client-rendered, but Next.js still does an initial server pass for "use client" components.
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 

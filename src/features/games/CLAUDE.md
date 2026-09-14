@@ -25,8 +25,8 @@ to the bare path. Each `[puzzle]/layout.tsx` sets `robots: { index: false }` bec
 an unbounded number space; the daily page stays indexable. Share text links to `<base>/<n>` so a
 copied result opens the day it describes.
 
-**The guess picker portals its menu to `<body>`** via `usePickerCoords` (from the character setup
-hooks), matching the character-setup and Mystic Frontier pickers. It has to: `.panel-card` sets
+**The guess picker portals its menu to `<body>`** via `usePickerCoords` (the shared hook in
+`src/lib`), matching the character-setup and Mystic Frontier pickers. It has to: `.panel-card` sets
 `overflow: hidden`, so an absolutely-positioned menu gets cut off by the panel's bottom edge, and
 the BGM panel is short enough (no hint cards, 3 guess slots) that the menu never fits below the
 input. Menu width is measured off the input when it opens, and the outside-click handler checks the
