@@ -17,6 +17,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "added", text: "The Mystic Frontier Solver now has the v271 potential lines, including the new \"for each element\" and \"for every type\" lines that count matching familiars, and the \"all dice odd, even, 3 or less, 4 or higher\" lines." },
       { type: "changed", text: "The Mystic Frontier familiar picker now includes the new v271 familiars." },
       { type: "fixed", text: "The Mystic Frontier familiar picker now uses the same up-to-date familiar list as character setup, fixing some outdated names, a missing Cygnus sprite, and duplicate rows for reissued familiars." },
+      { type: "fixed", text: "The Mystic Frontier potential picker no longer lists the same line twice." },
       { type: "changed", text: "Cooldown Reduction and several other Stats fields (Boss Damage, Critical Damage, Buff Duration, Summon Duration, Additional Status Damage, Damage, Critical Rate, Arcane Power and Sacred Power) now clamp to their real in-game caps in character setup." },
       { type: "fixed", text: "Fixed the Scouter simulator not letting an Oz Ring be set to level 0." },
       { type: "fixed", text: "Fixed the Genesis Liberation question showing up in character setup for legacy classes that can never actually access it." },

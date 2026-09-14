@@ -11,7 +11,7 @@ import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
 import { useScrollEdges, edgeFadeMask } from "../../../lib/useScrollEdges";
 import HoverTooltip from "../../../components/HoverTooltip";
 import { PillGroup } from "../../tools/shared-ui";
-import { usePickerCoords } from "../setup/hooks/usePickerCoords";
+import { usePickerCoords } from "../../../lib/usePickerCoords";
 import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";

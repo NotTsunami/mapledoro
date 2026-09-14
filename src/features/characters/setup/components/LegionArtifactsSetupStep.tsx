@@ -10,7 +10,7 @@ import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
 import type { StoredLegionArtifact } from "../../model/charactersStore";
-import { usePickerCoords } from "../hooks/usePickerCoords";
+import { usePickerCoords } from "../../../../lib/usePickerCoords";
 import {
   CRYSTAL_STAT_SLOTS,
   LEGION_ARTIFACT_STATS,

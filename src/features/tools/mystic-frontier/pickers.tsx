@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { AppTheme } from "../../../components/themes";
-import { usePickerCoords } from "../../characters/setup/hooks/usePickerCoords";
+import { usePickerCoords } from "../../../lib/usePickerCoords";
 import { ItemIcon } from "../../../components/ResourceImage";
 import { FamiliarCardSprite } from "../../../components/FamiliarCardSprite";
 import { MF_FAMILIARS, type MfFamiliar } from "./familiars";
-import { potentialsForRarity, type ResolvedPotential } from "./potentialEngine";
+import { getPotential, potentialsForRarity, type ResolvedPotential } from "./potentialEngine";
 import {
   MF_BONUS_COLORS, MF_BONUS_FAMILIES, MF_BONUS_FAMILY_DESC, formatBonusEffect, getBonusItem,
   type MfBonusColor, type MfBonusFamily,
@@ -248,14 +248,15 @@ export function LinePicker({
   const { ref: wrapperRef, portalRef } = usePickerCoords(isOpen, LINE_PICKER_WIDTH);
 
   const options = useMemo(() => potentialsForRarity(rarity), [rarity]);
+  // Looked up by id, not in `options`: a saved id may be a duplicate the pool dropped.
   const selected = useMemo<ResolvedPotential | undefined>(
-    () => (value === null ? undefined : options.find((p) => p.id === value)),
-    [options, value],
+    () => (value === null ? undefined : getPotential(value)),
+    [value],
   );
   const filtered = useMemo(() => {
-    const pool = options.filter((p) => p.id !== value);
+    const pool = selected ? options.filter((p) => p.label !== selected.label) : options;
     return query ? pool.filter((p) => matchesQuery(p.label, query)) : pool;
-  }, [options, value, query]);
+  }, [options, selected, query]);
 
   useEffect(() => { if (isOpen) inputRef.current?.focus(); }, [isOpen]);
   useEscapeToClose(isOpen, onClose, triggerRef);

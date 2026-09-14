@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AppTheme } from "../../components/themes";
-import { usePickerCoords } from "../characters/setup/hooks/usePickerCoords";
+import { usePickerCoords } from "../../lib/usePickerCoords";
 import { ActionButton } from "../tools/shared-ui";
 import { toolStyles } from "../tools/tool-styles";
 

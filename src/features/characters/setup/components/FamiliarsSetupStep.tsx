@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useEffect, type CSSProperties } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { usePickerCoords } from "../hooks/usePickerCoords";
+import { usePickerCoords } from "../../../../lib/usePickerCoords";
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";

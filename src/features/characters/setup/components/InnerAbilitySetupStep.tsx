@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { usePickerCoords } from "../hooks/usePickerCoords";
+import { usePickerCoords } from "../../../../lib/usePickerCoords";
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
