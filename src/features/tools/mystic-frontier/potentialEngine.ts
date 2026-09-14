@@ -19,6 +19,10 @@ export interface RollContext {
 }
 
 type Predicate = (ctx: RollContext) => boolean;
+// How many times a line applies to a rolled lineup: 0 or 1 for the conditional "If ..."
+// lines, 0 to 3 for the "+N for each Fire or Ice element" style lines, which apply once
+// per matching familiar. flat and mult are per application.
+type Activation = (ctx: RollContext) => number;
 
 export interface ResolvedPotential {
   id: number;
@@ -31,12 +35,17 @@ export interface ResolvedPotential {
   // True for the "+x% chance to roll …" lines, which alter roll odds rather than
   // the score of a fixed roll — they never contribute flat/mult.
   informational: boolean;
-  matches: Predicate;
+  activations: Activation;
 }
 
 const EVENT_PREFIX = /^\[EVENT\]\s*\[[^\]]*\]\s*/;
-const ALWAYS_FALSE: Predicate = () => false;
 const ALWAYS_TRUE: Predicate = () => true;
+const NEVER: Activation = () => 0;
+
+// The manifest names one element differently from the app.
+const ELEMENT_ALIASES: Record<string, MfElement> = { Electric: "Lightning" };
+const ELEMENTS = new Set<string>(["None", "Fire", "Ice", "Lightning", "Poison", "Dark", "Holy"]);
+const TYPES = new Set<string>(["Human", "Beast", "Plant", "Aquatic", "Fairy", "Reptile", "Devil", "Undead", "Mechanical"]);
 
 const PAIR_INDICES: Record<string, readonly [number, number]> = {
   "first and second": [0, 1],
@@ -125,14 +134,51 @@ const MATCHERS: ReadonlyArray<(cond: string, w: number) => Predicate | null> = [
     }
     : null),
   (c) => (/^Prevents dice from rolling over #w$/.test(c) ? ALWAYS_TRUE : null),
+  (c) => {
+    const m = /^If all dice roll an (odd|even) number$/.exec(c);
+    if (!m) return null;
+    const wantEven = m[1] === "even";
+    return (ctx) => full3(ctx) && ctx.dice.every((d) => (d % 2 === 0) === wantEven);
+  },
+  (c) => {
+    const m = /^If all dice roll ([1-6]) or (less|higher)$/.exec(c);
+    if (!m) return null;
+    const n = Number(m[1]);
+    const atMost = m[2] === "less";
+    return (ctx) => full3(ctx) && ctx.dice.every((d) => (atMost ? d <= n : d >= n));
+  },
 ];
 
-function buildPredicate(condition: string, w: number): Predicate {
+// One side of a "for each X or Y element" / "for every X or Y type" pair: an element
+// name, a type name, or "non-elemental". null when the manifest wording is unknown.
+function familiarTermPredicate(term: string): ((f: RollContext["lineup"][number]) => boolean) | null {
+  if (term === "non-elemental") return (f) => f.element === "None";
+  const element = ELEMENT_ALIASES[term] ?? term;
+  if (ELEMENTS.has(element)) return (f) => f.element === element;
+  if (TYPES.has(term)) return (f) => f.type === term;
+  return null;
+}
+
+// "+#add for each Fire or Ice element", "x#mul for every Human or Beast type",
+// "+#add for every non-elemental or Undead type": the line applies once per lineup
+// familiar matching either side.
+function buildCountActivation(condition: string): Activation | null {
+  const m = /^[+x]#(?:add|mul) for (?:each|every) (\S+) or (\S+) (?:element|type)$/.exec(condition);
+  if (!m) return null;
+  const a = familiarTermPredicate(m[1]);
+  const b = familiarTermPredicate(m[2]);
+  if (!a || !b) return null;
+  return (ctx) => ctx.lineup.filter((f) => a(f) || b(f)).length;
+}
+
+function buildActivation(condition: string, w: number): Activation {
+  const counted = buildCountActivation(condition);
+  if (counted) return counted;
   for (const matcher of MATCHERS) {
     const pred = matcher(condition, w);
-    if (pred) return pred;
+    if (pred) return (ctx) => (pred(ctx) ? 1 : 0);
   }
-  return ALWAYS_FALSE;
+  return NEVER;
 }
 
 function substitute(template: string, p: MfPotentialDef["params"]): string {
@@ -160,7 +206,7 @@ function resolvePotential(def: MfPotentialDef): ResolvedPotential {
     mult: informational ? 0 : def.params.mul ?? 0,
     diceCap: isCap ? w : null,
     informational,
-    matches: informational ? ALWAYS_FALSE : buildPredicate(condition, w),
+    activations: informational ? NEVER : buildActivation(condition, w),
   };
 }
 
