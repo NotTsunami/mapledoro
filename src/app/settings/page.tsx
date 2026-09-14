@@ -352,9 +352,8 @@ function DriveSyncPanel({
       await action();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Something went wrong talking to Google Drive.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const handleConnect = () =>

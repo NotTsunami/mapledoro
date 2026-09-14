@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useMemo, useState, useEffect } from "react";
+import { useReducer, useMemo, useState, useEffect, useEffectEvent } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import type { ChartOptions, ChartData, TooltipItem } from "chart.js";
@@ -525,18 +525,20 @@ function SimulationProgress({
   cancelStyle: React.CSSProperties;
 }) {
   const [progress, setProgress] = useState({ completed: 0, elapsedMs: 0 });
+  // Not a dependency: a fresh onFinished from a parent re-render must not restart the loop.
+  const finish = useEffectEvent(onFinished);
 
   useEffect(() => {
     let frame = 0;
     const tick = () => {
       const finished = run.step(FRAME_BUDGET_MS);
       setProgress({ completed: run.completed, elapsedMs: performance.now() - startedAt });
-      if (finished) onFinished(run.result());
+      if (finished) finish(run.result());
       else frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [run, startedAt, onFinished]);
+  }, [run, startedAt]);
 
   const { completed, elapsedMs } = progress;
   const fraction = trials > 0 ? completed / trials : 0;

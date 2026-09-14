@@ -7,6 +7,20 @@ export type ChartComponent = ComponentType<{ data: unknown; options: unknown }>;
 
 type ChartModule = typeof import("chart.js");
 type ChartName = "Bar" | "Line";
+type Registerables = (chart: ChartModule) => Parameters<ChartModule["Chart"]["register"]>;
+
+// Module scope rather than inside the hook: the compiler can't yet lower dynamic
+// import() expressions, and one in the hook body would leave the whole hook unoptimized.
+async function loadCharts<N extends ChartName>(
+  names: readonly N[],
+  registerables: Registerables,
+): Promise<Record<N, ChartComponent>> {
+  const [chartModule, reactChart] = await Promise.all([import("chart.js"), import("react-chartjs-2")]);
+  chartModule.Chart.register(...registerables(chartModule));
+  const resolved = {} as Record<N, ChartComponent>;
+  for (const name of names) resolved[name] = reactChart[name] as ChartComponent;
+  return resolved;
+}
 
 /**
  * Loads chart.js and react-chartjs-2 the first time a chart panel renders.
@@ -22,7 +36,7 @@ type ChartName = "Bar" | "Line";
  */
 export function useLazyChart<N extends ChartName>(
   names: readonly N[],
-  registerables: (chart: ChartModule) => Parameters<ChartModule["Chart"]["register"]>,
+  registerables: Registerables,
 ): Record<N, ChartComponent> | null {
   const [charts, setCharts] = useState<Record<N, ChartComponent> | null>(null);
   // Captured on first render: the loader below runs once and must not re-run when
@@ -31,24 +45,14 @@ export function useLazyChart<N extends ChartName>(
 
   useEffect(() => {
     let alive = true;
-    const { names: wanted, registerables: pick } = argsRef.current;
-
-    async function load(): Promise<void> {
-      const [chartModule, reactChart] = await Promise.all([
-        import("chart.js"),
-        import("react-chartjs-2"),
-      ]);
-      chartModule.Chart.register(...pick(chartModule));
-      if (!alive) return;
-      const resolved = {} as Record<N, ChartComponent>;
-      for (const name of wanted) resolved[name] = reactChart[name] as ChartComponent;
-      setCharts(resolved);
-    }
-
-    void load().catch(() => {
-      // Chunk failed to load; leave `charts` null so the panel renders nothing.
-    });
-
+    const { names, registerables } = argsRef.current;
+    loadCharts(names, registerables)
+      .then((resolved) => {
+        if (alive) setCharts(resolved);
+      })
+      .catch(() => {
+        // Chunk failed to load; leave `charts` null so the panel renders nothing.
+      });
     return () => {
       alive = false;
     };
