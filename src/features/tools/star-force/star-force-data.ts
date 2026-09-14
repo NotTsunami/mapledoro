@@ -22,7 +22,7 @@ export interface StarForceOpts {
   boomReduction: boolean;  // 30% boom reduction Sunny Sunday
   safeguard: boolean;      // boom protection at stars 15-17 (3x cost)
   mvp: MvpTier;
-  boomTier?: number;       // experimental enhancement mode 1-4 (stars 15-21); 1 = baseline
+  boomTier: number;        // experimental enhancement mode 1-4 (stars 15-21); 1 = baseline
 }
 
 // -- Rates --------------------------------------------------------------------
@@ -113,8 +113,8 @@ const BOOM_TIER_SUCCESS_RATES: Record<number, readonly number[]> = {
 export const BOOM_TIER_COUNT = 4;
 
 /** A boom tier override applies only at stars 15-21 with a tier above baseline. */
-function boomTierActive(star: number, boomTier: number | undefined): boolean {
-  return (boomTier ?? 1) > 1 && star >= 15 && star <= 21;
+function boomTierActive(star: number, boomTier: number): boolean {
+  return boomTier > 1 && star >= 15 && star <= 21;
 }
 
 // -- Cost formula -------------------------------------------------------------
@@ -203,7 +203,7 @@ export function attemptCost(level: number, star: number, opts: StarForceOpts): n
   if (opts.costDiscount) mult -= 0.3;
   if (opts.safeguard && star >= 15 && star <= 17) mult += 2;
   if (boomTierActive(star, opts.boomTier)) {
-    mult *= 1 + BOOM_TIER_COST_MULT_INCREASE[star][opts.boomTier! - 1];
+    mult *= 1 + BOOM_TIER_COST_MULT_INCREASE[star][opts.boomTier - 1];
   }
   return Math.round(base * mult);
 }
@@ -233,7 +233,7 @@ function adjustedRates(star: number, opts: StarForceOpts): AdjustedRates {
 
   // Boom tier (experimental): stars 15-21, overrides base success & boom rates
   if (boomTierActive(star, opts.boomTier)) {
-    const idx = opts.boomTier! - 1;
+    const idx = opts.boomTier - 1;
     success = BOOM_TIER_SUCCESS_RATES[star][idx];
     boom = BOOM_TIER_DESTROY_RATES[star][idx];
     maintain = 1 - success - boom; // no star decrease post-revamp

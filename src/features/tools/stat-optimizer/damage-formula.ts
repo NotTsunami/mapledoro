@@ -196,7 +196,7 @@ const isMainStatId = (v: string): v is MainStatId => ["str", "dex", "int", "luk"
  */
 export function resolveClassDamageProfile(
   jobName: string,
-  stats?: StoredCharacterStats,
+  stats: StoredCharacterStats,
 ): ClassDamageProfile {
   const classId = resolveClassId(jobName);
   const required = getClassDataByNexonJobName(jobName)?.requiredStats ?? [];
@@ -218,7 +218,7 @@ export function resolveClassDamageProfile(
   }
 
   const statIds = required.filter(isMainStatId);
-  const primary = statIds[0] ?? (stats ? inferPrimaryStat(stats) : "str");
+  const primary = statIds[0] ?? inferPrimaryStat(stats);
   const secondary = statIds.find((id) => id !== primary) ?? null;
   return {
     classId,

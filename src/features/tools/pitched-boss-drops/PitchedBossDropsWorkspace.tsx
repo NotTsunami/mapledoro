@@ -611,7 +611,7 @@ function DropLogTable({
                 style={{ background: index % 2 === 1 ? theme.timerBg : "transparent" }}
               >
                 <td style={{ ...tdStyle(theme), color: theme.muted, whiteSpace: "nowrap" }}>
-                  {formatShortDate(Date.parse(`${drop.date}T00:00:00Z`), true)}
+                  {formatShortDate(Date.parse(`${drop.date}T00:00:00Z`))}
                 </td>
                 <td style={{ ...tdStyle(theme), fontWeight: 700 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>

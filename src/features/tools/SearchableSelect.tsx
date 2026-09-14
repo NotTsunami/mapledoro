@@ -32,7 +32,7 @@ export function SearchableSelect<T>({
   triggerHeight,
   leading,
   menuMaxHeight = 320,
-  emptyLabel = "No matches",
+  emptyLabel,
   search,
   onSearchChange,
 }: {
@@ -49,9 +49,9 @@ export function SearchableSelect<T>({
   inputStyle: CSSProperties;
   triggerHeight?: number;
   /** Rendered left of the input while closed, e.g. the selected item's icon. */
-  leading?: ReactNode;
+  leading: ReactNode;
   menuMaxHeight?: number;
-  emptyLabel?: string;
+  emptyLabel: string;
   search: string;
   onSearchChange: (next: string) => void;
 }) {

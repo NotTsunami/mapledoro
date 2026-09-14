@@ -6,7 +6,7 @@ import type { AppTheme } from "../../components/themes";
 import type { StoredCharacterRecord } from "../characters/model/charactersStore";
 
 /** 32px character image with accent-initial fallback, for picker rows. */
-function PickerAvatar({ theme, name, imgURL }: { theme: AppTheme; name: string; imgURL?: string }) {
+function PickerAvatar({ theme, name, imgURL }: { theme: AppTheme; name: string; imgURL: string }) {
   if (imgURL) {
     return (
       <Image

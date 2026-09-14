@@ -63,7 +63,7 @@ export function ToolDialog({
   title: ReactNode;
   description?: ReactNode;
   onClose: () => void;
-  footer?: ReactNode;
+  footer: ReactNode;
   children: ReactNode;
   maxWidth?: number;
 }) {
@@ -109,7 +109,7 @@ export function ToolDialog({
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      opener?.focus?.();
+      opener?.focus();
     };
   }, [onClose]);
 
@@ -146,11 +146,9 @@ export function ToolDialog({
           </div>
         )}
         {children}
-        {footer && (
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            {footer}
-          </div>
-        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+          {footer}
+        </div>
       </div>
     </div>
   );

@@ -1406,7 +1406,7 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
             {/* Milestone levels strictly increase within a simulation, so level is a unique key. */}
             {result.milestones.slice(0, 24).map((milestone) => (
               <span key={milestone.level} style={milestoneChipStyle(theme)}>
-                Lv. {milestone.level} · {formatShortDate(milestone.date, true)}
+                Lv. {milestone.level} · {formatShortDate(milestone.date)}
               </span>
             ))}
           </div>

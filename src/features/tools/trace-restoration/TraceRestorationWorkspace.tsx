@@ -178,7 +178,7 @@ function EstimateResult({
     return (
       <span style={{ fontSize: "0.82rem", color: theme.text }}>
         <span style={{ fontWeight: 700 }}>Expected: </span>
-        {formatShortDate(result.date, true)} ({timeLabel})
+        {formatShortDate(result.date)} ({timeLabel})
       </span>
     );
   }
