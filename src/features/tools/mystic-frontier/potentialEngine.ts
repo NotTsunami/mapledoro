@@ -233,13 +233,21 @@ function poolRarities(rarity: MfRarity): readonly MfRarity[] {
   return rarity === "unique" || rarity === "legendary" ? [rarity, "epic"] : [rarity];
 }
 
-// Potentials selectable for a familiar of the given rarity, sorted for display.
+// Potentials selectable for a familiar of the given rarity, sorted for display, one
+// entry per label: the manifest repeats some lines verbatim under adjacent ids, and the
+// Epic fallback overlaps the Unique/Legendary lines. Same label means same params, so
+// the survivor is interchangeable; prefer the familiar's own rarity so picking a line
+// that also exists at Epic doesn't flag it as prepatch.
 export function potentialsForRarity(rarity: MfRarity): ResolvedPotential[] {
   const pool = poolRarities(rarity);
-  return allResolvedPotentials()
+  const byLabel = new Map<string, ResolvedPotential>();
+  for (const p of allResolvedPotentials()) {
     // react-doctor-disable-next-line js-set-map-lookups -- pool holds one or two rarities (see poolRarities); a Set is more work than the comparison.
-    .filter((p) => pool.includes(p.rarity) && !EVENT_PREFIX.test(p.label))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    if (!pool.includes(p.rarity) || EVENT_PREFIX.test(p.label)) continue;
+    const seen = byLabel.get(p.label);
+    if (!seen || (seen.rarity !== rarity && p.rarity === rarity)) byLabel.set(p.label, p);
+  }
+  return [...byLabel.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export function isLineSelectableFor(id: number, rarity: MfRarity): boolean {
