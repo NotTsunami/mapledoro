@@ -44,6 +44,7 @@ import {
   isStatsSubstepSane,
   isStatsSubstepComplete,
   isStatsSubstepAnyFieldFilled,
+  requiredStatsSetHasHp,
   TRIPLE_IDS,
   MAIN_STAT_IDS,
   COMBAT_LEFT,
@@ -1068,6 +1069,7 @@ function deriveStatsSubstepValidation({
 }) {
   const showArcanePower = isArcaneEligible(characterLevel, classData?.isLegacy);
   const showSacredPower = isSacredEligible(characterLevel, classData?.isLegacy);
+  const showHpPercentUnapplied = requiredStatsSetHasHp(classData);
   const symbolIds = ([showArcanePower && "arcanePower", showSacredPower && "sacredPower"] as const).filter(Boolean) as StatFieldId[];
   // full_setup stays skippable while untouched, but once a player starts filling it in this
   // treats it like MapleScouter's every-field-required rule. See isStatsSubstepAnyFieldFilled's
@@ -1083,13 +1085,9 @@ function deriveStatsSubstepValidation({
     && isStatsSubstepAnyFieldFilled(draft, tripleIds, showArcanePower, showSacredPower);
   const requireComplete = isScouter || anyFieldFilled;
   const statsComplete = requireComplete
-    ? isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower)
+    ? isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower, showHpPercentUnapplied)
     : isStatsSubstepSane(draft, tripleIds, primaryStat);
-  return { showHpPercentUnapplied: requiredStatsSetHasHp(classData), symbolIds, anyFieldFilled, requireComplete, statsComplete };
-}
-
-function requiredStatsSetHasHp(classData: ClassSkillData | undefined): boolean {
-  return new Set(classData?.requiredStats ?? []).has("hp");
+  return { showHpPercentUnapplied, symbolIds, anyFieldFilled, requireComplete, statsComplete };
 }
 
 function StatsWindowSubstep({

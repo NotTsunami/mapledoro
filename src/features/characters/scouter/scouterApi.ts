@@ -13,10 +13,10 @@
 import type { CharacterSoul, StoredCharacterRecord, StoredScouterLegion, StoredScouterBuffs, LinkSkillsData, LinkSkillId, WhLegionRank } from "../model/charactersStore";
 import { readCharactersStore, selectCharactersList } from "../model/charactersStore";
 import { CLASS_SKILL_DATA, getRequiredStatsForClass } from "../setup/data/classSkillData";
-import type { TripleStatFieldId } from "../setup/data/statFields";
+import { TRIPLE_STAT_FIELDS, type TripleStatFieldId } from "../setup/data/statFields";
 import { isRebootWorld } from "../setup/data/rebootData";
 import {
-  isArcaneEligible, isSacredEligible, isStatsSubstepComplete,
+  isArcaneEligible, isSacredEligible, isStatsSubstepComplete, requiredStatsSetHasHp,
   MAIN_STAT_IDS, TRIPLE_IDS, type StatsStepDraft,
 } from "../setup/data/statsStepDraft";
 import { deriveWeaponHandFromWeapon } from "../setup/data/classBranch";
@@ -686,7 +686,8 @@ export function findScouterSetupGap(character: StoredCharacterRecord): ScouterSe
 
   if (!(soulComplete && weaponHandComplete && iaComplete && whComplete)) return "quickQuestions";
 
-  const tripleIds = getRequiredStatsForClass(classData).filter((id): id is TripleStatFieldId => TRIPLE_IDS.has(id));
+  const classRequiredTripleIds = getRequiredStatsForClass(classData).filter((id): id is TripleStatFieldId => TRIPLE_IDS.has(id));
+  const tripleIds = classRequiredTripleIds.length === 0 ? TRIPLE_STAT_FIELDS.map((f) => f.id) : classRequiredTripleIds;
   const primaryStat = classData.requiredStats.find((s): s is TripleStatFieldId => MAIN_STAT_IDS.has(s));
   const draft: StatsStepDraft = {
     str: stats.str, dex: stats.dex, int: stats.int, luk: stats.luk, hp: stats.hp,
@@ -701,6 +702,7 @@ export function findScouterSetupGap(character: StoredCharacterRecord): ScouterSe
     draft, tripleIds, primaryStat,
     isArcaneEligible(character.level, classData.isLegacy),
     isSacredEligible(character.level, classData.isLegacy),
+    requiredStatsSetHasHp(classData),
   );
   return characterInfoComplete ? null : "characterInfo";
 }

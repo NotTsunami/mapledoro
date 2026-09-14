@@ -9,7 +9,7 @@ import type { CharacterMarriage, CharacterSoul, StoredCharacterStats, StoredHype
 import type { EquipmentLike } from "./equipmentStepDraft";
 import { HYPER_STAT_CATEGORIES, HYPER_STAT_PRESET_COUNT, parseStoredHyperStatLevel } from "./hyperStatData";
 import { convertInnerAbilityDraftToStored, type IADraft } from "./innerAbilityData";
-import { CLASS_SKILL_DATA, getRequiredStatsForClass } from "./classSkillData";
+import { CLASS_SKILL_DATA, getRequiredStatsForClass, type ClassSkillData } from "./classSkillData";
 import { TRIPLE_STAT_FIELDS, type StatFieldId, type TripleStatFieldId } from "./statFields";
 
 export interface TripleStatDraft {
@@ -396,10 +396,18 @@ export const COMBAT_RIGHT: StatFieldId[] = [
 export const MAIN_STAT_BASE_VALUE_WARN_AT = 10000;
 export const MAIN_STAT_PERCENT_UNAPPLIED_WARN_AT = 40000;
 
-function isTripleStatFilled(t: TripleStatDraft | undefined, id: TripleStatFieldId): boolean {
+/** Only Demon Avenger's HP feeds a percent-not-applied calculation, through its Demon Fury
+ *  scaling. Every other class's HP is context only, so the input is hidden for them (see
+ *  TripleStatRow's own hidePercentUnapplied) and must not be required here either. */
+export function requiredStatsSetHasHp(classData: ClassSkillData | undefined): boolean {
+  return new Set(classData?.requiredStats ?? []).has("hp");
+}
+
+function isTripleStatFilled(t: TripleStatDraft | undefined, id: TripleStatFieldId, showHpPercentUnapplied: boolean): boolean {
   if (!t?.base?.trim() || !t?.percent?.trim()) return false;
   const isAttack = id === "attackPower" || id === "magicAtt";
-  return isAttack || Boolean(t.percentUnapplied?.trim());
+  const percentUnappliedHidden = isAttack || (id === "hp" && !showHpPercentUnapplied);
+  return percentUnappliedHidden || Boolean(t.percentUnapplied?.trim());
 }
 
 // Same thresholds as the warning bubbles. A value that is clearly the wrong kind of number,
@@ -441,8 +449,9 @@ export function isStatsSubstepComplete(
   primaryStat: TripleStatFieldId | undefined,
   showArcanePower: boolean,
   showSacredPower: boolean,
+  showHpPercentUnapplied: boolean,
 ): boolean {
-  const tripleFilled = tripleIds.every((id) => isTripleStatFilled(draft[id], id));
+  const tripleFilled = tripleIds.every((id) => isTripleStatFilled(draft[id], id, showHpPercentUnapplied));
   const combatFilled = [...COMBAT_LEFT, ...COMBAT_RIGHT].every((id) => isCombatFieldFilled(draft, id));
   const symbolsFilled = (!showArcanePower || Boolean(draft.arcanePower?.trim())) && (!showSacredPower || Boolean(draft.sacredPower?.trim()));
   return tripleFilled && combatFilled && symbolsFilled
@@ -496,16 +505,24 @@ export function isStatsWindowSubstepValid(
 ): boolean {
   const classData = CLASS_SKILL_DATA.find((c) => c.nexonJobName === jobName);
   const draft = parseStatsStepDraft(rawValue);
-  const tripleIds = classData
+  // A class with no known required stats (every legacy job with no branch to derive one from,
+  // e.g. Noblesse, or any jobName not yet mapped in CLASS_SKILL_DATA) falls back to treating
+  // every triple field as relevant, the same fallback StatsSetupStep.tsx's own tripleIds uses,
+  // so a field typed there is still detected as "touched" here.
+  const classRequiredTripleIds = classData
     ? getRequiredStatsForClass(classData).filter((id): id is TripleStatFieldId => TRIPLE_IDS.has(id))
     : [];
+  const tripleIds = classRequiredTripleIds.length === 0
+    ? TRIPLE_STAT_FIELDS.map((f) => f.id)
+    : classRequiredTripleIds;
   const primaryStat = classData?.requiredStats.find((s): s is TripleStatFieldId => MAIN_STAT_IDS.has(s));
   const showArcanePower = isArcaneEligible(characterLevel, classData?.isLegacy);
   const showSacredPower = isSacredEligible(characterLevel, classData?.isLegacy);
+  const showHpPercentUnapplied = requiredStatsSetHasHp(classData);
   const requireComplete = forceComplete
     || (checkAnyFieldFilled && isStatsSubstepAnyFieldFilled(draft, tripleIds, showArcanePower, showSacredPower));
   if (!requireComplete) {
     return isStatsSubstepSane(draft, tripleIds, primaryStat);
   }
-  return isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower);
+  return isStatsSubstepComplete(draft, tripleIds, primaryStat, showArcanePower, showSacredPower, showHpPercentUnapplied);
 }
