@@ -12,7 +12,8 @@ import { toolStyles } from "../tool-styles";
 import { Field } from "../shared-ui";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { useMysticFrontierState, type SlotState } from "./useMysticFrontierState";
-import { BonusItemPicker, FamiliarPicker, FamiliarSprite, LinePicker } from "./pickers";
+import { BonusItemPicker, FamiliarPicker, LinePicker } from "./pickers";
+import { FamiliarCardSprite } from "../../../components/FamiliarCardSprite";
 import { getMfFamiliar } from "./familiars";
 import { isPrepatchEpicLine } from "./potentialEngine";
 import {
@@ -190,7 +191,7 @@ function SlotTrigger({ slot, theme }: { slot: SlotState; theme: AppTheme }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-      <FamiliarSprite fam={fam} size={FAM_SPRITE} theme={theme} />
+      <FamiliarCardSprite mobId={fam.spriteMobId ?? fam.mobId} familiarId={fam.id} cardId={fam.cardId} name={fam.label} size={FAM_SPRITE} theme={theme} />
       <span style={{ fontSize: "0.75rem", fontWeight: 800, color: theme.text, textAlign: "center", lineHeight: 1.2 }}>
         {fam.label}
       </span>

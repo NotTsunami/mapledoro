@@ -82,10 +82,14 @@ export function calculateScore(slots: CalcSlot[], bonusItems: MfBonusItem[]): Sc
   }
 
   for (const p of selectedPotentials(slots)) {
-    if (!p.matches(ctx)) continue;
-    totalFlat += p.flat;
-    totalMult += p.mult;
-    activeLines.push({ label: p.label, flat: p.flat, mult: p.mult });
+    // 0 or 1 for conditional lines; up to 3 for the "for each element/type" lines.
+    const n = p.activations(ctx);
+    if (n === 0) continue;
+    const flat = p.flat * n;
+    const mult = p.mult * n;
+    totalFlat += flat;
+    totalMult += mult;
+    activeLines.push({ label: p.label, flat, mult });
   }
 
   const afterFlat = diceSum + totalFlat;

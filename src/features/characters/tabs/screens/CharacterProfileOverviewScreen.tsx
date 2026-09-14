@@ -57,7 +57,8 @@ import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/Equ
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
 import { VMatrixNodeIcon, useVMatrixCatalog, type VMatrixNode } from "../../setup/components/VMatrixSetupStep";
 import { HexaStatNodeIcon } from "../../setup/components/HexaMatrixSetupStep";
-import { ReadOnlyFamiliarSlotCard, ReadOnlyBadgeSlot, FamiliarCardSprite, PRESET_COUNT as FAMILIAR_PRESET_COUNT, BADGE_SIZE as FAMILIAR_BADGE_SIZE, BADGE_BORDER as FAMILIAR_BADGE_BORDER } from "../../setup/components/FamiliarsSetupStep";
+import { ReadOnlyFamiliarSlotCard, ReadOnlyBadgeSlot, PRESET_COUNT as FAMILIAR_PRESET_COUNT, BADGE_SIZE as FAMILIAR_BADGE_SIZE, BADGE_BORDER as FAMILIAR_BADGE_BORDER } from "../../setup/components/FamiliarsSetupStep";
+import { FamiliarCardSprite } from "../../../../components/FamiliarCardSprite";
 import {
   storedPresetToDraft, toDraftItem, type SlotMap, type SlotKey,
   CENTER_WIDTH, COL1_SLOTS, COL2_SLOTS, COL6_SLOTS, COL7_SLOTS, CENTER_BOTTOM_SLOTS,
