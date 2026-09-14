@@ -563,7 +563,7 @@ function AddItemForm({
             triggerStyle={{ maxWidth: "none", minWidth: 160 }}
           />
           {form.char === "__custom__" && (
-            <input className="tool-input" type="text" value={form.charCustom} onChange={(e) => dispatchForm({ type: "setCharCustom", value: e.target.value })} placeholder="Character name" style={{ ...styles.inputStyle, flex: 1, minWidth: 0, alignSelf: "stretch" }} />
+            <input className="tool-input" type="text" value={form.charCustom} onChange={(e) => dispatchForm({ type: "setCharCustom", value: e.target.value })} placeholder="Character name" aria-label="Character name" style={{ ...styles.inputStyle, flex: 1, minWidth: 0, alignSelf: "stretch" }} />
           )}
         </div>
       </div>

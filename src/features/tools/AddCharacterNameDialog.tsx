@@ -106,6 +106,7 @@ export function AddCharacterNameDialog({
             <input
               type="text"
               placeholder="Character name"
+              aria-label="Character name"
               maxLength={14}
               value={typedName}
               onChange={(e) => setTypedName(e.target.value)}
@@ -164,6 +165,7 @@ export function AddCharacterNameDialog({
         <input
           type="text"
           placeholder="Character name"
+          aria-label="Character name"
           maxLength={14}
           value={typedName}
           onChange={(e) => setTypedName(e.target.value)}
