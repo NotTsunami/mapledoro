@@ -126,8 +126,7 @@ function computeEstimate(
   }
 }
 
-function computeWeeklyPointGain(selectedMissions: string[], bosses: TraceBoss[]): { weekly: number; monthly: number } {
-  const selected = new Set(selectedMissions);
+function computeWeeklyPointGain(selected: ReadonlySet<string>, bosses: TraceBoss[]): { weekly: number; monthly: number } {
   let weekly = 0;
   let monthly = 0;
   for (const boss of bosses) {
@@ -324,7 +323,7 @@ function BossChipGroup({
   label: string;
   labelStyle: CSSProperties;
   bosses: WhisperBoss[];
-  selectedBosses: string[];
+  selectedBosses: ReadonlySet<string>;
   onBossToggle: (id: string) => void;
 }) {
   if (bosses.length === 0) return null;
@@ -333,7 +332,7 @@ function BossChipGroup({
       <div className="tool-field-label" style={labelStyle}>{label}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {bosses.map((boss) => {
-          const active = selectedBosses.includes(boss.id);
+          const active = selectedBosses.has(boss.id);
           return (
             <button
               key={boss.id}
@@ -371,7 +370,7 @@ function CrystalSection({
   count: number;
   onCountChange: (n: number) => void;
   bosses: WhisperBoss[];
-  selectedBosses: string[];
+  selectedBosses: ReadonlySet<string>;
   onBossToggle: (id: string) => void;
   target?: string;
   targetOptions?: { id: string; name: string; cost: number }[];
@@ -380,10 +379,20 @@ function CrystalSection({
 }) {
   const styles = toolStyles(theme);
 
-  const weeklyBosses = bosses.filter((b) => b.frequency === "weekly");
-  const monthlyBosses = bosses.filter((b) => b.frequency === "monthly");
-  const weeklyGain = weeklyBosses.filter((b) => selectedBosses.includes(b.id)).length;
-  const monthlyGain = monthlyBosses.filter((b) => selectedBosses.includes(b.id)).length;
+  const weeklyBosses: WhisperBoss[] = [];
+  const monthlyBosses: WhisperBoss[] = [];
+  let weeklyGain = 0;
+  let monthlyGain = 0;
+  for (const boss of bosses) {
+    const cleared = selectedBosses.has(boss.id) ? 1 : 0;
+    if (boss.frequency === "weekly") {
+      weeklyBosses.push(boss);
+      weeklyGain += cleared;
+    } else {
+      monthlyBosses.push(boss);
+      monthlyGain += cleared;
+    }
+  }
   const result = computeEstimate(count, targetCost, weeklyGain, monthlyGain);
 
   const remaining = Math.max(0, targetCost - count);
@@ -506,6 +515,8 @@ function StarForceResearchTab({ theme }: { theme: AppTheme }) {
   }
 
   const pitchedTarget = PITCHED_TARGETS.find((t) => t.id === state.pitchedTarget) ?? PITCHED_TARGETS[0];
+  const pitchedSelected = new Set(state.pitchedBosses);
+  const dawnSelected = new Set(state.dawnBosses);
 
   return (
     <>
@@ -516,7 +527,7 @@ function StarForceResearchTab({ theme }: { theme: AppTheme }) {
         count={state.pitchedCount}
         onCountChange={(n) => save({ ...state, pitchedCount: n })}
         bosses={PITCHED_WHISPER_BOSSES}
-        selectedBosses={state.pitchedBosses}
+        selectedBosses={pitchedSelected}
         onBossToggle={(id) => toggleBoss("pitched", id)}
         target={state.pitchedTarget}
         targetOptions={PITCHED_TARGETS}
@@ -531,7 +542,7 @@ function StarForceResearchTab({ theme }: { theme: AppTheme }) {
         count={state.dawnCount}
         onCountChange={(n) => save({ ...state, dawnCount: n })}
         bosses={DAWN_WHISPER_BOSSES}
-        selectedBosses={state.dawnBosses}
+        selectedBosses={dawnSelected}
         onBossToggle={(id) => toggleBoss("dawn", id)}
         targetCost={DAWN_TARGET_COST}
       />
@@ -551,11 +562,10 @@ function BossMissionCard({
 }: {
   theme: AppTheme;
   boss: TraceBoss;
-  selectedMissions: string[];
+  selectedMissions: ReadonlySet<string>;
   onToggleMission: (id: string) => void;
 }) {
-  const selected = boss.missions.filter((m) => selectedMissions.includes(m.id));
-  const total = selected.reduce((sum, m) => sum + m.points, 0);
+  const total = boss.missions.reduce((sum, m) => (selectedMissions.has(m.id) ? sum + m.points : sum), 0);
 
   return (
     <div
@@ -578,7 +588,7 @@ function BossMissionCard({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {boss.missions.map((mission) => {
-          const active = selectedMissions.includes(mission.id);
+          const active = selectedMissions.has(mission.id);
           return (
             <button
               key={mission.id}
@@ -610,8 +620,10 @@ function TraceRestorationTab({ theme }: { theme: AppTheme }) {
     writeGlobalTool(STORAGE_KEY_RESTORATION, next);
   }
 
+  const selected = new Set(state.selectedMissions);
+
   function toggleMission(id: string) {
-    if (state.selectedMissions.includes(id)) {
+    if (selected.has(id)) {
       save({ ...state, selectedMissions: state.selectedMissions.filter((m) => m !== id) });
       return;
     }
@@ -638,7 +650,7 @@ function TraceRestorationTab({ theme }: { theme: AppTheme }) {
   }
 
   const targetItem = TRACE_ITEMS_BY_ID.get(state.targetItemId) ?? TRACE_ITEMS[0];
-  const { weekly, monthly } = computeWeeklyPointGain(state.selectedMissions, TRACE_BOSSES);
+  const { weekly, monthly } = computeWeeklyPointGain(selected, TRACE_BOSSES);
   const result = computeEstimate(state.currentPoints, targetItem.points, weekly, monthly);
   const remaining = Math.max(0, targetItem.points - state.currentPoints);
   const progress = Math.min(1, state.currentPoints / targetItem.points);
@@ -770,7 +782,7 @@ function TraceRestorationTab({ theme }: { theme: AppTheme }) {
             key={boss.id}
             theme={theme}
             boss={boss}
-            selectedMissions={state.selectedMissions}
+            selectedMissions={selected}
             onToggleMission={toggleMission}
           />
         ))}
@@ -792,7 +804,7 @@ function TraceRestorationTab({ theme }: { theme: AppTheme }) {
             key={boss.id}
             theme={theme}
             boss={boss}
-            selectedMissions={state.selectedMissions}
+            selectedMissions={selected}
             onToggleMission={toggleMission}
           />
         ))}
