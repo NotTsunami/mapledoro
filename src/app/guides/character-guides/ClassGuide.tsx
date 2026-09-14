@@ -355,7 +355,7 @@ function Sequence({ config }: { config: ClassConfig }) {
         {config.sequence.map((step, i) => {
           const skill = config.skills[step.skill];
           return (
-            <Fragment key={`${step.skill}-${i}`}>
+            <Fragment key={step.skill}>
               {i > 0 && <span className={styles.chev} aria-hidden>›</span>}
               <div className={styles.cast}>
                 {step.cd && <span className={styles.cdTag}>{step.cd}</span>}
@@ -431,7 +431,8 @@ function LevelingOrder({ config }: { config: ClassConfig }) {
               const skill = config.skills[key];
               const nt = skill.nodeType ?? "common";
               return (
-                <div key={`${key}-${i}`} className={cx(styles.cell, NODE_CELL[nt])}>
+                // A skill can recur at later target levels (Hero does), but never at the same one.
+                <div key={`${key}-${lv}`} className={cx(styles.cell, NODE_CELL[nt])}>
                   <div className={styles.cellN}>{i + 1}</div>
                   <SkillTrigger skill={skill} className={styles.sk} ariaLabel={`${skill.name}, level ${lv}`}>
                     <SkillImage skill={skill} size={28} />
@@ -464,10 +465,10 @@ function Utility({ config }: { config: ClassConfig }) {
       {config.utility.map((group) => (
         <section key={group.label} className={styles.card}>
           <h2 className={styles.secT}>{group.label}</h2>
-          {group.rows.map((row, i) => {
+          {group.rows.map((row) => {
             const skill = config.skills[row.skill];
             return (
-              <div key={`${row.skill}-${i}`} className={styles.uLine}>
+              <div key={row.skill} className={styles.uLine}>
                 <SkillTrigger skill={skill} className={styles.uIcon}>
                   <SkillImage skill={skill} size={22} />
                 </SkillTrigger>
@@ -522,8 +523,10 @@ function BaseStats({ config }: { config: ClassConfig }) {
             {row.parts.length === 0 ? (
               <span className={styles.muted}>Innate to the class — no skill sources</span>
             ) : (
-              row.parts.map((part, i) => (
-                <StatPartChip key={`${part.skill}-${i}`} part={part} skill={config.skills[part.skill]} />
+              // One skill can contribute twice to a stat with different values (Blaze Wizard's
+              // Final Flame Elemental), never twice with the same value.
+              row.parts.map((part) => (
+                <StatPartChip key={`${part.skill}-${part.value}`} part={part} skill={config.skills[part.skill]} />
               ))
             )}
           </div>
