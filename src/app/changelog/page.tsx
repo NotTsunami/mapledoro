@@ -12,6 +12,15 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-14",
+    changes: [
+      { type: "changed", text: "Cooldown Reduction and several other Stats fields (Boss Damage, Critical Damage, Buff Duration, Summon Duration, Additional Status Damage, Damage, Critical Rate, Arcane Power and Sacred Power) now clamp to their real in-game caps in character setup." },
+      { type: "fixed", text: "Fixed the Scouter simulator not letting an Oz Ring be set to level 0." },
+      { type: "fixed", text: "Fixed the Genesis Liberation question showing up in character setup for legacy classes that can never actually access it." },
+      { type: "fixed", text: "Fixed character setup breaking for a few classes with no fixed main stat (like Noblesse): the step jump menu could let you skip past an unfinished Stats step, and MapleScouter Setup could get stuck unable to continue even with everything filled in." },
+    ],
+  },
+  {
     date: "2026-09-11",
     changes: [
       { type: "added", text: "Added a Report a Bug page, linked in the footer. Pick the page or tool and the character involved, describe what happened, and it goes straight to the dev team." },

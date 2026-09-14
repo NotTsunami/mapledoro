@@ -1,11 +1,12 @@
-// Damage Range calculation (strategywiki, confirmed exact against real characters):
+// Damage Range calculation, per strategywiki, and exact in practice:
 //   UpperActual = round(Multiplier × StatValue × TotalJobATT / 100)
 //   LowerActual = round(UpperActual × Mastery% / 100)
 //   UpperShown  = floor(UpperActual × (1+Damage%/100) × (1+Final%/100))
 //   LowerShown  = floor(1 + LowerActual × (1+Damage%/100) × (1+Final%/100))
-// Multiplier/TotalJobATT-stat sourced from maplestorywiki.net/w/Damage_Formula, cross-checked
-// against strategywiki and real characters (see damageRangeData.generated.ts for the Xenon
-// correction: its own in-game tooltip is wrong, verified 1.3125 not the displayed 1.50).
+// Multiplier and the TotalJobATT stat come from maplestorywiki.net/w/Damage_Formula,
+// cross-checked against strategywiki. See damageRangeData.generated.ts for the Xenon
+// correction, where the in-game tooltip is wrong: the real value is 1.3125, not the
+// displayed 1.50.
 import type { StoredCharacterStats, StoredTripleStatField, StoredFamiliarsData } from "../../model/charactersStore";
 import { CLASS_SKILL_DATA } from "./classSkillData";
 import { resolveMasteryPercent } from "./masteryData";
@@ -16,11 +17,11 @@ import { familiarStatBonuses, type FamiliarStatBonus } from "./familiarsData";
 import { isRebootWorld, rebootFinalDamageBonusPercent } from "./rebootData";
 
 // Familiar stat lines (e.g. a unique-tier "INT: +6%") never appear in the Character Info stat
-// tooltip's own Base Value/% Value breakdown, but they're real — see familiarStatBonuses in
+// tooltip's own Base Value and % Value breakdown, but they are real. See familiarStatBonuses in
 // familiarsData.ts. Basic Stats already folds this in; StatValue needs the same treatment or
 // Damage Range silently undershoots for any character with an active INT/STR/DEX/LUK/HP-boosting
-// familiar line (confirmed against a real character: a missing +6% INT familiar line alone
-// accounted for the entire remaining gap between computed and real Damage Range).
+// familiar line. A missing +6% INT familiar line alone accounted for the entire remaining gap
+// between the computed and the displayed Damage Range.
 function tripleStatValue(field: StoredTripleStatField | undefined, familiarBonus?: FamiliarStatBonus): number {
   if (!field?.base) return 0;
   const base = (Number(field.base) || 0) + (familiarBonus?.flat ?? 0);
@@ -36,10 +37,10 @@ function resolveWeaponMultiplier(classId: string, weaponHand: "1h" | "2h" | unde
 }
 
 // strategywiki: Demon Avenger's Pure HP, 4th job and beyond, assuming all AP is invested into HP
-// (the standard build — HP is Demon Avenger's entire damage stat, unlike every other class):
-// 545 + 90×Level. Not read from any in-game UI field — Nexon doesn't expose Pure HP directly (the
-// Character Info HP tooltip only shows the generic Base/%/Not Applied breakdown, confirmed
-// against a real screenshot), this level-derived formula is the only way to get it.
+// (the standard build, since HP is Demon Avenger's entire damage stat, unlike every other class):
+// 545 + 90×Level. It is not read from any in-game UI field, because Nexon doesn't expose Pure HP
+// directly. The Character Info HP tooltip shows only the generic Base, %, and Not Applied
+// breakdown, so this level-derived formula is the only way to get it.
 function demonAvengerPureHp(level: number): number {
   return 545 + 90 * level;
 }

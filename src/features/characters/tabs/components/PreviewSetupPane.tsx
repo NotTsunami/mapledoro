@@ -15,12 +15,6 @@ import QuickSetupIntroScreen from "../screens/QuickSetupIntroScreen";
 import SearchResultPreviewScreen from "../screens/SearchResultPreviewScreen";
 import { panelCardStyle } from "./uiStyles";
 
-// Persists the user's last selected world filter across page refreshes.
-// TODO: When a "Default world" setting is added to the Settings page, read from
-// user preferences here instead of (or as fallback for) this localStorage key.
-// Hook: read `mapledoro_pref_default_world` (number | null) from settings store,
-// and use it as the initial value if present, overriding the localStorage fallback.
-
 interface PreviewSetupPaneProps {
   model: PreviewPaneModel;
   actions: PreviewPaneActions;
@@ -34,7 +28,7 @@ function getActiveScreenId(setup: PreviewPaneModel["setup"]): PreviewScreenId {
   if (inCharacterDirectoryView) return "directory";
   if (!hasCompletedRequiredFlow && setup.setupStepIndex === 0) return "quick-setup-intro";
   if (setup.setupStepIndex > 0) return "setup-flow";
-  if (hasCompletedRequiredFlow && !inCharacterDirectoryView) return "profile-overview";
+  if (hasCompletedRequiredFlow) return "profile-overview";
   return "none";
 }
 
@@ -94,84 +88,15 @@ function getSetupPanelInlineStyle(
   };
 }
 
-export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
-  const { theme, setup, directory, preview } = model;
-  const [directorySortBy, setDirectorySortBy] = useState<DirectorySortBy>("name");
-
-  // See StoredWorldFilter for what each variant means. Resolved (not raw) below, since
-  // "unset" and a world that has since left the roster both fall back to the first world.
-  const [directoryWorldFilterRaw, setDirectoryWorldFilterRaw] =
-    useState<StoredWorldFilter>(readStoredWorldFilter);
-  const directoryWorldFilter = resolveWorldFilter(directoryWorldFilterRaw, directory.worldIds);
-
-  // Mirrors CharacterDirectoryScreen's own world-scoping so the reveal-phase delay below
-  // matches whether the directory view it's about to animate actually has a champions
-  // section (an "all worlds" view has no such section, but hasChampionSection is false
-  // there too since mainCharacterKey/championCharacterKeys resolve to null/[]).
-  const showAllDirectoryWorlds = directoryWorldFilter === null && directory.worldIds.length > 1;
-  const activeDirectoryWorldId = directoryWorldFilter ?? directory.worldIds[0] ?? null;
-  const activeDirectoryMainKey =
-    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
-      ? (directory.mainCharacterKeyByWorld[String(activeDirectoryWorldId)] ?? null)
-      : null;
-  const activeDirectoryChampionKeys =
-    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
-      ? (directory.championCharacterKeysByWorld[String(activeDirectoryWorldId)] ?? [])
-      : [];
-  const hasChampionSection = buildDirectoryGroups({
-    allCharacters: directory.allCharacters,
-    sortBy: "name",
-    mainCharacterKey: activeDirectoryMainKey,
-    championCharacterKeys: activeDirectoryChampionKeys,
-    maxCharacters: directory.maxCharacters,
-  }).hasChampionSection;
-
+/** The directory panel's staggered reveal: main character, then champions, then mules, each
+ *  fading in at its own delay while the directory view is active, reset to 0 the moment it
+ *  isn't. Split out of PreviewSetupPane since the two effects' timer sequencing is a cohesive
+ *  concern on its own, independent of the rest of the pane's model/class-name derivation. */
+function useDirectoryRevealPhase(inCharacterDirectoryView: boolean, setup: PreviewPaneModel["setup"], hasChampionSection: boolean) {
+  const [directoryRevealPhase, setDirectoryRevealPhase] = useState(0);
   const getRevealDelays = useEffectEvent(() =>
     getDirectoryRevealDelays(setup.fastDirectoryRevealOnce, hasChampionSection),
   );
-
-  const [directoryRevealPhase, setDirectoryRevealPhase] = useState(0);
-  const inCharacterDirectoryView = setup.showFlowOverview && setup.showCharacterDirectory;
-  const shouldShowDirectoryPanel =
-    inCharacterDirectoryView &&
-    !setup.isSwitchingToDirectory &&
-    directoryRevealPhase > 0;
-  const activeScreenId = getActiveScreenId(setup);
-  const contentKey = `preview-screen-${activeScreenId}-${setup.activeFlowId}-${setup.setupStepIndex}-${setup.substepJumpNonce}-${setup.showCharacterDirectory ? "directory" : "profile"}`;
-  // Locks the initial-reveal-fade decision to whichever content key was showing the moment
-  // suppressLayoutTransition was first observed true, instead of re-reading that flag live.
-  // suppressLayoutTransition clears itself ~220ms after hydration regardless of whether this
-  // same profile-overview content is still on screen; reading it live would flip the content
-  // class back to step-forward mid-animation (or after), restarting a second, different
-  // animation on top of one that had already played. Setting state during render (rather
-  // than a ref) is the React-sanctioned way to derive a value once and hold it across
-  // renders — see "adjusting state when a prop changes" in the React docs.
-  const [lockedInitialRevealKey, setLockedInitialRevealKey] = useState<string | null>(null);
-  if (lockedInitialRevealKey === null && setup.suppressLayoutTransition) {
-    setLockedInitialRevealKey(contentKey);
-  }
-  const isInitialReveal = activeScreenId === "profile-overview" && lockedInitialRevealKey === contentKey;
-  const activeScreenClassName = getActiveScreenClassName(
-    activeScreenId,
-    setup.setupStepDirection,
-    isInitialReveal,
-  );
-  const setupPanelClassName = getSetupPanelClassName(setup, preview.isModeTransitioning);
-  const setupPanelStyle = getSetupPanelInlineStyle(
-    theme,
-    inCharacterDirectoryView,
-    shouldShowDirectoryPanel,
-    activeScreenId === "profile-overview",
-  );
-
-  // Persist world filter changes — stores the explicit user choice. The background
-  // refresh only ever sweeps the world on screen, so switching is also what queues the
-  // newly-shown world's stale characters (a no-op when none of them are out of date).
-  const handleWorldFilterChange = (worldId: number | null) => {
-    setDirectoryWorldFilterRaw(worldId);
-    writeStoredWorldFilter(worldId);
-    actions.queueWorldRefresh(worldId);
-  };
 
   useEffect(() => {
     if (!inCharacterDirectoryView || setup.isSwitchingToDirectory) {
@@ -204,6 +129,88 @@ export default function PreviewSetupPane({ model, actions }: PreviewSetupPanePro
     setup.fastDirectoryRevealOnce,
     setup.isSwitchingToDirectory,
   ]);
+
+  return directoryRevealPhase;
+}
+
+// Nesting depth 1: a long but flat chain of independent derived values (directory world
+// filter, active screen id/class names, panel styles) feeding one render, not nested control
+// flow. The reveal-phase timer sequencing is already split into useDirectoryRevealPhase above.
+// react-doctor-disable-next-line no-high-complexity-react-function
+export default function PreviewSetupPane({ model, actions }: PreviewSetupPaneProps) {
+  const { theme, setup, directory, preview } = model;
+  const [directorySortBy, setDirectorySortBy] = useState<DirectorySortBy>("name");
+
+  // See StoredWorldFilter for what each variant means. Resolved (not raw) below, since
+  // "unset" and a world that has since left the roster both fall back to the first world.
+  const [directoryWorldFilterRaw, setDirectoryWorldFilterRaw] =
+    useState<StoredWorldFilter>(readStoredWorldFilter);
+  const directoryWorldFilter = resolveWorldFilter(directoryWorldFilterRaw, directory.worldIds);
+
+  // Mirrors CharacterDirectoryScreen's own world-scoping so the reveal-phase delay below
+  // matches whether the directory view it's about to animate actually has a champions
+  // section (an "all worlds" view has no such section, but hasChampionSection is false
+  // there too since mainCharacterKey/championCharacterKeys resolve to null/[]).
+  const showAllDirectoryWorlds = directoryWorldFilter === null && directory.worldIds.length > 1;
+  const activeDirectoryWorldId = directoryWorldFilter ?? directory.worldIds[0] ?? null;
+  const activeDirectoryMainKey =
+    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
+      ? (directory.mainCharacterKeyByWorld[String(activeDirectoryWorldId)] ?? null)
+      : null;
+  const activeDirectoryChampionKeys =
+    !showAllDirectoryWorlds && activeDirectoryWorldId !== null
+      ? (directory.championCharacterKeysByWorld[String(activeDirectoryWorldId)] ?? [])
+      : [];
+  const hasChampionSection = buildDirectoryGroups({
+    allCharacters: directory.allCharacters,
+    sortBy: "name",
+    mainCharacterKey: activeDirectoryMainKey,
+    championCharacterKeys: activeDirectoryChampionKeys,
+    maxCharacters: directory.maxCharacters,
+  }).hasChampionSection;
+
+  const inCharacterDirectoryView = setup.showFlowOverview && setup.showCharacterDirectory;
+  const directoryRevealPhase = useDirectoryRevealPhase(inCharacterDirectoryView, setup, hasChampionSection);
+  const shouldShowDirectoryPanel =
+    inCharacterDirectoryView &&
+    !setup.isSwitchingToDirectory &&
+    directoryRevealPhase > 0;
+  const activeScreenId = getActiveScreenId(setup);
+  const contentKey = `preview-screen-${activeScreenId}-${setup.activeFlowId}-${setup.setupStepIndex}-${setup.substepJumpNonce}-${setup.showCharacterDirectory ? "directory" : "profile"}`;
+  // Locks the initial-reveal-fade decision to whichever content key was showing the moment
+  // suppressLayoutTransition was first observed true, instead of re-reading that flag live.
+  // suppressLayoutTransition clears itself ~220ms after hydration regardless of whether this
+  // same profile-overview content is still on screen; reading it live would flip the content
+  // class back to step-forward mid-animation (or after), restarting a second, different
+  // animation on top of one that had already played. Setting state during render (rather
+  // than a ref) is the React-sanctioned way to derive a value once and hold it across
+  // renders. See "adjusting state when a prop changes" in the React docs.
+  const [lockedInitialRevealKey, setLockedInitialRevealKey] = useState<string | null>(null);
+  if (lockedInitialRevealKey === null && setup.suppressLayoutTransition) {
+    setLockedInitialRevealKey(contentKey);
+  }
+  const isInitialReveal = activeScreenId === "profile-overview" && lockedInitialRevealKey === contentKey;
+  const activeScreenClassName = getActiveScreenClassName(
+    activeScreenId,
+    setup.setupStepDirection,
+    isInitialReveal,
+  );
+  const setupPanelClassName = getSetupPanelClassName(setup, preview.isModeTransitioning);
+  const setupPanelStyle = getSetupPanelInlineStyle(
+    theme,
+    inCharacterDirectoryView,
+    shouldShowDirectoryPanel,
+    activeScreenId === "profile-overview",
+  );
+
+  // Persist world filter changes, storing the explicit user choice. The background
+  // refresh only ever sweeps the world on screen, so switching is also what queues the
+  // newly-shown world's stale characters (a no-op when none of them are out of date).
+  const handleWorldFilterChange = (worldId: number | null) => {
+    setDirectoryWorldFilterRaw(worldId);
+    writeStoredWorldFilter(worldId);
+    actions.queueWorldRefresh(worldId);
+  };
 
   return (
     <div className="preview-pane">

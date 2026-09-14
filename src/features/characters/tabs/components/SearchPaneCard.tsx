@@ -14,6 +14,9 @@ interface SearchPaneCardProps {
   actions: SearchPaneActions;
 }
 
+// An already-extracted dispatcher: 5 mutually exclusive setupMode branches, each a one-line
+// delegation to its own pre-extracted screen component.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function SearchPaneCard({ model, actions }: SearchPaneCardProps) {
   const { theme, shell, profile } = model;
   const searchCardRef = useRef<HTMLElement | null>(null);

@@ -30,7 +30,7 @@ const MAIN_STAT_SET = new Set<string>(["str", "dex", "int", "luk"]);
 
 const WEAPON_JUMP_LETTER: Record<MainStatId, string> = { str: "S", int: "I", luk: "L", dex: "D" };
 
-// Item icon ids (manifests/v269/item.json, Character/Ring).
+// Item icon ids (manifests/v<ver>/item.json, Character/Ring).
 export const OZ_RING_ICON_IDS: Record<"restraint" | "continuous", string> = {
   restraint: "01113098",  // Ring of Restraint
   continuous: "01113329", // Continuous Ring
@@ -42,7 +42,7 @@ const WEAPON_JUMP_ICON_BY_STAT: Record<MainStatId, string> = {
   luk: "01113116", // Weapon Jump L Ring
 };
 
-/** The class's Weapon Jump ring variant — its display label and item icon id. */
+/** The class's Weapon Jump ring variant: its display label and item icon id. */
 export interface OzWeaponJumpVariant {
   /** Display label, e.g. "Weapon Jump I". */
   label: string;
@@ -95,7 +95,7 @@ export function sanitizeOzRingLevel(ring: OzRingId, raw: string): string {
 }
 
 /** Parses a raw level string into 1..that ring's max, or null if empty/zero/invalid. */
-export function parseOzRingLevel(ring: OzRingId, raw: string | undefined): number | null {
+function parseOzRingLevel(ring: OzRingId, raw: string | undefined): number | null {
   if (!raw) return null;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n <= 0) return null;
@@ -117,7 +117,26 @@ export function convertOzRingsDraftToStored(draft: OzRingsDraft): StoredOzRings 
   return { levels };
 }
 
-/** Reverse of convertOzRingsDraftToStored — seeds the step's draft from what's already
+/**
+ * Converts a draft to Scouter Simulator override levels. Unlike convertOzRingsDraftToStored,
+ * a typed "0" is kept as a real 0 rather than treated as unset: the simulator needs to
+ * represent "what if this ring were removed" as distinct from "this ring was never touched",
+ * and ozRingLevel (scouterApi.ts) falls back to the character's real stored level whenever a
+ * ring's key is absent here, so dropping a typed 0 would silently resurrect the real level
+ * instead of simulating its removal.
+ */
+export function convertOzRingsDraftToOverrideLevels(draft: OzRingsDraft): Partial<Record<OzRingId, number>> {
+  const levels: Partial<Record<OzRingId, number>> = {};
+  for (const ring of ALL_RING_IDS) {
+    const raw = draft.levels[ring];
+    if (!raw) continue;
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) levels[ring] = Math.min(n, OZ_RING_MAX_LEVEL[ring]);
+  }
+  return levels;
+}
+
+/** Reverse of convertOzRingsDraftToStored. Seeds the step's draft from what's already
  *  stored, so reopening Oz Rings on a character that already answered it doesn't start
  *  blank. Tolerates legacy stored fields (ringMode, totalling level, totallingStats) by
  *  reading only the surviving ring levels, and clamps to each ring's current max so a

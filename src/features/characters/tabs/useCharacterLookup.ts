@@ -54,7 +54,7 @@ export function useCharacterLookup({
   }, []);
 
   // Only ticks while an actual cooldown is counting down, not for the hook's whole
-  // lifetime — a fresh interval starts per lookup and self-clears once that lookup's
+  // lifetime. A fresh interval starts per lookup and self-clears once that lookup's
   // cooldown window ends, instead of re-rendering every second indefinitely.
   useEffect(() => {
     if (lastRequestAtMs === 0) return;
@@ -63,9 +63,9 @@ export function useCharacterLookup({
     const id = setInterval(() => setNowMs(Date.now()), 1000);
     const stopId = setTimeout(() => {
       clearInterval(id);
-      // One last update at the true end time — the interval's own ticks land on
-      // 1000ms boundaries from effect start, not on the cooldown's exact end, so
-      // without this the final render is stuck showing ~1s remaining forever.
+      // One last update at the true end time. The interval's own ticks land on 1000ms
+      // boundaries from effect start rather than the cooldown's exact end, so without
+      // this the final render is stuck showing about 1s remaining forever.
       setNowMs(Date.now());
     }, remaining);
     return () => {
@@ -119,11 +119,11 @@ export function useCharacterLookup({
     return false;
   };
 
-  // Returns whether the character was found, so callers (e.g. a stale-draft
-  // resume re-fetch) can fall back to other data when a lookup fails.
-  // eslint-disable-next-line sonarjs/cognitive-complexity
-  const runLookup = async (name: string): Promise<boolean> => {
-    const normalized = name.toLowerCase();
+  // Resolves whatever can be answered without a network request: an invalid name, a fresh
+  // cache hit, a cooldown still counting down, or a lookup already in flight. Returns the
+  // found/not-found boolean once one of those applies, or null when runLookup should proceed
+  // to the real fetch. Also drops an expired cache entry as a side effect of checking it.
+  const resolveWithoutFetch = (name: string, normalized: string): boolean | null => {
     if (!CHARACTER_NAME_REGEX.test(name)) {
       setStatusTone("error");
       setStatusMessage(getInvalidIgnMessage(MIN_QUERY_LENGTH, MAX_QUERY_LENGTH));
@@ -145,6 +145,16 @@ export function useCharacterLookup({
       return false;
     }
     if (isSearching) return false;
+
+    return null;
+  };
+
+  // Returns whether the character was found, so callers (e.g. a stale-draft
+  // resume re-fetch) can fall back to other data when a lookup fails.
+  const runLookup = async (name: string): Promise<boolean> => {
+    const normalized = name.toLowerCase();
+    const resolved = resolveWithoutFetch(name, normalized);
+    if (resolved !== null) return resolved;
 
     setIsSearching(true);
     setStatusTone("neutral");

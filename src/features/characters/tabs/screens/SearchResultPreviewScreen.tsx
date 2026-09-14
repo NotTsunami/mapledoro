@@ -11,6 +11,56 @@ interface SearchResultPreviewScreenProps {
   actions: PreviewPaneActions;
 }
 
+/** The resumable-draft branch of the preview card's action area: a stale-fallback warning
+ *  variant, or the plain "saved setup in progress" message, then the Resume/Start Fresh
+ *  buttons. Split out of SearchResultPreviewScreen since it's the one nested (depth-2) branch
+ *  in an otherwise flat render. */
+function ResumableDraftActions({ theme, setup, foundCharacter, isStaleFallbackPreview, actions }: {
+  theme: PreviewPaneModel["theme"];
+  setup: PreviewPaneModel["setup"];
+  foundCharacter: NonNullable<PreviewPaneModel["preview"]["foundCharacter"]>;
+  isStaleFallbackPreview: boolean;
+  actions: PreviewPaneActions;
+}) {
+  return (
+    <>
+      {isStaleFallbackPreview ? (
+        <>
+          <p style={{ fontSize: "0.86rem", color: statusText(theme, "danger"), fontWeight: 700, margin: 0 }}>
+            {`Couldn't refresh ${foundCharacter.characterName}'s data right now.`}
+          </p>
+          <p style={{ fontSize: "0.86rem", color: theme.text, fontWeight: 700, margin: 0, marginTop: "0.3rem", marginBottom: "0.72rem" }}>
+            You can still resume using your last saved data below.
+          </p>
+        </>
+      ) : (
+        <p style={{ fontSize: "0.86rem", color: theme.text, fontWeight: 700, margin: 0, marginBottom: "0.72rem" }}>
+          {`${foundCharacter.characterName} has a saved setup in progress.`}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={setup.isUiLocked}
+        onClick={actions.resumeFoundCharacterDraft}
+        style={{ ...primaryButtonStyle(theme, "0.7rem 0.9rem"), width: "100%" }}
+      >
+        Resume setup
+      </button>
+      <button
+        type="button"
+        disabled={setup.isUiLocked}
+        onClick={actions.startFreshSetup}
+        style={{ ...secondaryButtonStyle(theme, "0.7rem 0.9rem"), width: "100%", marginTop: "0.5rem" }}
+      >
+        Start fresh
+      </button>
+    </>
+  );
+}
+
+// Mostly flat class-name string assembly plus one two-way branch (delegated to
+// ResumableDraftActions above); nesting depth 1.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function SearchResultPreviewScreen({
   model,
   actions,
@@ -63,38 +113,13 @@ export default function SearchResultPreviewScreen({
         </div>
         <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: "0.65rem" }}>
           {preview.foundCharacterHasResumableDraft ? (
-            <>
-              {preview.isStaleFallbackPreview ? (
-                <>
-                  <p style={{ fontSize: "0.86rem", color: statusText(theme, "danger"), fontWeight: 700, margin: 0 }}>
-                    {`Couldn't refresh ${preview.foundCharacter.characterName}'s data right now.`}
-                  </p>
-                  <p style={{ fontSize: "0.86rem", color: theme.text, fontWeight: 700, margin: 0, marginTop: "0.3rem", marginBottom: "0.72rem" }}>
-                    You can still resume using your last saved data below.
-                  </p>
-                </>
-              ) : (
-                <p style={{ fontSize: "0.86rem", color: theme.text, fontWeight: 700, margin: 0, marginBottom: "0.72rem" }}>
-                  {`${preview.foundCharacter.characterName} has a saved setup in progress.`}
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={setup.isUiLocked}
-                onClick={actions.resumeFoundCharacterDraft}
-                style={{ ...primaryButtonStyle(theme, "0.7rem 0.9rem"), width: "100%" }}
-              >
-                Resume setup
-              </button>
-              <button
-                type="button"
-                disabled={setup.isUiLocked}
-                onClick={actions.startFreshSetup}
-                style={{ ...secondaryButtonStyle(theme, "0.7rem 0.9rem"), width: "100%", marginTop: "0.5rem" }}
-              >
-                Start fresh
-              </button>
-            </>
+            <ResumableDraftActions
+              theme={theme}
+              setup={setup}
+              foundCharacter={preview.foundCharacter}
+              isStaleFallbackPreview={preview.isStaleFallbackPreview}
+              actions={actions}
+            />
           ) : (
             <>
               <p style={{ fontSize: "0.86rem", color: theme.text, fontWeight: 700, margin: 0, marginBottom: "0.72rem" }}>

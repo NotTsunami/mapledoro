@@ -143,8 +143,8 @@ function GenderMarriageIcons({
 }
 
 // Current EXP percent, decorated with a green up-arrow when there's been real progress
-// since the last snapshot -- hovering/focusing the whole thing reveals the actual delta
-// (and any level-ups crossed) rather than showing that number inline all the time.
+// since the last snapshot. Hovering or focusing it reveals the delta, and any level-ups
+// crossed, rather than showing that number inline all the time.
 function ExpPercentIndicator({ theme, percent, delta }: { theme: SearchPaneModel["theme"]; percent: number; delta: ExpDelta | null }) {
   const lost = delta !== null && delta.percentDelta < 0;
   const content = (
@@ -170,6 +170,10 @@ interface CharacterProfileScreenProps {
   actions: SearchPaneActions;
 }
 
+// Mostly flat JSX markup: a handful of derived values, then several independent optional
+// sections (role chips, updated line, refresh button) each gated by its own `&&`, not nested
+// control flow.
+// react-doctor-disable-next-line no-high-complexity-react-function
 export default function CharacterProfileScreen({
   model,
   actions,

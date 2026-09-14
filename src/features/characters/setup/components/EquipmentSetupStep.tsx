@@ -13,6 +13,7 @@ import HoverTooltip from "../../../../components/HoverTooltip";
 import type { SetupStepDefinition } from "../steps";
 import CharacterAvatar from "../../tabs/components/CharacterAvatar";
 import SetupStepFrame from "./SetupStepFrame";
+import { PresetBar } from "./PresetBar";
 import { NavChevron } from "../../DropdownChevron";
 import {
   ARCANE_AREAS, SACRED_AREAS, GRAND_SACRED_AREAS,
@@ -54,7 +55,7 @@ const SUBSTEP_COUNT = 3;
 // Reading-order chains for the two substeps whose slots line up top-to-bottom in a single
 // in-game window (Titles/Totems/Symbols, Pets). The main grid's own chain (MAIN_GRID_CHAIN,
 // defined below once its column layout constants exist) is a 2D spatial layout with its
-// own column-based reading order -- see its own comment.
+// own column-based reading order. See its own comment.
 const ADDITIONAL_EQUIP_CHAIN: readonly SlotKey[] = ["title", "totem1", "totem2", "totem3"];
 const PETS_CHAIN: readonly SlotKey[] = ["pet1", "petEquip1", "pet2", "petEquip2", "pet3", "petEquip3"];
 
@@ -73,7 +74,7 @@ interface EquipmentSetupStepProps {
   direction?: "forward" | "backward";
   targetSubstep?: number | null;
   /** When true, targetSubstep is the substep opened from a profile bookmark's edit
-   *  pencil — it should present as if it were this step's only substep, mirroring
+   *  pencil. It presents as if it were this step's only substep, mirroring
    *  StatsSetupStep's own confineToSubstep prop. */
   confineToSubstep?: boolean;
   onSubstepChange?: (substepIndex: number) => void;
@@ -125,12 +126,12 @@ const FULL_LIST_LIMIT = 60;
 // superseded by the next character anyway. The search box stays instant; only the
 // filtering it drives waits for a pause.
 const SEARCH_DEBOUNCE_MS = 150;
-// A symbol group's 3-column tile grid — used to align its Max All/Clear header to the
-// same width so those buttons can right-align against the actual last tile.
+// A symbol group's 3-column tile grid. Aligns its Max All/Clear header to the same width
+// so those buttons can right-align against the actual last tile.
 const SYMBOL_GRID_WIDTH = 3 * SYMBOL_TILE_SIZE + 2 * 4;
 
 // Reading-order chain for the main equipment grid: top to bottom within each column, then
-// the top of the next column, following the grid's own left-to-right column order --
+// the top of the next column, following the grid's own left-to-right column order:
 // rings/belt/pocket, then face/eye/earring/pendants, then weapon/secondary/emblem, then
 // hat/top/bottom/shoulder/android, then cape/glove/shoe/medal/heart/badge. The sprite
 // itself isn't a pickable slot, so it's naturally skipped.
@@ -193,20 +194,10 @@ const pickerItemStyle = (theme: AppTheme, isCurrent: boolean, isHighlighted: boo
   fontSize: "0.8rem", fontWeight: 600, color: theme.text, textAlign: "left",
 });
 
-const presetButtonStyle = (theme: AppTheme, on: boolean): CSSProperties => ({
-  border: `1px solid ${on ? theme.accent : theme.border}`,
-  borderRadius: 8,
-  background: on ? theme.accent : theme.bg,
-  color: on ? "#fff" : theme.text,
-  fontFamily: "inherit", fontWeight: 800, fontSize: "0.8rem",
-  width: 34, height: 32, cursor: "pointer",
-});
-
 // Deliberately no opacity on this container: it wraps a HoverTooltip bubble (a real DOM
-// child, not a native title), and CSS opacity compounds onto descendants — a dimmed tile
-// made its own tooltip render washed-out/translucent on hover. Locked is already visually
-// distinct via the icon's own dimming (below), the muted "Lv X+" badge, and the missing
-// input, so no separate container-level fade is needed.
+// child, not a native title), and CSS opacity compounds onto descendants, so a dimmed tile
+// renders its own tooltip washed out on hover. Locked already reads as distinct via the
+// icon's own dimming (below), the muted "Lv X+" badge, and the missing input.
 const symbolTileStyle = (theme: AppTheme, placed: boolean): CSSProperties => ({
   width: SYMBOL_TILE_SIZE, flexShrink: 0,
   border: `1px solid ${placed ? theme.accent : theme.border}`,
@@ -217,10 +208,9 @@ const symbolTileStyle = (theme: AppTheme, placed: boolean): CSSProperties => ({
 });
 
 // Read-only counterpart: no accent highlight, since there's nothing being "selected" on a
-// display-only tile — placed-vs-unplaced already reads from the icon's own opacity/grayscale.
-// Locked gets a dashed border on top of that (mirrors iaLineChipStyle's own dashed-when-unset
-// convention) so it doesn't just look like an emptier version of "unlocked but 0" — it reads
-// as a different kind of empty.
+// display-only tile. Placed-vs-unplaced reads from the icon's own opacity/grayscale. Locked
+// gets a dashed border on top of that (mirroring iaLineChipStyle's dashed-when-unset
+// convention) so it reads as a different kind of empty than "unlocked but 0".
 const readOnlySymbolTileStyle = (theme: AppTheme, locked?: boolean): CSSProperties => ({
   width: SYMBOL_TILE_SIZE, flexShrink: 0,
   border: locked ? `1px dashed ${theme.border}` : `1px solid ${theme.border}`,
@@ -230,9 +220,9 @@ const readOnlySymbolTileStyle = (theme: AppTheme, locked?: boolean): CSSProperti
   padding: "8px 9px", boxSizing: "border-box",
 });
 
-// Padding + matching negative margin grows the actual clickable box toward a 44px
-// touch target without shifting surrounding layout — the button still occupies its
-// original space, it just responds to taps/clicks a bit outside its visible text.
+// Padding plus a matching negative margin grows the clickable box toward a 44px touch
+// target without shifting surrounding layout. The button still occupies its original
+// space, and responds to clicks slightly outside its visible text.
 const symbolSectionBtnStyle: CSSProperties = {
   background: "none", border: "none", font: "inherit",
   fontSize: "0.75rem", fontWeight: 800,
@@ -380,52 +370,28 @@ function petEquipCompatible(petId: string, equipId: string): boolean {
   return equip?.wearablePets?.includes(petId) ?? false;
 }
 
-function ItemPicker({
-  slot, current, theme, files, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty,
-  onSelect, onClose, onAdvance, onPrev, onNext,
+/** Loads (with the module-level cache) and filters one slot group's item catalog, and derives
+ *  the search-debounced display list. Split out of ItemPicker so that component is left with
+ *  rendering and keyboard wiring only. */
+function useItemPickerCatalog({
+  files, current, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty, query,
 }: {
-  slot: SlotKey;
-  current: EquipmentItem | null | undefined;
-  theme: AppTheme;
   files: string[];
+  current: EquipmentItem | null | undefined;
   itemFilter: (item: CatalogItem) => boolean;
   maxLevel?: number;
-  /** Item ids already placed in sibling slots (e.g. other rings); onlyEquip items among them are hidden. */
   excludeIds?: ReadonlySet<string>;
-  /** Preset 1's item for this slot, pinned at the top when editing an overridden preset slot. */
   presetBaseItem?: EquipmentItem | null;
-  /** Show the full filtered list before any search (for slots whose filtered catalog is already small, e.g. pet equips). */
   showAllWhenEmpty?: boolean;
-  onSelect: (item: EquipmentItem | null) => void;
-  onClose: () => void;
-  /** Called (instead of onClose) after an actual pick, for slots that belong to a chained
-   *  group (e.g. Title → Totems, Pet 1 → Pet Equip 1 → Pet 2 → …). viaKeyboard distinguishes
-   *  an Enter-driven pick from a mouse click — only a keyboard pick jumps slots, since a
-   *  mouse click means the user's cursor is staying local. Slots outside a chain (the main
-   *  equipment grid) don't pass this, so a pick there always just closes, same as before. */
-  onAdvance?: (viaKeyboard: boolean) => void;
-  onPrev?: () => void;
-  onNext?: () => void;
+  query: string;
 }) {
   const [loadedItems, setLoadedItems] = useState<CatalogItem[] | null>(null);
-  const [query, setQuery] = useState("");
   // Trails `query` by SEARCH_DEBOUNCE_MS; drives the result list (and everything that has to
   // stay in sync with it) so the icon requests land once per pause, not once per keystroke.
   const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const isAndroid = slot === "android";
-
-  function selectItem(item: EquipmentItem, viaKeyboard: boolean) {
-    onSelect(item);
-    if (onAdvance) { onAdvance(viaKeyboard); } else { onClose(); }
-  }
 
   const cacheKey = files.join("+");
   const items = cachedSlotItems[cacheKey] ?? loadedItems;
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(query), SEARCH_DEBOUNCE_MS);
@@ -467,6 +433,53 @@ function ItemPicker({
     excludeIds?.has(presetBaseItem.id) &&
     items?.some((it) => it.id === presetBaseItem.id && it.onlyEquip)
   );
+
+  return { items, displayed, searchQuery, presetBaseConflicts };
+}
+
+function ItemPicker({
+  slot, current, theme, files, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty,
+  onSelect, onClose, onAdvance, onPrev, onNext,
+}: {
+  slot: SlotKey;
+  current: EquipmentItem | null | undefined;
+  theme: AppTheme;
+  files: string[];
+  itemFilter: (item: CatalogItem) => boolean;
+  maxLevel?: number;
+  /** Item ids already placed in sibling slots (e.g. other rings); onlyEquip items among them are hidden. */
+  excludeIds?: ReadonlySet<string>;
+  /** Preset 1's item for this slot, pinned at the top when editing an overridden preset slot. */
+  presetBaseItem?: EquipmentItem | null;
+  /** Show the full filtered list before any search (for slots whose filtered catalog is already small, e.g. pet equips). */
+  showAllWhenEmpty?: boolean;
+  onSelect: (item: EquipmentItem | null) => void;
+  onClose: () => void;
+  /** Called (instead of onClose) after an actual pick, for slots that belong to a chained
+   *  group (e.g. Title → Totems, Pet 1 → Pet Equip 1 → Pet 2 → …). viaKeyboard distinguishes
+   *  an Enter-driven pick from a mouse click. Only a keyboard pick jumps slots, since a
+   *  mouse click means the cursor is staying local. Slots outside a chain (the main
+   *  equipment grid) don't pass this, so a pick there closes the picker. */
+  onAdvance?: (viaKeyboard: boolean) => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isAndroid = slot === "android";
+
+  function selectItem(item: EquipmentItem, viaKeyboard: boolean) {
+    onSelect(item);
+    if (onAdvance) { onAdvance(viaKeyboard); } else { onClose(); }
+  }
+
+  const { items, displayed, searchQuery, presetBaseConflicts } = useItemPickerCatalog({
+    files, current, itemFilter, maxLevel, excludeIds, presetBaseItem, showAllWhenEmpty, query,
+  });
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const { highlightedIndex, onKeyDown: navKeyDown, itemRef } = useKeyboardListNav({
     items: displayed ?? [],
@@ -618,7 +631,7 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
   );
 }
 
-/** Read-only counterpart to SlotCell for the profile Gear bookmark — same icon/empty-label
+/** Read-only counterpart to SlotCell for the profile Gear bookmark. Same icon/empty-label
  *  box and sizing (slotCellStyle/SLOT_SIZE), but no button semantics, hover-swap, or picker
  *  portal, since nothing here is clickable. */
 export function ReadOnlySlotTile({ slotKey, item, theme }: {
@@ -640,21 +653,21 @@ export function ReadOnlySlotTile({ slotKey, item, theme }: {
   return item ? <HoverTooltip label={item.name} theme={theme}>{box}</HoverTooltip> : box;
 }
 
-/** Read-only counterpart to SymbolLevelTile for the profile Gear bookmark — same icon tile,
+/** Read-only counterpart to SymbolLevelTile for the profile Gear bookmark. Same icon tile,
  *  but the level renders as plain text instead of an input. Three visually distinct states:
- *  placed (leveled, full color), unlocked-but-unleveled (lightly dimmed, still a normal solid
- *  border — it's available, just empty), and `locked` (character hasn't reached this area's
- *  required level yet — heavily dimmed + grayscale + dashed border + the unlock level instead
- *  of a real always-0 level), so a locked area reads as "not unlocked yet" rather than either
- *  "bugged" or "just an emptier version of unleveled." */
+ *  placed (leveled, full color), unlocked but unleveled (lightly dimmed, normal solid
+ *  border, meaning available and empty), and `locked` (the character hasn't reached this
+ *  area's required level, so it renders heavily dimmed and grayscale with a dashed border
+ *  and the unlock level in place of an always-0 level). */
 function symbolTileIconOpacity(locked: boolean | undefined, placed: boolean): number {
   if (locked) return 0.3;
   return placed ? 1 : 0.6;
 }
 
-// `loadImage=false` renders an empty box at the same size instead of the real icon — used by
-// the profile Gear bookmark to defer a not-yet-visited sub-view's images (see EquipmentBookmark's
-// visitedViews) without affecting layout, since the icon's box size doesn't depend on its content.
+// `loadImage=false` renders an empty box at the same size instead of the real icon. The
+// profile Gear bookmark uses it to defer a not-yet-visited sub-view's images (see
+// EquipmentBookmark's visitedViews). Layout is unaffected, since the box size doesn't
+// depend on its content.
 export function ReadOnlySymbolTile({ area, level, theme, locked, loadImage = true }: {
   area: SymbolArea;
   level: number;
@@ -700,39 +713,6 @@ function SlotColumn({ slots, grid, theme, activeSlot, onToggle, pickerCtx }: {
           picker={<SlotPicker slot={slot} ctx={pickerCtx} />}
         />
       ))}
-    </div>
-  );
-}
-
-// ── Preset bar (3 equipment presets + copy-from) ─────────────────────────────
-
-function PresetBar({ theme, active, onSwitch }: {
-  theme: AppTheme;
-  active: number;
-  onSwitch: (n: number) => void;
-}) {
-  const indices = Array.from({ length: PRESET_COUNT }, (_, i) => i);
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-      <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.muted }}>
-        Preset
-      </span>
-      <div style={{ display: "flex", gap: 4 }}>
-        {indices.map((i) => {
-          const on = i === active;
-          return (
-            <button
-              key={i}
-              type="button"
-              className="tap-target-44"
-              onClick={() => onSwitch(i)}
-              style={presetButtonStyle(theme, on)}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -795,8 +775,8 @@ function SymbolGroupHeader({ label, theme, onMaxAll, onClear }: {
   );
 }
 
-// Whole group (including its Max All/Clear header) is skipped once none of its areas are
-// unlocked yet — e.g. Grand Sacred (Lv 290+) for a freshly-260 character.
+// The whole group, including its Max All/Clear header, is skipped when none of its areas
+// are unlocked yet, such as Grand Sacred (Lv 290+) for a freshly-260 character.
 function SymbolGroup({ label, areas, maxLevel, symbolLevels, theme, isUnlocked, onLevel, onLevelMany }: {
   label: string;
   areas: SymbolArea[];
@@ -845,10 +825,10 @@ function SymbolSection({ symbolLevels, activeTab, availableTabs, characterLevel,
 }) {
   // Undefined level = assume eligible, same convention as isArcaneEligible/isSacredEligible
   // (an unresolved lookup shouldn't wrongly hide every area). Areas the character hasn't
-  // reached yet are hidden entirely, not shown disabled — this is the setup flow, not the
-  // profile page, and the project's own convention (see isArcaneEligible/isSacredEligible
-  // hiding the whole tab) is that asking about content the character can't have yet is
-  // noise. The profile-page "show disabled with a reason" treatment doesn't apply here.
+  // reached yet are hidden entirely rather than shown disabled. This is the setup flow, and
+  // the convention here (see isArcaneEligible/isSacredEligible hiding the whole tab) is not
+  // to ask about content the character can't have yet. The profile page's "show disabled
+  // with a reason" treatment doesn't apply.
   const isUnlocked = (area: SymbolArea) => characterLevel === undefined || characterLevel >= area.requiredLevel;
   return (
     <div>
@@ -925,7 +905,7 @@ function SlotPicker({ slot, ctx }: { slot: SlotKey; ctx: SlotPickerContext }) {
   const pairedPet = PET_EQUIP_TO_PET[slot]; // set ⇒ this is a petEquip slot
   const pairedEquip = PET_TO_PET_EQUIP[slot]; // set ⇒ this is a pet slot
   if (pairedPet) {
-    // Pet chosen: show only the equips it can wear — a short list, so reveal it without searching.
+    // Pet chosen: show only the equips it can wear. Short enough to reveal without searching.
     const pet = draft[pairedPet];
     if (pet) {
       itemFilter = (item) => source.filter(item) && (item.wearablePets?.includes(pet.id) ?? false);
@@ -1182,8 +1162,8 @@ function EquipmentGridSubstep({
   onFinish: () => void;
   nextLabel?: string;
   /** Hides the bossing-preset hint when this step renders as a profile bookmark's
-   *  confined edit — the profile's own "Set preset X as active" control is right
-   *  there, same reasoning as Stats/Inner Ability's own confineToSubstep gating. */
+   *  confined edit, since the profile's own "Set preset X as active" control is right
+   *  there. Same reasoning as Stats/Inner Ability's own confineToSubstep gating. */
   confineToSubstep?: boolean;
 }) {
   return (
@@ -1215,7 +1195,7 @@ function EquipmentGridSubstep({
       onFinish={onFinish}
       nextLabel={nextLabel}
     >
-      <PresetBar theme={theme} active={activePreset} onSwitch={switchPreset} />
+      <PresetBar theme={theme} count={PRESET_COUNT} active={activePreset} onSwitch={switchPreset} />
       {!confineToSubstep && (
         <p style={{ margin: "0 0 6px", fontSize: "0.75rem", fontWeight: 600, color: theme.muted, textAlign: "center" }}>
           Preset 1 is set as active by default. If you boss on a different preset, change that afterward from your profile.
@@ -1341,29 +1321,29 @@ function useEquipmentStepState({
   );
   // Derived fresh from `value` every render (not mirrored into its own useState) so the
   // one-shot backfill effect below can update it by calling onChange alone, matching
-  // V Matrix/HEXA Matrix/Familiars' pattern — a local mirror would go stale the moment
+  // V Matrix/HEXA Matrix/Familiars' pattern. A local mirror would go stale the moment
   // the backfill wrote to `value` without a matching setDraft, silently reintroducing
   // the wholesale-overwrite bug the backfill exists to fix.
   const draft = parseEquipmentStepDraft(value);
   const initialValueRef = useRef(value);
   const [activeSlot, setActiveSlot] = useState<SlotKey | null>(null);
   const activePreset = draft.activePreset ?? 0;
-  // Preset 0 is the base. Presets 1-2 are sparse per-slot overrides on top of it — a
+  // Preset 0 is the base. Presets 1-2 are sparse per-slot overrides on top of it: a
   // slot present in the active preset's own map wins, otherwise it falls through to
   // preset 0's value, so untouched slots keep mirroring preset 0 live even after other
   // slots in the same preset have been customized (plain object spread already gives
   // this "later/override keys win, missing keys fall through" merge for free).
   const activeGrid: SlotMap = activePreset === 0
     ? (draft.presets?.[0] ?? {})
-    : { ...(draft.presets?.[0] ?? {}), ...(draft.presets?.[activePreset] ?? {}) };
+    : { ...draft.presets?.[0], ...draft.presets?.[activePreset] };
   const readSlot = (slot: SlotKey) => (isSharedSlot(slot) ? draft[slot] : activeGrid[slot]);
 
   function commitDraft(next: EquipmentDraft) {
     onChange(serializeEquipmentStepDraft(next));
   }
 
-  // One-shot mount-time backfill from the character's saved equipment/symbols (only
-  // when this step lands blank) — matches V Matrix/HEXA Matrix/Familiars' own pattern.
+  // One-shot mount-time backfill from the character's saved equipment/symbols, only
+  // when this step lands blank. Matches V Matrix/HEXA Matrix/Familiars' own pattern.
   // Can't run during render since it depends on a client-only localStorage read.
   useEffect(() => {
     if (initialValueRef.current || !confirmedCharacterName) return;
@@ -1378,12 +1358,12 @@ function useEquipmentStepState({
   /** A fresh length-3 array of preset grids (cloned), so edits don't mutate state. */
   function clonePresets(): SlotMap[] {
     const base = draft.presets ?? [];
-    return Array.from({ length: PRESET_COUNT }, (_, i) => ({ ...(base[i] ?? {}) }));
+    return Array.from({ length: PRESET_COUNT }, (_, i) => ({ ...base[i] }));
   }
   const [substep, setSubstep] = useState(() => targetSubstep ?? (direction === "backward" ? 2 : 0));
   // Reports the mount-time default once (so entering a step "backward," which starts
   // on a substep other than 0, still gets persisted for resume even if the player
-  // reloads before navigating again) — subsequent changes are reported directly from
+  // reloads before navigating again). Subsequent changes are reported directly from
   // goToSubstep below instead of a substep-watching effect. Fully eliminating this last
   // mount-time report would mean lifting substep into a value the parent controls
   // directly, which isn't worth the blast radius for a bookkeeping report that never
@@ -1412,10 +1392,9 @@ function useEquipmentStepState({
 
   function updateSlot(slot: SlotKey, item: EquipmentItem | null) {
     if (isSharedSlot(slot)) {
-      // Switching to a DIFFERENT pet that can't wear the paired equip drops it. Clearing
-      // the pet (item === null) does NOT drop it — in-game, an unequipped pet leaves its
-      // Pet Equip sitting there inert until a compatible pet re-fills the slot, it isn't
-      // force-unequipped.
+      // Switching to another pet that can't wear the paired equip drops that equip.
+      // Clearing the pet (item === null) does not. In-game, an unequipped pet leaves its
+      // Pet Equip sitting there inert until a compatible pet re-fills the slot.
       const pairedEquip = PET_TO_PET_EQUIP[slot];
       if (pairedEquip && item && !sameItem(item, draft[slot])) {
         const equip = draft[pairedEquip];
@@ -1427,9 +1406,9 @@ function useEquipmentStepState({
       commitDraft({ ...draft, [slot]: item });
       return;
     }
-    // Always writes into just this one slot of the active preset's own sparse map —
-    // every other slot stays absent, so it keeps falling through to preset 0 (see
-    // activeGrid above) rather than getting frozen by a whole-preset clone.
+    // Writes into this one slot of the active preset's own sparse map. Every other slot
+    // stays absent, so it keeps falling through to preset 0 (see activeGrid above)
+    // rather than getting frozen by a whole-preset clone.
     const presets = clonePresets();
     presets[activePreset] = { ...presets[activePreset], [slot]: item };
     commitDraft({ ...draft, presets });
@@ -1447,9 +1426,9 @@ function useEquipmentStepState({
 
   function setSymbolLevels(updates: Record<string, string>) {
     // Kept as strings (even "0" or "") rather than deleted, so a tile can distinguish
-    // "explicitly typed 0" from "never touched" — the controller already excludes sub-1
+    // "explicitly typed 0" from "never touched". The controller already excludes sub-1
     // levels when building the calculator's real tools.symbols data.
-    const levels = { ...(draft.symbolLevels ?? {}), ...updates };
+    const levels = { ...draft.symbolLevels, ...updates };
     commitDraft({ ...draft, symbolLevels: levels });
   }
 
@@ -1458,17 +1437,16 @@ function useEquipmentStepState({
   }
 
   // Capture phase so a tap on another slot can swap the picker directly, even when the open
-  // picker's portal (absolutely positioned, high z-index) visually overlaps that slot — checking
-  // elementsFromPoint sees through the portal to the slot cell underneath. Walk top-to-bottom so
-  // a click that actually lands on the picker (e.g. its search box or "Clear slot" button) is
-  // left alone even if some other slot cell happens to sit underneath it at that point.
+  // picker's portal (absolutely positioned, high z-index) visually overlaps that slot.
+  // Checking elementsFromPoint sees through the portal to the slot cell underneath. Walk
+  // top-to-bottom so a click that lands on the picker (its search box or "Clear slot"
+  // button) is left alone even if a slot cell happens to sit underneath it.
   useEffect(() => {
     if (!activeSlot) return;
     // Tracks whether the mousedown that started this interaction was inside the picker, so
-    // a drag that ends outside it isn't mistaken for a real gesture there — e.g. selecting
-    // a picker's search query text and releasing past the window edge, or over an unrelated
-    // slot cell, shouldn't close the picker or swap to that slot. Only the click's landing
-    // point was checked before, not where it began.
+    // a drag that ends outside it isn't mistaken for a real gesture there. Selecting a
+    // picker's search query text and releasing past the window edge, or over an unrelated
+    // slot cell, shouldn't close the picker or swap to that slot.
     let mouseDownInsidePicker = false;
     const handleMouseDown = (e: MouseEvent) => {
       mouseDownInsidePicker = document.elementsFromPoint(e.clientX, e.clientY)
@@ -1520,10 +1498,10 @@ function useEquipmentStepState({
     return base;
   }
 
-  // Finishing a slot's picker — via Enter-picking or via an explicit Tab — only ever
-  // considers the next slot in the chain, and only jumps in if it's still empty; barging
-  // into a slot someone already filled (e.g. while correcting an earlier one) would be more
-  // surprising than helpful, so it just closes instead. Same rule as Familiars/Legion/IA.
+  // Finishing a slot's picker, by Enter-picking or an explicit Tab, considers only the next
+  // slot in the chain, and jumps in only if it's still empty. Barging into a slot someone
+  // already filled (say while correcting an earlier one) would surprise more than it helps,
+  // so the picker closes instead. Same rule as Familiars/Legion/IA.
   function goToEquipSlot(chain: readonly SlotKey[], fromSlot: SlotKey): () => void {
     const idx = chain.indexOf(fromSlot);
     const next = idx >= 0 && idx < chain.length - 1 ? chain[idx + 1] : null;

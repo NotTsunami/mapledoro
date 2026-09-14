@@ -12,7 +12,7 @@ import {
   type IADraft, type IAFull, type IALineFull, type IAPresetFull, type IATier,
 } from "../data/innerAbilityData";
 import { TIER_COLORS as IA_TIER_COLORS } from "../data/familiarsData";
-import { CopyFromPreset } from "./CopyFromPreset";
+import { PresetBar } from "./PresetBar";
 
 const PRESET_COUNT = 3;
 
@@ -94,51 +94,6 @@ const iaTierToggleStyle = (theme: AppTheme, tc: SwatchColor, active: boolean): C
   fontFamily: "inherit", fontWeight: 800, fontSize: "0.75rem", cursor: "pointer",
 });
 
-const presetButtonStyle = (theme: AppTheme, on: boolean): CSSProperties => ({
-  border: `1px solid ${on ? theme.accent : theme.border}`,
-  borderRadius: 8,
-  background: on ? theme.accent : theme.bg,
-  color: on ? "#fff" : theme.text,
-  fontFamily: "inherit", fontWeight: 800, fontSize: "0.8rem",
-  width: 32, height: 32, cursor: "pointer",
-});
-
-function IAPresetBar({ theme, active, onSwitch, onCopy, onClear }: {
-  theme: AppTheme;
-  active: number;
-  onSwitch: (n: number) => void;
-  onCopy: (from: number) => void;
-  onClear: () => void;
-}) {
-  const indices = Array.from({ length: PRESET_COUNT }, (_, i) => i);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.muted }}>
-          Preset
-        </span>
-        <div style={{ display: "flex", gap: 4 }}>
-          {indices.map((i) => {
-            const on = i === active;
-            return (
-              <button
-                key={i}
-                type="button"
-                className="tap-target-44"
-                onClick={() => onSwitch(i)}
-                style={presetButtonStyle(theme, on)}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <CopyFromPreset theme={theme} count={PRESET_COUNT} active={active} onCopy={onCopy} onClear={onClear} />
-    </div>
-  );
-}
-
 /** Colored grade banner ("Legendary Ability") that opens a 4-tier grade selector. */
 function IAGradeHeader({ grade, openId, theme, onToggle, onClose, onPick, onClear, onNext }: {
   grade: IATier | "";
@@ -146,8 +101,8 @@ function IAGradeHeader({ grade, openId, theme, onToggle, onClose, onPick, onClea
   theme: AppTheme;
   onToggle: () => void;
   onClose: () => void;
-  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click — only a keyboard
-   *  pick jumps to Line 1, since a mouse click means the user's cursor is staying local. */
+  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click. Only a keyboard
+   *  pick jumps to Line 1, since a mouse click means the cursor is staying local. */
   onPick: (tier: IATier, viaKeyboard: boolean) => void;
   onClear: () => void;
   onNext?: () => void;
@@ -230,9 +185,9 @@ function IALineOptions({ tier, currentValue, theme, onPick, onClose, onPrev, onN
   tier: IATier;
   currentValue: string;
   theme: AppTheme;
-  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click — only a keyboard
-   *  pick jumps to the next line, since a mouse click means the user's cursor is staying
-   *  local. Always false for a clear (Backspace or the Clear button), which never jumps. */
+  /** viaKeyboard distinguishes an Enter-driven pick from a mouse click. Only a keyboard pick
+   *  jumps to the next line, since a mouse click means the cursor is staying local. Always
+   *  false for a clear, by Backspace or the Clear button, which never jumps. */
   onPick: (value: string, viaKeyboard: boolean) => void;
   onClose: () => void;
   onPrev?: () => void;
@@ -365,10 +320,9 @@ export default function InnerAbilitySetupStep({ draft, onUpdate, theme, showActi
   draft: IADraft | undefined;
   onUpdate: (next: IADraft) => void;
   theme: AppTheme;
-  /** Shows a hint that the active preset can be set later from the profile — only
-   *  true during first-time full setup; false when opened from a profile bookmark's
-   *  edit pencil, since the profile's own "Set preset X as active" control is right
-   *  there already. */
+  /** Shows a hint that the active preset can be set later from the profile. True only during
+   *  first-time full setup, and false when opened from a profile bookmark's edit pencil, where
+   *  the profile's own "Set preset X as active" control is already right there. */
   showActivePresetHint?: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -424,9 +378,9 @@ export default function InnerAbilitySetupStep({ draft, onUpdate, theme, showActi
     onUpdate({ ...ia, presets });
   }
 
-  // Jumps into line `idx`'s popover only if it's still untouched (empty value); barging
-  // into a line someone already filled (e.g. while correcting an earlier one) would be
-  // more surprising than helpful, so it just closes instead — same rule as Familiars/Legion.
+  // Jumps into line `idx`'s popover only if it's still untouched, meaning an empty value.
+  // Barging into a line someone already filled, say while correcting an earlier one, would
+  // surprise more than it helps, so it closes instead. Same rule as Familiars and Legion.
   function goToLine(idx: number) {
     const target = ia.presets[ia.activePreset].lines[idx];
     setOpenId(target && !target.value ? `ia-line-${idx}` : null);
@@ -464,7 +418,7 @@ export default function InnerAbilitySetupStep({ draft, onUpdate, theme, showActi
 
   return (
     <div ref={zoneRef} style={{ maxWidth: 360, display: "flex", flexDirection: "column", gap: 6 }}>
-      <IAPresetBar theme={theme} active={ia.activePreset} onSwitch={setPreset} onCopy={copyPreset} onClear={clearGrade} />
+      <PresetBar theme={theme} count={PRESET_COUNT} active={ia.activePreset} onSwitch={setPreset} onCopy={copyPreset} onClear={clearGrade} />
       {showActivePresetHint && (
         <p style={{ margin: "0 0 6px", fontSize: "0.75rem", fontWeight: 600, color: theme.muted }}>
           Preset 1 is set as active by default. If you boss on a different preset, change that afterward from your profile.

@@ -16,7 +16,7 @@ export function characterExpPercent(level: number, exp: number): number {
  *  level-ups crossed in between (each full level crossed counts as 100%). Uncapped, since
  *  crossing multiple levels can total well past 100%. Returns 0 for a de-level (not a real
  *  in-game scenario) so callers never show a nonsense negative gain. */
-export function netExpPercentGained(fromLevel: number, fromExp: number, toLevel: number, toExp: number): number {
+function netExpPercentGained(fromLevel: number, fromExp: number, toLevel: number, toExp: number): number {
   if (toLevel < fromLevel) return 0;
   if (toLevel === fromLevel) return Math.max(0, percentOfLevel(toLevel, toExp) - percentOfLevel(fromLevel, fromExp));
   const startLevel = Math.max(fromLevel, MIN_EXP_LEVEL);
@@ -27,8 +27,8 @@ export function netExpPercentGained(fromLevel: number, fromExp: number, toLevel:
   return total;
 }
 
-/** Same idea as netExpPercentGained, but the raw EXP total instead of a percent -- how much
- *  EXP was actually earned between two snapshots, accounting for any level-ups crossed. */
+/** Same idea as netExpPercentGained, but the raw EXP total instead of a percent: how much EXP
+ *  was earned between two snapshots, accounting for any level-ups crossed. */
 export function netExpGained(fromLevel: number, fromExp: number, toLevel: number, toExp: number): number {
   if (toLevel < fromLevel) return 0;
   if (toLevel === fromLevel) return Math.max(0, toExp - fromExp);
@@ -48,9 +48,9 @@ export interface ExpDelta {
 /** Compares the character's current level/exp against the entry before it in expHistory
  *  (the current entry is always the last one, appended on the same write). Returns null
  *  when there's no prior snapshot to compare against, or nothing changed. A same-level
- *  percentDelta can come back negative -- EXP loss (e.g. dying to a boss in some modes)
- *  is a real, if rare, in-game scenario, unlike a de-level, which isn't and stays guarded
- *  against below. netExpPercentGained isn't used here for the same-level case since it
+ *  percentDelta can come back negative, since EXP loss, such as dying to a boss in some
+ *  modes, is a real if rare in-game scenario, unlike a de-level, which isn't and stays
+ *  guarded against below. netExpPercentGained isn't used for the same-level case since it
  *  clamps losses to 0, which is correct for the EXP chart (an intentionally climbing-only
  *  line, see ExpChart) but would hide a real loss here. */
 export function resolveExpDelta(character: StoredCharacterRecord): ExpDelta | null {
