@@ -294,16 +294,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
     setClassName,
     levels,
     desiredLevels,
-    setOriginLevel,
-    setAscentLevel,
-    setMasteryLevel,
-    setEnhancementLevel,
-    setCommonLevel,
-    setDesiredOriginLevel,
-    setDesiredAscentLevel,
-    setDesiredMasteryLevel,
-    setDesiredEnhancementLevel,
-    setDesiredCommonLevel,
+    setLevel,
+    setDesiredLevel,
     resetAll,
     applyGuide,
     costs,
@@ -467,8 +459,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 minLevel={1}
                 desiredLevels={[desiredLevels.origin]}
                 sectionCost={costs.origin}
-                onLevelChange={(_i, v) => setOriginLevel(v)}
-                onDesiredLevelChange={(_i, v) => setDesiredOriginLevel(v)}
+                onLevelChange={(i, v) => setLevel("origin", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("origin", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -480,8 +472,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                   levels={[levels.ascent]}
                   desiredLevels={[desiredLevels.ascent]}
                   sectionCost={costs.ascent}
-                  onLevelChange={(_i, v) => setAscentLevel(v)}
-                  onDesiredLevelChange={(_i, v) => setDesiredAscentLevel(v)}
+                  onLevelChange={(i, v) => setLevel("ascent", i, v)}
+                  onDesiredLevelChange={(i, v) => setDesiredLevel("ascent", i, v)}
                   theme={theme}
                   sectionPanel={halfPanel}
                   inputStyle={inputStyle}
@@ -496,8 +488,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 levels={levels.mastery}
                 desiredLevels={desiredLevels.mastery}
                 sectionCost={costs.mastery}
-                onLevelChange={setMasteryLevel}
-                onDesiredLevelChange={setDesiredMasteryLevel}
+                onLevelChange={(i, v) => setLevel("mastery", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("mastery", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -508,8 +500,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 levels={levels.enhancement}
                 desiredLevels={desiredLevels.enhancement}
                 sectionCost={costs.enhancement}
-                onLevelChange={setEnhancementLevel}
-                onDesiredLevelChange={setDesiredEnhancementLevel}
+                onLevelChange={(i, v) => setLevel("enhancement", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("enhancement", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -523,8 +515,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
               levels={levels.common}
               desiredLevels={desiredLevels.common}
               sectionCost={costs.common}
-              onLevelChange={setCommonLevel}
-              onDesiredLevelChange={setDesiredCommonLevel}
+              onLevelChange={(i, v) => setLevel("common", i, v)}
+              onDesiredLevelChange={(i, v) => setDesiredLevel("common", i, v)}
               theme={theme}
               sectionPanel={sectionPanel}
               inputStyle={inputStyle}

@@ -4,10 +4,9 @@
   Tools landing page.
   Groups tools into one panel per category, each tool a compact linked row.
 */
-import type { CSSProperties } from "react";
 import type { Route } from "next";
-import Link from "next/link";
 import AppShell from "../../components/AppShell";
+import { LinkRow, LinkRowPanel } from "../../components/LinkRow";
 import { ItemIcon, SkillIcon } from "../../components/ResourceImage";
 import type { AppTheme } from "../../components/themes";
 
@@ -134,153 +133,49 @@ const SECTIONS: { label: string; tools: ToolCard[] }[] = [
   { label: "Planners & Solvers", tools: PLANNERS },
 ];
 
-// Uppercase category label inside each panel; color (theme.muted) inline.
-const panelLabelBase: CSSProperties = {
-  fontWeight: 700,
-  fontSize: "0.85rem",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  padding: "1.15rem 1.4rem 0.2rem",
-};
-
-const rowGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(min(380px, 100%), 1fr))",
-  columnGap: "0.5rem",
-  padding: "0.35rem 0.65rem 0.65rem",
-};
-
-const rowBaseStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: "0.85rem",
-  padding: "0.7rem 0.75rem",
-  borderRadius: 12,
-  textDecoration: "none",
-};
-
-// Fixed square behind each icon so titles align on one vertical scan line.
-const iconTileBase: CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: 10,
-  flex: "none",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: "1.25rem",
-};
-
-const rowArrowBase: CSSProperties = {
-  marginLeft: "auto",
-  alignSelf: "center",
-  fontWeight: 800,
-  fontSize: "0.9rem",
-};
-
 function toolIcon(tool: ToolCard) {
   if (tool.iconType === "item") return <ItemIcon id={tool.itemId} size={26} />;
   if (tool.iconType === "skill") return <SkillIcon id={tool.skillId} size={26} />;
   return tool.icon;
 }
 
-function ToolRow({ tool, theme }: { tool: ToolCard; theme: AppTheme }) {
-  const inner = (
-    <>
-      <div style={{ ...iconTileBase, background: theme.bg }}>{toolIcon(tool)}</div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontWeight: 700, fontSize: "0.92rem", color: theme.text }}>
-            {tool.title}
-          </span>
-          {tool.comingSoon && (
-            <span className="tool-badge" style={{ background: theme.badge, color: theme.badgeText }}>
-              Soon
-            </span>
-          )}
-        </div>
-        <div
-          className="tool-row-desc"
-          style={{
-            fontSize: "0.78rem",
-            color: theme.muted,
-            fontWeight: 600,
-            lineHeight: 1.45,
-            marginTop: "0.15rem",
-            overflowWrap: "break-word",
-          }}
-        >
-          {tool.description}
-        </div>
-      </div>
-      {!tool.comingSoon && (
-        <span className="tool-row-arrow" style={{ ...rowArrowBase, color: theme.accentText }}>
-          →
-        </span>
-      )}
-    </>
-  );
-
-  if (tool.comingSoon) {
-    return <div style={{ ...rowBaseStyle, opacity: 0.55 }}>{inner}</div>;
-  }
-  return (
-    <Link href={tool.href} className="tool-row" style={rowBaseStyle}>
-      {inner}
-    </Link>
-  );
-}
-
 function ToolsContent({ theme }: { theme: AppTheme }) {
   return (
-    <>
-      <style>{`
-        .tool-row { transition: background 0.15s ease; }
-        .tool-row:hover, .tool-row:focus-visible { background: ${theme.accentSoft}; }
-        .tool-row .tool-row-arrow { opacity: 0; transition: opacity 0.15s ease; }
-        .tool-row:hover .tool-row-arrow, .tool-row:focus-visible .tool-row-arrow { opacity: 1; }
-        /* Equal-height rows where two columns render; mobile wraps naturally. */
-        @media (min-width: 861px) {
-          .tool-row-desc {
-            min-height: calc(0.78rem * 1.45);
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 1;
-            overflow: hidden;
-          }
-        }
-      `}</style>
+    <div className="page-content">
+      <div className="page-container">
+        <div className="page-title" style={{ color: theme.text }}>
+          Tools
+        </div>
+        <div className="page-subtitle" style={{ color: theme.muted }}>
+          MapleStory calculators, trackers, and planners
+        </div>
 
-      <div className="page-content">
-        <div className="page-container">
-          <div className="page-title" style={{ color: theme.text }}>
-            Tools
-          </div>
-          <div className="page-subtitle" style={{ color: theme.muted }}>
-            MapleStory calculators, trackers, and planners
-          </div>
-
-          <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            {SECTIONS.map((section) => (
-              <div
-                key={section.label}
-                className="panel-card"
-                style={{ background: theme.panel, border: `1px solid ${theme.border}` }}
-              >
-                <div style={{ ...panelLabelBase, color: theme.muted }}>
-                  {section.label}
-                </div>
-                <div style={rowGridStyle}>
-                  {section.tools.map((tool) => (
-                    <ToolRow key={tool.title} tool={tool} theme={theme} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {SECTIONS.map((section) => (
+            <LinkRowPanel key={section.label} label={section.label} theme={theme}>
+              {section.tools.map((tool) => (
+                <LinkRow
+                  key={tool.title}
+                  href={tool.href}
+                  icon={toolIcon(tool)}
+                  title={tool.title}
+                  description={tool.description}
+                  disabled={tool.comingSoon}
+                  badge={
+                    tool.comingSoon && (
+                      <span className="tool-badge" style={{ background: theme.badge, color: theme.badgeText }}>
+                        Soon
+                      </span>
+                    )
+                  }
+                  theme={theme}
+                />
+              ))}
+            </LinkRowPanel>
+          ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

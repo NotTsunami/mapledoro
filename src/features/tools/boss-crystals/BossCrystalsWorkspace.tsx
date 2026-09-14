@@ -828,9 +828,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
     server, setServer, visibleCharacters,
     totalWeeklyMeso, totalMonthlyMeso, totalCrystals, clearedMeso, clearedCrystals, serverMult,
     dialog, dialogBosses, dialogDisabled, dialogPreview, dialogWorldCrystals,
-    dialogTitle, showBossDialog, pendingName, pendingNameTaken,
-    nameMode, setNameMode, typedName, setTypedName,
-    selectedStoreChar, setSelectedStoreChar, availableStoreChars,
+    dialogTitle, showBossDialog, namePicker,
     openAdd, proceedToBosses, confirmAdd, openEdit, confirmEdit,
     deleteCharacter, toggleBossCleared, setAllBossesCleared, reorderCharacters, toggleDialogBoss, setDialogParty, applyPreset,
     clearData, closeDialog, goBackToAddName, exportXlsx,
@@ -950,19 +948,7 @@ export default function BossCrystalsWorkspace({ theme }: { theme: AppTheme }) {
       {dialog?.type === "add-name" && (
         <AddCharacterNameDialog
           theme={theme}
-          available={availableStoreChars}
-          nameMode={nameMode}
-          onNameMode={(m) => {
-            setNameMode(m);
-            if (m === "type") setSelectedStoreChar(null);
-            else setTypedName("");
-          }}
-          typedName={typedName}
-          onTypedName={setTypedName}
-          selectedChar={selectedStoreChar}
-          onSelectedChar={setSelectedStoreChar}
-          pendingName={pendingName}
-          nameTaken={pendingNameTaken}
+          picker={namePicker}
           onNext={proceedToBosses}
           onClose={closeDialog}
         />

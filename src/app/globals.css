@@ -171,6 +171,90 @@ html.scroll-locked body {
   overflow: hidden;
 }
 
+/* Uppercase category label at the top of a landing-page panel; color inline */
+.panel-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1.15rem 1.4rem 0.2rem;
+}
+
+/* Landing-page link rows (Tools / Games / Guides, see `LinkRow.tsx`): a grid of
+   compact linked rows inside a panel card. Colors inline, except the hover tint,
+   which `.link-row-grid` receives as `--link-row-hover`. */
+.link-row-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
+  column-gap: 0.5rem;
+  padding: 0.35rem 0.65rem 0.65rem;
+}
+
+.link-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+a.link-row:hover,
+a.link-row:focus-visible {
+  background: var(--link-row-hover);
+}
+
+/* Fixed square behind each icon so titles align on one vertical scan line. */
+.link-row-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.link-row-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.link-row-desc {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin-top: 0.15rem;
+  overflow-wrap: break-word;
+}
+
+/* Equal-height rows where two columns render; mobile wraps naturally. */
+@media (min-width: 861px) {
+  .link-row-desc {
+    min-height: calc(0.78rem * 1.45);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+  }
+}
+
+.link-row-arrow {
+  margin-left: auto;
+  align-self: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.link-row:hover .link-row-arrow,
+.link-row:focus-visible .link-row-arrow {
+  opacity: 1;
+}
+
 /* Header row inside a panel card */
 .panel-header {
   padding: 1rem 1.25rem 0.8rem;

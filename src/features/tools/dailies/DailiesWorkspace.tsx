@@ -753,15 +753,8 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
     characters,
     getStoreChar,
     getWorldCounterTotal,
-    availableStoreChars,
+    namePicker,
     dialog,
-    nameMode,
-    setNameMode,
-    typedName,
-    setTypedName,
-    selectedStoreChar,
-    setSelectedStoreChar,
-    pendingName, pendingNameTaken,
     draft,
     setDraft,
     openAdd,
@@ -845,19 +838,7 @@ export default function DailiesWorkspace({ theme }: { theme: AppTheme }) {
       {dialog?.type === "add-name" && (
         <AddCharacterNameDialog
           theme={theme}
-          available={availableStoreChars}
-          nameMode={nameMode}
-          onNameMode={(m) => {
-            setNameMode(m);
-            if (m === "type") setSelectedStoreChar(null);
-            else setTypedName("");
-          }}
-          typedName={typedName}
-          onTypedName={setTypedName}
-          selectedChar={selectedStoreChar}
-          onSelectedChar={setSelectedStoreChar}
-          pendingName={pendingName}
-          nameTaken={pendingNameTaken}
+          picker={namePicker}
           onNext={proceedToTasks}
           onClose={closeDialog}
         />
