@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { AppTheme } from "../../../components/themes";
-import { usePickerCoords } from "./usePickerCoords";
+import { usePickerCoords } from "../../characters/setup/hooks/usePickerCoords";
 import { ItemIcon } from "../../../components/ResourceImage";
 import { FamiliarCardSprite } from "../../../components/FamiliarCardSprite";
 import { MF_FAMILIARS, type MfFamiliar } from "./familiars";
@@ -338,39 +338,35 @@ function BonusFamilyList({ theme, onPick }: {
 }) {
   return (
     <div style={{ maxHeight: 300, overflowY: "auto" }}>
-      {MF_BONUS_FAMILIES.map((family) => {
-        const icon = getBonusItem(family, "White");
-        return (
-          <button
-            key={family}
-            type="button"
-            className="mf-option"
-            onClick={() => onPick(family)}
-            style={optionButtonStyle(theme)}
-          >
-            {icon && <ItemIcon id={icon.id} size={28} />}
-            {bonusOptionLabel(theme, `${family} Dice`, MF_BONUS_FAMILY_DESC[family])}
-          </button>
-        );
-      })}
+      {MF_BONUS_FAMILIES.map((family) => (
+        <button
+          key={family}
+          type="button"
+          className="mf-option"
+          onClick={() => onPick(family)}
+          style={optionButtonStyle(theme)}
+        >
+          <ItemIcon id={getBonusItem(family, "White").id} size={28} />
+          {bonusOptionLabel(theme, `${family} Dice`, MF_BONUS_FAMILY_DESC[family])}
+        </button>
+      ))}
     </div>
   );
 }
 
 function BonusColorList({ theme, family, onPick }: {
-  theme: AppTheme; family: MfBonusFamily; onPick: (c: MfBonusColor) => void;
+  theme: AppTheme; family: MfBonusFamily; onPick: (f: MfBonusFamily, c: MfBonusColor) => void;
 }) {
   return (
     <div style={{ maxHeight: 300, overflowY: "auto" }}>
       {MF_BONUS_COLORS.map((color) => {
         const item = getBonusItem(family, color);
-        if (!item) return null;
         return (
           <button
             key={color}
             type="button"
             className="mf-option"
-            onClick={() => onPick(color)}
+            onClick={() => onPick(family, color)}
             style={optionButtonStyle(theme)}
           >
             <ItemIcon id={item.id} size={28} />
@@ -398,8 +394,8 @@ export function BonusItemPicker({
 
   useEscapeToClose(isOpen, onClose, triggerRef);
 
-  function pickColor(color: MfBonusColor) {
-    if (family) onSelect(family, color);
+  function pickColor(pickedFamily: MfBonusFamily, color: MfBonusColor) {
+    onSelect(pickedFamily, color);
     setFamily(null);
     onClose();
     triggerRef.current?.focus();

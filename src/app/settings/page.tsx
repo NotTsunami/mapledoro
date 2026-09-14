@@ -84,6 +84,7 @@ function exportData() {
 const CLOCK_SLACK_MS = 60_000;
 
 function formatSyncTime(ms: number): string {
+  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: every caller is behind DriveSyncPanel's `mounted` gate or inside DriveCompareModal, which only opens after a user-triggered Drive action, and readDriveSyncState returns the disconnected state (lastSyncedAt null) on the server. The viewer's own zone is the point of a backup timestamp, so no fixed timeZone.
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
@@ -175,6 +176,76 @@ const COMPARE_COPY = {
   },
 } as const;
 
+function ComparisonColumn({ theme, title, count, time }: { theme: AppTheme; title: string; count: string; time: string }) {
+  const columnStyle: CSSProperties = {
+    border: `1px solid ${theme.border}`,
+    background: theme.bg,
+    borderRadius: "10px",
+    padding: "0.6rem 0.75rem",
+    display: "grid",
+    gap: "0.15rem",
+    alignContent: "start",
+  };
+  const headStyle: CSSProperties = {
+    fontSize: "0.75rem",
+    fontWeight: 800,
+    color: theme.muted,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  };
+  return (
+    <div style={columnStyle}>
+      <span style={headStyle}>{title}</span>
+      <span style={{ fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>{count}</span>
+      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: theme.muted }}>{time}</span>
+    </div>
+  );
+}
+
+/** What the write adds, what it drops, and how to read the timestamps. */
+function ComparisonNotes({
+  theme,
+  copy,
+  gained,
+  lost,
+  backupReadable,
+  interpretation,
+}: {
+  theme: AppTheme;
+  copy: (typeof COMPARE_COPY)[CompareMode];
+  gained: string[];
+  lost: string[];
+  backupReadable: boolean;
+  interpretation: string | null;
+}) {
+  const diffStyle: CSSProperties = { margin: 0, fontSize: "0.82rem", fontWeight: 700 };
+  const mutedStyle: CSSProperties = { ...diffStyle, color: theme.muted };
+  return (
+    <>
+      {gained.length > 0 && (
+        <p style={{ ...diffStyle, color: statusText(theme, "success") }}>
+          + {copy.gainedLabel}: {nameList(gained)}
+        </p>
+      )}
+      {lost.length > 0 && (
+        <p style={{ ...diffStyle, color: statusText(theme, "danger") }}>
+          − {copy.lostLabel}: {nameList(lost)}
+        </p>
+      )}
+      {backupReadable && gained.length === 0 && lost.length === 0 && (
+        <p style={mutedStyle}>Same characters on both sides. Tool, game, and tracker data still updates.</p>
+      )}
+      {!backupReadable && (
+        <p style={mutedStyle}>
+          The file in your Drive couldn&apos;t be read as a MapleDoro backup, so no character
+          comparison is shown.
+        </p>
+      )}
+      {interpretation && <p style={mutedStyle}>{interpretation}</p>}
+    </>
+  );
+}
+
 function DriveCompareModal({
   theme,
   mode,
@@ -201,26 +272,6 @@ function DriveCompareModal({
   const lost = mode === "restore" ? localOnly : backupOnly;
   const interpretation = comparisonInterpretation(mode, comparison.savedAt, lastSyncedAt);
 
-  const columnStyle: CSSProperties = {
-    border: `1px solid ${theme.border}`,
-    background: theme.bg,
-    borderRadius: "10px",
-    padding: "0.6rem 0.75rem",
-    display: "grid",
-    gap: "0.15rem",
-    alignContent: "start",
-  };
-  const columnHeadStyle: CSSProperties = {
-    fontSize: "0.75rem",
-    fontWeight: 800,
-    color: theme.muted,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  };
-  const countStyle: CSSProperties = { fontSize: "0.95rem", fontWeight: 800, color: theme.text };
-  const timeStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: theme.muted };
-  const diffStyle: CSSProperties = { margin: 0, fontSize: "0.82rem", fontWeight: 700 };
-
   return (
     <ModalShell
       theme={theme}
@@ -231,47 +282,27 @@ function DriveCompareModal({
       <div style={{ display: "grid", gap: "0.75rem" }}>
         <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800 }}>{copy.title}</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-          <div style={columnStyle}>
-            <span style={columnHeadStyle}>This browser</span>
-            <span style={countStyle}>{countCharacters(comparison.localNames.length)}</span>
-            <span style={timeStyle}>
-              {lastSyncedAt === null
-                ? "Never backed up from here"
-                : `Last backed up ${formatSyncTime(lastSyncedAt)}`}
-            </span>
-          </div>
-          <div style={columnStyle}>
-            <span style={columnHeadStyle}>Drive backup</span>
-            <span style={countStyle}>
-              {comparison.backupNames === null ? "Characters unreadable" : countCharacters(comparison.backupNames.length)}
-            </span>
-            <span style={timeStyle}>
-              {comparison.savedAt === null ? "Save time unknown" : `Saved ${formatSyncTime(comparison.savedAt)}`}
-            </span>
-          </div>
+          <ComparisonColumn
+            theme={theme}
+            title="This browser"
+            count={countCharacters(comparison.localNames.length)}
+            time={lastSyncedAt === null ? "Never backed up from here" : `Last backed up ${formatSyncTime(lastSyncedAt)}`}
+          />
+          <ComparisonColumn
+            theme={theme}
+            title="Drive backup"
+            count={comparison.backupNames === null ? "Characters unreadable" : countCharacters(comparison.backupNames.length)}
+            time={comparison.savedAt === null ? "Save time unknown" : `Saved ${formatSyncTime(comparison.savedAt)}`}
+          />
         </div>
-        {gained.length > 0 && (
-          <p style={{ ...diffStyle, color: statusText(theme, "success") }}>
-            + {copy.gainedLabel}: {nameList(gained)}
-          </p>
-        )}
-        {lost.length > 0 && (
-          <p style={{ ...diffStyle, color: statusText(theme, "danger") }}>
-            − {copy.lostLabel}: {nameList(lost)}
-          </p>
-        )}
-        {comparison.backupNames !== null && gained.length === 0 && lost.length === 0 && (
-          <p style={{ ...diffStyle, color: theme.muted }}>
-            Same characters on both sides. Tool, game, and tracker data still updates.
-          </p>
-        )}
-        {comparison.backupNames === null && (
-          <p style={{ ...diffStyle, color: theme.muted }}>
-            The file in your Drive couldn&apos;t be read as a MapleDoro backup, so no character
-            comparison is shown.
-          </p>
-        )}
-        {interpretation && <p style={{ ...diffStyle, color: theme.muted }}>{interpretation}</p>}
+        <ComparisonNotes
+          theme={theme}
+          copy={copy}
+          gained={gained}
+          lost={lost}
+          backupReadable={comparison.backupNames !== null}
+          interpretation={interpretation}
+        />
         <p
           style={{
             margin: 0,
@@ -352,12 +383,12 @@ function DriveSyncPanel({
       await action();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Something went wrong talking to Google Drive.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const handleConnect = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- not a setState updater: runDriveAction is an async action runner (above) that awaits this callback exactly once, so React never replays it and the nested setSync/setStatus calls run once.
     runDriveAction(async () => {
       setSync(await connectDrive());
       setStatus("Connected to Google Drive.");
@@ -376,6 +407,7 @@ function DriveSyncPanel({
      comparison is the guard, not a heuristic. Nothing in Drive yet means
      nothing can be lost, so the first backup skips straight through. */
   const handleBackup = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
       if (meta === null) {
@@ -387,6 +419,7 @@ function DriveSyncPanel({
     });
 
   const handleRestore = () =>
+    // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
     runDriveAction(async () => {
       const meta = await getDriveBackupMeta();
       if (meta === null) {
@@ -405,6 +438,7 @@ function DriveSyncPanel({
     if (!pending) return;
     setPending(null);
     if (pending.mode === "backup") {
+      // react-doctor-disable-next-line no-impure-state-updater -- same as handleConnect: an action-runner callback, not an updater.
       runDriveAction(() => performBackup(pending.existing));
       return;
     }

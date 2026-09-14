@@ -6,7 +6,6 @@ import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { ProgressBar } from "../../../components/ProgressBar";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
 import {
-  type AstraBoss,
   ASTRA_BOSSES,
   ASTRA_MISSIONS,
   ASTRA_DAILY_QUESTS,
@@ -37,33 +36,29 @@ import { CLEARED_HINT } from "./copy";
 function VoucherInput({
   activeDiff,
   vouchersKept,
-  isActive,
   theme,
   inputStyle,
   onVouchersKeptChange,
 }: {
-  activeDiff: AstraBoss["difficulties"][number];
+  activeDiff: { voucherCount: number; voucherValue: number };
   vouchersKept: number;
-  isActive: boolean;
   theme: AppTheme;
   inputStyle: React.CSSProperties;
   onVouchersKeptChange: (count: number) => void;
 }) {
   const uid = useId();
-  const maxV = activeDiff.voucherCount ?? 0;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
       <label htmlFor={uid} style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>Vouchers</label>
       <ToolNumberInput
         id={uid}
         min={0}
-        max={maxV}
+        max={activeDiff.voucherCount}
         integer
         value={vouchersKept}
-        disabled={!isActive}
         onKeyDown={replaceZeroOnDigit}
         onCommit={onVouchersKeptChange}
-        style={{ ...inputStyle, width: "48px", textAlign: "center", padding: "4px 6px", fontSize: "0.75rem", cursor: isActive ? "text" : "not-allowed" }}
+        style={{ ...inputStyle, width: "48px", textAlign: "center", padding: "4px 6px", fontSize: "0.75rem", cursor: "text" }}
       />
       <span style={{ fontSize: "0.75rem", fontWeight: 600, color: theme.muted }}>
         / {activeDiff.voucherCount} ({activeDiff.voucherValue} frags ea.)
@@ -570,7 +565,6 @@ export default function AstraSection({ theme }: { theme: AppTheme }) {
                   <VoucherInput
                     activeDiff={activeDiff}
                     vouchersKept={sel.vouchersKept}
-                    isActive
                     theme={theme}
                     inputStyle={inputStyle}
                     onVouchersKeptChange={(count) => state.setVouchersKept(boss.name, count)}

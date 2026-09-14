@@ -5,8 +5,8 @@ import {
   readCharactersStore,
   selectCharactersList,
 } from "../../characters/model/charactersStore";
-import type { StoredCharacterRecord } from "../../characters/model/charactersStore";
 import { moveInArray } from "../useCardReorder";
+import { useCharacterNamePicker } from "../useCharacterNamePicker";
 import {
   type BossRow,
   type CharacterEntry,
@@ -76,9 +76,6 @@ export function useBossCrystalsState(mounted: boolean) {
 
   // Dialog state
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [nameMode, setNameMode] = useState<"type" | "select">("type");
-  const [typedName, setTypedName] = useState("");
-  const [selectedStoreChar, setSelectedStoreChar] = useState<StoredCharacterRecord | null>(null);
   const [dialogBosses, setDialogBosses] = useState<BossRow[]>(() => createBosses(""));
 
   // Load from localStorage. A render-phase update (not a ref write, which would
@@ -112,6 +109,7 @@ export function useBossCrystalsState(mounted: boolean) {
     (updater: (prev: CharacterEntry[]) => CharacterEntry[]) => {
       setCharacters((prev) => {
         const next = updater(prev);
+        // react-doctor-disable-next-line no-side-effect-in-state-updater-function -- called from inside the setState updater by project convention (see root CLAUDE.md), so the write stays atomic with the state change rather than trailing it in an effect. Writing the same derived state twice on a replay is idempotent.
         saveState(server, next);
         return next;
       });
@@ -175,22 +173,20 @@ export function useBossCrystalsState(mounted: boolean) {
   }
   const serverMult = server === "heroic" ? 1 : 5;
 
-  // Available imported characters (not yet added)
   const usedNames = useMemo(
     () => new Set(characters.map((c) => c.name.toLowerCase())),
     [characters],
   );
-  const availableStoreChars = useMemo(() => {
+  // Only offer characters from the world currently in view, so an import lands
+  // in the same world it was picked under and stays visible after adding.
+  const worldStoreChars = useMemo(() => {
     if (!mounted) return [];
-    const all = selectCharactersList(readCharactersStore());
-    // Only offer characters from the world currently in view, so an import lands
-    // in the same world it was picked under and stays visible after adding.
-    return all.filter(
-      (c) =>
-        !usedNames.has(c.characterName.toLowerCase()) &&
-        worldServerType(c.worldID) === server,
+    return selectCharactersList(readCharactersStore()).filter(
+      (c) => worldServerType(c.worldID) === server,
     );
-  }, [mounted, usedNames, server]);
+  }, [mounted, server]);
+  const namePicker = useCharacterNamePicker(worldStoreChars, usedNames);
+  const { pendingName, nameTaken, selectedChar, reset: resetNamePicker } = namePicker;
 
   // Dialog computed
   const dialogDisabled = useMemo(() => getDisabledSet(dialogBosses), [dialogBosses]);
@@ -208,39 +204,29 @@ export function useBossCrystalsState(mounted: boolean) {
     const committed = editing ? editing.income.crystals + editing.income.monthlyCrystals : 0;
     return totalCrystals - committed + pending;
   }, [dialog, dialogPreview, totalCrystals, visibleCharacters]);
-  const pendingName =
-    nameMode === "type" ? typedName.trim() : (selectedStoreChar?.characterName ?? "");
-  // The picker can't offer a name already added, but a typed one can still collide.
-  // Two entries under one name leave the cards indistinguishable (they key on it),
-  // so the dialog blocks it rather than letting a silent duplicate through.
-  const pendingNameTaken = pendingName !== "" && usedNames.has(pendingName.toLowerCase());
-
   let dialogTitle = "";
   if (dialog?.type === "add-bosses") dialogTitle = `Select Bosses \u2014 ${dialog.name}`;
-  else if (dialog?.type === "edit") dialogTitle = `Edit Bosses \u2014 ${characters[dialog.index]?.name ?? ""}`;
+  else if (dialog?.type === "edit") dialogTitle = `Edit Bosses \u2014 ${characters[dialog.index].name}`;
 
   const showBossDialog = dialog?.type === "add-bosses" || dialog?.type === "edit";
 
   // -- Dialog handlers --
   const openAdd = useCallback(() => {
-    setNameMode("type");
-    setTypedName("");
-    setSelectedStoreChar(null);
+    resetNamePicker();
     setDialog({ type: "add-name" });
-  }, []);
+  }, [resetNamePicker]);
 
+  // `selectedChar` is only set in select mode, so it alone says whether the name was imported.
   const proceedToBosses = useCallback(() => {
-    if (!pendingName || pendingNameTaken) return;
-    const imageURL =
-      nameMode === "select" ? (selectedStoreChar?.characterImgURL ?? null) : null;
+    if (!pendingName || nameTaken) return;
+    const imageURL = selectedChar?.characterImgURL ?? null;
     // Imported characters take their real world; typed ones take the current view.
-    const world: ServerType =
-      nameMode === "select" && selectedStoreChar
-        ? worldServerType(selectedStoreChar.worldID)
-        : (server as ServerType);
+    const world: ServerType = selectedChar
+      ? worldServerType(selectedChar.worldID)
+      : (server as ServerType);
     setDialogBosses(createBosses(""));
     setDialog({ type: "add-bosses", name: pendingName, imageURL, world });
-  }, [pendingName, pendingNameTaken, nameMode, selectedStoreChar, server]);
+  }, [pendingName, nameTaken, selectedChar, server]);
 
   const confirmAdd = useCallback(() => {
     if (dialog?.type !== "add-bosses") return;
@@ -333,15 +319,7 @@ export function useBossCrystalsState(mounted: boolean) {
     dialogWorldCrystals,
     dialogTitle,
     showBossDialog,
-    pendingName,
-    pendingNameTaken,
-    nameMode,
-    setNameMode,
-    typedName,
-    setTypedName,
-    selectedStoreChar,
-    setSelectedStoreChar,
-    availableStoreChars,
+    namePicker,
     openAdd,
     proceedToBosses,
     confirmAdd,

@@ -611,7 +611,7 @@ function DropLogTable({
                 style={{ background: index % 2 === 1 ? theme.timerBg : "transparent" }}
               >
                 <td style={{ ...tdStyle(theme), color: theme.muted, whiteSpace: "nowrap" }}>
-                  {formatShortDate(Date.parse(`${drop.date}T00:00:00Z`), true)}
+                  {formatShortDate(Date.parse(`${drop.date}T00:00:00Z`))}
                 </td>
                 <td style={{ ...tdStyle(theme), fontWeight: 700 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -848,9 +848,7 @@ function NoCharactersState({ theme }: { theme: AppTheme }) {
 export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }) {
   const mounted = useMounted();
 
-  const [drops, setDrops] = useState<PitchedBossDrop[]>(() =>
-    typeof window === "undefined" ? [] : readStore().drops,
-  );
+  const [drops, setDrops] = useState<PitchedBossDrop[]>(() => readStore().drops);
   const [filters, setFilters] = useState<Filters>({ character: "all", category: "all" });
   const [sort, setSort] = useState<Sort>({ key: "date", dir: "desc" });
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -886,12 +884,10 @@ export default function PitchedBossDropsWorkspace({ theme }: { theme: AppTheme }
   }
 
   function handleAdd(payload: LogDropPayload) {
-    const char = characters.find((c) => c.characterName === payload.characterName);
-    if (!char) return;
     const newDrop: PitchedBossDrop = {
       id: generateId(),
-      characterId: String(char.characterID),
-      characterName: char.characterName,
+      characterId: String(payload.character.characterID),
+      characterName: payload.character.characterName,
       itemId: payload.itemId,
       channel: payload.channel,
       date: payload.date,

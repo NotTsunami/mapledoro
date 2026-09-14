@@ -80,12 +80,10 @@ export type ApplyOutcome =
 
 /** An apply and its result, tagged with what it applied to so a character or mode
  *  switch stops showing an answer that no longer belongs to the panel on screen. */
-export interface ApplyRun {
-  char: string;
-  mode: OptimizerMode;
-  status: "applying" | "done";
-  outcome: ApplyOutcome | null;
-}
+export type ApplyRun = { char: string; mode: OptimizerMode } & (
+  | { status: "applying" }
+  | { status: "done"; outcome: ApplyOutcome }
+);
 
 async function recomputeBoss380Hexa(
   record: StoredCharacterRecord,
@@ -366,7 +364,7 @@ export function useStatOptimizer() {
     // Read before the write: afterwards the payload hash has moved and this
     // entry is no longer the character's current one.
     const before = peekScouterCache(previous)?.boss380Hexa ?? null;
-    setApplyRun({ char, mode, status: "applying", outcome: null });
+    setApplyRun({ char, mode, status: "applying" });
     const written = updateCharacterRecord(char, (record) =>
       result.mode === "hyper"
         ? applyHyperToRecord(record, {

@@ -358,7 +358,7 @@ function writeHexaNodes(
   return nodes.map((node, i) => {
     const core = cores[i];
     const types = best[i];
-    if (!core?.unlocked || !types) return node;
+    if (!core.unlocked || !types) return node;
     const active = node.activePreset === 1 ? 1 : 0;
     const presets: [HexaStatSlot, HexaStatSlot] = [node.presets[0] ?? emptySlot(), node.presets[1] ?? emptySlot()];
     presets[active] = {

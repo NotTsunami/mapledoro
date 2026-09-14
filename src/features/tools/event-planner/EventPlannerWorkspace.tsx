@@ -22,7 +22,6 @@ import {
   EVENT_ITEMS,
   EVENT_ITEMS_BY_ID,
   ITEM_CATEGORIES,
-  categoryLabel,
   type EventItem,
 } from "./event-items";
 import { useEventPlannerState, type PlannerEntry, type EntryCost } from "./useEventPlannerState";
@@ -55,23 +54,14 @@ function ItemSelector({
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matches = q
-      ? EVENT_ITEMS.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            item.slot.toLowerCase().includes(q) ||
-            categoryLabel(item.category).toLowerCase().includes(q),
-        )
-      : EVENT_ITEMS;
-    const groups = new Map<string, EventItem[]>();
-    for (const item of matches) {
-      const arr = groups.get(item.category) ?? [];
-      arr.push(item);
-      groups.set(item.category, arr);
-    }
     return ITEM_CATEGORIES.flatMap((cat) => {
-      const items = groups.get(cat.id);
-      return items && items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
+      const labelMatches = cat.label.toLowerCase().includes(q);
+      const items = EVENT_ITEMS.filter(
+        (item) =>
+          item.category === cat.id &&
+          (labelMatches || item.name.toLowerCase().includes(q) || item.slot.toLowerCase().includes(q)),
+      );
+      return items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
     });
   }, [search]);
 
@@ -573,7 +563,7 @@ function AddItemForm({
             triggerStyle={{ maxWidth: "none", minWidth: 160 }}
           />
           {form.char === "__custom__" && (
-            <input className="tool-input" type="text" value={form.charCustom} onChange={(e) => dispatchForm({ type: "setCharCustom", value: e.target.value })} placeholder="Character name" style={{ ...styles.inputStyle, flex: 1, minWidth: 0, alignSelf: "stretch" }} />
+            <input className="tool-input" type="text" value={form.charCustom} onChange={(e) => dispatchForm({ type: "setCharCustom", value: e.target.value })} placeholder="Character name" aria-label="Character name" style={{ ...styles.inputStyle, flex: 1, minWidth: 0, alignSelf: "stretch" }} />
           )}
         </div>
       </div>

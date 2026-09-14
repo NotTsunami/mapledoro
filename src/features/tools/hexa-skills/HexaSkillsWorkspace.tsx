@@ -10,12 +10,13 @@ import {
   commonSkillsFor,
   getClassGroups,
   getClassesInGroup,
+  type HexaClassDef,
 } from "./hexa-classes";
 import {
   useHexaSkillsState,
   type SkillCostSummary,
 } from "./useHexaSkillsState";
-import { COMMON_COSTS, MAX_SKILL_LEVEL, getCostRange } from "./hexa-costs";
+import { COMMON_COSTS, getCostRange } from "./hexa-costs";
 import { SkillSection, MasterySection, HexaStatSection } from "./hexa-ui";
 import { GuideView, FdBreakdownView } from "./hexa-fd-ui";
 import { hasFdData, computeGuide, computeFdBreakdown } from "./hexa-fd";
@@ -283,6 +284,57 @@ function EmptyState({ theme, sectionPanel }: { theme: AppTheme; sectionPanel: Re
 
 // ── Main Workspace ───────────────────────────────────────────────────────────
 
+/** SHINE classes use Erda Link, which the tracker only approximates. */
+function ShineNotice({
+  theme,
+  classDef,
+  sectionPanel,
+}: {
+  theme: AppTheme;
+  classDef: HexaClassDef | null;
+  sectionPanel: React.CSSProperties;
+}) {
+  if (classDef?.group !== "SHINE") return null;
+  return (
+    <div
+      className="fade-in panel-card"
+      style={{
+        ...sectionPanel,
+        ...shineNoticeStyle,
+        background: theme.accentSoft,
+        border: `1px solid ${theme.accent}`,
+        color: theme.text,
+      }}
+    >
+      <strong>Note:</strong> {classDef.className} uses the Erda Link system instead of the traditional HEXA skill system.
+      The fragment costs shown below are placeholder values based on standard classes.
+      Accurate Erda Link costs will be supported in a future update.
+    </div>
+  );
+}
+
+type HexaCosts = ReturnType<typeof useHexaSkillsState>["costs"];
+
+/** Grand totals with Sol Janus taken back out, for players who skip it. */
+function costsWithoutJanus(costs: HexaCosts, desiredCommon: number[]) {
+  // Found by name: COMMON_SKILLS' order is data, and an index would silently
+  // start subtracting Sol Hecate if the list were ever reordered.
+  const janusIdx = COMMON_SKILLS.findIndex((s) => s.name === "Sol Janus");
+  const janusCost = costs.common.perSkill[janusIdx];
+  const janusMaxCost = getCostRange(COMMON_COSTS, 0, desiredCommon[janusIdx]);
+  const grand = {
+    solErda: costs.grand.solErda - janusCost.solErda,
+    fragments: costs.grand.fragments - janusCost.fragments,
+  };
+  const maxGrand = {
+    solErda: costs.maxGrand.solErda - janusMaxCost.solErda,
+    fragments: costs.maxGrand.fragments - janusMaxCost.fragments,
+  };
+  const spent = { solErda: maxGrand.solErda - grand.solErda, fragments: maxGrand.fragments - grand.fragments };
+  const progressPct = maxGrand.fragments > 0 ? Math.min(100, (spent.fragments / maxGrand.fragments) * 100) : 0;
+  return { grand, maxGrand, progressPct };
+}
+
 export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
   const {
     mounted,
@@ -294,16 +346,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
     setClassName,
     levels,
     desiredLevels,
-    setOriginLevel,
-    setAscentLevel,
-    setMasteryLevel,
-    setEnhancementLevel,
-    setCommonLevel,
-    setDesiredOriginLevel,
-    setDesiredAscentLevel,
-    setDesiredMasteryLevel,
-    setDesiredEnhancementLevel,
-    setDesiredCommonLevel,
+    setLevel,
+    setDesiredLevel,
     resetAll,
     applyGuide,
     costs,
@@ -330,27 +374,10 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
     [showFd, className, classDef, levels, desiredLevels],
   );
 
-  const adjusted = useMemo(() => {
-    if (includeJanus) return { grand: costs.grand, maxGrand: costs.maxGrand, progressPct: costs.progressPct };
-    // Found by name: COMMON_SKILLS' order is data, and an index would silently
-    // start subtracting Sol Hecate if the list were ever reordered.
-    const janusIdx = COMMON_SKILLS.findIndex((s) => s.name === "Sol Janus");
-    const janusCost = costs.common.perSkill[janusIdx] ?? { solErda: 0, fragments: 0 };
-    const janusMaxCost = janusIdx < 0
-      ? { solErda: 0, fragments: 0 }
-      : getCostRange(COMMON_COSTS, 0, desiredLevels.common[janusIdx] ?? MAX_SKILL_LEVEL);
-    const grand = {
-      solErda: costs.grand.solErda - janusCost.solErda,
-      fragments: costs.grand.fragments - janusCost.fragments,
-    };
-    const maxGrand = {
-      solErda: costs.maxGrand.solErda - janusMaxCost.solErda,
-      fragments: costs.maxGrand.fragments - janusMaxCost.fragments,
-    };
-    const spent = { solErda: maxGrand.solErda - grand.solErda, fragments: maxGrand.fragments - grand.fragments };
-    const progressPct = maxGrand.fragments > 0 ? Math.min(100, (spent.fragments / maxGrand.fragments) * 100) : 0;
-    return { grand, maxGrand, progressPct };
-  }, [includeJanus, costs, desiredLevels.common]);
+  const adjusted = useMemo(
+    () => (includeJanus ? costs : costsWithoutJanus(costs, desiredLevels.common)),
+    [includeJanus, costs, desiredLevels.common],
+  );
 
   const styles = toolStyles(theme);
   const { sectionPanel, inputStyle } = styles;
@@ -414,22 +441,7 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
           )}
         </div>
 
-        {classDef && classDef.group === "SHINE" && (
-          <div
-            className="fade-in panel-card"
-            style={{
-              ...sectionPanel,
-              ...shineNoticeStyle,
-              background: theme.accentSoft,
-              border: `1px solid ${theme.accent}`,
-              color: theme.text,
-            }}
-          >
-            <strong>Note:</strong> {classDef.className} uses the Erda Link system instead of the traditional HEXA skill system.
-            The fragment costs shown below are placeholder values based on standard classes.
-            Accurate Erda Link costs will be supported in a future update.
-          </div>
-        )}
+        <ShineNotice theme={theme} classDef={classDef} sectionPanel={sectionPanel} />
 
         {showFd && (
           <div className="fade-in">
@@ -448,11 +460,11 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
 
         {!classDef && <EmptyState theme={theme} sectionPanel={sectionPanel} />}
 
-        {classDef && activeTab === "guide" && guide && (
+        {activeTab === "guide" && guide && (
           <GuideView theme={theme} guide={guide} sectionPanel={sectionPanel} onApply={applyGuide} />
         )}
 
-        {classDef && activeTab === "fd" && breakdown && (
+        {activeTab === "fd" && breakdown && (
           <FdBreakdownView theme={theme} breakdown={breakdown} sectionPanel={sectionPanel} />
         )}
 
@@ -467,8 +479,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 minLevel={1}
                 desiredLevels={[desiredLevels.origin]}
                 sectionCost={costs.origin}
-                onLevelChange={(_i, v) => setOriginLevel(v)}
-                onDesiredLevelChange={(_i, v) => setDesiredOriginLevel(v)}
+                onLevelChange={(i, v) => setLevel("origin", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("origin", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -480,8 +492,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                   levels={[levels.ascent]}
                   desiredLevels={[desiredLevels.ascent]}
                   sectionCost={costs.ascent}
-                  onLevelChange={(_i, v) => setAscentLevel(v)}
-                  onDesiredLevelChange={(_i, v) => setDesiredAscentLevel(v)}
+                  onLevelChange={(i, v) => setLevel("ascent", i, v)}
+                  onDesiredLevelChange={(i, v) => setDesiredLevel("ascent", i, v)}
                   theme={theme}
                   sectionPanel={halfPanel}
                   inputStyle={inputStyle}
@@ -496,8 +508,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 levels={levels.mastery}
                 desiredLevels={desiredLevels.mastery}
                 sectionCost={costs.mastery}
-                onLevelChange={setMasteryLevel}
-                onDesiredLevelChange={setDesiredMasteryLevel}
+                onLevelChange={(i, v) => setLevel("mastery", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("mastery", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -508,8 +520,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
                 levels={levels.enhancement}
                 desiredLevels={desiredLevels.enhancement}
                 sectionCost={costs.enhancement}
-                onLevelChange={setEnhancementLevel}
-                onDesiredLevelChange={setDesiredEnhancementLevel}
+                onLevelChange={(i, v) => setLevel("enhancement", i, v)}
+                onDesiredLevelChange={(i, v) => setDesiredLevel("enhancement", i, v)}
                 theme={theme}
                 sectionPanel={halfPanel}
                 inputStyle={inputStyle}
@@ -523,8 +535,8 @@ export default function HexaSkillsWorkspace({ theme }: { theme: AppTheme }) {
               levels={levels.common}
               desiredLevels={desiredLevels.common}
               sectionCost={costs.common}
-              onLevelChange={setCommonLevel}
-              onDesiredLevelChange={setDesiredCommonLevel}
+              onLevelChange={(i, v) => setLevel("common", i, v)}
+              onDesiredLevelChange={(i, v) => setDesiredLevel("common", i, v)}
               theme={theme}
               sectionPanel={sectionPanel}
               inputStyle={inputStyle}

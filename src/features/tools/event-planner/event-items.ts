@@ -34,12 +34,6 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
   { id: "misc", label: "Misc" },
 ];
 
-const CATEGORY_MAP = new Map(ITEM_CATEGORIES.map((c) => [c.id, c.label]));
-
-export function categoryLabel(id: string): string {
-  return CATEGORY_MAP.get(id) ?? id;
-}
-
 /** Maximum star force level based on item level (GMS post-NEXT). */
 export function maxStarForLevel(level: number): number {
   if (level >= 138) return 25;

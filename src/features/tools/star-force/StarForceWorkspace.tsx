@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useMemo, useState, useEffect, useRef } from "react";
+import { useReducer, useMemo, useState, useEffect, useEffectEvent } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import type { ChartOptions, ChartData, TooltipItem } from "chart.js";
@@ -489,7 +489,11 @@ function parseTrials(raw: string): number {
 
 // -- Run controls -------------------------------------------------------------
 
-type RunPhase = "idle" | "running" | "done" | "cancelled";
+type RunPhase =
+  | { kind: "idle" }
+  | { kind: "running"; run: SimulationRun; startedAt: number }
+  | { kind: "done" }
+  | { kind: "cancelled" };
 
 interface RunEstimate {
   attempts: number;
@@ -497,57 +501,108 @@ interface RunEstimate {
   heavy: boolean;
 }
 
+function noteStyleFor(theme: AppTheme): React.CSSProperties {
+  return { fontSize: "0.75rem", fontWeight: 600, color: theme.muted, lineHeight: 1.5 };
+}
+
+/** Drives the run one frame at a time. Owns the per-frame progress state so the
+ *  workspace above it only re-renders when the run finishes. */
+function SimulationProgress({
+  theme,
+  run,
+  startedAt,
+  trials,
+  onFinished,
+  onCancel,
+  cancelStyle,
+}: {
+  theme: AppTheme;
+  run: SimulationRun;
+  startedAt: number;
+  trials: number;
+  onFinished: (result: SimulationResult) => void;
+  onCancel: () => void;
+  cancelStyle: React.CSSProperties;
+}) {
+  const [progress, setProgress] = useState({ completed: 0, elapsedMs: 0 });
+  // Not a dependency: a fresh onFinished from a parent re-render must not restart the loop.
+  const finish = useEffectEvent(onFinished);
+
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      const finished = run.step(FRAME_BUDGET_MS);
+      setProgress({ completed: run.completed, elapsedMs: performance.now() - startedAt });
+      if (finished) finish(run.result());
+      else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [run, startedAt]);
+
+  const { completed, elapsedMs } = progress;
+  const fraction = trials > 0 ? completed / trials : 0;
+  const remainingMs = completed > 0 ? (elapsedMs / completed) * (trials - completed) : null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      <div
+        role="progressbar"
+        aria-label="Simulation progress"
+        aria-valuemin={0}
+        aria-valuemax={trials}
+        aria-valuenow={completed}
+        style={{ height: 6, borderRadius: 999, background: theme.timerBg, overflow: "hidden" }}
+      >
+        <div style={{ width: `${fraction * 100}%`, height: "100%", background: theme.accent }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
+        <span style={noteStyleFor(theme)}>
+          Running {completed.toLocaleString()} of {trials.toLocaleString()} trials
+          {remainingMs != null && completed > 20 ? `, ${formatDuration(remainingMs / 1000)} left` : ""}
+        </span>
+        <button type="button" className="tool-btn tool-dialog-btn" onClick={onCancel} style={cancelStyle}>
+          Stop
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RunControls({
   theme,
   phase,
   trials,
-  completed,
-  elapsedMs,
   estimate,
   stale,
   onRun,
+  onFinished,
   onCancel,
   cancelStyle,
 }: {
   theme: AppTheme;
   phase: RunPhase;
   trials: number;
-  completed: number;
-  elapsedMs: number;
   estimate: RunEstimate;
   stale: boolean;
   onRun: () => void;
+  onFinished: (result: SimulationResult) => void;
   onCancel: () => void;
   cancelStyle: React.CSSProperties;
 }) {
-  const noteStyle: React.CSSProperties = { fontSize: "0.75rem", fontWeight: 600, color: theme.muted, lineHeight: 1.5 };
+  const noteStyle = noteStyleFor(theme);
 
-  if (phase === "running") {
-    const fraction = trials > 0 ? completed / trials : 0;
-    const remainingMs = completed > 0 ? (elapsedMs / completed) * (trials - completed) : null;
-
+  if (phase.kind === "running") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        <div
-          role="progressbar"
-          aria-label="Simulation progress"
-          aria-valuemin={0}
-          aria-valuemax={trials}
-          aria-valuenow={completed}
-          style={{ height: 6, borderRadius: 999, background: theme.timerBg, overflow: "hidden" }}
-        >
-          <div style={{ width: `${fraction * 100}%`, height: "100%", background: theme.accent }} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
-          <span style={noteStyle}>
-            Running {completed.toLocaleString()} of {trials.toLocaleString()} trials
-            {remainingMs != null && completed > 20 ? `, ${formatDuration(remainingMs / 1000)} left` : ""}
-          </span>
-          <button type="button" className="tool-btn tool-dialog-btn" onClick={onCancel} style={cancelStyle}>
-            Stop
-          </button>
-        </div>
-      </div>
+      <SimulationProgress
+        theme={theme}
+        run={phase.run}
+        startedAt={phase.startedAt}
+        trials={trials}
+        onFinished={onFinished}
+        onCancel={onCancel}
+        cancelStyle={cancelStyle}
+      />
     );
   }
 
@@ -555,7 +610,7 @@ function RunControls({
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <ActionButton
         theme={theme}
-        label={phase === "done" || phase === "cancelled" ? "Run Simulation Again" : "Run Simulation"}
+        label={phase.kind === "done" || phase.kind === "cancelled" ? "Run Simulation Again" : "Run Simulation"}
         fullWidth
         disabled={trials < 1}
         onClick={onRun}
@@ -588,7 +643,7 @@ function StarForceForm({
   calc: CalcState;
   dispatch: React.ActionDispatch<[action: CalcAction]>;
   previewCost: number;
-  previewResult: StarResult | null;
+  previewResult: StarResult;
   inputStyle: React.CSSProperties;
   selectStyle: React.CSSProperties;
   runControls: React.ReactNode;
@@ -650,6 +705,7 @@ function StarForceForm({
         </InputRow>
 
         <InputRow label="Replace Cost" theme={theme}>
+          {/* react-doctor-disable-next-line no-placeholder-only-field -- InputRow renders a wrapping <label>, so its visible "Replace Cost" text is this input's accessible name; the rule can't see through the component boundary. */}
           <input
             className="tool-input"
             type="number"
@@ -747,17 +803,13 @@ function StarForceForm({
         <span>
           Next try: <span style={{ color: theme.text }}>{formatMesoFull(previewCost)} mesos</span>
         </span>
-        {previewResult && (
-          <>
-            <span>
-              Success: <span style={{ color: theme.text }}>{pct(previewResult.success)}</span>
-            </span>
-            {previewResult.destroy > 0 && (
-              <span>
-                Destroy: <span style={{ color: boomRed }}>{pct(previewResult.destroy)}</span>
-              </span>
-            )}
-          </>
+        <span>
+          Success: <span style={{ color: theme.text }}>{pct(previewResult.success)}</span>
+        </span>
+        {previewResult.destroy > 0 && (
+          <span>
+            Destroy: <span style={{ color: boomRed }}>{pct(previewResult.destroy)}</span>
+          </span>
         )}
       </div>
 
@@ -820,7 +872,7 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
   // Closed form, cheap, always live. Only the Monte Carlo run is gated.
   const results = useMemo(() => computeExpectedCosts(opts), [opts]);
   const previewCost = useMemo(() => attemptCost(calc.level, calc.startStar, opts), [calc.level, calc.startStar, opts]);
-  const previewResult = results.length > 0 ? results[0] : null;
+  const previewResult = results[0];
 
   const estimate: RunEstimate = useMemo(() => {
     const attempts = expectedAttempts(opts) * trials;
@@ -832,64 +884,36 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
   // when they change underneath it.
   const settingsKey = useMemo(() => JSON.stringify([opts, trials]), [opts, trials]);
 
-  const runRef = useRef<SimulationRun | null>(null);
-  const startedAtRef = useRef(0);
-  const [phase, setPhase] = useState<RunPhase>("idle");
-  const [progress, setProgress] = useState({ completed: 0, elapsedMs: 0 });
+  const [phase, setPhase] = useState<RunPhase>({ kind: "idle" });
   const [sim, setSim] = useState<SimulationResult | null>(null);
   const [snapshot, setSnapshot] = useState<SimSnapshot | null>(null);
   const [runKey, setRunKey] = useState("");
 
-  useEffect(() => {
-    if (phase !== "running") return;
-
-    let frame = 0;
-    const tick = () => {
-      const run = runRef.current;
-      if (!run) return;
-
-      const finished = run.step(FRAME_BUDGET_MS);
-      setProgress({ completed: run.completed, elapsedMs: performance.now() - startedAtRef.current });
-
-      if (finished) {
-        setSim(run.result());
-        setPhase("done");
-        runRef.current = null;
-      } else {
-        frame = requestAnimationFrame(tick);
-      }
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [phase]);
-
   const handleRun = () => {
     if (trials < 1) return;
-    runRef.current = startSimulation(opts, trials);
-    startedAtRef.current = performance.now();
-    setProgress({ completed: 0, elapsedMs: 0 });
     setSim(null);
     setSnapshot({ startStar: calc.startStar, targetStar: calc.targetStar, trials });
     setRunKey(settingsKey);
-    setPhase("running");
+    setPhase({ kind: "running", run: startSimulation(opts, trials), startedAt: performance.now() });
   };
 
-  const handleCancel = () => {
-    runRef.current = null;
-    setPhase("cancelled");
+  const handleFinished = (result: SimulationResult) => {
+    setSim(result);
+    setPhase({ kind: "done" });
   };
+
+  const handleCancel = () => setPhase({ kind: "cancelled" });
 
   const styles = toolStyles(theme);
   const inputStyle: React.CSSProperties = { ...styles.inputStyle, ...controlHeightStyle };
   const selectStyle: React.CSSProperties = { ...styles.selectStyle, ...controlHeightStyle };
 
-  const stale = phase === "done" && runKey !== settingsKey;
+  const stale = phase.kind === "done" && runKey !== settingsKey;
   const showResults = sim !== null && snapshot !== null;
 
   const announcement = (() => {
-    if (phase === "cancelled") return "Simulation stopped.";
-    if (phase === "done" && sim && snapshot) return simulationSummary(sim, snapshot);
+    if (phase.kind === "cancelled") return "Simulation stopped.";
+    if (phase.kind === "done" && sim && snapshot) return simulationSummary(sim, snapshot);
     return "";
   })();
 
@@ -941,11 +965,10 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
               theme={theme}
               phase={phase}
               trials={trials}
-              completed={progress.completed}
-              elapsedMs={progress.elapsedMs}
               estimate={estimate}
               stale={stale}
               onRun={handleRun}
+              onFinished={handleFinished}
               onCancel={handleCancel}
               cancelStyle={styles.dialogBtnStyle}
             />
@@ -967,13 +990,13 @@ export default function StarForceWorkspace({ theme }: { theme: AppTheme }) {
           </>
         ) : (
           <div className="fade-in panel-card" style={emptyNoteStyle}>
-            {phase === "cancelled"
+            {phase.kind === "cancelled"
               ? "Simulation stopped before it finished. Run it again, or lower the trial count or target star."
               : "Run the simulation to see the cost distribution, percentiles, and boom counts. The per-star breakdown below is exact and needs no simulation."}
           </div>
         )}
 
-        {results.length > 0 && <BreakdownTable theme={theme} results={results} />}
+        <BreakdownTable theme={theme} results={results} />
       </div>
     </div>
   );

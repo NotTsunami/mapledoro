@@ -13,7 +13,6 @@ import {
   ORIGIN_COSTS,
   ENHANCEMENT_COSTS,
   MASTERY_COSTS,
-  COMMON_COSTS,
   COMMON_COST_TABLES,
   getCostRange,
   type LevelCost,
@@ -89,6 +88,18 @@ function clampLevel(v: number): number {
   return Math.max(0, Math.min(30, Math.round(v) || 0));
 }
 
+type LevelGroup = keyof SkillLevels;
+
+/** `levels` with one node set to `v`. `idx` is ignored for the single-node groups. */
+function withLevel(levels: SkillLevels, group: LevelGroup, idx: number, v: number): SkillLevels {
+  const level = clampLevel(v);
+  if (group === "origin") return { ...levels, origin: Math.max(1, level) };
+  if (group === "ascent") return { ...levels, ascent: level };
+  const nodes = [...levels[group]];
+  nodes[idx] = level;
+  return { ...levels, [group]: nodes };
+}
+
 /** Ensure saved arrays match the expected lengths for the given class. */
 function normalizeLevels(levels: SkillLevels, classDef: HexaClassDef | null, fill = 0): SkillLevels {
   const masteryLen = classDef ? classDef.mastery.length : 4;
@@ -122,7 +133,7 @@ function sectionCost(levels: number[], desired: number[], tableAt: (i: number) =
   return { perSkill, total };
 }
 
-const commonCostTable = (i: number): readonly LevelCost[] => COMMON_COST_TABLES[i] ?? COMMON_COSTS;
+const commonCostTable = (i: number): readonly LevelCost[] => COMMON_COST_TABLES[i];
 
 function singleCost(level: number, desired: number, costTable: readonly LevelCost[]): SectionCost {
   const cost = getCostRange(costTable, level, desired);
@@ -268,79 +279,15 @@ export function useHexaSkillsState() {
     });
   }, [updateState]);
 
-  // Level setters
-  const setOriginLevel = useCallback((v: number) => {
-    updateState((prev) => ({ ...prev, levels: { ...prev.levels, origin: Math.max(1, clampLevel(v)) } }));
+  const setLevel = useCallback((group: LevelGroup, idx: number, v: number) => {
+    updateState((prev) => ({ ...prev, levels: withLevel(prev.levels, group, idx, v) }));
   }, [updateState]);
 
-  const setAscentLevel = useCallback((v: number) => {
-    updateState((prev) => ({ ...prev, levels: { ...prev.levels, ascent: clampLevel(v) } }));
-  }, [updateState]);
-
-  const setMasteryLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const mastery = [...prev.levels.mastery];
-      mastery[idx] = clampLevel(v);
-      return { ...prev, levels: { ...prev.levels, mastery } };
-    });
-  }, [updateState]);
-
-  const setEnhancementLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const enhancement = [...prev.levels.enhancement];
-      enhancement[idx] = clampLevel(v);
-      return { ...prev, levels: { ...prev.levels, enhancement } };
-    });
-  }, [updateState]);
-
-  const setCommonLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const common = [...prev.levels.common];
-      common[idx] = clampLevel(v);
-      return { ...prev, levels: { ...prev.levels, common } };
-    });
-  }, [updateState]);
-
-  // Desired level setters
-  const setDesiredOriginLevel = useCallback((v: number) => {
-    updateState((prev) => {
-      const dl = prev.desiredLevels ?? defaultDesiredLevels();
-      return { ...prev, desiredLevels: { ...dl, origin: Math.max(1, clampLevel(v)) } };
-    });
-  }, [updateState]);
-
-  const setDesiredAscentLevel = useCallback((v: number) => {
-    updateState((prev) => {
-      const dl = prev.desiredLevels ?? defaultDesiredLevels();
-      return { ...prev, desiredLevels: { ...dl, ascent: clampLevel(v) } };
-    });
-  }, [updateState]);
-
-  const setDesiredMasteryLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const dl = prev.desiredLevels ?? defaultDesiredLevels();
-      const mastery = [...dl.mastery];
-      mastery[idx] = clampLevel(v);
-      return { ...prev, desiredLevels: { ...dl, mastery } };
-    });
-  }, [updateState]);
-
-  const setDesiredEnhancementLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const dl = prev.desiredLevels ?? defaultDesiredLevels();
-      const enhancement = [...dl.enhancement];
-      enhancement[idx] = clampLevel(v);
-      return { ...prev, desiredLevels: { ...dl, enhancement } };
-    });
-  }, [updateState]);
-
-  const setDesiredCommonLevel = useCallback((idx: number, v: number) => {
-    updateState((prev) => {
-      const dl = prev.desiredLevels ?? defaultDesiredLevels();
-      const common = [...dl.common];
-      common[idx] = clampLevel(v);
-      return { ...prev, desiredLevels: { ...dl, common } };
-    });
+  const setDesiredLevel = useCallback((group: LevelGroup, idx: number, v: number) => {
+    updateState((prev) => ({
+      ...prev,
+      desiredLevels: withLevel(prev.desiredLevels ?? defaultDesiredLevels(), group, idx, v),
+    }));
   }, [updateState]);
 
   const resetAll = useCallback(() => {
@@ -367,16 +314,8 @@ export function useHexaSkillsState() {
     setClassName,
     levels,
     desiredLevels,
-    setOriginLevel,
-    setAscentLevel,
-    setMasteryLevel,
-    setEnhancementLevel,
-    setCommonLevel,
-    setDesiredOriginLevel,
-    setDesiredAscentLevel,
-    setDesiredMasteryLevel,
-    setDesiredEnhancementLevel,
-    setDesiredCommonLevel,
+    setLevel,
+    setDesiredLevel,
     resetAll,
     applyGuide,
     costs,

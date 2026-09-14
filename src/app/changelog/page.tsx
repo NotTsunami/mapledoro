@@ -22,6 +22,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: "fixed", text: "Fixed the Genesis Liberation question showing up in character setup for legacy classes that can never actually access it." },
       { type: "fixed", text: "Fixed character setup breaking for a few classes with no fixed main stat (like Noblesse): the step jump menu could let you skip past an unfinished Stats step, and MapleScouter Setup could get stuck unable to continue even with everything filled in." },
       { type: "fixed", text: "Fixed Boss Clear percentages not matching MapleScouter's site." },
+      { type: "fixed", text: "Fixed the Trace Restoration Tracker showing no completion date for high-point targets when only a few low-value missions are selected." },
     ],
   },
   {

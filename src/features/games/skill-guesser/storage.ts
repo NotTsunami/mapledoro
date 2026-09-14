@@ -12,22 +12,18 @@
   overwrite another's history.
 */
 
+import { computeGuessStats, type GuessResult, type GuessStats } from "../dailyGame";
 import { readGameSection, writeGameSection } from "../gamesStore";
+import { MAX_GUESSES } from "./puzzles";
 
 const SECTION = "skillGuesser";
 
 export type GameMode = "normal" | "hard";
 
-export interface SkillGuesserResult {
-  guesses: string[];
-  won: boolean;
-  done: boolean;
-}
-
 /** Per-puzzle results, one slot per mode. */
 export interface PuzzleResults {
-  normal?: SkillGuesserResult;
-  hard?: SkillGuesserResult;
+  normal?: GuessResult;
+  hard?: GuessResult;
 }
 
 interface SkillGuesserSection {
@@ -45,7 +41,7 @@ export function readPuzzleResults(puzzleNumber: number): PuzzleResults {
 export function writeSkillGuesserResult(
   puzzleNumber: number,
   mode: GameMode,
-  result: SkillGuesserResult,
+  result: GuessResult,
 ): void {
   const results = readResults();
   const key = String(puzzleNumber);
@@ -54,36 +50,9 @@ export function writeSkillGuesserResult(
   } satisfies SkillGuesserSection);
 }
 
-export interface SkillGuesserStats {
-  played: number;
-  /** Whole percent, 0-100. */
-  winRate: number;
-  /** Average guesses across wins, or null before the first win. */
-  avgGuesses: number | null;
-  /** Wins by guess count (indexes 0-4 = 1-5 guesses), index 5 = losses. */
-  distribution: number[];
-}
-
-export function computeSkillGuesserStats(mode: GameMode): SkillGuesserStats {
+export function computeSkillGuesserStats(mode: GameMode): GuessStats {
   const results = Object.values(readResults())
     .map((r) => r[mode])
-    .filter((r): r is SkillGuesserResult => r !== undefined && r.done);
-  const distribution = [0, 0, 0, 0, 0, 0];
-  let wins = 0;
-  let winGuessTotal = 0;
-  for (const r of results) {
-    if (r.won) {
-      wins += 1;
-      winGuessTotal += r.guesses.length;
-      distribution[Math.min(r.guesses.length, 5) - 1] += 1;
-    } else {
-      distribution[5] += 1;
-    }
-  }
-  return {
-    played: results.length,
-    winRate: results.length > 0 ? Math.round((wins / results.length) * 100) : 0,
-    avgGuesses: wins > 0 ? winGuessTotal / wins : null,
-    distribution,
-  };
+    .filter((r): r is GuessResult => r !== undefined);
+  return computeGuessStats(results, MAX_GUESSES);
 }

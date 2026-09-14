@@ -1,29 +1,13 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
-import ModalShell from "../../../components/ModalShell";
-import type { AppTheme } from "../../../components/themes";
-import { toolStyles } from "../../tools/tool-styles";
-import PuzzleSkillIcon from "./PuzzleSkillIcon";
-import { MAX_GUESSES, msUntilNextPuzzle, type SkillGuesserPuzzle } from "./puzzles";
-import type { GameMode, SkillGuesserResult } from "./storage";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import ModalShell from "../../components/ModalShell";
+import type { AppTheme } from "../../components/themes";
+import { toolStyles } from "../tools/tool-styles";
+import type { GuessResult, PuzzleClock } from "./dailyGame";
 
 // Shares link straight to the day that was played, via the archive route.
-const SHARE_BASE_URL = "https://www.mapledoro.com/games/skill-guesser";
-
-function buildShareText(
-  puzzleNumber: number,
-  mode: GameMode,
-  answer: string,
-  result: SkillGuesserResult,
-): string {
-  const score = result.won ? `${result.guesses.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
-  const tag = mode === "hard" ? " (Hard)" : "";
-  const squares = result.guesses
-    .map((g) => (g === answer ? "\u{1F7E9}" : "\u{1F7E5}"))
-    .join("");
-  return `Mapledle #${puzzleNumber}${tag} ${score}\n${squares}\n${SHARE_BASE_URL}/${puzzleNumber}`;
-}
+const SITE_ORIGIN = "https://www.mapledoro.com";
 
 function formatCountdown(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -34,13 +18,13 @@ function formatCountdown(ms: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-function NextPuzzleCountdown({ theme }: { theme: AppTheme }) {
-  const [remaining, setRemaining] = useState(() => msUntilNextPuzzle());
+function NextPuzzleCountdown({ theme, clock }: { theme: AppTheme; clock: PuzzleClock }) {
+  const [remaining, setRemaining] = useState(() => clock.msUntilNextPuzzle());
 
   useEffect(() => {
-    const id = setInterval(() => setRemaining(msUntilNextPuzzle()), 1000);
+    const id = setInterval(() => setRemaining(clock.msUntilNextPuzzle()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [clock]);
 
   return (
     <div style={{ fontSize: "0.8rem", fontWeight: 700, color: theme.muted }}>
@@ -72,24 +56,38 @@ const revealCard: CSSProperties = {
   textAlign: "left",
 };
 
+/** End-of-game dialog: outcome, answer reveal, share squares, next-puzzle countdown. */
 export default function ResultsDialog({
   theme,
+  gameName,
+  basePath,
   puzzleNumber,
-  puzzle,
-  mode,
-  result,
+  modeTag = "",
   answer,
-  skillNameRevealed,
+  result,
+  maxGuesses,
+  clock,
+  revealIcon,
+  revealHeading,
+  revealSubheading,
   onClose,
 }: {
   theme: AppTheme;
+  /** Player-facing name, used in the heading and share text. */
+  gameName: string;
+  /** Route base, e.g. "/games/bgm-guesser"; the share link appends the puzzle number. */
+  basePath: string;
   puzzleNumber: number;
-  puzzle: SkillGuesserPuzzle;
-  mode: GameMode;
-  result: SkillGuesserResult;
-  /** The value guesses are scored against (skill name in hard mode, else class). */
+  /** Appended after the puzzle number, e.g. " (Hard)". */
+  modeTag?: string;
+  /** The value guesses were scored against. */
   answer: string;
-  skillNameRevealed: boolean;
+  result: GuessResult;
+  maxGuesses: number;
+  clock: PuzzleClock;
+  revealIcon: ReactNode;
+  revealHeading: string;
+  revealSubheading: string;
   onClose: () => void;
 }) {
   const styles = toolStyles(theme);
@@ -101,19 +99,22 @@ export default function ResultsDialog({
     return () => clearTimeout(t);
   }, [copied]);
 
+  const score = result.won ? `${result.guesses.length}/${maxGuesses}` : `X/${maxGuesses}`;
+  const squares = result.guesses.map((g) => (g === answer ? "\u{1F7E9}" : "\u{1F7E5}"));
+
   async function handleShare() {
+    const link = `${SITE_ORIGIN}${basePath}/${puzzleNumber}`;
+    const text = `${gameName} #${puzzleNumber}${modeTag} ${score}\n${squares.join("")}\n${link}`;
     try {
-      await navigator.clipboard.writeText(buildShareText(puzzleNumber, mode, answer, result));
+      await navigator.clipboard.writeText(text);
       setCopied(true);
     } catch { /* clipboard unavailable */ }
   }
 
-  const score = result.won ? `${result.guesses.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
-
   return (
     <ModalShell
       theme={theme}
-      ariaLabel="Mapledle results"
+      ariaLabel={`${gameName} results`}
       onClose={onClose}
       style={{ width: "min(420px, calc(100% - 2rem))", padding: "1.5rem" }}
     >
@@ -122,33 +123,28 @@ export default function ResultsDialog({
           {result.won ? "You got it!" : "Out of guesses!"}
         </div>
         <div style={{ fontSize: "0.8rem", fontWeight: 700, color: theme.muted, marginTop: "0.2rem" }}>
-          Mapledle #{puzzleNumber}{mode === "hard" ? " (Hard)" : ""} — {score}
+          {gameName} #{puzzleNumber}{modeTag} — {score}
         </div>
 
         <div
           style={{ ...revealCard, border: `1px solid ${theme.border}`, background: theme.timerBg }}
         >
           <div style={{ ...revealIconFrame, background: theme.panel, border: `1px solid ${theme.border}` }}>
-            <PuzzleSkillIcon
-              puzzle={puzzle}
-              size={44}
-              alt={puzzle.skillName}
-              style={{ imageRendering: "pixelated" }}
-            />
+            {revealIcon}
           </div>
           <div>
             <div style={{ fontSize: "0.92rem", fontWeight: 800, color: theme.text }}>
-              {puzzle.className}
+              {revealHeading}
             </div>
             <div style={{ fontSize: "0.78rem", fontWeight: 600, color: theme.muted }}>
-              {skillNameRevealed ? puzzle.skillName : "Clear Hard Mode to reveal the skill name"}
+              {revealSubheading}
             </div>
           </div>
         </div>
 
         <div style={{ fontSize: "1.3rem", letterSpacing: "0.15em", marginBottom: "1.1rem" }} aria-hidden="true">
-          {result.guesses.map((g, i) => (
-            <span key={i}>{g === answer ? "\u{1F7E9}" : "\u{1F7E5}"}</span>
+          {squares.map((sq, i) => (
+            <span key={i}>{sq}</span>
           ))}
         </div>
 
@@ -171,7 +167,7 @@ export default function ResultsDialog({
           </button>
         </div>
 
-        <NextPuzzleCountdown theme={theme} />
+        <NextPuzzleCountdown theme={theme} clock={clock} />
       </div>
     </ModalShell>
   );

@@ -29,6 +29,10 @@ export const GRANULAR_LEVELS = [
   "120-129", "130-139", "140-149", "150-159", "160-169", "170-179",
   "180-189", "190-199", "200-209", "210-219", "220-229", "230-239", "240-249", "250+",
 ] as const;
+type ArmorLevel = (typeof ARMOR_LEVELS)[number];
+export type WeaponLevel = (typeof WEAPON_LEVELS)[number];
+type GranularLevel = (typeof GRANULAR_LEVELS)[number];
+export type ItemLevel = ArmorLevel | GranularLevel;
 
 // -- Tier probabilities -------------------------------------------------------
 
@@ -46,29 +50,29 @@ const NON_ADVANTAGED_LINE_PROBS: Record<number, number> = { 1: 0.40, 2: 0.40, 3:
 
 // -- Stat-per-tier tables -----------------------------------------------------
 
-const STAT_PER_TIER: Record<string, number> = {
+const STAT_PER_TIER: Record<ArmorLevel, number> = {
   "120-139": 7, "140-159": 8, "160-179": 9, "180-199": 10,
   "200-229": 11, "230-249": 12, "250+": 12,
 };
 
-const COMBO_PER_TIER: Record<string, number> = {
+const COMBO_PER_TIER: Record<ArmorLevel, number> = {
   "120-139": 4, "140-159": 4, "160-179": 5, "180-199": 5,
   "200-229": 6, "230-249": 6, "250+": 7,
 };
 
-const HP_PER_TIER: Record<string, number> = {
+const HP_PER_TIER: Partial<Record<ItemLevel, number>> = {
   "120-129": 360, "130-139": 390, "140-149": 420, "150-159": 450,
   "160-169": 480, "170-179": 510, "180-189": 540, "190-199": 570,
   "200-209": 600, "210-219": 620, "220-229": 640, "230-239": 660,
   "240-249": 680, "250+": 700,
 };
 
-const WATT_PER_TIER_ADV: Record<string, Record<number, number>> = {
+const WATT_PER_TIER_ADV: Record<WeaponLevel, Record<number, number>> = {
   "160-199": { 3: 0.15, 4: 0.22, 5: 0.3025, 6: 0.3993, 7: 0.512435 },
   "200+":    { 3: 0.18, 4: 0.264, 5: 0.363, 6: 0.47916, 7: 0.614922 },
 };
 
-const WATT_PER_TIER_NON_ADV: Record<string, Record<number, number>> = {
+const WATT_PER_TIER_NON_ADV: Record<WeaponLevel, Record<number, number>> = {
   "160-199": { 1: 0.05, 2: 0.11, 3: 0.185, 4: 0.2662, 5: 0.366025, 6: 0.43923, 7: 0.512435 },
   "200+":    { 1: 0.06, 2: 0.132, 3: 0.2178, 4: 0.31944, 5: 0.43923, 6: 0.527076, 7: 0.614922 },
 };
@@ -113,18 +117,17 @@ function getUpperTierLimit(flameType: FlameType, nonAdvantaged: boolean): number
   return 8;
 }
 
-function toCoarseLevel(granular: string): string {
-  const map: Record<string, string> = {
-    "120-129": "120-139", "130-139": "120-139",
-    "140-149": "140-159", "150-159": "140-159",
-    "160-169": "160-179", "170-179": "160-179",
-    "180-189": "180-199", "190-199": "180-199",
-    "200-209": "200-229", "210-219": "200-229", "220-229": "200-229",
-    "230-239": "230-249", "240-249": "230-249",
-    "250+": "250+",
-  };
-  return map[granular] ?? granular;
-}
+// Granular (Demon Avenger) bands fold into the armor band that shares their stat tables;
+// armor bands map to themselves so the lookup is total over every level the selects offer.
+const COARSE_LEVEL: Record<ItemLevel, ArmorLevel> = {
+  "120-129": "120-139", "130-139": "120-139", "120-139": "120-139",
+  "140-149": "140-159", "150-159": "140-159", "140-159": "140-159",
+  "160-169": "160-179", "170-179": "160-179", "160-179": "160-179",
+  "180-189": "180-199", "190-199": "180-199", "180-199": "180-199",
+  "200-209": "200-229", "210-219": "200-229", "220-229": "200-229", "200-229": "200-229",
+  "230-239": "230-249", "240-249": "230-249", "230-249": "230-249",
+  "250+": "250+",
+};
 
 function getChooseFrom(cls: FlameClass): number {
   if (cls === "xenon" || cls === "db" || cls === "shadower" || cls === "cadena") return 8;
@@ -193,7 +196,7 @@ interface LineCtx {
   attackFn: (tier: number) => number;
 }
 
-function daLines(itemLevel: string, ctx: LineCtx): FlameLine[] {
+function daLines(itemLevel: ItemLevel, ctx: LineCtx): FlameLine[] {
   const hpt = HP_PER_TIER[itemLevel] ?? 600;
   return [
     { contribution: (t) => t * hpt },
@@ -255,21 +258,21 @@ function otherLines(ctx: LineCtx, secEquiv: number): FlameLine[] {
 function buildFlameLines(
   cls: FlameClass,
   itemType: ItemType,
-  itemLevel: string,
-  weaponLevel: string,
+  itemLevel: ItemLevel,
+  weaponLevel: WeaponLevel,
   baseAttack: number,
   eq: StatEquivalences,
   nonAdvantaged: boolean,
 ): FlameLine[] {
-  const coarse = toCoarseLevel(itemLevel);
-  const spt = STAT_PER_TIER[coarse] ?? 11;
-  const cpt = COMBO_PER_TIER[coarse] ?? 6;
+  const coarse = COARSE_LEVEL[itemLevel];
+  const spt = STAT_PER_TIER[coarse];
+  const cpt = COMBO_PER_TIER[coarse];
 
   const attackFn = (tier: number): number => {
     if (tier === 0) return 0;
     if (itemType === "armor") return tier * eq.attack;
     const table = nonAdvantaged ? WATT_PER_TIER_NON_ADV : WATT_PER_TIER_ADV;
-    const perc = table[weaponLevel]?.[tier] ?? 0;
+    const perc = table[weaponLevel][tier];
     return baseAttack * perc * eq.attack;
   };
 
@@ -322,8 +325,8 @@ export function computeFlameResults(params: {
   flameClass: FlameClass;
   itemType: ItemType;
   flameType: FlameType;
-  itemLevel: string;
-  weaponLevel: string;
+  itemLevel: ItemLevel;
+  weaponLevel: WeaponLevel;
   baseAttack: number;
   flameAdvantaged: boolean;
   desiredStat: number;

@@ -23,11 +23,13 @@ export function useApplyCharacterQueryParam({
     appliedRef.current = true;
     const name = new URLSearchParams(window.location.search).get("character");
     if (name && characters.some((c) => c.characterName === name)) {
+      // react-doctor-disable-next-line no-pass-data-to-parent -- the parent already owns this hook (usePerCharacterToolState, useStatOptimizer). The effect exists because the URL param and the character store are only readable after hydration, so the initial selection can't be seeded in a state initializer without a server/client mismatch.
       handleCharChange(name);
       return;
     }
     const main = selectMainCharacter(readCharactersStore());
     if (main && characters.some((c) => c.characterName === main.characterName)) {
+      // react-doctor-disable-next-line no-pass-data-to-parent -- same post-hydration reasoning as above.
       handleCharChange(main.characterName);
     }
   }, [mounted, characters, handleCharChange]);

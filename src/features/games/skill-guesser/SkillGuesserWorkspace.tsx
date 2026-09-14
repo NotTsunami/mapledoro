@@ -1,55 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import Link from "next/link";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
-import { STATUS, statusText } from "../../../components/statusColors";
-import { useMounted } from "../../../lib/useMounted";
-import { ActionButton } from "../../tools/shared-ui";
 import { toolStyles } from "../../tools/tool-styles";
-import { usePuzzleRoute } from "../usePuzzleRoute";
+import { EMPTY_RESULT, applyGuess } from "../dailyGame";
+import DailyGameWorkspace from "../DailyGameWorkspace";
+import { GuessControls } from "../GuessControls";
+import ResultsDialog from "../ResultsDialog";
+import { GuessSlots, StatsPanel } from "../shared-ui";
 import { SKILL_GUESSER_CLASSES, findSkillGuesserClass } from "./classes";
 import {
   MAX_GUESSES,
+  PUZZLE_CLOCK,
   allSkillNames,
-  currentPuzzleNumber,
   getPuzzle,
-  msUntilNextPuzzle,
-  puzzleDateMs,
   type SkillGuesserPuzzle,
 } from "./puzzles";
 import PuzzleSkillIcon from "./PuzzleSkillIcon";
-import ResultsDialog from "./ResultsDialog";
 import {
   computeSkillGuesserStats,
   readPuzzleResults,
   writeSkillGuesserResult,
   type GameMode,
-  type SkillGuesserResult,
 } from "./storage";
 
-
-/* Puzzles roll over at 00:00 UTC, so the date label is formatted in UTC too. */
-const PUZZLE_DATE_FMT = new Intl.DateTimeFormat(undefined, {
-  timeZone: "UTC",
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-});
-
-const EMPTY_RESULT: SkillGuesserResult = { guesses: [], won: false, done: false };
-
-const optionBtn: CSSProperties = {
-  display: "block",
-  width: "100%",
-  background: "none",
-  border: "none",
-  padding: "7px 12px",
-  font: "inherit",
-  textAlign: "left",
-  fontSize: "0.82rem",
-  fontWeight: 600,
-};
+const BASE_PATH = "/games/skill-guesser";
+const GAME_NAME = "Mapledle";
 
 const modeTabBtn: CSSProperties = {
   padding: "5px 14px",
@@ -60,26 +36,6 @@ const modeTabBtn: CSSProperties = {
   userSelect: "none",
 };
 
-const guessSlot: CSSProperties = {
-  borderRadius: 10,
-  padding: "0.5rem 0.85rem",
-  display: "flex",
-  alignItems: "center",
-  gap: "0.6rem",
-  fontSize: "0.85rem",
-  fontWeight: 700,
-  minHeight: 24,
-};
-
-const distBar: CSSProperties = {
-  borderRadius: 4,
-  fontSize: "0.75rem",
-  fontWeight: 800,
-  padding: "1px 6px",
-  textAlign: "right",
-  boxSizing: "border-box",
-};
-
 const iconFrame: CSSProperties = {
   width: 96,
   height: 96,
@@ -88,140 +44,6 @@ const iconFrame: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
 };
-
-/* ------------------------------------------------------------------ */
-/*  Guess picker (searchable combobox over the active answer pool)     */
-/*  Normal mode picks a class; hard mode picks the skill name.         */
-/* ------------------------------------------------------------------ */
-
-function GuessPicker({
-  theme,
-  options,
-  placeholder,
-  ariaLabel,
-  search,
-  guessed,
-  onSearchChange,
-  onStage,
-  onSubmit,
-}: {
-  theme: AppTheme;
-  options: string[];
-  placeholder: string;
-  ariaLabel: string;
-  search: string;
-  guessed: Set<string>;
-  onSearchChange: (v: string) => void;
-  onStage: (name: string) => void;
-  onSubmit: (name: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((name) => name.toLowerCase().includes(q));
-  }, [search, options]);
-
-  function pick(name: string) {
-    onStage(name);
-    setOpen(false);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape") {
-      setOpen(false);
-      return;
-    }
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const exact = filtered.find((name) => name.toLowerCase() === search.trim().toLowerCase());
-    if (exact && !guessed.has(exact)) {
-      setOpen(false);
-      onSubmit(exact);
-      return;
-    }
-    const first = filtered.find((name) => !guessed.has(name));
-    if (first) pick(first);
-  }
-
-  const menuStyle: CSSProperties = {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    maxHeight: 240,
-    overflowY: "auto",
-    background: theme.panel,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 8,
-    zIndex: 10,
-    marginTop: 4,
-    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-  };
-
-  return (
-    <div ref={ref} style={{ position: "relative", flex: 1, minWidth: 220 }}>
-      <input
-        type="text"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls="sg-guess-listbox"
-        aria-label={ariaLabel}
-        value={search}
-        placeholder={placeholder}
-        className="tool-input"
-        onChange={(e) => {
-          onSearchChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKeyDown}
-        style={{ ...toolStyles(theme).inputStyle, width: "100%", height: 40, boxSizing: "border-box" }}
-      />
-      {open && (
-        <div id="sg-guess-listbox" role="listbox" style={menuStyle}>
-          {filtered.length === 0 && (
-            <div style={{ padding: 12, fontSize: "0.8rem", color: theme.muted, textAlign: "center" }}>
-              No matches found
-            </div>
-          )}
-          {filtered.map((name) => {
-            const used = guessed.has(name);
-            return (
-              <button
-                key={name}
-                type="button"
-                role="option"
-                aria-selected={search === name}
-                className="sg-option"
-                disabled={used}
-                onClick={() => pick(name)}
-                style={{
-                  ...optionBtn,
-                  color: used ? theme.muted : theme.text,
-                  textDecoration: used ? "line-through" : "none",
-                  cursor: used ? "not-allowed" : "pointer",
-                }}
-              >
-                {name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Mode tabs (Normal / Hard — hard locked until normal is finished)   */
@@ -284,56 +106,8 @@ function ModeTabs({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Guess slots + hints                                                */
+/*  Hints                                                              */
 /* ------------------------------------------------------------------ */
-
-function GuessSlots({
-  theme,
-  guesses,
-  answer,
-}: {
-  theme: AppTheme;
-  guesses: string[];
-  answer: string;
-}) {
-  return (
-    <div style={{ display: "grid", gap: "0.45rem" }}>
-      {Array.from({ length: MAX_GUESSES }, (_, i) => {
-        const guess = guesses[i];
-        const correct = guess === answer;
-        const verdict = statusText(theme, correct ? "success" : "danger");
-        const filled: CSSProperties = guess
-          ? {
-              border: `1px solid ${verdict}`,
-              background: theme.panel,
-              color: theme.text,
-            }
-          : {
-              border: `1px dashed ${theme.border}`,
-              background: theme.timerBg,
-              color: theme.muted,
-            };
-        return (
-          <div
-            key={i}
-            style={{ ...filled, ...guessSlot }}
-          >
-            {guess ? (
-              <>
-                <span aria-hidden="true" style={{ color: verdict, fontWeight: 800 }}>
-                  {correct ? "✓" : "✗"}
-                </span>
-                <span>{guess}</span>
-              </>
-            ) : (
-              <span style={{ fontSize: "0.78rem" }}>Guess {i + 1}</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function HintCards({
   theme,
@@ -353,6 +127,7 @@ function HintCards({
   ];
   return (
     <div className="sg-hints" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
+      <style>{`@media (max-width: 560px) { .sg-hints { grid-template-columns: 1fr !important; } }`}</style>
       {hints.map((h) => {
         const unlocked = failedCount >= h.unlockAfter;
         return (
@@ -380,69 +155,6 @@ function HintCards({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Stats panel                                                        */
-/* ------------------------------------------------------------------ */
-
-function StatsPanel({
-  theme,
-  mode,
-  sectionPanel,
-}: {
-  theme: AppTheme;
-  mode: GameMode;
-  sectionPanel: CSSProperties;
-}) {
-  const stats = computeSkillGuesserStats(mode);
-  const maxCount = Math.max(1, ...stats.distribution);
-  const summary = [
-    { label: "Played", value: String(stats.played) },
-    { label: "Win Rate", value: `${stats.winRate}%` },
-    { label: "Avg Guesses", value: stats.avgGuesses !== null ? stats.avgGuesses.toFixed(2) : "—" },
-  ];
-
-  return (
-    <div className="fade-in panel-card" style={sectionPanel}>
-      <div className="tool-field-label" style={{ color: theme.muted, marginBottom: "0.6rem" }}>
-        Your Stats — {mode === "hard" ? "Hard" : "Normal"}
-      </div>
-      <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: stats.played > 0 ? "0.9rem" : 0 }}>
-        {summary.map((s) => (
-          <div key={s.label}>
-            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: theme.text }}>{s.value}</div>
-            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.muted }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-      {stats.played > 0 && (
-        <div style={{ display: "grid", gap: "0.3rem" }}>
-          {stats.distribution.map((count, i) => {
-            const label = i < MAX_GUESSES ? String(i + 1) : "X";
-            return (
-              // react-doctor-disable-next-line no-array-index-as-key -- `label` is the row's identity, not its position: a fixed-length guess histogram (1..MAX_GUESSES then X) that never reorders or filters
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ width: 14, fontSize: "0.75rem", fontWeight: 800, color: theme.muted }}>{label}</span>
-                <div
-                  style={{
-                    ...distBar,
-                    width: `${(count / maxCount) * 100}%`,
-                    minWidth: count > 0 ? 26 : 8,
-                    background: i < MAX_GUESSES ? theme.accent : STATUS.danger.fill,
-                    color: i < MAX_GUESSES ? theme.accentOn : STATUS.danger.on,
-                    opacity: count > 0 ? 1 : 0.25,
-                  }}
-                >
-                  {count}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Single puzzle (owns both modes' results + the active mode)         */
 /* ------------------------------------------------------------------ */
 
@@ -451,8 +163,6 @@ function PuzzleView({ theme, puzzleNumber }: { theme: AppTheme; puzzleNumber: nu
   const styles = toolStyles(theme);
   const [results, setResults] = useState(() => readPuzzleResults(puzzleNumber));
   const [mode, setMode] = useState<GameMode>("normal");
-  const [search, setSearch] = useState("");
-  const [staged, setStaged] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const hardUnlocked = results.normal?.done === true;
@@ -478,27 +188,20 @@ function PuzzleView({ theme, puzzleNumber }: { theme: AppTheme; puzzleNumber: nu
 
   function handleModeChange(next: GameMode) {
     setMode(next);
-    setSearch("");
-    setStaged(null);
     setDialogOpen(false);
   }
 
-  function handleSubmit(name?: string) {
-    const guess = name ?? staged;
-    if (!guess || result.done || guessed.has(guess)) return;
-    setStaged(null);
-    setSearch("");
+  function handleSubmit(guess: string) {
     setResults((prev) => {
       const current = prev[mode] ?? EMPTY_RESULT;
-      if (current.done || current.guesses.includes(guess)) return prev;
-      const guesses = [...current.guesses, guess];
-      const won = guess === answer;
-      const next = { guesses, won, done: won || guesses.length >= MAX_GUESSES };
+      const next = applyGuess(current, guess, answer, MAX_GUESSES);
+      if (next === current) return prev;
       writeSkillGuesserResult(puzzleNumber, mode, next);
       return { ...prev, [mode]: next };
     });
-    const finished = guess === answer || result.guesses.length + 1 >= MAX_GUESSES;
-    if (finished) setTimeout(() => setDialogOpen(true), 700);
+    if (applyGuess(result, guess, answer, MAX_GUESSES).done) {
+      setTimeout(() => setDialogOpen(true), 700);
+    }
   }
 
   return (
@@ -537,56 +240,54 @@ function PuzzleView({ theme, puzzleNumber }: { theme: AppTheme; puzzleNumber: nu
           />
         </div>
 
-        {result.done ? (
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.1rem" }}>
-            <ActionButton theme={theme} label="View Results" onClick={() => setDialogOpen(true)} />
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.1rem", flexWrap: "wrap" }}>
-            <GuessPicker
-              theme={theme}
-              options={options}
-              placeholder={mode === "hard" ? "Search skills…" : "Search classes…"}
-              ariaLabel={mode === "hard" ? "Guess a skill" : "Guess a class"}
-              search={search}
-              guessed={guessed}
-              onSearchChange={(v) => {
-                setSearch(v);
-                setStaged(null);
-              }}
-              onStage={(name) => {
-                setStaged(name);
-                setSearch(name);
-              }}
-              onSubmit={handleSubmit}
-            />
-            <ActionButton
-              theme={theme}
-              label="Guess"
-              onClick={() => handleSubmit()}
-              disabled={staged === null || guessed.has(staged)}
-              style={{ height: 40, padding: "0 22px" }}
-            />
-          </div>
-        )}
+        {/* Keyed by mode so a half-typed search doesn't carry across answer pools. */}
+        <GuessControls
+          key={mode}
+          theme={theme}
+          done={result.done}
+          options={options}
+          placeholder={mode === "hard" ? "Search skills…" : "Search classes…"}
+          ariaLabel={mode === "hard" ? "Guess a skill" : "Guess a class"}
+          guessed={guessed}
+          onSubmit={handleSubmit}
+          onViewResults={() => setDialogOpen(true)}
+        />
 
         <div style={{ display: "grid", gap: "1.1rem" }}>
-          <GuessSlots theme={theme} guesses={result.guesses} answer={answer} />
+          <GuessSlots theme={theme} guesses={result.guesses} answer={answer} maxGuesses={MAX_GUESSES} />
           <HintCards theme={theme} puzzle={puzzle} failedCount={failedCount} />
         </div>
       </div>
 
-      <StatsPanel theme={theme} mode={mode} sectionPanel={styles.sectionPanel} />
+      <StatsPanel
+        theme={theme}
+        sectionPanel={styles.sectionPanel}
+        label={`Your Stats — ${mode === "hard" ? "Hard" : "Normal"}`}
+        stats={computeSkillGuesserStats(mode)}
+        maxGuesses={MAX_GUESSES}
+      />
 
       {dialogOpen && (
         <ResultsDialog
           theme={theme}
+          gameName={GAME_NAME}
+          basePath={BASE_PATH}
           puzzleNumber={puzzleNumber}
-          puzzle={puzzle}
-          mode={mode}
-          result={result}
+          modeTag={mode === "hard" ? " (Hard)" : ""}
           answer={answer}
-          skillNameRevealed={skillNameRevealed}
+          result={result}
+          maxGuesses={MAX_GUESSES}
+          clock={PUZZLE_CLOCK}
+          revealIcon={
+            <PuzzleSkillIcon
+              puzzle={puzzle}
+              size={44}
+              alt={puzzle.skillName}
+              style={{ imageRendering: "pixelated" }}
+            />
+          }
+          revealHeading={puzzle.className}
+          revealSubheading={skillNameRevealed ? puzzle.skillName : "Clear Hard Mode to reveal the skill name"}
           onClose={() => setDialogOpen(false)}
         />
       )}
@@ -606,92 +307,16 @@ export default function SkillGuesserWorkspace({
   /** Archive route segment, absent on the daily route. */
   urlPuzzle?: string;
 }) {
-  const mounted = useMounted();
-  const [today, setToday] = useState(() => currentPuzzleNumber());
-  const [puzzleNumber, setPuzzleNumber] = usePuzzleRoute("/games/skill-guesser", urlPuzzle, today);
-
-  // Advance to the next puzzle when the UTC day rolls over while the page is
-  // open; carry the viewer along only if they're looking at the latest day.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const next = currentPuzzleNumber();
-      setToday(next);
-      setPuzzleNumber((p) => (p === today ? next : p));
-    }, msUntilNextPuzzle() + 250);
-    return () => clearTimeout(t);
-  }, [today, setPuzzleNumber]);
-
-  if (!mounted) return null;
-
-  const canPrev = puzzleNumber > 1;
-  const canNext = puzzleNumber < today;
-  // react-doctor-disable-next-line no-locale-format-in-render -- unreachable during SSR: sits below the `if (!mounted) return null` gate above
-  const dateLabel = PUZZLE_DATE_FMT.format(puzzleDateMs(puzzleNumber));
-  const arrowStyle = (enabled: boolean): CSSProperties => ({
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "none",
-    border: "none",
-    padding: "0 0.3rem",
-    font: "inherit",
-    lineHeight: 1,
-    color: enabled ? theme.accent : theme.border,
-    cursor: enabled ? "pointer" : "not-allowed",
-  });
-
   return (
-    <div className="page-content">
-      <div className="tool-container" style={{ maxWidth: 560 }}>
-        <style>{`.sg-option:hover:not(:disabled) { background: ${theme.accentSoft}; }
-@media (max-width: 560px) { .sg-hints { grid-template-columns: 1fr !important; } }`}</style>
-        <div className="tool-header">
-          <Link href="/games" className="tool-header-back" style={{ color: theme.accentText }}>
-            ← Back to Games
-          </Link>
-          <div className="tool-header-title" style={{ color: theme.text }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", lineHeight: 1 }}>
-              <button
-                type="button"
-                aria-label="Previous puzzle"
-                disabled={!canPrev}
-                onClick={() => setPuzzleNumber((p) => p - 1)}
-                style={arrowStyle(canPrev)}
-              >
-                ‹
-              </button>
-              <span>Mapledle #{puzzleNumber}</span>
-              <button
-                type="button"
-                aria-label="Next puzzle"
-                disabled={!canNext}
-                onClick={() => setPuzzleNumber((p) => p + 1)}
-                style={arrowStyle(canNext)}
-              >
-                ›
-              </button>
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                color: theme.muted,
-                textAlign: "center",
-                marginTop: "0.2rem",
-              }}
-            >
-              {dateLabel}
-            </div>
-          </div>
-          <div className="tool-header-desc" style={{ color: theme.muted }}>
-            Guess which class learns the daily skill in {MAX_GUESSES} tries. Finish Normal Mode to
-            unlock Hard Mode, and use the arrows to replay earlier days.
-          </div>
-        </div>
-
-        <PuzzleView key={puzzleNumber} theme={theme} puzzleNumber={puzzleNumber} />
-      </div>
-    </div>
+    <DailyGameWorkspace
+      theme={theme}
+      urlPuzzle={urlPuzzle}
+      basePath={BASE_PATH}
+      gameName={GAME_NAME}
+      description={`Guess which class learns the daily skill in ${MAX_GUESSES} tries. Finish Normal Mode to unlock Hard Mode, and use the arrows to replay earlier days.`}
+      clock={PUZZLE_CLOCK}
+    >
+      {(puzzleNumber) => <PuzzleView key={puzzleNumber} theme={theme} puzzleNumber={puzzleNumber} />}
+    </DailyGameWorkspace>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "../../characters/model/charactersStore";
 import { readGlobalTool, writeGlobalTool } from "../globalToolsStore";
 import { moveInArray } from "../useCardReorder";
+import { useCharacterNamePicker } from "../useCharacterNamePicker";
 import { utcDateStr } from "../date";
 import {
   ARCANE_SYMBOL_QUESTS,
@@ -316,11 +317,8 @@ export function useDailiesState() {
     return loadState();
   });
 
-  // Dialog + name-picker + task-draft state.
+  // Dialog + task-draft state.
   const [dialog, setDialog] = useState<DailyDialogState>(null);
-  const [nameMode, setNameMode] = useState<"type" | "select">("type");
-  const [typedName, setTypedName] = useState("");
-  const [selectedStoreChar, setSelectedStoreChar] = useState<StoredCharacterRecord | null>(null);
   const [draft, setDraft] = useState<SelectedTasks>(emptySelected);
 
   // Daily reset (00:00 UTC) while the page stays open.
@@ -361,10 +359,8 @@ export function useDailiesState() {
     () => new Set(state.characters.map((c) => c.name.toLowerCase())),
     [state.characters],
   );
-  const availableStoreChars = useMemo(
-    () => storeChars.filter((c) => !usedNames.has(c.characterName.toLowerCase())),
-    [storeChars, usedNames],
-  );
+  const namePicker = useCharacterNamePicker(storeChars, usedNames);
+  const { pendingName, nameTaken, reset: resetNamePicker } = namePicker;
 
   const getStoreChar = useCallback(
     (name: string) => storeByName.get(name.toLowerCase()) ?? null,
@@ -389,27 +385,19 @@ export function useDailiesState() {
     [worldCounterTotals, storeByName],
   );
 
-  const pendingName =
-    nameMode === "type" ? typedName.trim() : (selectedStoreChar?.characterName ?? "");
-  // The picker can't offer a name already added, but a typed one can still collide.
-  // Two entries under one name leave the cards indistinguishable (they key on it)
-  // and double-count in the per-world counter totals, so the dialog blocks it
-  // rather than letting a silent duplicate through.
-  const pendingNameTaken = pendingName !== "" && usedNames.has(pendingName.toLowerCase());
-
   // -- Dialog handlers --
   const openAdd = useCallback(() => {
-    setNameMode("type");
-    setTypedName("");
-    setSelectedStoreChar(null);
+    resetNamePicker();
     setDialog({ type: "add-name" });
-  }, []);
+  }, [resetNamePicker]);
 
+  // A duplicate name would also double-count in the per-world counter totals,
+  // so the picker's `nameTaken` block matters here beyond the card key.
   const proceedToTasks = useCallback(() => {
-    if (!pendingName || pendingNameTaken) return;
+    if (!pendingName || nameTaken) return;
     setDraft(emptySelected());
     setDialog({ type: "add-tasks", name: pendingName });
-  }, [pendingName, pendingNameTaken]);
+  }, [pendingName, nameTaken]);
 
   const confirmAdd = useCallback(() => {
     if (dialog?.type !== "add-tasks") return;
@@ -460,9 +448,7 @@ export function useDailiesState() {
   const setCounter = useCallback(
     (index: number, id: string, value: number, charMax: number, worldMax: number) => {
       commit((prev) => {
-        const target = prev[index];
-        if (!target) return prev;
-        const worldKey = worldKeyOf(target.name, storeByName);
+        const worldKey = worldKeyOf(prev[index].name, storeByName);
         const others = sumOthersCounter(prev, index, worldKey, id, storeByName);
         const remaining = Math.max(0, worldMax - others);
         const clamped = Math.min(remaining, Math.max(0, Math.min(charMax, value)));
@@ -479,11 +465,9 @@ export function useDailiesState() {
   const setAllTasks = useCallback(
     (index: number, done: boolean) => {
       commit((prev) => {
-        const target = prev[index];
-        if (!target) return prev;
         const nextState = done
-          ? applyCheckAll(target.state, index, prev, storeByName)
-          : clearAllTasks(target.state);
+          ? applyCheckAll(prev[index].state, index, prev, storeByName)
+          : clearAllTasks(prev[index].state);
         return prev.map((c, i) => (i === index ? { ...c, state: nextState } : c));
       });
     },
@@ -498,16 +482,8 @@ export function useDailiesState() {
     characters: state.characters,
     getStoreChar,
     getWorldCounterTotal,
-    availableStoreChars,
+    namePicker,
     dialog,
-    nameMode,
-    setNameMode,
-    typedName,
-    setTypedName,
-    selectedStoreChar,
-    setSelectedStoreChar,
-    pendingName,
-    pendingNameTaken,
     draft,
     setDraft,
     openAdd,

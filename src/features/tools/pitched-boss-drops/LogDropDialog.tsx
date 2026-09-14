@@ -13,13 +13,11 @@ import {
   DROP_CATEGORIES,
   DROP_ITEMS,
   DROP_ITEMS_BY_ID,
-  categoryLabel,
-  type DropItem,
 } from "./pitched-items";
 import { SearchableSelect } from "../SearchableSelect";
 
 export interface LogDropPayload {
-  characterName: string;
+  character: StoredCharacterRecord;
   itemId: string;
   channel: number;
   date: string;
@@ -56,8 +54,8 @@ function CharacterPicker({
 }: {
   theme: AppTheme;
   characters: StoredCharacterRecord[];
-  value: string;
-  onChange: (name: string) => void;
+  value: StoredCharacterRecord | null;
+  onChange: (character: StoredCharacterRecord) => void;
 }) {
   return (
     <div
@@ -75,8 +73,8 @@ function CharacterPicker({
           key={c.characterName}
           theme={theme}
           character={c}
-          selected={value === c.characterName}
-          onSelect={() => onChange(c.characterName)}
+          selected={value === c}
+          onSelect={() => onChange(c)}
         />
       ))}
     </div>
@@ -100,22 +98,12 @@ function ItemPicker({
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matches = q
-      ? DROP_ITEMS.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            categoryLabel(item.category).toLowerCase().includes(q),
-        )
-      : DROP_ITEMS;
-    const groups = new Map<string, DropItem[]>();
-    for (const item of matches) {
-      const arr = groups.get(item.category) ?? [];
-      arr.push(item);
-      groups.set(item.category, arr);
-    }
     return DROP_CATEGORIES.flatMap((cat) => {
-      const items = groups.get(cat.id);
-      return items && items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
+      const labelMatches = cat.label.toLowerCase().includes(q);
+      const items = DROP_ITEMS.filter(
+        (item) => item.category === cat.id && (labelMatches || item.name.toLowerCase().includes(q)),
+      );
+      return items.length > 0 ? [{ id: cat.id, label: cat.label, items }] : [];
     });
   }, [search]);
 
@@ -161,7 +149,7 @@ export default function LogDropDialog({
   onClose: () => void;
   onSubmit: (payload: LogDropPayload) => void;
 }) {
-  const [charName, setCharName] = useState("");
+  const [character, setCharacter] = useState<StoredCharacterRecord | null>(null);
   const [itemId, setItemId] = useState("");
   const [channel, setChannel] = useState("");
   const [date, setDate] = useState(localDateStr);
@@ -169,11 +157,11 @@ export default function LogDropDialog({
 
   const styles = toolStyles(theme);
 
-  const ready = charName !== "" && itemId !== "" && channel !== "" && date !== "";
+  const ready = character !== null && itemId !== "" && channel !== "" && date !== "";
 
   function handleSubmit() {
-    if (!ready) return;
-    onSubmit({ characterName: charName, itemId, channel: parseInt(channel, 10), date, note: note.trim() });
+    if (character === null) return;
+    onSubmit({ character, itemId, channel: parseInt(channel, 10), date, note: note.trim() });
   }
 
   return (
@@ -216,8 +204,8 @@ export default function LogDropDialog({
             <CharacterPicker
               theme={theme}
               characters={characters}
-              value={charName}
-              onChange={setCharName}
+              value={character}
+              onChange={setCharacter}
             />
           </div>
 

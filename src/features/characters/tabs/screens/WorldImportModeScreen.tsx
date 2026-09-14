@@ -156,7 +156,7 @@ function ConflictRow({
               whiteSpace: "nowrap",
             }}
           >
-            {CHARACTERS_COPY.importConflict.useImported}
+            {CHARACTERS_COPY.importConflict.takeImported}
           </button>
         </div>
         <button
@@ -331,7 +331,7 @@ function ConflictsSection({
           {CHARACTERS_COPY.worldImport.keepAllMine}
         </button>
         <button type="button" onClick={() => applyBulkChoiceToAll("imported")} style={secondaryButtonStyle(theme, "0.5rem 0.8rem")}>
-          {CHARACTERS_COPY.worldImport.useAllImported}
+          {CHARACTERS_COPY.worldImport.takeAllImported}
         </button>
       </div>
       <div
@@ -725,7 +725,7 @@ function WorldImportConflictView({ theme, isUiLocked, payload, onImportWorldBulk
                 cursor: "pointer",
               }}
             >
-              {CHARACTERS_COPY.importConflict.useImported}
+              {CHARACTERS_COPY.importConflict.takeImported}
             </button>
           </div>
         </div>

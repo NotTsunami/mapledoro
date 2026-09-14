@@ -28,12 +28,6 @@ export const DROP_CATEGORIES: DropCategory[] = [
   { id: "exceptional", label: "Exceptional Enhancements" },
 ];
 
-const CATEGORY_MAP = new Map(DROP_CATEGORIES.map((c) => [c.id, c.label]));
-
-export function categoryLabel(id: string): string {
-  return CATEGORY_MAP.get(id) ?? id;
-}
-
 export const DROP_ITEMS: DropItem[] = [
   // ── Pitched Boss ──────────────────────────────────────────────────────────
   { id: "berserked", name: "Berserked", category: "pitched", itemId: "01012632" },

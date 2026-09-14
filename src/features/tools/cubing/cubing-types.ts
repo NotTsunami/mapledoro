@@ -65,6 +65,10 @@ export const CUBE_TYPES: { value: CubeKey; label: string }[] = [
   { value: "black", label: "Bright / Black" },
 ];
 
+export const CUBE_LABELS: Record<CubeKey, string> = Object.fromEntries(
+  CUBE_TYPES.map((c) => [c.value, c.label]),
+) as Record<CubeKey, string>;
+
 export const TIERS: { value: number; label: string }[] = [
   { value: 0, label: "Rare" },
   { value: 1, label: "Epic" },
@@ -72,7 +76,9 @@ export const TIERS: { value: number; label: string }[] = [
   { value: 3, label: "Legendary" },
 ];
 
-export const STAT_TYPES: { value: string; label: string }[] = [
+export type StatTypeKey = "normal" | "hp" | "allStat";
+
+export const STAT_TYPES: { value: StatTypeKey; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "hp", label: "Max HP (Demon Avenger)" },
   { value: "allStat", label: "All Stat (Xenon)" },
@@ -298,13 +304,13 @@ function lines(n: number): string {
   return n === 1 ? "1 Line" : `${n} Lines`;
 }
 
-const STAT_DISPLAY: Record<string, { valueName: string; display: string }> = {
+const STAT_DISPLAY: Record<StatTypeKey, { valueName: string; display: string }> = {
   normal: { valueName: "Stat", display: "Stat" },
   hp: { valueName: "Hp", display: "Max HP" },
   allStat: { valueName: "AllStat", display: "All Stat" },
 };
 
-function getPrimeLineValue(itemLevel: number, desiredTier: number, statType: string): number {
+function getPrimeLineValue(itemLevel: number, desiredTier: number, statType: StatTypeKey): number {
   const levelBonus = itemLevel >= 160 ? 1 : 0;
   const base = statType === "allStat" ? 0 : 3;
   return base + 3 * desiredTier + levelBonus;
@@ -375,7 +381,7 @@ function buildBossOptions(prime: number, desiredTier: number): StatOption[] {
   return opts;
 }
 
-function buildNonWSEStatOptions(desiredTier: number, itemLevel: number, statType: string, valueName: string, display: string): StatOption[] {
+function buildNonWSEStatOptions(desiredTier: number, itemLevel: number, statType: StatTypeKey, valueName: string, display: string): StatOption[] {
   const prime = getPrimeLineValue(itemLevel, desiredTier, statType);
   const needSpecial = statType === "allStat" && desiredTier === 1;
   const amounts = needSpecial ? [1, 3, 4, 5, 6, 9] : get3LStatAmounts(prime);
@@ -455,9 +461,9 @@ export function buildStatOptions(
   cubeType: CubeKey,
   desiredTier: number,
   itemLevel: number,
-  statType: string,
+  statType: StatTypeKey,
 ): StatOption[] {
-  const { valueName, display } = STAT_DISPLAY[statType] ?? STAT_DISPLAY.normal;
+  const { valueName, display } = STAT_DISPLAY[statType];
   const isWSE = itemType === "weapon" || itemType === "secondary" || itemType === "emblem";
 
   const opts = isWSE

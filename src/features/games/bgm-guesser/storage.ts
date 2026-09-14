@@ -7,62 +7,30 @@
   history.
 */
 
+import { computeGuessStats, type GuessResult, type GuessStats } from "../dailyGame";
 import { readGameSection, writeGameSection } from "../gamesStore";
+import { MAX_GUESSES } from "./puzzles";
 
 const SECTION = "bgmGuesser";
 
-export interface BgmGuesserResult {
-  guesses: string[];
-  won: boolean;
-  done: boolean;
-}
-
 interface BgmGuesserSection {
-  results: Record<string, BgmGuesserResult>;
+  results: Record<string, GuessResult>;
 }
 
-function readResults(): Record<string, BgmGuesserResult> {
+function readResults(): Record<string, GuessResult> {
   return readGameSection<BgmGuesserSection>(SECTION)?.results ?? {};
 }
 
-export function readPuzzleResult(puzzleNumber: number): BgmGuesserResult | undefined {
+export function readPuzzleResult(puzzleNumber: number): GuessResult | undefined {
   return readResults()[String(puzzleNumber)];
 }
 
-export function writeBgmGuesserResult(puzzleNumber: number, result: BgmGuesserResult): void {
+export function writeBgmGuesserResult(puzzleNumber: number, result: GuessResult): void {
   writeGameSection(SECTION, {
     results: { ...readResults(), [String(puzzleNumber)]: result },
   } satisfies BgmGuesserSection);
 }
 
-export interface BgmGuesserStats {
-  played: number;
-  /** Whole percent, 0-100. */
-  winRate: number;
-  /** Average guesses across wins, or null before the first win. */
-  avgGuesses: number | null;
-  /** Wins by guess count (indexes 0-2 = 1-3 guesses), last index = losses. */
-  distribution: number[];
-}
-
-export function computeBgmGuesserStats(maxGuesses: number): BgmGuesserStats {
-  const results = Object.values(readResults()).filter((r) => r.done);
-  const distribution = Array.from({ length: maxGuesses + 1 }, () => 0);
-  let wins = 0;
-  let winGuessTotal = 0;
-  for (const r of results) {
-    if (r.won) {
-      wins += 1;
-      winGuessTotal += r.guesses.length;
-      distribution[Math.min(r.guesses.length, maxGuesses) - 1] += 1;
-    } else {
-      distribution[maxGuesses] += 1;
-    }
-  }
-  return {
-    played: results.length,
-    winRate: results.length > 0 ? Math.round((wins / results.length) * 100) : 0,
-    avgGuesses: wins > 0 ? winGuessTotal / wins : null,
-    distribution,
-  };
+export function computeBgmGuesserStats(): GuessStats {
+  return computeGuessStats(Object.values(readResults()), MAX_GUESSES);
 }

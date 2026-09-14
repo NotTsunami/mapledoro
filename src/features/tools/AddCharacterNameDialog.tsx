@@ -3,10 +3,10 @@
 import { useRef } from "react";
 import type { AppTheme } from "../../components/themes";
 import { statusText } from "../../components/statusColors";
-import type { StoredCharacterRecord } from "../characters/model/charactersStore";
 import { CharacterPickerRow } from "./CharacterPickerRow";
 import { ToolDialog } from "./ToolDialog";
 import { toolStyles } from "./tool-styles";
+import type { CharacterNamePicker } from "./useCharacterNamePicker";
 
 /**
  * Step one of the "add a character" flow shared by the manually-populated
@@ -14,34 +14,26 @@ import { toolStyles } from "./tool-styles";
  */
 export function AddCharacterNameDialog({
   theme,
-  available,
-  nameMode,
-  onNameMode,
-  typedName,
-  onTypedName,
-  selectedChar,
-  onSelectedChar,
-  pendingName,
-  nameTaken = false,
+  picker,
   onNext,
   onClose,
 }: {
   theme: AppTheme;
-  available: StoredCharacterRecord[];
-  nameMode: "type" | "select";
-  onNameMode: (m: "type" | "select") => void;
-  typedName: string;
-  onTypedName: (v: string) => void;
-  selectedChar: StoredCharacterRecord | null;
-  onSelectedChar: (c: StoredCharacterRecord) => void;
-  pendingName: string;
-  /** The tracker already holds this name. The picker below can't offer a
-   *  duplicate (it filters them out), but a typed name can still collide, and
-   *  adding one twice leaves two cards the tracker can't tell apart. */
-  nameTaken?: boolean;
+  picker: CharacterNamePicker;
   onNext: () => void;
   onClose: () => void;
 }) {
+  const {
+    available,
+    nameMode,
+    setNameMode,
+    typedName,
+    setTypedName,
+    selectedChar,
+    setSelectedChar,
+    pendingName,
+    nameTaken,
+  } = picker;
   const hasAvailable = available.length > 0;
   const styles = toolStyles(theme);
   // Focus once on mount only — re-running this on every render would fight the
@@ -103,7 +95,7 @@ export function AddCharacterNameDialog({
               type="radio"
               name="tool-name-mode"
               checked={nameMode === "type"}
-              onChange={() => onNameMode("type")}
+              onChange={() => setNameMode("type")}
               style={{ accentColor: theme.accent }}
             />
             <span style={{ fontSize: "0.82rem", fontWeight: 700, color: theme.text }}>
@@ -114,9 +106,10 @@ export function AddCharacterNameDialog({
             <input
               type="text"
               placeholder="Character name"
+              aria-label="Character name"
               maxLength={14}
               value={typedName}
-              onChange={(e) => onTypedName(e.target.value)}
+              onChange={(e) => setTypedName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canProceed) onNext();
               }}
@@ -137,7 +130,7 @@ export function AddCharacterNameDialog({
               type="radio"
               name="tool-name-mode"
               checked={nameMode === "select"}
-              onChange={() => onNameMode("select")}
+              onChange={() => setNameMode("select")}
               style={{ accentColor: theme.accent }}
             />
             <span style={{ fontSize: "0.82rem", fontWeight: 700, color: theme.text }}>
@@ -162,7 +155,7 @@ export function AddCharacterNameDialog({
                   theme={theme}
                   character={c}
                   selected={selectedChar?.characterName === c.characterName}
-                  onSelect={() => onSelectedChar(c)}
+                  onSelect={() => setSelectedChar(c)}
                 />
               ))}
             </div>
@@ -172,9 +165,10 @@ export function AddCharacterNameDialog({
         <input
           type="text"
           placeholder="Character name"
+          aria-label="Character name"
           maxLength={14}
           value={typedName}
-          onChange={(e) => onTypedName(e.target.value)}
+          onChange={(e) => setTypedName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && typedName.trim()) onNext();
           }}

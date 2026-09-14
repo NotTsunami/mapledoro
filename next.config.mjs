@@ -2,6 +2,10 @@
 const nextConfig = {
   poweredByHeader: false,
   typedRoutes: true,
+  // Auto-memoizes components and hooks (babel-plugin-react-compiler). The tools
+  // have no hand-written React.memo, so this is what stops a workspace-level
+  // state change from re-rendering every card and row beneath it.
+  reactCompiler: true,
   async headers() {
     return [
       {

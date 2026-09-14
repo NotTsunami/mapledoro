@@ -186,6 +186,61 @@ function OtherWeeksAccordion({
   );
 }
 
+function headerStatus(loading: boolean, error: string | null, upcoming: SunnySundayWeek | null): string {
+  if (loading) return "Loading...";
+  if (error) return "Connection error";
+  return upcoming ? formatLocalDate(upcoming.dateISO) : "No data";
+}
+
+function SunnySundayBody({
+  theme,
+  loading,
+  error,
+  upcoming,
+  otherWeeks,
+  showOther,
+  onToggle,
+}: {
+  theme: AppTheme;
+  loading: boolean;
+  error: string | null;
+  upcoming: SunnySundayWeek | null;
+  otherWeeks: SunnySundayWeek[];
+  showOther: boolean;
+  onToggle: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="empty-state" style={{ color: theme.muted }}>
+        Loading event data&hellip;
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="empty-state" style={{ color: theme.muted }}>
+        <div style={{ marginBottom: "0.5rem" }}>Could not load Sunny Sunday data.</div>
+        <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
+          Check that your Discord bot is configured.
+        </div>
+      </div>
+    );
+  }
+  if (!upcoming) {
+    return (
+      <div className="empty-state" style={{ color: theme.muted }}>
+        No Sunny Sunday data available.
+      </div>
+    );
+  }
+  return (
+    <>
+      <EventDetailsList details={upcoming.details} theme={theme} />
+      <OtherWeeksAccordion weeks={otherWeeks} theme={theme} showOther={showOther} onToggle={onToggle} />
+    </>
+  );
+}
+
 export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
   const [{ weeks, loading, error }, dispatch] = useReducer(fetchReducer, { weeks: [], loading: true, error: null });
   const [showOther, setShowOther] = useState(false);
@@ -214,12 +269,6 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
   const otherWeeks = futureWeeks.slice(1);
   const isActive = upcoming && now ? new Date(upcoming.dateISO) <= now && getEventEnd(upcoming.dateISO) > now : false;
 
-  let statusText: string;
-  if (loading) statusText = "Loading...";
-  else if (error) statusText = "Connection error";
-  else if (upcoming) statusText = formatLocalDate(upcoming.dateISO);
-  else statusText = "No data";
-
   return (
     <Panel theme={theme}>
       {/* Header */}
@@ -237,7 +286,7 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
               marginTop: "2px",
             }}
           >
-            {statusText}
+            {headerStatus(loading, error, upcoming)}
           </div>
         </div>
         {isActive && (
@@ -247,38 +296,15 @@ export default function SunnySundayPanel({ theme }: SunnySundayPanelProps) {
         )}
       </div>
 
-      {loading && (
-        <div className="empty-state" style={{ color: theme.muted }}>
-          Loading event data&hellip;
-        </div>
-      )}
-
-      {error && (
-        <div className="empty-state" style={{ color: theme.muted }}>
-          <div style={{ marginBottom: "0.5rem" }}>Could not load Sunny Sunday data.</div>
-          <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-            Check that your Discord bot is configured.
-          </div>
-        </div>
-      )}
-
-      {!loading && !error && upcoming && (
-        <>
-          <EventDetailsList details={upcoming.details} theme={theme} />
-          <OtherWeeksAccordion
-            weeks={otherWeeks}
-            theme={theme}
-            showOther={showOther}
-            onToggle={() => setShowOther((prev) => !prev)}
-          />
-        </>
-      )}
-
-      {!loading && !error && !upcoming && (
-        <div className="empty-state" style={{ color: theme.muted }}>
-          No Sunny Sunday data available.
-        </div>
-      )}
+      <SunnySundayBody
+        theme={theme}
+        loading={loading}
+        error={error}
+        upcoming={upcoming}
+        otherWeeks={otherWeeks}
+        showOther={showOther}
+        onToggle={() => setShowOther((prev) => !prev)}
+      />
     </Panel>
   );
 }

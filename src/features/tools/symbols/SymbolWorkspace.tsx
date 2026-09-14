@@ -354,6 +354,33 @@ function SymbolIncomeControls({
 
 // -- Symbol Card --------------------------------------------------------------
 
+function levelProgressPct(isMaxed: boolean, current: number, levelMax: number): number {
+  if (isMaxed) return 100;
+  return levelMax > 0 ? (current / levelMax) * 100 : 0;
+}
+
+/** Right-hand footer note: why the area is locked, or when it completes. */
+function AreaStatus({
+  area,
+  days,
+  isLocked,
+  isMaxed,
+  theme,
+}: {
+  area: SymbolArea;
+  days: number;
+  isLocked: boolean;
+  isMaxed: boolean;
+  theme: AppTheme;
+}) {
+  if (isLocked) return <span>Requires Lv. {area.requiredLevel}</span>;
+  if (isMaxed) return null;
+  if (days === Infinity) {
+    return <span style={{ color: statusText(theme, "danger"), fontWeight: 800 }}>No income set</span>;
+  }
+  return <span style={{ color: theme.accentText, fontWeight: 800 }}>{addDays(days)}</span>;
+}
+
 function SymbolCard({
   area,
   state,
@@ -383,11 +410,8 @@ function SymbolCard({
   theme: AppTheme;
   updateSymbol: (areaName: string, patch: Partial<SymbolState>) => void;
 }) {
-  let levelPct: number;
-  if (isMaxed) levelPct = 100;
-  else if (levelMax > 0) levelPct = (state.current / levelMax) * 100;
-  else levelPct = 0;
-  const areaPct = totalForOneArea > 0 ? (consumed / totalForOneArea) * 100 : 0;
+  const levelPct = levelProgressPct(isMaxed, state.current, levelMax);
+  const areaPct = (consumed / totalForOneArea) * 100;
   const isSacred = type === "sacred";
   const isGrand = isSacred && isGrandSacredArea(area);
   const dailyMax = area.daily + (isSacred ? SACRED_DAILY_EVENT_BONUS : ARCANE_DAILY_EVENT_BONUS);
@@ -486,17 +510,7 @@ function SymbolCard({
       {/* Overall area progress + completion */}
       <div style={areaProgressStyle}>
         <span>{areaPct.toFixed(1)}% complete</span>
-        {isLocked && <span>Requires Lv. {area.requiredLevel}</span>}
-        {!isLocked && !isMaxed && days !== Infinity && (
-          <span style={{ color: theme.accentText, fontWeight: 800 }}>
-            {addDays(days)}
-          </span>
-        )}
-        {!isLocked && !isMaxed && days === Infinity && (
-          <span style={{ color: statusText(theme, "danger"), fontWeight: 800 }}>
-            No income set
-          </span>
-        )}
+        <AreaStatus area={area} days={days} isLocked={isLocked} isMaxed={isMaxed} theme={theme} />
       </div>
     </div>
   );

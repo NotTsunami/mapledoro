@@ -6,8 +6,8 @@ Boss Crystals. `migrate()` upgrades the v1 shape (unordered `Record<characterNam
 
 **Manual-add flow:** characters come from the shared two-step dialog (`AddCharacterNameDialog` →
 `DailiesSelectionDialog`), not auto-listed from the character store. Shared pieces with Boss Crystals
-live in `../`: `AddCharacterNameDialog`, `AddCharacterCard`, `useCardReorder` (which also exports
-`moveInArray`). A card's avatar / level / job / world are looked up **live** by name (`getStoreChar`);
+live in `../`: `AddCharacterNameDialog` with its `useCharacterNamePicker` state hook, `AddCharacterCard`,
+`useCardReorder` (which also exports `moveInArray`). A card's avatar / level / job / world are looked up **live** by name (`getStoreChar`);
 a typed name with no match just shows the name.
 
 **Selection model:** cards start empty and only selected tasks render or count toward progress.

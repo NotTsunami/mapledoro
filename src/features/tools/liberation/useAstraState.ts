@@ -97,7 +97,7 @@ function accumulateBossIncome(
     const tracesPerClear = Math.floor(diff.traces / sel.partySize);
     weeklyTraces += tracesPerClear;
 
-    const voucherFrags = diff.hasVoucher ? sel.vouchersKept * (diff.voucherValue ?? 0) : 0;
+    const voucherFrags = diff.hasVoucher ? sel.vouchersKept * diff.voucherValue : 0;
     weeklyVoucherFragments += voucherFrags;
 
     if (!sel.clearedThisWeek) {
@@ -219,8 +219,8 @@ function simulateAstra(p: SimParams): SimResult {
 
   const final = missionResults[missionResults.length - 1];
   return {
-    completionDate: final?.completionDate ?? "Never",
-    weeksToComplete: final?.weeksFromStart ?? Infinity,
+    completionDate: final.completionDate,
+    weeksToComplete: final.weeksFromStart,
     missionResults,
   };
 }
