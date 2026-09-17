@@ -12,6 +12,12 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-09-17",
+    changes: [
+      { type: "added", text: "Add full Erda Link tracking support for SHINE classes, integrated into the existing HEXA Tracker." },
+    ],
+  },
+  {
     date: "2026-09-14",
     changes: [
       { type: "added", text: "The Mystic Frontier Solver now has the v271 potential lines, including the new \"for each element\" and \"for every type\" lines that count matching familiars, and the \"all dice odd, even, 3 or less, 4 or higher\" lines." },
