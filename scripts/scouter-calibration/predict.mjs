@@ -153,11 +153,42 @@ export function buffs(u, classId, links) {
 
 export const CORES = ["skillCore1", "skillCore2", "masteryCore1", "masteryCore2", "masteryCore3", "masteryCore4", "reinCore1", "reinCore2", "reinCore3", "reinCore4", "generalCore2", "generalCore3"];
 
-// Mastery cores that step every few levels instead of rising evenly: Hoyoung's 1st steps every 6
-// levels (MapleScouter's own leveling path takes it 1 -> 6 -> 12 -> 18 -> 24 -> 30, and its Lv 29 -> 30
-// probe gains 7x an ordinary level), Cadena's 1st every 2 (its measured levels fit that exactly).
-// Between measured levels these follow a + s L + J x (steps so far), fitted to the class's own levels.
-const CORE_STAIRS = { hoyoung: { masteryCore1: 6 }, cadena: { masteryCore1: 2 } };
+// Cores with a stat that steps at certain levels on top of an even rise, from the game's per-level
+// skill data (MapleStory Wiki skill tables): Hoyoung's Universal Harmony final damage +1 every 6
+// levels, Dark Knight's Gungnir's Descent ignore defense +1 at 4, 7, ..., 28, and so on. Between
+// measured levels these follow a + s L + J x (steps so far), fitted to the class's own levels. Hoyoung's
+// and Cadena's measured levels match the shape exactly (Hoyoung's to 0.0000% at all six).
+const MIN_STEP_FIT_LEVELS = 5;
+const every = (n, from = n) => Array.from({ length: Math.floor((30 - from) / n) + 1 }, (_, i) => from + i * n);
+const TENS = [10, 20, 30];
+const CORE_STEPS = {
+  hoyoung: { masteryCore1: every(6) },
+  cadena: { masteryCore1: every(2, 3) },
+  dark_knight: { masteryCore1: every(3, 4) },
+  marksman: { masteryCore1: every(3) },
+  shadower: { masteryCore2: every(3), generalCore3: [15, 30] },
+  blade_master: { masteryCore1: every(3, 4), generalCore3: [15, 30] },
+  night_lord: { generalCore3: [15, 30] },
+  cannoneer: { masteryCore1: [...every(3), ...every(6, 7)], masteryCore4: every(3), generalCore3: TENS },
+  buccaneer: { generalCore3: TENS },
+  corsair: { generalCore3: TENS },
+  luminous: { masteryCore1: every(6, 7) },
+  mercedes: { masteryCore3: Array.from({ length: 29 }, (_, i) => i + 2).filter((L) => L % 3 !== 0) },
+  blaster: { masteryCore3: every(3) },
+  xenon: { masteryCore1: every(3, 4) },
+  demon_slayer: { masteryCore1: [...every(3, 4), ...every(6, 7)], masteryCore3: every(2, 3) },
+  ark: { masteryCore1: every(6, 7), generalCore3: every(2) },
+  adele: { masteryCore1: [15, 30], generalCore3: every(2) },
+  illium: { generalCore3: every(2) },
+  khali: { generalCore3: every(2) },
+  bishop: { masteryCore3: every(2), generalCore3: TENS },
+  arch_mage_i_l: { masteryCore1: every(2), masteryCore2: every(2), generalCore3: TENS },
+  arch_mage_f_p: { generalCore3: TENS },
+  kanna: { generalCore3: every(6, 7) },
+  hayato: { generalCore3: every(6, 7) },
+  sia_astelle: { generalCore3: every(2, 3) },
+  erel_light: { generalCore3: every(2, 3) },
+};
 
 // Spline evaluation: MapleScouter's cubic Hermite (bossClearFormula.ts has the same one).
 export function splineEval({ x, y, m }, t) {
@@ -231,15 +262,20 @@ export function createEngine(data) {
   }
 
   function stairShape(classId, core, pts) {
-    const period = CORE_STAIRS[classId]?.[core];
-    if (!period) return null;
+    const stepLevels = CORE_STEPS[classId]?.[core];
+    // Three measured levels fit any step size exactly, so nothing would check it (one class's sheets
+    // went from 10 to 206 HEXA off that way): use the steps only with two levels to spare.
+    if (!stepLevels || pts.length < MIN_STEP_FIT_LEVELS) return null;
     const key = `${classId} ${core}`;
-    if (stairCache[key]) return stairCache[key];
+    if (key in stairCache) return stairCache[key];
     // Least squares for s and J (the constant cancels in the shape).
-    const steps = (L) => Math.floor(L / period), mean = (f) => pts.reduce((t, pt) => t + f(pt), 0) / pts.length;
+    const steps = (L) => stepLevels.filter((x) => x <= L).length, mean = (f) => pts.reduce((t, pt) => t + f(pt), 0) / pts.length;
     const mL = mean(([L]) => L), mS = mean(([L]) => steps(L)), mY = mean(([, y]) => y);
     const sLL = mean(([L]) => (L - mL) ** 2), sSS = mean(([L]) => (steps(L) - mS) ** 2), sLS = mean(([L]) => (L - mL) * (steps(L) - mS));
     const sLY = mean(([L, y]) => (L - mL) * (y - mY)), sSY = mean(([L, y]) => (steps(L) - mS) * (y - mY)), det = sLL * sSS - sLS * sLS;
+    // When the measured levels can't tell the steps from the even rise (an every-other-level step
+    // seen only at Lv 1, 15 and 30 looks like a straight line), keep the straight line.
+    if (det < 1e-6 * sLL * sSS) return (stairCache[key] = null);
     const s = (sLY * sSS - sSY * sLS) / det, J = (sSY * sLL - sLY * sLS) / det;
     return (stairCache[key] = (L) => s * L + J * steps(L));
   }
