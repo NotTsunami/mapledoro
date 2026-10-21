@@ -103,7 +103,7 @@ export function boolBuffLabel(id: BoolBuffEntry["id"], primaryStat: ReturnType<t
   if (id === "genepass") return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <span>Power of the Adversary</span>
-      <span style={{ opacity: 0.7, color: theme.muted }}>Buff from the Genesis Pass, only applies to Arcane River bosses</span>
+      <span style={{ opacity: 0.7, color: theme.muted }}>Buff from the Genesis Pass, applies to Arcane River bosses, Lotus and Damien</span>
     </div>
   );
   return undefined;
