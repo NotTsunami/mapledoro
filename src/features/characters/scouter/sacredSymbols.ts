@@ -8,7 +8,7 @@
 import type { StoredCharacterRecord, StoredScouterBuffs } from "../model/charactersStore";
 import { readCharacterToolData } from "../../tools/characterToolStorage";
 
-export interface SacredSymbolBoss {
+interface SacredSymbolBoss {
   /** Symbol region, as named in the Symbols tool (symbol-data.ts). */
   area: string;
   /** Item id of the symbol, for its icon. */
@@ -30,7 +30,7 @@ export const SACRED_SYMBOL_BOSSES: readonly SacredSymbolBoss[] = [
   { area: "Geardock", itemId: "01714001", boss: "jupiter", bossLabel: "Jupiter", grand: true },
 ];
 
-export const SACRED_SYMBOL_MAX_LEVEL = 11;
+const SACRED_SYMBOL_MAX_LEVEL = 11;
 
 /** Areas whose symbol is Lv 11 in saved symbol levels, or null when none of them are saved. */
 export function maxedSymbolsFromLevels(symbols: Partial<Record<string, { level?: number } | undefined>> | undefined): string[] | null {

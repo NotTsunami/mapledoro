@@ -14,7 +14,7 @@ import { coreAtt, coreAttAt, createEngine, splineEval, type EngineData, type Eng
 const ENGINE_DATA_URL = "/data/scouter-engine.json";
 const MAX_REMEMBERED_RESULTS = 64;
 
-export type ScouterEngineState = "idle" | "loading" | "ready" | "failed";
+type ScouterEngineState = "idle" | "loading" | "ready" | "failed";
 
 let state: ScouterEngineState = "idle";
 let engine: ScouterEngine | null = null;

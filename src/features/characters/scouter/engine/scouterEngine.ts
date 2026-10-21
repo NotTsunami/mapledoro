@@ -17,7 +17,7 @@ import type { ScouterHexa, ScouterStat, ScouterUserStat } from "../scouterApi";
 
 const n = (value: unknown): number => Number(value);
 
-export interface EngineSpline {
+interface EngineSpline {
   x: number[];
   y: number[];
   m: number[];
@@ -26,7 +26,7 @@ export interface EngineSpline {
 type StatKey = "main" | "sub" | "ssub";
 type CurveKey = "skill1" | "skill2" | "mastery" | "rein" | "general2" | "general3";
 
-export interface EngineClassData {
+interface EngineClassData {
   koreanName: string;
   stat: { hiddenBase: Partial<Record<StatKey, number>>; flat: number; perLevel: number };
   flatAtk: number;
@@ -102,7 +102,7 @@ const DA_HP_PER_CHAMPION_ALL = 490;
 const MUGONG_SOUL_ATT_PCT = 3;
 export const soulAtkPct = (u: ScouterUserStat): number => (n(u.special.mugongSoul) > 0 ? MUGONG_SOUL_ATT_PCT : 0);
 
-export const HEXA_CORES = ["skillCore1", "skillCore2", "masteryCore1", "masteryCore2", "masteryCore3", "masteryCore4", "reinCore1", "reinCore2", "reinCore3", "reinCore4", "generalCore2", "generalCore3"] as const;
+const HEXA_CORES = ["skillCore1", "skillCore2", "masteryCore1", "masteryCore2", "masteryCore3", "masteryCore4", "reinCore1", "reinCore2", "reinCore3", "reinCore4", "generalCore2", "generalCore3"] as const;
 type CoreKey = (typeof HEXA_CORES)[number] & keyof ScouterHexa;
 
 // Flat ATT one HEXA core also gives (the 3rd common node on most of these, Zero's 4th Mastery core),
@@ -282,7 +282,7 @@ export function tableBonus(rows: CooldownRow[], s: number, h0: number): number {
 // Kaling's figure fit: see predictKaling.
 const KALING_ASCENT_WEIGHT = 1.944;
 
-export interface EngineGroups { stat: number; flatAtk: number; atkPct: number; dmg: number; crit: number; def: number; cores: number; other: number }
+interface EngineGroups { stat: number; flatAtk: number; atkPct: number; dmg: number; crit: number; def: number; cores: number; other: number }
 
 export interface EnginePrediction {
   classId: string;
