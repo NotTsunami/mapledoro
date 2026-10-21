@@ -1026,23 +1026,12 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
           }
         }
 
-        /* PowerStrip's 4-across grid (BossClearGrid.tsx) overflows "Converted"'s long value on
-           narrow panels -- same container-query approach as .boss-quick-row-list above. */
-        .power-strip {
-          container-type: inline-size;
-        }
-        @container (max-width: 400px) {
-          .power-strip-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-        }
-
         /* Stat Efficiency (StatEfficiencyPanel.tsx) puts both its sections in two side-by-side
            boxes, which halves the panel's height at the ~517px this bookmark normally gets
            (binder page = the setup panel minus the 108px spine and its padding). A half has to
            hold source + meter + answer for the comparisons, or a stat name + amount box + value
            for the per-stat table, so below the width where two of those fit the boxes stack
-           into one column instead. Same container-query approach as .power-strip-grid above. */
+           into one column instead. Same container-query approach as .boss-quick-row-list above. */
         .stat-efficiency-panel {
           container-type: inline-size;
         }

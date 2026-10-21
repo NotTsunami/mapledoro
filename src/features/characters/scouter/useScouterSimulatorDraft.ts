@@ -15,6 +15,7 @@ import {
 } from "./scouterApi";
 import { hexaCoreFields } from "./hexaSimulatorFields";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "./scouterLinkSkills";
+import { savedMaxedSymbols } from "./sacredSymbols";
 
 export type SimulatorTab = "buffs" | "hexa" | "ozRings" | "input" | "linkSkills" | "extras";
 
@@ -222,9 +223,9 @@ export function useScouterSimulatorDraft(
     }
     return out;
   });
-  const [initialBuffsDraft] = useState<BuffsDraft>(() => storedBuffsToDraft(character.scouter?.buffs) ?? emptyBuffsDraft());
+  const [initialBuffsDraft] = useState<BuffsDraft>(() => storedBuffsToDraft(character.scouter?.buffs, savedMaxedSymbols(character)) ?? emptyBuffsDraft());
   const [buffsDraft, setBuffsDraft] = useState(() =>
-    previousOverrides?.dopingOverrides ? storedBuffsToDraft(previousOverrides.dopingOverrides) : initialBuffsDraft);
+    previousOverrides?.dopingOverrides ? storedBuffsToDraft(previousOverrides.dopingOverrides, savedMaxedSymbols(character)) : initialBuffsDraft);
   const [initialOzRingsDraft] = useState<OzRingsDraft>(() => storedOzRingsToOzRingsDraft(character.scouter?.ozRings));
   const [ozRingsDraft, setOzRingsDraft] = useState(() => ozRingOverridesToDraft(character, previousOverrides?.ringOverrides));
   const [input, setInput] = useState<Record<keyof SimulatorInputOverrides, number>>(() => {

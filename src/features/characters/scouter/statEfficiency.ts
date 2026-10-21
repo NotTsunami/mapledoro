@@ -3,10 +3,9 @@
   production bundle (chunk `app/[locale]/(pages)/result/page-*.js`: component `tu` is the
   Main Eff. tab, `tm` the Detail Eff. table, `tx` the meter).
 
-  The raw numbers are NOT derived here, and aren't derived on their site either:
-  `specEfficiency` is computed server-side and rides on the same POST /api/calc/dmg response
-  scouterCache.ts already fetches and stores (see ScouterSpecEfficiency there for what each
-  field means). Everything below is only the site's own presentation math on top of that
+  The raw numbers are NOT derived here: `specEfficiency` is MapleScouter's table, rebuilt by
+  the local engine (engine/scouterLocal.ts; see ScouterSpecEfficiency in scouterResult.ts for
+  what each field means). Everything below is only the site's own presentation math on top of that
   table, ported verbatim -- including its quirks, which are deliberate and must not be
   "fixed" without a live re-check against maplescouter.com:
 
@@ -29,7 +28,7 @@
   is the only one that reads a character level, which that page didn't expose.
 */
 
-import type { ScouterSpecEfficiency } from "./scouterCache";
+import type { ScouterSpecEfficiency } from "./scouterResult";
 import { CLASS_SKILL_DATA } from "../setup/data/classSkillData";
 import { resolveClassId } from "../setup/data/nexonJobMapping";
 import { TRIPLE_STAT_FIELDS, type TripleStatFieldId } from "../setup/data/statFields";

@@ -1,7 +1,7 @@
 /*
-  Solves the kernel's per-bucket calibration from a character's cached MapleScouter
-  efficiency table (`ScouterSpecEfficiency`, already fetched and stored by
-  scouterCache.ts for the Stat Efficiency bookmark).
+  Solves the kernel's per-bucket calibration from a character's Scouter
+  efficiency table (`ScouterSpecEfficiency`, the local engine's rebuild of
+  MapleScouter's table that the Stat Efficiency bookmark also reads).
 
   Why this exists: our stat inputs are the in-game stat window, which is unbuffed,
   while scouter optimizes against a fully-buffed bossing state (link skills,
@@ -17,7 +17,7 @@
   (main 5 / sub 3 / ATT 8 / boss 15 / dmg 13 / crit dmg 15 / crit rate 0 / IED 6).
 */
 
-import type { ScouterSpecEfficiency } from "../../characters/scouter/scouterCache";
+import type { ScouterSpecEfficiency } from "../../characters/scouter/scouterResult";
 import {
   excessCritDamage,
   zeroCalibration,
@@ -28,7 +28,7 @@ import {
 
 /** Boss PDR scouter measures its `igreff1` field against (`igreff1_380` is the same
  *  stat at 380). The solved IED total is a property of the character, not the boss,
- *  so either field recovers it -- 300 is the one every cached entry carries. */
+ *  so either field recovers it. */
 const IGREFF_PDR = 300;
 
 const isPositive = (n: number | undefined): n is number => typeof n === "number" && Number.isFinite(n) && n > 0;

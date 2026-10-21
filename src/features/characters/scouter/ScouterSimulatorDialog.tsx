@@ -22,7 +22,7 @@ import {
   getStatPotionTiers, primaryStatForClass,
   type BuffsDraft, type BoolBuffId, type BoolBuffEntry, type GuildBuffId, type RenownStatId,
 } from "../setup/data/buffsData";
-import { BuffIconImage, BoolBuffTile, RenownCol } from "../setup/components/BuffsSetupStep";
+import { BuffIconImage, BoolBuffTile, MaxedSymbolTiles, RenownCol } from "../setup/components/BuffsSetupStep";
 import { boolTileStyle, pickOneGroupStyle, pickOneLabelStyle, buffIconOverride, buffSecondIconOverride, boolBuffLabel } from "../setup/components/buffTileHelpers";
 import { LeveledIconTile } from "../setup/components/LeveledIconTile";
 import SectionLabel from "../setup/components/SectionLabel";
@@ -36,7 +36,7 @@ import {
   SIMULATOR_HEXA_CORE_MAX, simulatorStatLabels,
   type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInputOverrides,
 } from "./scouterApi";
-import type { ScouterErrorReason } from "./scouterCache";
+import type { ScouterErrorReason } from "./scouterResult";
 import type { ScouterSimulatorApplyResult } from "./useScouterSimulator";
 import { useScouterSimulatorDraft, type InfoDraft, type ScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
 import { hexaCoreFields } from "./hexaSimulatorFields";
@@ -45,10 +45,8 @@ import { hexaCoreFields } from "./hexaSimulatorFields";
 // CharacterProfileOverviewScreen.tsx), kept as a small local copy rather than a shared export,
 // matching how those two files each keep their own.
 const SIMULATOR_ERROR_TEXT: Record<ScouterErrorReason, string> = {
-  rate_limited: "You're refreshing too fast. Wait a moment and try again.",
-  timeout: "MapleScouter's API timed out. Try again in a moment.",
-  bad_response: "MapleScouter's API returned something unexpected. Try again in a moment.",
-  network: "Couldn't reach MapleScouter's API. Try again in a moment.",
+  bad_response: "Couldn't calculate the Scouter figures for these stats. Try again in a moment.",
+  network: "Couldn't load the Scouter data. Check your connection and try again.",
 };
 
 const TAB_OPTIONS: { value: SimulatorTab; label: string }[] = [
@@ -131,10 +129,10 @@ function tileRowStyle(): CSSProperties {
 // ── Buffs tab ────────────────────────────────────────────────────────────────
 
 // Same ordering and filtering as BuffsSetupStep.tsx's own ungroupedBools, with Advanced Stat
-// Potion inserted after Sparkling Red Star rather than appended. maxedSacredSymbol is always
-// included, since the real step's showMaxedSacredSymbol gate is about which setup flow is
-// running, which doesn't apply to this popup. extremeGreenPotion is always excluded, being a
-// Hurricane-class-only tile and out of scope for this condensed tab.
+// Potion inserted after Sparkling Red Star rather than appended. Maxed Symbols is always shown,
+// since the real step's gate on it is about which setup flow is running, which doesn't apply to
+// this popup. extremeGreenPotion is always excluded, being a Hurricane-class-only tile and out of
+// scope for this condensed tab.
 const UNGROUPED_BUFFS = BOOL_BUFFS.filter((b) => !b.group && b.id !== "extremeGreenPotion");
 const STAT_POTION_INSERT_IDX = UNGROUPED_BUFFS.findIndex((b) => b.id === "sparklingRedStar") + 1;
 
@@ -209,6 +207,10 @@ function BuffsTab({ theme, draft, onChange, primaryStat, jobName }: {
         </div>
       ))}
 
+      <div>
+        <p style={sectionLabelStyle(theme)}>Maxed Symbols</p>
+        <MaxedSymbolTiles theme={theme} selected={draft.symbols} onToggle={(area) => onChange({ ...draft, symbols: { ...draft.symbols, [area]: !draft.symbols[area] } })} />
+      </div>
       <div>
         <p style={sectionLabelStyle(theme)}>Champion&apos;s Renown</p>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -889,7 +891,7 @@ export default function ScouterSimulatorDialog({
   const inputStyle = statInputStyle(theme);
 
   const draft = useScouterSimulatorDraft(character, hexaClassDef, previousOverrides);
-  const [error, setError] = useState<ScouterErrorReason | null>(null);
+  const [error, setError] = useState<{ reason: ScouterErrorReason; detail?: string } | null>(null);
 
   const RESET_BY_TAB: Record<SimulatorTab, () => void> = {
     buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, linkSkills: draft.resetLinkSkills, extras: draft.resetInfo, input: draft.resetInput,
@@ -908,7 +910,7 @@ export default function ScouterSimulatorDialog({
     }
     setError(null);
     void onApply(draft.buildOverrides()).then((result) => {
-      if (result.status === "error") setError(result.reason);
+      if (result.status === "error") setError({ reason: result.reason, detail: result.detail });
       // "unsupported"/"ok" both close the popup from the caller's side (ok = success per the
       // plan; unsupported shouldn't happen here since ScouterSimulatorDialog is only ever
       // opened for a class the real Scouter figure already confirmed is supported).
@@ -996,7 +998,8 @@ export default function ScouterSimulatorDialog({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.55rem", padding: "0.8rem 1.1rem", borderTop: `1px solid ${theme.border}` }}>
         {error && (
           <p style={{ margin: 0, marginRight: "auto", fontSize: "0.8rem", fontWeight: 700, color: statusText(theme, "danger") }}>
-            {SIMULATOR_ERROR_TEXT[error]}
+            {SIMULATOR_ERROR_TEXT[error.reason]}
+            {error.detail && <><br />{error.detail}</>}
           </p>
         )}
         <button type="button" onClick={onClose} className="tool-btn tool-dialog-btn" style={dialogBtnColors(theme)}>

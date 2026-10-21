@@ -69,7 +69,12 @@ export interface StoredScouterBuffs {
   candiedApple?: true;
   caretakerSupport?: true;
   sparklingRedStar?: true;
+  /** The old single "Lv. 11 Sacred Symbols" answer, all or nothing. Still read for characters
+   *  saved before maxedSymbols (see scouter/sacredSymbols.ts), never written any more. */
   maxedSacredSymbol?: true;
+  /** Sacred Symbol regions at Lv 11 (scouter/sacredSymbols.ts): ticked in MapleScouter Setup's
+   *  Buffs step, or derived from saved symbol levels by Full Setup. */
+  maxedSymbols?: string[];
   greatHeroBoost?: true;
   legendaryHero?: true;
   advWeaponTempering?: true;

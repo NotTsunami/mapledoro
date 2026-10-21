@@ -6,7 +6,6 @@ import HoverTooltip from "../../../components/HoverTooltip";
 import { statusText } from "../../../components/statusColors";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
-import RefreshSpinnerIcon from "../tabs/components/RefreshSpinnerIcon";
 import { formatFigure } from "./scouterFormat";
 import { useScouterResult, type ScouterErrorReason, type ScouterFigureStatus } from "./useScouterResult";
 import type { ScouterSimulatorController } from "./useScouterSimulator";
@@ -22,12 +21,19 @@ function SetupBookmarkIcon() {
   );
 }
 
+/** Shown wherever the local engine's numbers appear: the Scouter and Stat Efficiency bookmark
+ *  banner and this figure's info tooltip. */
+export const SCOUTER_ENGINE_NOTICE = "MapleDoro is currently experimenting with a new algorithm to determine gear scores. Going forward, your HEXA and normal values may begin to diverge from MapleScouter.";
+
 const SCOUTER_INFO: TooltipContent = {
   title: "What is MapleScouter?",
   description: (
     <>
       MapleScouter is a community site MapleStory players use to compare character strength.
       The number here is its HEXA-adjusted gear score.
+      <br />
+      <br />
+      {SCOUTER_ENGINE_NOTICE}
       <br />
       <br />
       For the most accurate result, fill out MapleScouter Setup in full. You&apos;ll find it in
@@ -37,178 +43,84 @@ const SCOUTER_INFO: TooltipContent = {
   link: { href: "https://maplescouter.com/", label: "See more on MapleScouter" },
 };
 
-function refreshButtonStyle(theme: AppTheme, disabled: boolean, justRefreshed: boolean): CSSProperties {
+function betaTagStyle(theme: AppTheme): CSSProperties {
   return {
-    display: "flex", alignItems: "center", justifyContent: "center",
-    width: 20, height: 20, flexShrink: 0,
-    color: justRefreshed ? theme.accentText : theme.muted,
-    background: justRefreshed ? `${theme.accent}33` : theme.bg,
-    border: `1px solid ${justRefreshed ? theme.accent : theme.border}`,
-    borderRadius: 6, cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    transition: "background 0.3s ease, color 0.3s ease, border-color 0.3s ease",
+    fontSize: "0.75rem", fontWeight: 700, lineHeight: 1, padding: "2px 5px", borderRadius: 6,
+    color: theme.accentText, border: `1px solid ${theme.accent}`,
   };
 }
 
-// No shared relative-time formatter exists in the codebase yet (src/features/tools/date.ts
-// is all calendar-day formatters), so this stays here rather than growing a shared module.
-// Not exported, since only this figure's own tooltip uses it.
-function formatRelativeTime(ms: number): string {
-  const diffMin = Math.floor((Date.now() - ms) / 60_000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 /** Value shown for each non-"ready" state. "ready" renders the real number instead. */
-const STATUS_VALUE: Partial<Record<string, string>> = {
+const STATUS_VALUE: Record<Exclude<ScouterFigureStatus["kind"], "ready">, string> = {
   unsupported: "N/A",
   incomplete: "—",
-  empty: "—",
+  loading: "…",
   error: "—",
 };
 
-/** Explains why the button is disabled for the two setup-gated states; every other state
- *  (including "ready") just names the action, since there's nothing to explain.
- *  justRefreshedUnchanged adds a muted second line explaining why a refresh looked like a
- *  no-op (the inputs haven't changed, so MapleScouter wasn't actually re-queried). */
-function refreshTooltip(status: ScouterFigureStatus, loading: boolean, justRefreshedUnchanged: boolean, theme: AppTheme): ReactNode {
-  if (loading) return "Calculating…";
-  if (status.kind === "unsupported") return "MapleScouter doesn't support this class yet.";
-  if (status.kind === "incomplete") {
-    const area = status.gap === "quickQuestions" ? "Quick Questions" : "Character Info";
-    return `Fill out MapleScouter Setup's ${area} before calculating this.`;
-  }
-  if (justRefreshedUnchanged) {
-    return <>Refresh Scouter<br /><span style={{ color: theme.muted }}>Already up to date. Your MapleScouter Setup inputs haven&apos;t changed.</span></>;
-  }
-  return "Refresh Scouter";
-}
-
-/** The figure's own tooltip: what the number is when there is one, why it's stale when
- *  it's stale, otherwise why there's nothing to show yet. */
-const FIGURE_TOOLTIP: Partial<Record<string, string>> = {
-  unsupported: "MapleScouter doesn't support this class yet.",
-  incomplete: "Not calculated yet.",
-  empty: "Not calculated yet.",
-};
-
-// Shown when there's nothing cached to fall back on, so a refresh had to fail outright.
 const ERROR_REASON_TOOLTIP: Record<ScouterErrorReason, string> = {
-  rate_limited: "You're refreshing too fast. Wait a moment and try again.",
-  timeout: "MapleScouter's API timed out. Try again in a moment.",
-  bad_response: "MapleScouter's API returned something unexpected. Try again in a moment.",
-  network: "Couldn't reach MapleScouter's API. Try again in a moment.",
+  bad_response: "Couldn't calculate the Scouter figures for these stats.",
+  network: "Couldn't load the Scouter data. Check your connection and reload the page.",
 };
 
-// Shown on a stale "ready" value. Same reasons, framed around the number already on screen
-// instead of telling the player to retry, which is still what the button is for.
-const STALE_REASON_TOOLTIP: Record<ScouterErrorReason, string> = {
-  rate_limited: "You're refreshing too fast, showing the last known value.",
-  timeout: "MapleScouter's API timed out, showing the last known value.",
-  bad_response: "MapleScouter's API returned something unexpected, showing the last known value.",
-  network: "Couldn't reach MapleScouter's API, showing the last known value.",
-};
-
+/** The figure's own tooltip: what the number is when there is one, otherwise why there's none. */
 function figureTooltip(status: ScouterFigureStatus, theme: AppTheme): ReactNode {
-  if (status.kind === "ready") {
-    const asOf = <span style={{ color: theme.muted }}>As of {formatRelativeTime(status.entry.computedAt)}</span>;
-    if (!status.stale) return <>Boss 380 HEXA<br />{asOf}</>;
-    // Restates what the figure is, not only why it's stale, since the stale message alone
-    // would replace that context instead of adding to it. "As of" stays neutral in
-    // theme.muted as plain metadata, while the reason takes the same warning color the number
-    // itself turns when stale, so the two connect visually instead of blending into one muted
-    // paragraph. No reason at all, meaning a cold-mount last-known value rather than a failed
-    // refresh, gets its own neutral not-yet-recalculated line.
-    const staleLine = status.reason
-      ? STALE_REASON_TOOLTIP[status.reason]
-      : "Showing the results for the last known values. Refresh to update.";
-    return <>Boss 380 HEXA<br />{asOf}<br /><span style={{ color: statusText(theme, "warning") }}>{staleLine}</span></>;
+  switch (status.kind) {
+    case "ready": {
+      const scouter = status.entry.scouterFigures;
+      if (!scouter) return "Boss 380 HEXA";
+      return (
+        <>
+          Boss 380 HEXA, adjusted for how this class clears bosses in practice
+          <br />
+          <span style={{ color: theme.muted }}>MapleScouter est.: {formatFigure(scouter.boss380Hexa)}</span>
+        </>
+      );
+    }
+    case "unsupported": return "Scouter doesn't support this class yet.";
+    case "incomplete": return `Fill out MapleScouter Setup's ${status.gap === "quickQuestions" ? "Quick Questions" : "Character Info"} to see this.`;
+    case "loading": return "Calculating…";
+    case "error":
+      return status.detail
+        ? <>{ERROR_REASON_TOOLTIP[status.reason]}<br /><span style={{ color: theme.muted }}>{status.detail}</span></>
+        : ERROR_REASON_TOOLTIP[status.reason];
   }
-  if (status.kind === "error") {
-    const base = status.reason ? ERROR_REASON_TOOLTIP[status.reason] : "MapleScouter's API didn't respond. Click refresh to try again.";
-    if (!status.repeatedFailure) return base;
-    // The same input has now failed the same way more than once in a row, which points more
-    // at a mistyped stat, a literal 0 for instance, than another transient blip. So add a
-    // pointer to Setup on top of the retry copy rather than replacing it.
-    return <>{base}<br /><span style={{ color: theme.muted }}>Double-check your MapleScouter Setup inputs if this keeps happening.</span></>;
-  }
-  return FIGURE_TOOLTIP[status.kind] ?? "Not calculated yet.";
 }
 
-// A real ready value should read as prominent data, not a dim placeholder. theme.muted is
-// right for the "—" and "N/A" this slot showed before Scouter had anything to say. Stale and
-// error take their own status colors so a problem stands out.
+// A real ready value should read as prominent data, not a dim placeholder. theme.muted is right
+// for the "—" and "N/A" this slot shows before Scouter has anything to say. An error takes its
+// own status color so a problem stands out.
 function figureValueColor(theme: AppTheme, status: ScouterFigureStatus): string {
-  if (status.kind === "ready") return status.stale ? statusText(theme, "warning") : theme.text;
+  if (status.kind === "ready") return theme.text;
   if (status.kind === "error") return statusText(theme, "danger");
   return theme.muted;
 }
 
-/** The refresh trigger for a MapleScouter-backed result, shared between the Overview figure
- *  and any bookmark header that wants the same recalculate-now action inline. */
-export function ScouterRefreshButton({ theme, status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged = false, disabled }: {
-  theme: AppTheme; status: ScouterFigureStatus; loading: boolean; canRefresh: boolean; refresh: () => void; justRefreshed: boolean; justRefreshedUnchanged?: boolean; disabled?: boolean;
-}) {
-  return (
-    <HoverTooltip label={refreshTooltip(status, loading, justRefreshedUnchanged, theme)} theme={theme}>
-      <button
-        type="button"
-        className="tap-target-44"
-        aria-label="Refresh Scouter"
-        disabled={!canRefresh || disabled}
-        onClick={refresh}
-        style={refreshButtonStyle(theme, !canRefresh || Boolean(disabled), justRefreshed)}
-      >
-        <RefreshSpinnerIcon color="currentColor" size={12} />
-      </button>
-    </HoverTooltip>
-  );
-}
-
 export default function ScouterFigure({ character, theme, simulator }: { character: StoredCharacterRecord; theme: AppTheme; simulator: ScouterSimulatorController }) {
-  const { status, loading, canRefresh, refresh, justRefreshed, justRefreshedUnchanged } = useScouterResult(character);
+  const status = useScouterResult(character);
   const simulated = simulator.active;
 
   // A simulated result replaces the real figure in place, per the Scouter Simulator plan's
   // product decision. Same rendering path as a real "ready" status, sourced from
   // useScouterSimulator instead of useScouterResult, with its own always-warning color and
-  // tooltip so it never reads as an ordinary fresh result.
-  const realValue = status.kind === "ready" ? formatFigure(status.entry.boss380Hexa) : (STATUS_VALUE[status.kind] ?? "—");
+  // tooltip so it never reads as an ordinary result.
+  const realValue = status.kind === "ready" ? formatFigure(status.entry.boss380Hexa) : STATUS_VALUE[status.kind];
   const value = simulated ? formatFigure(simulated.entry.boss380Hexa) : realValue;
   const valueColor = simulated ? statusText(theme, "warning") : figureValueColor(theme, status);
   const tooltip = simulated
-    ? <>Boss 380 HEXA (simulated)<br /><span style={{ color: statusText(theme, "warning") }}>Showing a &quot;what if&quot; from the Scouter Simulator, not your real saved result.</span></>
+    ? <>Boss 380 HEXA (simulated)<br /><span style={{ color: statusText(theme, "warning") }}>Showing a &quot;what if&quot; from the Scouter Simulator, not your real result.</span></>
     : figureTooltip(status, theme);
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: theme.muted }}>Scouter</div>
+        <span style={betaTagStyle(theme)}>Beta</span>
         <InfoTooltip content={SCOUTER_INFO} theme={theme} />
-        {simulated ? (
-          <HoverTooltip label="Editing this needs the Scouter Simulator popup, open from the Scouter bookmark." theme={theme}>
-            <button
-              type="button"
-              className="tap-target-44"
-              aria-label="Refresh Scouter"
-              disabled
-              style={refreshButtonStyle(theme, true, false)}
-            >
-              <RefreshSpinnerIcon color="currentColor" size={12} />
-            </button>
-          </HoverTooltip>
-        ) : (
-          <ScouterRefreshButton theme={theme} status={status} loading={loading} canRefresh={canRefresh} refresh={refresh} justRefreshed={justRefreshed} justRefreshedUnchanged={justRefreshedUnchanged} />
-        )}
       </div>
       <HoverTooltip label={tooltip} theme={theme}>
         <div style={{ fontSize: 20, fontWeight: 800, color: valueColor, lineHeight: 1, fontFamily: "var(--font-heading)" }}>
-          {loading ? "…" : value}
+          {value}
         </div>
       </HoverTooltip>
     </div>

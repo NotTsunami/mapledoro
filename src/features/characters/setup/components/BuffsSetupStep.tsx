@@ -21,6 +21,7 @@ import {
   type GuildBuffId, type BoolBuffId, type RenownStatId, type BoolBuffEntry,
   type BoolBuffIconType,
 } from "../data/buffsData";
+import { SACRED_SYMBOL_BOSSES, savedMaxedSymbols } from "../../scouter/sacredSymbols";
 import SetupStepFrame from "./SetupStepFrame";
 import { LeveledIconTile } from "./LeveledIconTile";
 import {
@@ -168,6 +169,41 @@ export function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, sec
   );
 }
 
+// ── Maxed Symbols ──────────────────────────────────────────────────────────────
+
+/** One tile per Sacred Symbol, on when it is at Lv 11. Each boosts only its own boss (see
+ *  scouter/sacredSymbols.ts). Shared with the Scouter Simulator's Buffs tab. */
+export function MaxedSymbolTiles({ theme, selected, onToggle }: {
+  theme: AppTheme;
+  selected: Partial<Record<string, boolean>>;
+  onToggle: (area: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {SACRED_SYMBOL_BOSSES.map((symbol) => {
+        const active = selected[symbol.area] ?? false;
+        return (
+          <HoverTooltip
+            key={symbol.area}
+            theme={theme}
+            label={
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span>{symbol.grand ? "Grand Sacred" : "Sacred"} Symbol:</span>
+                <span>{symbol.area} (Lv. 11)</span>
+                <span style={{ opacity: 0.7, color: theme.muted }}>+20% damage vs. {symbol.bossLabel}</span>
+              </div>
+            }
+          >
+            <button type="button" onClick={() => onToggle(symbol.area)} aria-label={`${symbol.area} symbol at Lv. 11`} aria-pressed={active} style={boolTileStyle(active, theme)}>
+              {renderIcon({ kind: "item", id: symbol.itemId }, 32, active, symbol.area, theme)}
+            </button>
+          </HoverTooltip>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── RenownCol ────────────────────────────────────────────────────────────────
 
 export function RenownCol({ shortLabel, fullLabel, value, onChange, theme }: {
@@ -210,10 +246,10 @@ export default function BuffsSetupStep({
   const classMainStats = mainStatsForClass(requiredStats);
   const statTiers = getStatPotionTiers(primaryStat);
 
-  // full_setup derives this from the Equipment Symbols substep instead (see
-  // deriveMaxedSacredSymbol in useCharacterSetupController.ts). Asking it here too would
-  // be a duplicate, out-of-order entry point for the same fact.
-  const showMaxedSacredSymbol = flowId === "maplescouter_setup";
+  // full_setup derives Maxed Symbols from the Equipment Symbols substep instead (see
+  // withDerivedMaxedSymbols in useCharacterSetupController.ts). Asking it here too would be a
+  // duplicate, out-of-order entry point for the same fact.
+  const showMaxedSymbols = flowId === "maplescouter_setup";
 
   const draft = parseBuffsDraft(value);
   const initialValueRef = useRef(value);
@@ -230,10 +266,11 @@ export default function BuffsSetupStep({
   // replaces the whole `buffs` object, it doesn't merge per-flag).
   useEffect(() => {
     if (initialValueRef.current || !confirmedCharacterName) return;
-    const saved = selectCharacterByIgn(readCharactersStore(), confirmedCharacterName)?.scouter?.buffs;
-    if (!saved) return;
+    const character = selectCharacterByIgn(readCharactersStore(), confirmedCharacterName);
+    const saved = character?.scouter?.buffs;
+    if (!character || !saved) return;
     // react-doctor-disable-next-line no-pass-data-to-parent
-    onChange(serializeBuffsDraft(storedBuffsToDraft(saved)));
+    onChange(serializeBuffsDraft(storedBuffsToDraft(saved, savedMaxedSymbols(character))));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -256,7 +293,6 @@ export default function BuffsSetupStep({
   const isHurricane = isHurricaneClass(jobName);
   const ungroupedBools = BOOL_BUFFS.filter((b) => {
     if (b.group) return false;
-    if (b.id === "maxedSacredSymbol") return showMaxedSacredSymbol;
     if (b.id === "extremeGreenPotion") return isHurricane;
     return true;
   });
@@ -384,6 +420,13 @@ export default function BuffsSetupStep({
             ])}
           </div>
         </div>
+
+        {showMaxedSymbols && (
+          <div>
+            <p style={sectionLabel(theme)}>Maxed Symbols</p>
+            <MaxedSymbolTiles theme={theme} selected={draft.symbols} onToggle={(area) => update({ symbols: { ...draft.symbols, [area]: !draft.symbols[area] } })} />
+          </div>
+        )}
 
         {/* Champion's Renown */}
         <div>

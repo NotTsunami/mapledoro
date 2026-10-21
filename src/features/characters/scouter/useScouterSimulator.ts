@@ -4,13 +4,13 @@ import { useCallback, useState } from "react";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { readCharactersStore } from "../model/charactersStore";
 import type { ScouterSimulatorOverrides } from "./scouterApi";
-import { runScouterSimulator } from "./scouterSimulatorCache";
-import { peekScouterLastKnown, type ScouterErrorReason, type ScouterResultEntry } from "./scouterCache";
+import { runScouterSimulator } from "./scouterSimulatorRun";
+import { loadScouterResultFor, type ScouterErrorReason, type ScouterResultEntry } from "./scouterResult";
 
 /** True when the override combo touches only level, Arcane Force and Sacred Power, fields that
- *  never reach MapleScouter's API and feed purely local Boss Clear Grid gap math (see
- *  ScouterSimulatorOverrides' own field comments). Applying one of these alone needs no fresh
- *  API result, since the character's already-cached entry is just as accurate.
+ *  don't enter the damage calculation and feed purely local Boss Clear Grid gap math (see
+ *  ScouterSimulatorOverrides' own field comments). Applying one of these alone reuses the
+ *  character's real result, which is just as accurate.
  *
  *  buildOverrides (useScouterSimulatorDraft.ts) omits every untouched tab group, so an absent
  *  group here means unchanged. This is a presence check. */
@@ -25,8 +25,8 @@ function isLocalOnlyOverride(overrides: ScouterSimulatorOverrides): boolean {
 }
 
 /** The overrides a player can set from the Scouter Simulator popup. Level, Arcane Force and
- *  Sacred Power are MapleDoro-only concepts that never reach MapleScouter's API and feed purely
- *  local Boss Clear Grid formula math. The rest, such as finalDmgPercent and hexaCoreOverrides,
+ *  Sacred Power don't enter the damage calculation and feed purely local Boss Clear Grid formula
+ *  math. The rest, such as finalDmgPercent and hexaCoreOverrides,
  *  become part of the real request via buildDirectScouterPayload. */
 interface ScouterSimulatorState {
   overrides: ScouterSimulatorOverrides;
@@ -36,7 +36,7 @@ interface ScouterSimulatorState {
 export type ScouterSimulatorApplyResult =
   | { status: "ok" }
   | { status: "unsupported" }
-  | { status: "error"; reason: ScouterErrorReason };
+  | { status: "error"; reason: ScouterErrorReason; detail?: string };
 
 export interface ScouterSimulatorController {
   /** The currently-applied simulation, or null when the bookmark is showing the real
@@ -44,7 +44,7 @@ export interface ScouterSimulatorController {
    *  per the product decision. */
   active: ScouterSimulatorState | null;
   applying: boolean;
-  /** Runs the simulator for the given overrides (cache-first, network on a miss). On success,
+  /** Runs the simulator for the given overrides. On success,
    *  sets `active` and resolves { status: "ok" }, which the popup uses to close itself. On
    *  failure `active` is left untouched, so the bookmark keeps showing what it showed before,
    *  and the reason is returned for the popup's own inline error message. */
@@ -72,9 +72,10 @@ export function useScouterSimulator(character: StoredCharacterRecord | null): Sc
   const apply = useCallback(async (overrides: ScouterSimulatorOverrides): Promise<ScouterSimulatorApplyResult> => {
     if (!character) return { status: "unsupported" };
     if (isLocalOnlyOverride(overrides)) {
-      const entry = peekScouterLastKnown(character);
-      if (!entry) return { status: "unsupported" };
-      setActive({ overrides, entry });
+      const real = await loadScouterResultFor(character);
+      if (!real) return { status: "unsupported" };
+      if (!real.ok) return { status: "error", reason: real.reason, detail: real.detail };
+      setActive({ overrides, entry: real.entry });
       return { status: "ok" };
     }
     setApplying(true);

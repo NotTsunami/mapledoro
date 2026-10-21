@@ -8,7 +8,8 @@ import {
   selectCharacterByIgn,
   type StoredCharacterRecord,
 } from "../../characters/model/charactersStore";
-import { peekScouterCache, refreshScouterResult } from "../../characters/scouter/scouterCache";
+import { loadScouterResultFor, scouterResultFor } from "../../characters/scouter/scouterResult";
+import { ensureScouterEngine } from "../../characters/scouter/engine/scouterLocal";
 import { useApplyCharacterQueryParam } from "../useApplyCharacterQueryParam";
 import { readToolLevel, writeToolLevel } from "../toolLevel";
 import {
@@ -89,13 +90,9 @@ async function recomputeBoss380Hexa(
   record: StoredCharacterRecord,
   before: number | null,
 ): Promise<ApplyOutcome> {
-  const result = await refreshScouterResult(record);
-  // A stale "ok" is the LAST good entry handed back after a failed refetch, so it
-  // describes the allocation we just replaced -- not a recomputed figure.
-  if (result.status === "ok" && !result.stale) {
-    return { kind: "figure", before, after: result.entry.boss380Hexa };
-  }
-  return result.status === "unsupported" ? { kind: "unsupported" } : { kind: "failed" };
+  const result = await loadScouterResultFor(record);
+  if (!result) return { kind: "unsupported" };
+  return result.ok ? { kind: "figure", before, after: result.entry.boss380Hexa } : { kind: "failed" };
 }
 
 interface SelectionState {
@@ -163,19 +160,29 @@ export function useStatOptimizer() {
     selectedCharRef.current = charName;
     setSelectedCharName(charName);
     const record = charName ? selectCharacterByIgn(readCharactersStore(), charName) : null;
-    // Cache-only read (no network call, see peekScouterCache): a hit calibrates the
-    // kernel onto scouter's buffed footing, a miss leaves the raw stat window.
+    // A Scouter result calibrates the kernel onto scouter's buffed footing; none (unsupported, or
+    // the engine data not loaded yet) leaves the raw stat window. The effect below re-seeds once
+    // the data has loaded.
+    const scouter = record ? scouterResultFor(record) : null;
+    const specEfficiency = scouter?.ok ? scouter.entry.specEfficiency : undefined;
     const seed = record
-      ? seedFromCharacter(
-          record,
-          peekScouterCache(record)?.specEfficiency,
-          readToolLevel(record, STAT_OPTIMIZER_TOOL_KEY),
-        )
+      ? seedFromCharacter(record, specEfficiency, readToolLevel(record, STAT_OPTIMIZER_TOOL_KEY))
       : emptyCharacterSeed();
     setState(seedToState(seed));
   }, []);
 
   useApplyCharacterQueryParam({ mounted, characters, handleCharChange });
+
+  // The Scouter engine's data loads once per page. A character picked before it arrived was
+  // seeded without calibration, so seed it again when the data lands (only that once).
+  useEffect(() => {
+    let cancelled = false;
+    void ensureScouterEngine().then((engine) => {
+      const charName = selectedCharRef.current;
+      if (!cancelled && engine && charName) handleCharChange(charName);
+    });
+    return () => { cancelled = true; };
+  }, [handleCharChange]);
 
   /** Rewrites just the active target's slice, leaving the other one untouched. */
   const patchTarget = useCallback(
@@ -361,9 +368,9 @@ export function useStatOptimizer() {
     if (!char) return;
     const previous = selectCharacterByIgn(readCharactersStore(), char);
     if (!previous) return;
-    // Read before the write: afterwards the payload hash has moved and this
-    // entry is no longer the character's current one.
-    const before = peekScouterCache(previous)?.boss380Hexa ?? null;
+    // Read before the write: afterwards the character's result reflects the new allocation.
+    const scouterBefore = scouterResultFor(previous);
+    const before = scouterBefore?.ok ? scouterBefore.entry.boss380Hexa : null;
     setApplyRun({ char, mode, status: "applying" });
     const written = updateCharacterRecord(char, (record) =>
       result.mode === "hyper"

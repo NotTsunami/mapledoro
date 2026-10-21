@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
@@ -16,11 +16,13 @@ import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
-import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
-import { BOSS_DISPLAY_NAME, groupByBoss, type BossEntryList } from "./bossGrouping";
-import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
+import { BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
+import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./bossGrouping";
+import { computeBossClear, isEstimatedBoss, minimumClearHexa, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
-import type { ScouterResultEntry } from "./scouterCache";
+import type { BossClearInputs, ScouterResultEntry } from "./scouterResult";
+import { maxedSacredSymbols, savedMaxedSymbols, savedSacredLevels } from "./sacredSymbols";
+import type { StoredScouterBuffs } from "../model/charactersStore";
 
 // Icon ids looked up by hand from manifests/v271/ui-boss.json, renamed from boss.json as of
 // v269 (see the Image Policy in the root CLAUDE.md), cross-checked against the same bosses
@@ -30,6 +32,12 @@ const BOSS_ICON_ID: Record<string, string> = {
   듄켈: "27", "검은 마법사": "25", 세렌: "28", 칼로스: "30", 대적자: "35", 흉성: "37",
   카링: "31", 림보: "33", 발드릭스: "34", 유피테르: "38", 가엔슬: "29", 카이: "36",
 };
+
+/** The low-end bosses MapleDoro estimates carry their own icon id. */
+function bossIconId(boss: string, entries: BossCutEntry[]): string | undefined {
+  const first = entries[0];
+  return BOSS_ICON_ID[boss] ?? (isEstimatedBoss(first) ? first.iconId : undefined);
+}
 
 // Easiest to hardest. Champion and Destiny are solo variants of a party tier, nearly always
 // Hard, and sit below Extreme on every boss that has one. Lotus, Black Mage, Seren and
@@ -174,6 +182,9 @@ const BOSS_ART_POSITION: Record<string, string> = {
   "진 힐라": "50% 23%", 듄켈: "48% 46%", "검은 마법사": "42% 19%", 세렌: "50% 33%",
   칼로스: "55% 60%", 대적자: "75% 29%", 흉성: "50% 26%", 카링: "50% 26%", 림보: "50% 58%",
   발드릭스: "50% 40%", 유피테르: "48% 25%", 가엔슬: "50% 51%", 카이: "50% 28%",
+  "Akechi Mitsuhide": "50% 29%", "Princess No": "50% 35%", Vellum: "50% 65%", "Pink Bean": "50% 50%", Cygnus: "50% 62%", Arkarium: "50% 74%", Horntail: "50% 30%", Papulatus: "50% 35%",
+  Pierre: "50% 40%", "Von Bon": "50% 40%", "Crimson Queen": "50% 24%",
+  "Von Leon": "50% 54%", Hilla: "50% 40%", Magnus: "50% 40%", Zakum: "50% 54%",
 };
 
 // Spotlight's own crop anchors, deliberately separate from BOSS_ART_POSITION above, which was
@@ -310,7 +321,9 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
   return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
-      tiles.push({ entry, result });
+      const scouter = inputs.scouterInputs && computeBossClear(entry, level, arcaneForce, authenticForce, inputs.scouterInputs);
+      const minimumHexa = minimumClearHexa(entry, inputs) ?? undefined;
+      tiles.push({ entry, result: { ...result, minimumHexa, ...(scouter ? { scouterEstimatePercent: scouter.clearRatePercent } : {}) } });
     }
     return tiles;
   }, []);
@@ -319,8 +332,15 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
 // Trailing * flags a clear% mapledoro deliberately corrects away from MapleScouter's own figure
 // (Champion Black Mage, see bossClearFormula.ts's effectiveEasyRate) so a player comparing the
 // two sites sees at a glance that the mismatch is intended, with the hover tooltip explaining it.
+// A leading ~ marks MapleDoro's own estimate for a boss MapleScouter doesn't cover. Past
+// CLEAR_PERCENT_CAP the exact figure says nothing (a low-end boss reads in the billions), so it
+// shows as the cap with a +.
+const CLEAR_PERCENT_CAP = 9999;
 function formatClearPercent(result: BossClearResult): string {
-  return `${result.clearRatePercent.toFixed(2)}%${result.scouterClearRatePercent === null ? "" : "*"}`;
+  const value = result.clearRatePercent > CLEAR_PERCENT_CAP
+    ? `${CLEAR_PERCENT_CAP.toLocaleString()}%+`
+    : `${result.clearRatePercent.toFixed(2)}%`;
+  return `${result.estimated ? "~" : ""}${value}${result.scouterClearRatePercent === null ? "" : "*"}`;
 }
 
 // Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill.
@@ -337,11 +357,17 @@ function chipTagColor(theme: AppTheme, status: PillStatus): string {
 // one-line labels, which suits those but turns a multi-row breakdown into an unscannable wall
 // of centered text, so this overrides text-align through HoverTooltip's style prop. Difficulty
 // and clear percent are left out, since both are already visible on the chip being hovered.
+// Below 1,000 the HEXA scale stops meaning anything (a low-end boss can need almost none).
+function formatMinimumHexa(hexa: number): string {
+  return hexa < 1000 ? "under 1,000" : formatFigure(hexa);
+}
+
 function chipTooltipDividerStyle(theme: AppTheme): CSSProperties {
   return { borderTop: `1px solid ${theme.border}`, margin: "4px 0" };
 }
 function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; difficulty: string; result: BossClearResult }) {
   const { combinedLossPercent, lines: losses } = lossBreakdown(result);
+  const anyLoss = losses.some((line) => line.lossPercent !== null);
   return (
     <div style={{ minWidth: 168, textAlign: "left" }}>
       <div style={{ fontWeight: 800 }}>{difficulty}</div>
@@ -350,6 +376,12 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <span style={{ color: theme.muted }}>Adjusted HEXA Stat</span>
         <span>{formatFigure(result.bossStat)}</span>
       </div>
+      {result.minimumHexa !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>100% Solo HEXA</span>
+          <span>{formatMinimumHexa(result.minimumHexa)}</span>
+        </div>
+      )}
       {/* Whichever scale the chip ISN'T showing -- the party figure once the boss has flipped to
           solo (also what MapleScouter's own site shows, so the cross-check survives the flip). */}
       {result.soloScalePercent !== null && (
@@ -358,19 +390,35 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <span>{(result.soloable ? result.clearRate * 100 : result.soloScalePercent).toFixed(2)}%</span>
         </div>
       )}
+      {result.scouterEstimatePercent !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>MapleScouter est.</span>
+          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
+        </div>
+      )}
       <div style={chipTooltipDividerStyle(theme)} />
       {combinedLossPercent > 0 && (
         <div style={{ color: statusText(theme, "warning"), fontWeight: 800 }}>{combinedLossPercent}% FD Loss</div>
       )}
+      {/* One row per gap: the character's value over the boss's requirement, then the loss. The
+          loss column only exists when some row has one, so with none the values right-align with
+          the figures above. */}
       {losses.map((line) => (
-        <div key={line.label} style={{ marginTop: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
-            {line.lossPercent !== null && <span style={{ color: statusText(theme, "warning") }}>-{line.lossPercent}%</span>}
-          </div>
-          <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
+        <div key={line.label} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
+          <span style={{ flex: 1, color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
+          <span style={{ color: theme.muted, fontWeight: 500 }}>{line.yourValue} / {line.bossValue}</span>
+          {anyLoss && <span style={{ minWidth: 48, textAlign: "right", color: statusText(theme, "warning") }}>{line.lossPercent !== null ? `-${line.lossPercent}%` : ""}</span>}
         </div>
       ))}
+      {result.estimated && (
+        <>
+          <div style={chipTooltipDividerStyle(theme)} />
+          <div style={{ color: theme.muted, fontWeight: 500 }}>
+            Estimate. MapleScouter doesn&apos;t cover this boss, so MapleDoro works it out from the
+            boss&apos;s HP and time limit.
+          </div>
+        </>
+      )}
       {result.scouterClearRatePercent !== null && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
@@ -426,7 +474,7 @@ function BossQuickViewRow({
   const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
   if (tiles.length === 0) return null;
 
-  const iconId = BOSS_ICON_ID[boss];
+  const iconId = bossIconId(boss, entries);
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
 
   return (
@@ -485,44 +533,37 @@ function PowerStripFdEquiv({ theme, pct }: { theme: AppTheme; pct: number }) {
   );
 }
 
-function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
+function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv, scouterValue }: {
   theme: AppTheme; label: string; value: number; sub?: number;
   /** The character's real (pre-simulation) figure for this slot. Set only while a Scouter
    *  Simulator what-if is applied. Drives the delta chip and the "was" tooltip line. */
   realValue?: number;
   /** This boss's FD-equivalent % for the simulation (Boss 300 / Boss 380 only). */
   fdEquiv?: number | null;
+  /** MapleScouter's own figure, for a class with a clear factor (which value includes). */
+  scouterValue?: number;
 }) {
-  const content = (
+  // The strip already shows the current figure (and its delta chip while simulated), so the
+  // tooltip carries only what the strip cannot: the pre-simulation value, muted since it is
+  // history, the Normal-tier figure at full weight since it is current, and MapleScouter's own
+  // figure when a clear factor changed it.
+  const lines = [
+    realValue !== undefined && <span key="was" style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>,
+    sub !== undefined && <span key="normal">Normal: {formatFigure(sub)}</span>,
+    scouterValue !== undefined && <span key="scouter" style={{ color: theme.muted }}>MapleScouter est.: {formatFigure(scouterValue)}</span>,
+  ].filter(Boolean);
+  const tooltip: ReactNode = lines.length === 0 ? null : <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>{lines}</span>;
+  const figure = <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>;
+  return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: theme.muted }}>{label}</span>
-      {/* Value and delta stack rather than sit side by side -- Converted's 9-digit figure plus
-          its own 9-digit delta can't share one line inside a 2-column strip at 360px. */}
-      <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>
+      {/* Value and delta stack rather than sit side by side, so a figure and its delta never
+          have to share one line inside a 2-column strip at 360px. The tooltip wraps only the
+          figure, sized to it, so its bubble opens over the number rather than the whole cell. */}
+      {tooltip === null ? figure : <HoverTooltip theme={theme} label={tooltip} style={{ alignSelf: "flex-start" }}>{figure}</HoverTooltip>}
       {realValue !== undefined && <PowerStripDelta theme={theme} value={value} realValue={realValue} />}
       {fdEquiv != null && <PowerStripFdEquiv theme={theme} pct={fdEquiv} />}
     </div>
-  );
-  // "Normal" alone (no simulation): the old single-line tooltip, unchanged.
-  if (realValue === undefined) {
-    if (sub === undefined) return content;
-    return <HoverTooltip theme={theme} label={`Normal: ${formatFigure(sub)}`}>{content}</HoverTooltip>;
-  }
-  // While simulated, the strip already shows the current figure and its delta chip, so the
-  // tooltip carries only what the strip cannot: the pre-simulation value, muted since it is
-  // history, and the Normal-tier figure if there is one, at full weight since it is current.
-  return (
-    <HoverTooltip
-      theme={theme}
-      label={
-        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>
-          <span style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>
-          {sub !== undefined && <span>Normal: {formatFigure(sub)}</span>}
-        </span>
-      }
-    >
-      {content}
-    </HoverTooltip>
   );
 }
 
@@ -531,27 +572,21 @@ function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
 // below, so they read as this view's header rather than an unrelated sibling.
 function PowerStrip({ theme, entry, realEntry }: { theme: AppTheme; entry: ScouterResultEntry; realEntry?: ScouterResultEntry }) {
   // A simulation touching only level, Arcane Force or Sacred Power reuses the character's
-  // cached result untouched, since those fields never reach MapleScouter, so the power figures
-  // are identical. Skip the "was" tooltip line and the always-zero chip in that case.
+  // cached result untouched, since those fields don't enter the damage calculation, so the power
+  // figures are identical. Skip the "was" tooltip line and the always-zero chip in that case.
   const showDeltas = realEntry !== undefined && (
     Math.round(entry.boss300Hexa) !== Math.round(realEntry.boss300Hexa) ||
-    Math.round(entry.boss380Hexa) !== Math.round(realEntry.boss380Hexa) ||
-    Math.round(entry.convertedPowerHexa) !== Math.round(realEntry.convertedPowerHexa) ||
-    Math.round(entry.dojoPower) !== Math.round(realEntry.dojoPower)
+    Math.round(entry.boss380Hexa) !== Math.round(realEntry.boss380Hexa)
   );
   const real = showDeltas ? realEntry : undefined;
   const fdEquiv300 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage300, entry.bossClearInputs?.calculatedHexaDamage300) : null;
   const fdEquiv380 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage380, entry.bossClearInputs?.calculatedHexaDamage380) : null;
   return (
-    <div className="power-strip" style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
-      {/* Grid, not flex-wrap: Converted's long value skews flex column widths. 4 columns on
-          desktop, 2 on narrow panels (.power-strip-grid's container query in styles.ts). */}
-      <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 / Converted shown as HEXA</span>
-      <div className="power-strip-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} />
-        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} />
-        <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} realValue={real?.convertedPowerHexa} />
-        <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} realValue={real?.dojoPower} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 shown as HEXA</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} scouterValue={entry.scouterFigures?.boss300Hexa} />
+        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} scouterValue={entry.scouterFigures?.boss380Hexa} />
       </div>
     </div>
   );
@@ -844,8 +879,15 @@ function NavArrowButton({ theme, direction, disabled, onClick }: {
  *  no damage. Requirement-relevant stats are returned even at no loss, so the UI can show a
  *  quiet boss-versus-you reference line for players checking whether they meet a requirement,
  *  not only when something is wrong. */
-function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number; yourValue: number; lossPercent: number | null }[] } {
-  const gaps: { label: string; bossValue: number; yourValue: number; gapDmg: number; gapCeiling: number }[] = [
+/** The symbol's level for its loss row: the saved level when it agrees with Maxed Symbols, else
+ *  "<11" (ticked off without saved levels, or unticked in the Simulator despite a maxed save). */
+function sacredSymbolLevelText(symbol: NonNullable<BossClearResult["sacredSymbol"]>): string {
+  if (symbol.maxed) return "11";
+  return symbol.level !== null && symbol.level < 11 ? String(symbol.level) : "<11";
+}
+
+function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number | string; yourValue: number | string; lossPercent: number | null }[] } {
+  const gaps: { label: string; bossValue: number | string; yourValue: number | string; gapDmg: number; gapCeiling: number }[] = [
     { label: "Level", bossValue: result.bossLevel, yourValue: result.characterLevel, gapDmg: result.levelGapDmg, gapCeiling: result.levelGapCeiling },
   ];
   if (result.bossArcaneForce !== null) {
@@ -853,6 +895,14 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
   }
   if (result.bossAuthenticForce !== null) {
     gaps.push({ label: "Sacred Power", bossValue: result.bossAuthenticForce, yourValue: result.characterAuthenticForce, gapDmg: result.authenticGapDmg, gapCeiling: result.authenticGapCeiling });
+  }
+  // The boss's own Sacred Symbol, from saved symbol levels: its +20% damage is the ceiling.
+  const symbol = result.sacredSymbol;
+  if (symbol) {
+    gaps.push({
+      label: `${symbol.area} Symbol`, bossValue: "11", yourValue: sacredSymbolLevelText(symbol),
+      gapDmg: symbol.maxed ? symbol.boost : 1, gapCeiling: symbol.boost,
+    });
   }
   // Loss is relative to each stat's own bonus ceiling rather than to 1. Sitting exactly at a
   // boss's requirement reads gapDmg around 1.0 but is still short of the max bonus tier: Black
@@ -979,7 +1029,7 @@ function BossSpotlight({
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onBack: () => void;
 }) {
   const [boss, entries] = grouped[selectedIndex];
-  const iconId = BOSS_ICON_ID[boss];
+  const iconId = bossIconId(boss, entries);
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
   const artPosition = SPOTLIGHT_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -1087,9 +1137,21 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  Spotlight's selected boss is owned by CharacterProfileOverviewScreen rather than local
  *  state, so the page header can read the same value directly instead of BossClearGrid
  *  reporting it back up through an effect. See resolveBossDisplayName. */
+/** Boss Clear inputs with the character's Maxed Symbols: the Simulator's buffs while one is
+ *  applied, otherwise their saved buffs, falling back to saved symbol levels for a character saved
+ *  before Maxed Symbols existed. */
+function withMaxedSymbols(inputs: BossClearInputs | undefined, character: StoredCharacterRecord, buffsOverride: StoredScouterBuffs | undefined): BossClearInputs | undefined {
+  if (!inputs) return inputs;
+  return {
+    ...inputs,
+    sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, savedMaxedSymbols(character)),
+    sacredLevels: savedSacredLevels(character) ?? undefined,
+  };
+}
+
 export default function BossClearGrid({
   theme, character, entry, realEntry, view, onViewChange, selectedIndex, onSelectedIndexChange,
-  levelOverride, arcaneForceOverride, authenticForceOverride, simulated, onOpenSimulator,
+  levelOverride, arcaneForceOverride, authenticForceOverride, buffsOverride, simulated, onOpenSimulator,
 }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
@@ -1109,6 +1171,8 @@ export default function BossClearGrid({
   levelOverride?: number;
   arcaneForceOverride?: number;
   authenticForceOverride?: number;
+  /** The Scouter Simulator's buffs while one is applied, for Maxed Symbols. */
+  buffsOverride?: StoredScouterBuffs;
   /** Whether a Scouter Simulator "what if" is currently applied. Swaps the Quick View filter
    *  row's launcher button label from "Simulator" to "Edit". */
   simulated: boolean;
@@ -1118,14 +1182,15 @@ export default function BossClearGrid({
   onOpenSimulator: () => void;
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
-  const inputs = entry.bossClearInputs;
-  const grouped = groupByBoss(BOSSCUT_DATA);
+  // MapleScouter's own estimate (inputs.scouterInputs) keeps its single switch on purpose.
+  const inputs = withMaxedSymbols(entry.bossClearInputs, character, buffsOverride);
+  const grouped = BOSS_CLEAR_GROUPS;
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
 
   if (!inputs) {
     return (
       <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>
-        Boss Clear data isn&apos;t available yet. Refresh the Scouter figure on Overview to compute it.
+        Boss Clear data isn&apos;t available for this class yet.
       </p>
     );
   }

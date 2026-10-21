@@ -337,10 +337,15 @@ function CalibrationNote({ theme, notice }: { theme: AppTheme; notice: Calibrati
       </WarnNote>
     );
   }
-  const action =
-    notice === "setup"
-      ? "finish this character's Scouter setup"
-      : "refresh this character's Scouter figure";
+  if (notice === "pending") {
+    return (
+      <WarnNote theme={theme}>
+        This is valued against your unbuffed stat window until this character&apos;s Scouter figures
+        are calculated, so it may not line up with MapleScouter yet.
+      </WarnNote>
+    );
+  }
+  const action = "finish this character's Scouter setup";
   return (
     <WarnNote theme={theme}>
       This is valued against your unbuffed stat window, so it will not line up with MapleScouter.

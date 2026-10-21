@@ -25,6 +25,7 @@ import { whAutofillSourceFromRoster } from "../setup/data/scouterQuestionsData";
 import { OZ_RING_MAX_LEVEL, type OzRingId } from "../setup/data/ozRingData";
 import { scouterKoreanClassName } from "./scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY, SCOUTER_UNMODELED_LINK_SKILL_KEYS } from "./scouterLinkSkills";
+import { maxedSacredSymbols, sacredSwitchOn } from "./sacredSymbols";
 import { readCharacterToolData } from "../../tools/characterToolStorage";
 import type { HexaSkillLevels } from "../../tools/hexa-skills/hexa-classes";
 import { COMMON_SKILLS } from "../../tools/hexa-skills/hexa-classes";
@@ -316,7 +317,7 @@ function buildDoping(buffs: StoredScouterBuffs | undefined): ScouterDoping {
     championBoss: renownLevel(buffs, "bossDmg"),
     championIgnore: renownLevel(buffs, "ignoreDef"),
     championCriDmg: renownLevel(buffs, "critDmg"),
-    authenticDmg: Boolean(buffs?.maxedSacredSymbol),
+    authenticDmg: sacredSwitchOn(maxedSacredSymbols(buffs)),
     moonshine: Boolean(buffs?.brightMoonlight),
     cake: false,
     apple: Boolean(buffs?.onyxApple),
@@ -559,8 +560,11 @@ interface HexaBuildResult {
   solJanusLevel: number;
 }
 
-function buildHexa(characterName: string, isHexaEligible: boolean, koreanClassName: string): HexaBuildResult {
-  const saved = readCharacterToolData<{ levels?: HexaSkillLevels }>(characterName, "hexaSkills");
+function buildHexa(character: StoredCharacterRecord, isHexaEligible: boolean, koreanClassName: string): HexaBuildResult {
+  // The record's own copy first: right after a setup Finish, the in-memory record already has
+  // the new levels while storage still holds the old ones until the roster persists.
+  const saved = (character.tools?.hexaSkills as { levels?: HexaSkillLevels } | undefined)
+    ?? readCharacterToolData<{ levels?: HexaSkillLevels }>(character.characterName, "hexaSkills");
   const cores = hexaCoreLevels(saved?.levels, isHexaEligible);
   const solJanusLevel = SOL_JANUS_INDEX >= 0 ? (saved?.levels?.common[SOL_JANUS_INDEX] ?? 0) : 0;
   const solHecateLevel = SOL_HECATE_INDEX >= 0 ? (saved?.levels?.common[SOL_HECATE_INDEX] ?? 0) : 0;
@@ -748,7 +752,7 @@ export function buildScouterPayload(
 
   const legion = ctx.scouterLegionByWorld[String(character.worldID)];
   const isHexaEligible = character.level >= 260 && !classData.isLegacy;
-  const { hexa, solJanusLevel } = buildHexa(character.characterName, isHexaEligible, koreanClassName);
+  const { hexa, solJanusLevel } = buildHexa(character, isHexaEligible, koreanClassName);
 
   return {
     doping: buildDoping(overrides?.dopingOverrides ?? character.scouter?.buffs),
@@ -968,8 +972,7 @@ function applyInputOverrides(stat: ScouterStat, input: SimulatorInputOverrides |
 }
 
 /** Builds a real ScouterUserStat with a Scouter Simulator popup's full overrides applied, for
- *  POSTing straight to /api/scouter (MapleScouter's plain /calc/dmg) instead of the api-key-
- *  gated simulator endpoint. Returns null under the same conditions buildScouterPayload does
+ *  the local engine (the same shape as the real payload). Returns null under the same conditions buildScouterPayload does
  *  (class unsupported). `cridmgeff1` is the character's own specEfficiency rate (from their
  *  last computed Scouter result), needed only when finalDmgPercent is set. */
 export function buildDirectScouterPayload(

@@ -8,7 +8,7 @@ import { critRateToCritDmg } from "../../tools/stat-optimizer/scouter-class-data
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { statInputStyle } from "../setup/components/QuestionControls";
 import { resolveClassId } from "../setup/data/nexonJobMapping";
-import type { ScouterSpecEfficiency } from "./scouterCache";
+import type { ScouterSpecEfficiency } from "./scouterResult";
 import {
   computeMainEfficiencies, detailEfficiencyRows, efficiencyUnitOptions,
   formatEfficiencyValue, meterPosition, resolveEfficiencyStatLabels,
