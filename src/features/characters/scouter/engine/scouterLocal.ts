@@ -118,16 +118,33 @@ function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePre
   };
 }
 
+/** `detail` says which check failed, for the player and for a bug report. */
 export type ScouterComputeResult =
   | { ok: true; entry: ScouterResultEntry }
-  | { ok: false; reason: ScouterErrorReason };
+  | { ok: false; reason: ScouterErrorReason; detail?: string };
+
+const GROUP_LABEL: Record<keyof EnginePrediction["groups"], string> = {
+  stat: "main and secondary stats", flatAtk: "ATT", atkPct: "ATT %", dmg: "damage and boss damage",
+  crit: "critical damage", def: "ignore defense", cores: "HEXA skill levels", other: "other settings (rings, souls, cooldowns)",
+};
+
+/** Why a prediction can't be shown, or null when it can. */
+function predictionProblem(p: EnginePrediction): string | null {
+  const broken = (Object.keys(p.groups) as (keyof EnginePrediction["groups"])[]).filter((k) => !Number.isFinite(p.groups[k]));
+  if (broken.length > 0) return `Some of this character's ${broken.map((k) => GROUP_LABEL[k]).join(", ")} aren't valid numbers. Check MapleScouter Setup.`;
+  if (p.hexa === null || p.hexa300 === null) return "This class's HEXA curves are missing from the Scouter data.";
+  if (!(p.damage > 0) || p.hexa <= 0) return "These stats work out to no damage. Check main stat and ATT in MapleScouter Setup.";
+  return null;
+}
 
 function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
   try {
-    if (!eng.classOf(u)) return { ok: false, reason: "bad_response" };
+    if (!eng.classOf(u)) return { ok: false, reason: "bad_response", detail: "MapleDoro's Scouter has no data for this class yet." };
     const base = eng.predict(u), normal = eng.predictNormal(u);
-    if (base.hexa === null || base.hexa300 === null || normal.hexa === null || normal.hexa300 === null) return { ok: false, reason: "bad_response" };
-    if (!Number.isFinite(base.damage) || base.hexa <= 0) return { ok: false, reason: "bad_response" };
+    const problem = predictionProblem(base) ?? predictionProblem(normal);
+    if (problem || base.hexa === null || base.hexa300 === null || normal.hexa === null || normal.hexa300 === null) {
+      return { ok: false, reason: "bad_response", detail: problem ?? undefined };
+    }
     return {
       ok: true,
       entry: {
@@ -139,8 +156,8 @@ function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
         specEfficiency: specEfficiency(eng, u, base),
       },
     };
-  } catch {
-    return { ok: false, reason: "bad_response" };
+  } catch (error) {
+    return { ok: false, reason: "bad_response", detail: `Calculation error: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 

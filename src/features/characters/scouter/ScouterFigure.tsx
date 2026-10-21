@@ -64,13 +64,16 @@ const ERROR_REASON_TOOLTIP: Record<ScouterErrorReason, string> = {
 };
 
 /** The figure's own tooltip: what the number is when there is one, otherwise why there's none. */
-function figureTooltip(status: ScouterFigureStatus): ReactNode {
+function figureTooltip(status: ScouterFigureStatus, theme: AppTheme): ReactNode {
   switch (status.kind) {
     case "ready": return "Boss 380 HEXA";
     case "unsupported": return "Scouter doesn't support this class yet.";
     case "incomplete": return `Fill out MapleScouter Setup's ${status.gap === "quickQuestions" ? "Quick Questions" : "Character Info"} to see this.`;
     case "loading": return "Calculating…";
-    case "error": return ERROR_REASON_TOOLTIP[status.reason];
+    case "error":
+      return status.detail
+        ? <>{ERROR_REASON_TOOLTIP[status.reason]}<br /><span style={{ color: theme.muted }}>{status.detail}</span></>
+        : ERROR_REASON_TOOLTIP[status.reason];
   }
 }
 
@@ -96,7 +99,7 @@ export default function ScouterFigure({ character, theme, simulator }: { charact
   const valueColor = simulated ? statusText(theme, "warning") : figureValueColor(theme, status);
   const tooltip = simulated
     ? <>Boss 380 HEXA (simulated)<br /><span style={{ color: statusText(theme, "warning") }}>Showing a &quot;what if&quot; from the Scouter Simulator, not your real result.</span></>
-    : figureTooltip(status);
+    : figureTooltip(status, theme);
 
   return (
     <div>

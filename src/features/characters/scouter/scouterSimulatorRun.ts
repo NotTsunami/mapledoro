@@ -13,7 +13,7 @@ import type { StoredCharacterRecord } from "../model/charactersStore";
 export type ScouterSimulatorRunResult =
   | { status: "ok"; entry: ScouterResultEntry }
   | { status: "unsupported" }
-  | { status: "error"; reason: ScouterErrorReason };
+  | { status: "error"; reason: ScouterErrorReason; detail?: string };
 
 /** Never throws: every failure resolves to a tagged reason. */
 export async function runScouterSimulator(
@@ -26,5 +26,5 @@ export async function runScouterSimulator(
   const request = buildDirectScouterPayload(character, ctx, overrides, cridmgeff1);
   if (!request) return { status: "unsupported" };
   const computed = await computeScouterResult(request, hashScouterPayload(request));
-  return computed.ok ? { status: "ok", entry: computed.entry } : { status: "error", reason: computed.reason };
+  return computed.ok ? { status: "ok", entry: computed.entry } : { status: "error", reason: computed.reason, detail: computed.detail };
 }

@@ -15,7 +15,8 @@ export type ScouterFigureStatus =
   // The engine's class data is still loading (once per page load).
   | { kind: "loading" }
   | { kind: "ready"; entry: ScouterResultEntry }
-  | { kind: "error"; reason: ScouterErrorReason };
+  // detail names the check that failed, when the engine knows (see scouterLocal.ts).
+  | { kind: "error"; reason: ScouterErrorReason; detail?: string };
 
 function statusFor(character: StoredCharacterRecord, engineFailed: boolean): ScouterFigureStatus {
   if (!isScouterSupportedClass(character.jobName)) return { kind: "unsupported" };
@@ -24,7 +25,7 @@ function statusFor(character: StoredCharacterRecord, engineFailed: boolean): Sco
   if (engineFailed) return { kind: "error", reason: "network" };
   const result = scouterResultFor(character);
   if (!result) return { kind: "loading" };
-  return result.ok ? { kind: "ready", entry: result.entry } : { kind: "error", reason: result.reason };
+  return result.ok ? { kind: "ready", entry: result.entry } : { kind: "error", reason: result.reason, detail: result.detail };
 }
 
 /** The character's Scouter status, always for its current data: there is no refresh step, since

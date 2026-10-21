@@ -36,7 +36,7 @@ interface ScouterSimulatorState {
 export type ScouterSimulatorApplyResult =
   | { status: "ok" }
   | { status: "unsupported" }
-  | { status: "error"; reason: ScouterErrorReason };
+  | { status: "error"; reason: ScouterErrorReason; detail?: string };
 
 export interface ScouterSimulatorController {
   /** The currently-applied simulation, or null when the bookmark is showing the real
@@ -74,7 +74,7 @@ export function useScouterSimulator(character: StoredCharacterRecord | null): Sc
     if (isLocalOnlyOverride(overrides)) {
       const real = await loadScouterResultFor(character);
       if (!real) return { status: "unsupported" };
-      if (!real.ok) return { status: "error", reason: real.reason };
+      if (!real.ok) return { status: "error", reason: real.reason, detail: real.detail };
       setActive({ overrides, entry: real.entry });
       return { status: "ok" };
     }

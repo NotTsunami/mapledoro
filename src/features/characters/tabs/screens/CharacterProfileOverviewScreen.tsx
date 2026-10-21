@@ -3230,7 +3230,10 @@ function ScouterResultGate({ theme, character, label, disabled, onEditStep, chil
     return (
       <>
         {header}
-        <ScouterBookmarkNotice theme={theme}>{SCOUTER_ERROR_REASON_TEXT[status.reason]}</ScouterBookmarkNotice>
+        <ScouterBookmarkNotice theme={theme}>
+          {SCOUTER_ERROR_REASON_TEXT[status.reason]}
+          {status.detail && <><br />{status.detail}</>}
+        </ScouterBookmarkNotice>
       </>
     );
   }

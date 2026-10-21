@@ -887,7 +887,7 @@ export default function ScouterSimulatorDialog({
   const inputStyle = statInputStyle(theme);
 
   const draft = useScouterSimulatorDraft(character, hexaClassDef, previousOverrides);
-  const [error, setError] = useState<ScouterErrorReason | null>(null);
+  const [error, setError] = useState<{ reason: ScouterErrorReason; detail?: string } | null>(null);
 
   const RESET_BY_TAB: Record<SimulatorTab, () => void> = {
     buffs: draft.resetBuffs, hexa: draft.resetHexa, ozRings: draft.resetOzRings, linkSkills: draft.resetLinkSkills, extras: draft.resetInfo, input: draft.resetInput,
@@ -906,7 +906,7 @@ export default function ScouterSimulatorDialog({
     }
     setError(null);
     void onApply(draft.buildOverrides()).then((result) => {
-      if (result.status === "error") setError(result.reason);
+      if (result.status === "error") setError({ reason: result.reason, detail: result.detail });
       // "unsupported"/"ok" both close the popup from the caller's side (ok = success per the
       // plan; unsupported shouldn't happen here since ScouterSimulatorDialog is only ever
       // opened for a class the real Scouter figure already confirmed is supported).
@@ -994,7 +994,8 @@ export default function ScouterSimulatorDialog({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.55rem", padding: "0.8rem 1.1rem", borderTop: `1px solid ${theme.border}` }}>
         {error && (
           <p style={{ margin: 0, marginRight: "auto", fontSize: "0.8rem", fontWeight: 700, color: statusText(theme, "danger") }}>
-            {SIMULATOR_ERROR_TEXT[error]}
+            {SIMULATOR_ERROR_TEXT[error.reason]}
+            {error.detail && <><br />{error.detail}</>}
           </p>
         )}
         <button type="button" onClick={onClose} className="tool-btn tool-dialog-btn" style={dialogBtnColors(theme)}>
