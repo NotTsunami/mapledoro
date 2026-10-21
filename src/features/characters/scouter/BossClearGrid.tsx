@@ -888,6 +888,14 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
   if (result.bossAuthenticForce !== null) {
     gaps.push({ label: "Sacred Power", bossValue: result.bossAuthenticForce, yourValue: result.characterAuthenticForce, gapDmg: result.authenticGapDmg, gapCeiling: result.authenticGapCeiling });
   }
+  // The boss's own Sacred Symbol, from saved symbol levels: its +20% damage is the ceiling.
+  const symbol = result.sacredSymbol;
+  if (symbol) {
+    gaps.push({
+      label: `${symbol.area} Symbol`, bossValue: symbol.maxLevel, yourValue: symbol.level,
+      gapDmg: symbol.level >= symbol.maxLevel ? symbol.boost : 1, gapCeiling: symbol.boost,
+    });
+  }
   // Loss is relative to each stat's own bonus ceiling rather than to 1. Sitting exactly at a
   // boss's requirement reads gapDmg around 1.0 but is still short of the max bonus tier: Black
   // Mage at 1350 arcane against 1320 required reads gapDmg 1.0 against a 1.1 ceiling for that

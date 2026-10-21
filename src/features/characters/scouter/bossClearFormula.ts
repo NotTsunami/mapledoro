@@ -307,6 +307,9 @@ export interface BossClearResult {
   /** The HEXA this character needs for 100% here (minimumClearHexa). Filled in by the Boss Clear
    *  grid. */
   minimumHexa?: number;
+  /** This boss's own Sacred Symbol, when the character's symbol levels are known: its level and
+   *  the bonus a maxed one gives. Shown as a damage loss below Lv 11. */
+  sacredSymbol: { area: string; level: number; maxLevel: number; boost: number } | null;
 }
 
 /** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */
@@ -322,6 +325,12 @@ const BOSS_SACRED_SYMBOL: Readonly<Record<string, string>> = {
   maleficStar: "Arteria", limbo: "Carcion", bardrix: "Tallahart", jupiter: "Geardock",
 };
 const SACRED_SYMBOL_MAX_LEVEL = 11;
+
+function sacredSymbolOf(entry: BossCutEntry, inputs: BossClearInputs): BossClearResult["sacredSymbol"] {
+  const area = BOSS_SACRED_SYMBOL[entry.name];
+  if (!area || !inputs.sacredSymbolLevels || inputs.sacredBoost === undefined) return null;
+  return { area, level: inputs.sacredSymbolLevels[area] ?? 0, maxLevel: SACRED_SYMBOL_MAX_LEVEL, boost: inputs.sacredBoost };
+}
 
 /** Corrects the shared Sacred Symbol switch to this boss's own symbol: the bonus added if the
  *  symbol is maxed but the switch is off, removed if the switch is on but it isn't. */
@@ -495,6 +504,7 @@ export function computeBossClear(
     soloScalePercent: shown.soloScalePercent,
     soloable: shown.soloable,
     estimated: isEstimatedBoss(entry),
+    sacredSymbol: sacredSymbolOf(entry, inputs),
   };
 }
 
