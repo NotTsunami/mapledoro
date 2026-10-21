@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
 import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource";
@@ -518,36 +518,30 @@ function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
   /** This boss's FD-equivalent % for the simulation (Boss 300 / Boss 380 only). */
   fdEquiv?: number | null;
 }) {
-  const content = (
+  // "Normal" alone (no simulation): a single line. While simulated, the strip already shows the
+  // current figure and its delta chip, so the tooltip carries only what the strip cannot: the
+  // pre-simulation value, muted since it is history, and the Normal-tier figure if there is one,
+  // at full weight since it is current.
+  let tooltip: ReactNode = sub === undefined ? null : `Normal: ${formatFigure(sub)}`;
+  if (realValue !== undefined) {
+    tooltip = (
+      <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>
+        <span style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>
+        {sub !== undefined && <span>Normal: {formatFigure(sub)}</span>}
+      </span>
+    );
+  }
+  const figure = <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>;
+  return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: theme.muted }}>{label}</span>
       {/* Value and delta stack rather than sit side by side, so a figure and its delta never
-          have to share one line inside a 2-column strip at 360px. */}
-      <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>
+          have to share one line inside a 2-column strip at 360px. The tooltip wraps only the
+          figure, sized to it, so its bubble opens over the number rather than the whole cell. */}
+      {tooltip === null ? figure : <HoverTooltip theme={theme} label={tooltip} style={{ alignSelf: "flex-start" }}>{figure}</HoverTooltip>}
       {realValue !== undefined && <PowerStripDelta theme={theme} value={value} realValue={realValue} />}
       {fdEquiv != null && <PowerStripFdEquiv theme={theme} pct={fdEquiv} />}
     </div>
-  );
-  // "Normal" alone (no simulation): the old single-line tooltip, unchanged.
-  if (realValue === undefined) {
-    if (sub === undefined) return content;
-    return <HoverTooltip theme={theme} label={`Normal: ${formatFigure(sub)}`}>{content}</HoverTooltip>;
-  }
-  // While simulated, the strip already shows the current figure and its delta chip, so the
-  // tooltip carries only what the strip cannot: the pre-simulation value, muted since it is
-  // history, and the Normal-tier figure if there is one, at full weight since it is current.
-  return (
-    <HoverTooltip
-      theme={theme}
-      label={
-        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>
-          <span style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>
-          {sub !== undefined && <span>Normal: {formatFigure(sub)}</span>}
-        </span>
-      }
-    >
-      {content}
-    </HoverTooltip>
   );
 }
 
