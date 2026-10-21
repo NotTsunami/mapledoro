@@ -138,6 +138,17 @@ function evaluateClear(clear, probes) {
   const entry = BOSSCUT_DATA.find((b) => b.name === clear.boss && b.difficulty === clear.difficulty);
   if (!entry) return { error: `no bosscut entry for ${clear.boss} ${clear.difficulty}` };
   if (clear.hexa380 == null) return { skipped: "no HEXA value, logged only" };
+  // A boss-adjusted HEXA already includes the boss's gap penalties, so recomputing from it would
+  // apply them twice. The clear % MapleScouter showed with it is the prediction itself.
+  if (clear.hexaAdjusted) {
+    if (clear.shownPercent == null) return { skipped: "boss-adjusted HEXA with no shown %, logged only" };
+    const actualPercent = (100 * clear.timerSeconds) / (clear.timerSeconds - clear.secondsLeft);
+    return {
+      scouterPercent: clear.shownPercent, actualPercent,
+      factor: clear.partySize === 1 ? actualPercent / clear.shownPercent : null,
+      levelAssumed: false, shownMismatch: false,
+    };
+  }
 
   const damage = splineEval(probe.spline380, clear.hexa380);
   const inputs = {
@@ -202,11 +213,9 @@ function runReport() {
   const { clears: logged } = readJson(CLEARS_FILE);
   // A temporary event skill inflates a clear, and other regions differ from GMS in attack speed cap,
   // patch state and MapleScouter's class data, so neither counts toward a class factor.
-  // A boss-adjusted HEXA already has the boss's gap penalties in it, and the formula would apply
-  // them again.
   const clears = logged.filter((clear) => !clear.eventSkill && (clear.region ?? "GMS") === "GMS"
-    && !(clear.uploaded && clear.uploaded < LAST_SCOUTER_UPDATE) && !clear.hexaAdjusted);
-  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill, non-GMS, boss-adjusted or pre-${LAST_SCOUTER_UPDATE} clear(s) left out.`);
+    && !(clear.uploaded && clear.uploaded < LAST_SCOUTER_UPDATE));
+  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill, non-GMS or pre-${LAST_SCOUTER_UPDATE} clear(s) left out.`);
   const unknownRegion = clears.filter((clear) => clear.region == null).length;
   if (unknownRegion > 0) console.log(`${unknownRegion} clear(s) have no region yet and are counted as GMS until confirmed.`);
   console.log();
