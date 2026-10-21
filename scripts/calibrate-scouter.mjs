@@ -43,6 +43,10 @@ const NON_KMS_CLASSES = new Set(["kanna", "hayato", "lynn", "mo_xuan", "sia_aste
 // A video's shown % may drift a little from today's recompute (rounded HEXA, a later MapleScouter
 // tweak). Past this, the shown % is flagged as not matching today's model.
 const SHOWN_PERCENT_TOLERANCE = 0.03;
+// MapleScouter's last boss-cut update. Clears from before it read 0.1-0.3 lower on every class
+// against today's formula, so they're from a different balance state and don't count. Move this
+// forward after the next update that changes cuts or class numbers.
+const LAST_SCOUTER_UPDATE = "2026-05-27";
 // Level gaps cap at 5 levels above the boss; an unknown level is assumed capped (endgame clears).
 const LEVEL_GAP_CAP = 5;
 // Destiny-tier clears always have Sacred Power past the cap, so the Authentic gap is maxed.
@@ -198,8 +202,9 @@ function runReport() {
   const { clears: logged } = readJson(CLEARS_FILE);
   // A temporary event skill inflates a clear, and other regions differ from GMS in attack speed cap,
   // patch state and MapleScouter's class data, so neither counts toward a class factor.
-  const clears = logged.filter((clear) => !clear.eventSkill && (clear.region ?? "GMS") === "GMS");
-  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill or non-GMS clear(s) left out.`);
+  const clears = logged.filter((clear) => !clear.eventSkill && (clear.region ?? "GMS") === "GMS"
+    && !(clear.uploaded && clear.uploaded < LAST_SCOUTER_UPDATE));
+  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill, non-GMS or pre-${LAST_SCOUTER_UPDATE} clear(s) left out.`);
   const unknownRegion = clears.filter((clear) => clear.region == null).length;
   if (unknownRegion > 0) console.log(`${unknownRegion} clear(s) have no region yet and are counted as GMS until confirmed.`);
   console.log();
