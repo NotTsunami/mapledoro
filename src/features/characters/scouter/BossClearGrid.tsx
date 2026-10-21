@@ -381,7 +381,7 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
       )}
       {result.minimumHexa !== undefined && (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ color: theme.muted }}>{result.isPartyBoss ? "Solo 100% at" : "100% at"}</span>
+          <span style={{ color: theme.muted }}>100% solo HEXA</span>
           <span>{formatMinimumHexa(result.minimumHexa)}</span>
         </div>
       )}
