@@ -102,16 +102,14 @@ function specEfficiency(eng: ScouterEngine, u: ScouterUserStat, base: EnginePred
 }
 
 /** Boss Clear's damage inputs, scaled so each lands exactly on the HEXA figure shown: a boss with
- *  no level or force gap then shows the same adjusted HEXA as Boss 300/380. That scale carries
- *  the class clear factor, the engine's spline calibration and flat cooldown reduction, which
- *  MapleScouter counts in its HEXA figure but leaves out of its own Boss Clear damage (MapleDoro
- *  counts it in both, since a cooldown hat does help a clear). */
-function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, figures: ScouterFigures | null): BossClearInputs | undefined {
+ *  no level or force gap then shows the same adjusted HEXA as Boss 300/380, as maplescouter.com's
+ *  own boss tiles do. That scale carries the class clear factor, the engine's spline calibration
+ *  and flat cooldown reduction, which the HEXA figure counts but the raw damage figure does not. */
+function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, figures: ScouterFigures): BossClearInputs | undefined {
   const c = eng.classData(base.classId);
   if (!c?.spline300 || !c.spline380) return undefined;
-  // Without figures: MapleScouter's own inputs, unscaled.
-  const scale380 = figures ? splineEval(c.spline380, figures.boss380Hexa) / base.damage : 1;
-  const scale300 = figures ? splineEval(c.spline300, figures.boss300Hexa) / base.damage300 : 1;
+  const scale380 = splineEval(c.spline380, figures.boss380Hexa) / base.damage;
+  const scale300 = splineEval(c.spline300, figures.boss300Hexa) / base.damage300;
   return {
     calculatedHexaDamage300: base.damage300 * scale300,
     calculatedHexaDamage380: base.damage * scale380,
@@ -190,7 +188,7 @@ function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
       ok: true,
       entry: {
         ...figures,
-        bossClearInputs: withScouterEstimate(bossClearInputs(eng, u, base, figures), factor === 1 ? undefined : bossClearInputs(eng, u, base, null)),
+        bossClearInputs: withScouterEstimate(bossClearInputs(eng, u, base, figures), factor === 1 ? undefined : bossClearInputs(eng, u, base, scouterFigures)),
         specEfficiency: specEfficiency(eng, u, base),
       },
     };
