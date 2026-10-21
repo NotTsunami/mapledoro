@@ -16,7 +16,7 @@ const CHANGELOG: ChangelogEntry[] = [
     changes: [
       { type: "changed", text: "The Scouter figure, Boss Clear and Stat Efficiency are now calculated by MapleDoro itself, so they no longer depend on MapleScouter being reachable and update as soon as you edit your character. The refresh button is gone, and Boss Clear no longer shows Converted and Dojo." },
       { type: "added", text: "Boss Clear now covers Zakum through Akechi, which MapleScouter does not. Their clear rates are estimated from boss HP and marked with a ~." },
-      { type: "added", text: "Boss Clear tooltips now show the HEXA your character needs to solo each boss at 100%." },
+      { type: "added", text: "Boss Clear tooltips now show the HEXA your class needs to solo each boss at 100% once you meet its level and force requirements." },
       { type: "changed", text: "Kanna and Mo Xuan's Scouter HEXA and Boss Clear are now adjusted for how they clear in real fights, with MapleScouter's original number shown in the tooltip." },
       { type: "changed", text: "The Buffs step and the Scouter simulator now ask which Sacred Symbols are at Lv. 11, and Boss Clear only gives each boss the bonus from its own symbol, including Tallahart for Baldrix and Geardock for Jupiter." },
       { type: "changed", text: "Boss Clear percentages over 9,999% now show as 9,999%+." },

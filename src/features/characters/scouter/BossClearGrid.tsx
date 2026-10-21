@@ -322,7 +322,7 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
       const scouter = inputs.scouterInputs && computeBossClear(entry, level, arcaneForce, authenticForce, inputs.scouterInputs);
-      const minimumHexa = minimumClearHexa(entry, level, arcaneForce, authenticForce, inputs) ?? undefined;
+      const minimumHexa = minimumClearHexa(entry, inputs) ?? undefined;
       tiles.push({ entry, result: { ...result, minimumHexa, ...(scouter ? { scouterEstimatePercent: scouter.clearRatePercent } : {}) } });
     }
     return tiles;

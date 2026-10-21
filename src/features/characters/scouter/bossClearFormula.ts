@@ -521,20 +521,22 @@ export function computeBossClear(
   };
 }
 
-/** The HEXA this character would need to read exactly 100% on this boss, with its own level,
- *  force and Ascent: Boss 380 HEXA, or Boss 300 HEXA for a boss under 380% defense. A party-only
- *  boss's 100% is on the solo scale (soloScaleDivisor), so it reads as the solo minimum. Found by
- *  scaling the character's damage until the clear rate is 1, then turning that damage back into
- *  HEXA. Null when the formula has no result for the boss. */
-export function minimumClearHexa(
-  entry: BossCutEntry,
-  characterLevel: number,
-  characterArcaneForce: number,
-  characterAuthenticForce: number,
-  inputs: BossClearInputs,
-): number | null {
+// Past these, the level and force gaps are at their ceilings, which is the state MapleScouter's
+// cuts are measured in (gapAdjustedDamage divides by those ceilings).
+const MINIMUM_LEVEL_LEAD = 5;
+const MINIMUM_FORCE = 99999;
+
+/** The HEXA needed to read exactly 100% on this boss with its level and force requirements
+ *  comfortably met (every gap bonus at its ceiling), so it is the same for every character of a
+ *  class: their HEXA curve, Ascent and class clear factor, plus the boss-specific buffs in the
+ *  inputs (Maxed Symbols, Power of the Adversary). A character below the boss's requirements needs
+ *  more, which the tooltip's damage-loss lines show. Boss 380 HEXA, or Boss 300 HEXA for a boss
+ *  under 380% defense. A party-only boss's 100% is on the solo scale (soloScaleDivisor). Found by
+ *  scaling the damage until the clear rate is 1, then turning that damage back into HEXA. Null
+ *  when the formula has no result for the boss. */
+export function minimumClearHexa(entry: BossCutEntry, inputs: BossClearInputs): number | null {
   const rateAt = (scale: number) => {
-    const result = computeBossClear(entry, characterLevel, characterArcaneForce, characterAuthenticForce, {
+    const result = computeBossClear(entry, entry.level + MINIMUM_LEVEL_LEAD, MINIMUM_FORCE, MINIMUM_FORCE, {
       ...inputs,
       calculatedHexaDamage300: inputs.calculatedHexaDamage300 * scale,
       calculatedHexaDamage380: inputs.calculatedHexaDamage380 * scale,
