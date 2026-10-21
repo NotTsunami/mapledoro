@@ -188,7 +188,8 @@ export function MaxedSymbolTiles({ theme, selected, onToggle }: {
             theme={theme}
             label={
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span>{symbol.grand ? "Grand Sacred" : "Sacred"} Symbol: {symbol.area} (Lv. 11)</span>
+                <span>{symbol.grand ? "Grand Sacred" : "Sacred"} Symbol:</span>
+                <span>{symbol.area} (Lv. 11)</span>
                 <span style={{ opacity: 0.7, color: theme.muted }}>+20% damage vs. {symbol.bossLabel}</span>
               </div>
             }
