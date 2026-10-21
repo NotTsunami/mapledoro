@@ -51,7 +51,9 @@ const LAST_SCOUTER_UPDATE = sinceIndex >= 0 ? process.argv[sinceIndex + 1] : "20
 // Bosses reworked since then: their earlier clears were against an easier or different fight.
 // Kaling (2026-09-09): its perils can no longer all be hit at once.
 const BOSS_CHANGED = { kaling: "2026-09-09" };
-const clearCutoff = (clear) => [LAST_SCOUTER_UPDATE, BOSS_CHANGED[clear.boss] ?? ""].sort().at(-1);
+// Classes rebalanced since then, by their latest GMS balance patch.
+const CLASS_CHANGED = { erel_light: "2026-09-09", sia_astelle: "2026-09-09" };
+const clearCutoff = (clear) => [LAST_SCOUTER_UPDATE, BOSS_CHANGED[clear.boss] ?? "", CLASS_CHANGED[clear.class] ?? ""].sort().at(-1);
 // Level gaps cap at 5 levels above the boss; an unknown level is assumed capped (endgame clears).
 const LEVEL_GAP_CAP = 5;
 // Destiny-tier clears always have Sacred Power past the cap, so the Authentic gap is maxed.
