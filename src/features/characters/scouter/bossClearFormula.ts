@@ -339,6 +339,22 @@ function sacredSymbolFactor(entry: BossCutEntry, inputs: BossClearInputs): numbe
   return maxed ? inputs.sacredBoost : 1 / inputs.sacredBoost;
 }
 
+// The Genesis Pass's Power of the Adversary buff covers the Arcane River bosses plus Lotus and
+// Damien (not Guardian Angel Slime). Its stats come in as inputs.genePassBoost (scouterLocal.ts),
+// its Arcane Power here.
+const GENE_PASS_BOSSES: ReadonlySet<string> = new Set(["lucid", "will", "gloom", "verusHilla", "darknell", "blackMage", "lotus", "damien"]);
+const GENE_PASS_ARCANE_POWER = 150;
+
+/** Buffs that only count against some bosses: the boss's own Sacred Symbol and the Genesis Pass.
+ *  Returns their damage multiplier and the Arcane Force to use (capped at 1750 as elsewhere). */
+function bossSpecificBuffs(entry: BossCutEntry, inputs: BossClearInputs, characterArcaneForce: number): { damage: number; arcaneForce: number } {
+  const genePass = inputs.genePassBoost !== undefined && GENE_PASS_BOSSES.has(entry.name);
+  return {
+    damage: sacredSymbolFactor(entry, inputs) * (genePass ? (inputs.genePassBoost ?? 1) : 1),
+    arcaneForce: Math.min(characterArcaneForce + (genePass ? GENE_PASS_ARCANE_POWER : 0), 1750),
+  };
+}
+
 /** Damage against a boss under 300% defense, relative to the 300% figure. Defense scales damage
  *  by 1 - defense x (1 - IED), so the character's own 300% multiplier gives any other. */
 function lowDefenseFactor(guard: number, ignoreDefConst300: number): number {
@@ -453,9 +469,10 @@ export function computeBossClear(
   let arcaneCorrection = 1;
   if (hasArcaneReq) arcaneCorrection = entry.boss === "검은 마법사" ? 1.1 : 1.5;
 
-  const rawDamage = adjustedHexaDamage(entry.boss, guard, inputs) * lowDefenseFactor(entry.guard, inputs.ignoreDefConst300)
-    * sacredSymbolFactor(entry, inputs);
-  const arcaneGap = arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750));
+  const buffs = bossSpecificBuffs(entry, inputs, characterArcaneForce);
+  const rawDamage = adjustedHexaDamage(entry.boss, guard, inputs) * lowDefenseFactor(entry.guard, inputs.ignoreDefConst300) * buffs.damage;
+  const arcaneForce = buffs.arcaneForce;
+  const arcaneGap = arcaneGapDmg(entry.arcaneForce, arcaneForce);
   const authenticGap = authenticGapDmg(entry.authenticForce, characterAuthenticForce);
   const levelGap = levelGapDmg(characterLevel, entry.level);
   const damage = gapAdjustedDamage(rawDamage, arcaneGap, authenticGap, levelGap, arcaneCorrection, hasAuthenticReq);
@@ -494,7 +511,7 @@ export function computeBossClear(
     bossLevel: entry.level,
     characterLevel,
     ...gapContrastFields(entry, hasArcaneReq, hasAuthenticReq),
-    characterArcaneForce: Math.min(characterArcaneForce, 1750),
+    characterArcaneForce: arcaneForce,
     characterAuthenticForce,
     scouterClearRatePercent,
     soloScalePercent: shown.soloScalePercent,

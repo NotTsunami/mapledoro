@@ -38,6 +38,10 @@ export interface BossClearInputs {
   /** Sacred Symbol regions at Lv 11 (sacredSymbols.ts). Boss Clear gives each boss the bonus only
    *  if its own region's symbol is in here (see bossClearFormula.ts). */
   sacredMaxed?: readonly string[];
+  /** Set when the Genesis Pass's Power of the Adversary buff is on: how much it multiplies this
+   *  character's 300 damage by. Boss Clear applies it, and its Arcane Power, to the bosses it
+   *  covers (bossClearFormula.ts). */
+  genePassBoost?: number;
   /** Saved Sacred Symbol levels by region, when known, so the tooltip can show the real level. */
   sacredLevels?: Partial<Record<string, number>>;
 }

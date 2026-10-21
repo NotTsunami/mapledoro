@@ -124,7 +124,24 @@ function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePre
     genePassConst: 1,
     sacredBonusOn: u.doping.authenticDmg,
     sacredBoost: sacredBoost(eng, u, base),
+    genePassBoost: u.doping.genePass ? genePassBoost(eng, u, base) : undefined,
   };
+}
+
+/** How much the Genesis Pass's Power of the Adversary buff multiplies this character's 300
+ *  damage by (every boss it covers has 300% defense): ATT +20, All Stats +20, Max HP +1000,
+ *  Boss Damage +10% and Ignore Defense +10%. Its Arcane Power +150 is applied by Boss Clear.
+ *  MapleScouter only counts it for a character without Genesis Liberation, but in game it lasts
+ *  as long as the pass, liberated or not. */
+function genePassBoost(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction): number {
+  const buffed = structuredClone(u);
+  // Demon Avenger's main stat is HP, which All Stats skips.
+  const nudges = [
+    add("atkBase", 20), add("mainStatBase", base.classId === "demon_avenger" ? 1000 : 20),
+    add("subStatBase", 20), add("ssubStatBase", 20), add("bossDmg", 10), iedTimes(0.9),
+  ];
+  for (const nudge of nudges) nudge(buffed.stat);
+  return eng.predict(buffed).damage300 / base.damage300;
 }
 
 /** How much the maxed Sacred Symbol bonus multiplies this character's 380 damage by. */
@@ -138,7 +155,9 @@ function sacredBoost(eng: ScouterEngine, u: ScouterUserStat, base: EnginePredict
 /** MapleScouter's own inputs ride inside MapleDoro's, for a class with a clear factor, so every
  *  Boss Clear view can show MapleScouter's estimate beside MapleDoro's. */
 function withScouterEstimate(inputs: BossClearInputs | undefined, scouterInputs: BossClearInputs | undefined): BossClearInputs | undefined {
-  return inputs && scouterInputs ? { ...inputs, scouterInputs } : inputs;
+  // MapleScouter ignores the Genesis Pass buff for a liberated character, and its own estimate
+  // never gets the per-boss buff MapleDoro applies, so its inputs leave it out.
+  return inputs && scouterInputs ? { ...inputs, scouterInputs: { ...scouterInputs, genePassBoost: undefined } } : inputs;
 }
 
 /** `detail` says which check failed, for the player and for a bug report. */
