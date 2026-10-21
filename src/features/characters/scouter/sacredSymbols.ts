@@ -50,7 +50,8 @@ export function maxedSacredSymbols(buffs: StoredScouterBuffs | undefined, savedL
 /** MapleScouter's single switch: on when all six regular regions are maxed, as MapleDoro has
  *  always sent it. */
 export function sacredSwitchOn(maxed: readonly string[]): boolean {
-  return SACRED_SYMBOL_BOSSES.filter((s) => !s.grand).every((s) => maxed.includes(s.area));
+  const maxedSet = new Set(maxed);
+  return SACRED_SYMBOL_BOSSES.filter((s) => !s.grand).every((s) => maxedSet.has(s.area));
 }
 
 /** maxedSymbolsFromLevels for a character's saved symbol levels: the in-memory record first, since
