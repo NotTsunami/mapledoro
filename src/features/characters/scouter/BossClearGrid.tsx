@@ -373,15 +373,9 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <span style={{ color: theme.muted }}>Adjusted HEXA Stat</span>
         <span>{formatFigure(result.bossStat)}</span>
       </div>
-      {result.scouterEstimatePercent !== undefined && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ color: theme.muted }}>MapleScouter est.</span>
-          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
-        </div>
-      )}
       {result.minimumHexa !== undefined && (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ color: theme.muted }}>100% solo HEXA</span>
+          <span style={{ color: theme.muted }}>100% Solo HEXA</span>
           <span>{formatMinimumHexa(result.minimumHexa)}</span>
         </div>
       )}
@@ -391,6 +385,12 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
           <span style={{ color: theme.muted }}>{result.soloable ? `${result.partyLimit}-player party %` : "Solo %"}</span>
           <span>{(result.soloable ? result.clearRate * 100 : result.soloScalePercent).toFixed(2)}%</span>
+        </div>
+      )}
+      {result.scouterEstimatePercent !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>MapleScouter est.</span>
+          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
         </div>
       )}
       <div style={chipTooltipDividerStyle(theme)} />
