@@ -367,6 +367,12 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <span style={{ color: theme.muted }}>Adjusted HEXA Stat</span>
         <span>{formatFigure(result.bossStat)}</span>
       </div>
+      {result.scouterEstimatePercent !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>MapleScouter est.</span>
+          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
+        </div>
+      )}
       {/* Whichever scale the chip ISN'T showing -- the party figure once the boss has flipped to
           solo (also what MapleScouter's own site shows, so the cross-check survives the flip). */}
       {result.soloScalePercent !== null && (
@@ -388,12 +394,6 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
         </div>
       ))}
-      {result.scouterEstimatePercent !== undefined && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ color: theme.muted }}>MapleScouter est.</span>
-          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
-        </div>
-      )}
       {result.estimated && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
