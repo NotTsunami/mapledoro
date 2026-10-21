@@ -12,6 +12,21 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-10-21",
+    changes: [
+      { type: "changed", text: "The Scouter figure, Boss Clear and Stat Efficiency are now calculated by MapleDoro itself, so they no longer depend on MapleScouter being reachable and update as soon as you edit your character. The refresh button is gone, and Boss Clear no longer shows Converted and Dojo." },
+      { type: "added", text: "Boss Clear now covers Zakum through Akechi, which MapleScouter does not. Their clear rates are estimated from boss HP and marked with a ~." },
+      { type: "added", text: "Boss Clear tooltips now show the HEXA your character needs to solo each boss at 100%." },
+      { type: "changed", text: "Kanna and Mo Xuan's Scouter HEXA and Boss Clear are now adjusted for how they clear in real fights, with MapleScouter's original number shown in the tooltip." },
+      { type: "changed", text: "The Buffs step and the Scouter simulator now ask which Sacred Symbols are at Lv. 11, and Boss Clear only gives each boss the bonus from its own symbol, including Tallahart for Baldrix and Geardock for Jupiter." },
+      { type: "changed", text: "Boss Clear percentages over 9,999% now show as 9,999%+." },
+      { type: "changed", text: "When the Scouter figure can't be calculated, its tooltip now says why." },
+      { type: "fixed", text: "Fixed the Power of the Adversary buff having no effect on Boss Clear. It now applies to Lucid, Will, Gloom, Verus Hilla, Darknell, Black Mage, Lotus and Damien, including after Genesis Liberation." },
+      { type: "fixed", text: "Fixed Boss Clear's Adjusted HEXA Stat reading lower than your Boss 380 HEXA on bosses with no level or force penalty." },
+      { type: "fixed", text: "Fixed the Scouter figure showing the wrong HEXA right after a MapleScouter import until you switched bookmarks." },
+    ],
+  },
+  {
     date: "2026-10-01",
     changes: [
       { type: "fixed", text: "Fixed the MapleScouter import in Character Setup setting the 3rd Common HEXA core to level 0." },
