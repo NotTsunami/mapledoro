@@ -46,7 +46,8 @@ const SHOWN_PERCENT_TOLERANCE = 0.03;
 // MapleScouter's last boss-cut update. Clears from before it read 0.1-0.3 lower on every class
 // against today's formula, so they're from a different balance state and don't count. Move this
 // forward after the next update that changes cuts or class numbers.
-const LAST_SCOUTER_UPDATE = "2026-05-27";
+const sinceIndex = process.argv.indexOf("--since");
+const LAST_SCOUTER_UPDATE = sinceIndex >= 0 ? process.argv[sinceIndex + 1] : "2026-05-27";
 // Level gaps cap at 5 levels above the boss; an unknown level is assumed capped (endgame clears).
 const LEVEL_GAP_CAP = 5;
 // Destiny-tier clears always have Sacred Power past the cap, so the Authentic gap is maxed.
@@ -235,6 +236,6 @@ function runReport() {
   }
 }
 
-const [mode, ...args] = process.argv.slice(2).filter((a, i, all) => !["--data", "--clears"].includes(a) && !["--data", "--clears"].includes(all[i - 1]));
+const [mode, ...args] = process.argv.slice(2).filter((a, i, all) => !["--data", "--clears", "--since"].includes(a) && !["--data", "--clears", "--since"].includes(all[i - 1]));
 if (mode === "probe") await runProbe(args);
 else runReport();
