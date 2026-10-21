@@ -29,6 +29,8 @@ export interface BossClearInputs {
   spline300: ScouterSpline;
   spline380: ScouterSpline;
   genePassConst: number;
+  /** MapleScouter's own inputs, for a class whose clear factor these include. */
+  scouterInputs?: BossClearInputs;
 }
 
 /** The Stat Efficiency bookmark's table, MapleScouter's `specEfficiency` rebuilt by the local

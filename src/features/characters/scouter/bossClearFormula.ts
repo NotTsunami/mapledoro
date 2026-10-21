@@ -301,6 +301,9 @@ export interface BossClearResult {
   soloable: boolean;
   /** MapleScouter has no cut for this boss: MapleDoro's estimate from boss HP. */
   estimated: boolean;
+  /** MapleScouter's own clear % for a class with a clear factor, which clearRatePercent includes.
+   *  Filled in by the Boss Clear grid from the inputs' scouterInputs. */
+  scouterEstimatePercent?: number;
 }
 
 /** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */

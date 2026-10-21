@@ -9,7 +9,7 @@
 import type { ScouterStat, ScouterUserStat } from "../scouterApi";
 import type { BossClearInputs, ScouterErrorReason, ScouterResultEntry, ScouterSpecEfficiency } from "../scouterResult";
 import { CLASS_CLEAR_FACTOR } from "./classClearFactors";
-import { coreAtt, coreAttAt, createEngine, type EngineData, type EnginePrediction, type ScouterEngine } from "./scouterEngine";
+import { coreAtt, coreAttAt, createEngine, splineEval, type EngineData, type EnginePrediction, type ScouterEngine } from "./scouterEngine";
 
 const ENGINE_DATA_URL = "/data/scouter-engine.json";
 const MAX_REMEMBERED_RESULTS = 64;
@@ -101,14 +101,22 @@ function specEfficiency(eng: ScouterEngine, u: ScouterUserStat, base: EnginePred
   };
 }
 
-function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, factor: number): BossClearInputs | undefined {
+/** Boss Clear's damage inputs, scaled so each lands exactly on the HEXA figure shown: a boss with
+ *  no level or force gap then shows the same adjusted HEXA as Boss 300/380. That scale carries
+ *  the class clear factor, the engine's spline calibration and flat cooldown reduction, which
+ *  MapleScouter counts in its HEXA figure but leaves out of its own Boss Clear damage (MapleDoro
+ *  counts it in both, since a cooldown hat does help a clear). */
+function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, figures: ScouterFigures | null): BossClearInputs | undefined {
   const c = eng.classData(base.classId);
   if (!c?.spline300 || !c.spline380) return undefined;
+  // Without figures: MapleScouter's own inputs, unscaled.
+  const scale380 = figures ? splineEval(c.spline380, figures.boss380Hexa) / base.damage : 1;
+  const scale300 = figures ? splineEval(c.spline300, figures.boss300Hexa) / base.damage300 : 1;
   return {
-    calculatedHexaDamage300: base.damage300 * factor,
-    calculatedHexaDamage380: base.damage * factor,
-    calculatedDamage380: eng.predictNormal(u).damage * factor,
-    calculatedHexaDamageKaling: eng.predictKaling(u) * factor,
+    calculatedHexaDamage300: base.damage300 * scale300,
+    calculatedHexaDamage380: base.damage * scale380,
+    calculatedDamage380: eng.predictNormal(u).damage * scale380,
+    calculatedHexaDamageKaling: eng.predictKaling(u) * scale380,
     ascentConst: eng.ascentShare(u),
     ignoreDefConst300: base.ign300,
     ignoreDefConst380: base.ign380,
@@ -117,6 +125,12 @@ function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePre
     // 1 on every sheet MapleScouter has answered for.
     genePassConst: 1,
   };
+}
+
+/** MapleScouter's own inputs ride inside MapleDoro's, for a class with a clear factor, so every
+ *  Boss Clear view can show MapleScouter's estimate beside MapleDoro's. */
+function withScouterEstimate(inputs: BossClearInputs | undefined, scouterInputs: BossClearInputs | undefined): BossClearInputs | undefined {
+  return inputs && scouterInputs ? { ...inputs, scouterInputs } : inputs;
 }
 
 /** `detail` says which check failed, for the player and for a bug report. */
@@ -171,11 +185,12 @@ function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
     }
     const scouterFigures = { boss300Normal: normal.hexa300, boss300Hexa: base.hexa300, boss380Normal: normal.hexa, boss380Hexa: base.hexa };
     const factor = CLASS_CLEAR_FACTOR[base.classId] ?? 1;
+    const figures = factor === 1 ? scouterFigures : clearFactorFigures(eng, u, base, normal, factor, scouterFigures);
     return {
       ok: true,
       entry: {
-        ...(factor === 1 ? scouterFigures : clearFactorFigures(eng, u, base, normal, factor, scouterFigures)),
-        bossClearInputs: bossClearInputs(eng, u, base, factor),
+        ...figures,
+        bossClearInputs: withScouterEstimate(bossClearInputs(eng, u, base, figures), factor === 1 ? undefined : bossClearInputs(eng, u, base, null)),
         specEfficiency: specEfficiency(eng, u, base),
       },
     };

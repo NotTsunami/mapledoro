@@ -319,7 +319,8 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
   return sorted.reduce<{ entry: BossCutEntry; result: BossClearResult }[]>((tiles, entry) => {
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
-      tiles.push({ entry, result });
+      const scouter = inputs.scouterInputs && computeBossClear(entry, level, arcaneForce, authenticForce, inputs.scouterInputs);
+      tiles.push({ entry, result: scouter ? { ...result, scouterEstimatePercent: scouter.clearRatePercent } : result });
     }
     return tiles;
   }, []);
@@ -387,6 +388,12 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
         </div>
       ))}
+      {result.scouterEstimatePercent !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>MapleScouter est.</span>
+          <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
+        </div>
+      )}
       {result.estimated && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
@@ -510,27 +517,26 @@ function PowerStripFdEquiv({ theme, pct }: { theme: AppTheme; pct: number }) {
   );
 }
 
-function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
+function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv, scouterValue }: {
   theme: AppTheme; label: string; value: number; sub?: number;
   /** The character's real (pre-simulation) figure for this slot. Set only while a Scouter
    *  Simulator what-if is applied. Drives the delta chip and the "was" tooltip line. */
   realValue?: number;
   /** This boss's FD-equivalent % for the simulation (Boss 300 / Boss 380 only). */
   fdEquiv?: number | null;
+  /** MapleScouter's own figure, for a class with a clear factor (which value includes). */
+  scouterValue?: number;
 }) {
-  // "Normal" alone (no simulation): a single line. While simulated, the strip already shows the
-  // current figure and its delta chip, so the tooltip carries only what the strip cannot: the
-  // pre-simulation value, muted since it is history, and the Normal-tier figure if there is one,
-  // at full weight since it is current.
-  let tooltip: ReactNode = sub === undefined ? null : `Normal: ${formatFigure(sub)}`;
-  if (realValue !== undefined) {
-    tooltip = (
-      <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>
-        <span style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>
-        {sub !== undefined && <span>Normal: {formatFigure(sub)}</span>}
-      </span>
-    );
-  }
+  // The strip already shows the current figure (and its delta chip while simulated), so the
+  // tooltip carries only what the strip cannot: the pre-simulation value, muted since it is
+  // history, the Normal-tier figure at full weight since it is current, and MapleScouter's own
+  // figure when a clear factor changed it.
+  const lines = [
+    realValue !== undefined && <span key="was" style={{ color: theme.muted }}>Was: {formatFigure(realValue)}</span>,
+    sub !== undefined && <span key="normal">Normal: {formatFigure(sub)}</span>,
+    scouterValue !== undefined && <span key="scouter" style={{ color: theme.muted }}>MapleScouter est.: {formatFigure(scouterValue)}</span>,
+  ].filter(Boolean);
+  const tooltip: ReactNode = lines.length === 0 ? null : <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 88 }}>{lines}</span>;
   const figure = <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -563,8 +569,8 @@ function PowerStrip({ theme, entry, realEntry }: { theme: AppTheme; entry: Scout
     <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 shown as HEXA</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} />
-        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} />
+        <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} scouterValue={entry.scouterFigures?.boss300Hexa} />
+        <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} scouterValue={entry.scouterFigures?.boss380Hexa} />
       </div>
     </div>
   );
