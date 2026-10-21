@@ -409,6 +409,9 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
         </div>
       ))}
+      {result.sacredSymbol && result.sacredSymbol.level < result.sacredSymbol.maxLevel && (
+        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 4 }}>Update symbol levels in the Gear bookmark.</div>
+      )}
       {result.estimated && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
