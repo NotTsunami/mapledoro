@@ -180,6 +180,9 @@ const BOSS_ART_POSITION: Record<string, string> = {
   "진 힐라": "50% 23%", 듄켈: "48% 46%", "검은 마법사": "42% 19%", 세렌: "50% 33%",
   칼로스: "55% 60%", 대적자: "75% 29%", 흉성: "50% 26%", 카링: "50% 26%", 림보: "50% 58%",
   발드릭스: "50% 40%", 유피테르: "48% 25%", 가엔슬: "50% 51%", 카이: "50% 28%",
+  "Akechi Mitsuhide": "50% 29%", "Princess No": "50% 35%", Vellum: "50% 65%", "Pink Bean": "50% 50%", Cygnus: "50% 62%", Arkarium: "50% 74%", Horntail: "50% 30%", Papulatus: "50% 35%",
+  Pierre: "50% 40%", "Von Bon": "50% 40%", "Crimson Queen": "50% 24%",
+  "Von Leon": "50% 54%", Hilla: "50% 40%", Magnus: "50% 40%", Zakum: "50% 54%",
 };
 
 // Spotlight's own crop anchors, deliberately separate from BOSS_ART_POSITION above, which was
