@@ -1,11 +1,12 @@
 // Scouter calibration: compares MapleScouter's Boss Clear % against real clears to measure how far
 // off it is per class. Report only for now; nothing here writes into the app yet.
 //
-//   node scripts/calibrate-scouter.mjs --data <dir>                 report on scripts/scouter-calibration/clears.json
+//   node scripts/calibrate-scouter.mjs --data <dir> --clears <file>  report on the clears log
 //   node scripts/calibrate-scouter.mjs probe --data <dir> [ids...]  fetch class probes (default: classes in clears.json without one)
 //
 // <dir> holds the private calibration data, never committed: class-probes.json and
-// probe-payload.json (the reference sheet probes are sent from, a /calc/dmg body).
+// probe-payload.json (the reference sheet probes are sent from, a /calc/dmg body). The clears log
+// lives in its own dataset outside the repo, since its video links identify players.
 //
 // Why a HEXA value is enough: MapleScouter's /calc/dmg response carries spline_300/380 and a few
 // constants that depend only on the class, never on the character's stats (verified by probing one
@@ -24,12 +25,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(SCRIPT_DIR, "scouter-calibration");
 const SCOUTER_DIR = path.join(SCRIPT_DIR, "..", "src", "features", "characters", "scouter");
-const CLEARS_FILE = path.join(DATA_DIR, "clears.json");
 const dataIndex = process.argv.indexOf("--data"), PRIVATE_DIR = dataIndex >= 0 ? process.argv[dataIndex + 1] : null;
 if (!PRIVATE_DIR) {
-  console.error("usage: node scripts/calibrate-scouter.mjs [probe] --data <dir> [ids...]");
+  console.error("usage: node scripts/calibrate-scouter.mjs [probe] --data <dir> [--clears <file>] [ids...]");
   process.exit(1);
 }
+const clearsIndex = process.argv.indexOf("--clears");
+const CLEARS_FILE = clearsIndex >= 0 ? process.argv[clearsIndex + 1] : path.join(PRIVATE_DIR, "clears.json");
 const PROBES_FILE = path.join(PRIVATE_DIR, "class-probes.json");
 const PROBE_PAYLOAD_FILE = path.join(PRIVATE_DIR, "probe-payload.json");
 const CALC_URL = "https://api.maplescouter.com/api/calc/dmg";
@@ -193,7 +195,10 @@ function groupFactors(rows, keyOf) {
 }
 
 function runReport() {
-  const { clears } = readJson(CLEARS_FILE);
+  const { clears: logged } = readJson(CLEARS_FILE);
+  // A temporary event skill inflates a clear, so event clears never count toward a class factor.
+  const clears = logged.filter((clear) => !clear.eventSkill);
+  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill clear(s) left out.\n`);
   const probes = readJson(PROBES_FILE, {});
   const rows = clears.map((clear) => ({ clear, r: evaluateClear(clear, probes) }));
 
@@ -210,6 +215,6 @@ function runReport() {
   }
 }
 
-const [mode, ...args] = process.argv.slice(2).filter((a, i, all) => a !== "--data" && all[i - 1] !== "--data");
+const [mode, ...args] = process.argv.slice(2).filter((a, i, all) => !["--data", "--clears"].includes(a) && !["--data", "--clears"].includes(all[i - 1]));
 if (mode === "probe") await runProbe(args);
 else runReport();
