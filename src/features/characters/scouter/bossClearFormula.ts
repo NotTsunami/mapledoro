@@ -17,6 +17,7 @@
 
 import { BOSSCUT_DATA, type BossCutEntry } from "./bosscut-data.generated";
 import type { EstimatedBossEntry } from "./lowend-boss-data.generated";
+import { SACRED_SYMBOL_BOSSES } from "./sacredSymbols";
 import type { BossClearInputs } from "./scouterResult";
 
 interface Spline {
@@ -307,9 +308,9 @@ export interface BossClearResult {
   /** The HEXA this character needs for 100% here (minimumClearHexa). Filled in by the Boss Clear
    *  grid. */
   minimumHexa?: number;
-  /** This boss's own Sacred Symbol, when the character's symbol levels are known: its level and
-   *  the bonus a maxed one gives. Shown as a damage loss below Lv 11. */
-  sacredSymbol: { area: string; level: number; maxLevel: number; boost: number } | null;
+  /** This boss's own Sacred Symbol: whether it is maxed, the bonus a maxed one gives, and where
+   *  that answer comes from (for the tooltip's hint). Shown as a damage loss when not maxed. */
+  sacredSymbol: { area: string; maxed: boolean; boost: number; source: "symbols" | "buffs" } | null;
 }
 
 /** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */
@@ -317,28 +318,23 @@ export function isEstimatedBoss(entry: BossCutEntry): entry is EstimatedBossEntr
   return "entryLevel" in entry;
 }
 
-// Each Sacred Symbol region's +20% damage applies only to its own boss once the symbol is maxed.
-// MapleScouter has one switch for all of them, so when the character's real symbol levels are
-// known, each boss gets the bonus from its own symbol instead.
-const BOSS_SACRED_SYMBOL: Readonly<Record<string, string>> = {
-  seren: "Cernium", kalos: "Hotel Arcus", adversary: "Odium", kaling: "Shangri-La",
-  maleficStar: "Arteria", limbo: "Carcion", bardrix: "Tallahart", jupiter: "Geardock",
-};
-const SACRED_SYMBOL_MAX_LEVEL = 11;
+// Each Sacred Symbol region's +20% damage applies only to its own boss once the symbol is maxed
+// (sacredSymbols.ts). MapleScouter has one switch for all of them; here each boss gets the bonus
+// from its own symbol instead.
+const BOSS_SACRED_SYMBOL: Readonly<Record<string, string>> = Object.fromEntries(SACRED_SYMBOL_BOSSES.map((s) => [s.boss, s.area]));
 
 function sacredSymbolOf(entry: BossCutEntry, inputs: BossClearInputs): BossClearResult["sacredSymbol"] {
   const area = BOSS_SACRED_SYMBOL[entry.name];
-  if (!area || !inputs.sacredSymbolLevels || inputs.sacredBoost === undefined) return null;
-  return { area, level: inputs.sacredSymbolLevels[area] ?? 0, maxLevel: SACRED_SYMBOL_MAX_LEVEL, boost: inputs.sacredBoost };
+  if (!area || !inputs.sacredMaxed || inputs.sacredBoost === undefined) return null;
+  return { area, maxed: inputs.sacredMaxed.includes(area), boost: inputs.sacredBoost, source: inputs.sacredSource ?? "buffs" };
 }
 
 /** Corrects the shared Sacred Symbol switch to this boss's own symbol: the bonus added if the
  *  symbol is maxed but the switch is off, removed if the switch is on but it isn't. */
 function sacredSymbolFactor(entry: BossCutEntry, inputs: BossClearInputs): number {
   const area = BOSS_SACRED_SYMBOL[entry.name];
-  const levels = inputs.sacredSymbolLevels;
-  if (!area || !levels || inputs.sacredBoost === undefined || inputs.sacredBonusOn === undefined) return 1;
-  const maxed = (levels[area] ?? 0) >= SACRED_SYMBOL_MAX_LEVEL;
+  if (!area || !inputs.sacredMaxed || inputs.sacredBoost === undefined || inputs.sacredBonusOn === undefined) return 1;
+  const maxed = inputs.sacredMaxed.includes(area);
   if (maxed === inputs.sacredBonusOn) return 1;
   return maxed ? inputs.sacredBoost : 1 / inputs.sacredBoost;
 }

@@ -7,6 +7,7 @@
 */
 
 import type { StoredScouterBuffs } from "../../model/charactersStore";
+import { maxedSacredSymbols, SACRED_SYMBOL_BOSSES } from "../../scouter/sacredSymbols";
 
 // ── Leveled guild buffs (0–15) ───────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export type BoolBuffId =
   | "sayramElixir" | "collectorElixir" | "honorableElixir"
   | "heroEcho" | "legionMight" | "masarayuGift" | "extremePotion" | "extremeGreenPotion"
   | "mvpSuperpower" | "vipBuff" | "brightMoonlight" | "candiedApple"
-  | "caretakerSupport" | "sparklingRedStar" | "maxedSacredSymbol" | "fishBuff" | "genepass"
+  | "caretakerSupport" | "sparklingRedStar" | "fishBuff" | "genepass"
   // Group A, pick one
   | "greatHeroBoost" | "legendaryHero" | "advWeaponTempering" | "sparklingBlueStar"
   // Group B, pick one
@@ -145,7 +146,6 @@ export const BOOL_BUFFS: readonly BoolBuffEntry[] = [
   { id: "caretakerSupport",  name: "Caretaker's Support",            icon: { kind: "skill", id: "80011827" } },
   { id: "vipBuff",           name: "VIP Buff (Stats)",               icon: { kind: "item",  id: "02024163", shadow: true } },
   { id: "mvpSuperpower",     name: "MVP Superpower Buff",            icon: { kind: "item",  id: "02023544" } },
-  { id: "maxedSacredSymbol", name: "Lv. 11 Sacred Symbols",          icon: { kind: "item",  id: "02638024" } },
   { id: "genepass",          name: "Power of the Adversary",         icon: { kind: "skill", id: "80003909" } },
   // Group A
   { id: "sparklingBlueStar",   name: "Sparkling Blue Star Potion",       icon: { kind: "item",  id: "02024173" }, group: "A" },
@@ -251,10 +251,12 @@ export interface BuffsDraft {
   bools: Partial<Record<BoolBuffId, boolean>>;
   // Champion's Renown: raw strings "0"–"5", "" = untouched
   renown: Partial<Record<RenownStatId, string>>;
+  // Maxed Symbols: Sacred Symbol region -> at Lv 11 (see scouter/sacredSymbols.ts)
+  symbols: Partial<Record<string, boolean>>;
 }
 
 export function emptyBuffsDraft(): BuffsDraft {
-  return { guild: {}, statPotionTier: "0", bools: {}, renown: {} };
+  return { guild: {}, statPotionTier: "0", bools: {}, renown: {}, symbols: {} };
 }
 
 export function parseBuffsDraft(value: string): BuffsDraft {
@@ -267,6 +269,7 @@ export function parseBuffsDraft(value: string): BuffsDraft {
         statPotionTier: p.statPotionTier ?? "0",
         bools: p.bools ?? {},
         renown: p.renown ?? {},
+        symbols: p.symbols ?? {},
       };
     }
   } catch { /* fall through */ }
@@ -342,7 +345,7 @@ function collectRenown(draft: BuffsDraft): Partial<Record<RenownStatId, number>>
  *  object wholesale, finishing without re-checking every previously set flag drops it. Seed the
  *  draft from this before starting an edit session on a character that already has buffs
  *  saved. */
-export function storedBuffsToDraft(stored: StoredScouterBuffs | undefined): BuffsDraft {
+export function storedBuffsToDraft(stored: StoredScouterBuffs | undefined, savedMaxedSymbols?: string[] | null): BuffsDraft {
   if (!stored) return emptyBuffsDraft();
   const guild: Partial<Record<GuildBuffId, string>> = {};
   for (const { id } of GUILD_BUFFS) {
@@ -363,7 +366,8 @@ export function storedBuffsToDraft(stored: StoredScouterBuffs | undefined): Buff
     const level = stored.renown?.[id];
     if (typeof level === "number") renown[id] = String(level);
   }
-  return { guild, statPotionTier, bools, renown };
+  const symbols = Object.fromEntries(maxedSacredSymbols(stored, savedMaxedSymbols).map((area) => [area, true]));
+  return { guild, statPotionTier, bools, renown, symbols };
 }
 
 export function convertBuffsDraftToStored(draft: BuffsDraft): StoredScouterBuffs | null {
@@ -378,6 +382,14 @@ export function convertBuffsDraftToStored(draft: BuffsDraft): StoredScouterBuffs
 
   const renown = collectRenown(draft);
   if (renown) out.renown = renown;
+
+  // Written once the section has been touched, empty included: an empty list is a real "none
+  // maxed", where a missing one falls back to saved symbol levels or the old all-or-nothing
+  // answer. An untouched draft must still convert to null, which callers read as "Buffs not
+  // visited, keep the saved buffs".
+  if (Object.keys(draft.symbols).length > 0) {
+    out.maxedSymbols = SACRED_SYMBOL_BOSSES.filter((s) => draft.symbols[s.area]).map((s) => s.area);
+  }
 
   return Object.keys(out).length > 0 ? (out as StoredScouterBuffs) : null;
 }

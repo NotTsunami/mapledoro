@@ -19,6 +19,7 @@ import { assignMainSubStats, buildScouterPayload } from "../../scouter/scouterAp
 import type { StoredCharacterRecord, LinkSkillId } from "../../model/charactersStore";
 import { SCOUTER_CLASS_KOREAN_NAMES } from "../../scouter/scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
+import { SACRED_SYMBOL_BOSSES } from "../../scouter/sacredSymbols";
 import { LINK_SKILLS } from "./linkSkillsData";
 import { CLASS_SKILL_DATA } from "./classSkillData";
 import { TRIPLE_STAT_FIELDS, STAT_LABELS, type TripleStatFieldId } from "./statFields";
@@ -414,7 +415,6 @@ const DOPING_BOOL_MAP: Partial<Record<keyof ScouterUserStat["doping"], keyof Buf
   collector: "collectorElixir",
   buff275: "honorableElixir",
   additional1: "vipBuff",
-  authenticDmg: "maxedSacredSymbol",
   moonshine: "brightMoonlight",
   apple: "onyxApple",
   tengu: "tengusJudgement",
@@ -447,6 +447,13 @@ function buildBuffsDraft(payload: ScouterUserStat): BuffsDraft {
 
   for (const [dopingKey, boolId] of Object.entries(DOPING_BOOL_MAP)) {
     if (doping[dopingKey as keyof ScouterUserStat["doping"]] === true) draft.bools[boolId] = true;
+  }
+
+  // MapleScouter's single "Sacred Symbols maxed" switch ticks every symbol in Maxed Symbols. Off
+  // leaves that section untouched, so saved symbol levels still decide for a character that has
+  // them.
+  if (doping.authenticDmg === true) {
+    draft.symbols = Object.fromEntries(SACRED_SYMBOL_BOSSES.map((s) => [s.area, true]));
   }
 
   // Advanced Stat Potion: gated on the `statPotion` boolean (the `stat` level lingers when
@@ -719,7 +726,14 @@ function buffFields(): ComparedField[] {
     read: (p: ScouterUserStat) => normNum(p.doping[RENOWN_PAYLOAD_KEY[id]] as string | undefined ?? "0"),
   }));
 
-  return [...bools, ...guild, statPotion, ...renown];
+  // MapleScouter's one switch for every Sacred Symbol; MapleDoro sends it when all six regular
+  // regions are in Maxed Symbols (see scouter/sacredSymbols.ts).
+  const sacred: ComparedField = {
+    label: "Sacred Symbols maxed (all regions)",
+    read: (p: ScouterUserStat) => onOff(p.doping.authenticDmg === true),
+  };
+
+  return [...bools, ...guild, statPotion, ...renown, sacred];
 }
 
 /** Diffs an export against the character it's being imported onto. Returns an empty list

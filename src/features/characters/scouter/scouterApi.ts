@@ -25,6 +25,7 @@ import { whAutofillSourceFromRoster } from "../setup/data/scouterQuestionsData";
 import { OZ_RING_MAX_LEVEL, type OzRingId } from "../setup/data/ozRingData";
 import { scouterKoreanClassName } from "./scouterClassNames";
 import { LINK_SKILL_TO_SCOUTER_KEY, SCOUTER_UNMODELED_LINK_SKILL_KEYS } from "./scouterLinkSkills";
+import { maxedSacredSymbols, sacredSwitchOn } from "./sacredSymbols";
 import { readCharacterToolData } from "../../tools/characterToolStorage";
 import type { HexaSkillLevels } from "../../tools/hexa-skills/hexa-classes";
 import { COMMON_SKILLS } from "../../tools/hexa-skills/hexa-classes";
@@ -316,7 +317,7 @@ function buildDoping(buffs: StoredScouterBuffs | undefined): ScouterDoping {
     championBoss: renownLevel(buffs, "bossDmg"),
     championIgnore: renownLevel(buffs, "ignoreDef"),
     championCriDmg: renownLevel(buffs, "critDmg"),
-    authenticDmg: Boolean(buffs?.maxedSacredSymbol),
+    authenticDmg: sacredSwitchOn(maxedSacredSymbols(buffs)),
     moonshine: Boolean(buffs?.brightMoonlight),
     cake: false,
     apple: Boolean(buffs?.onyxApple),

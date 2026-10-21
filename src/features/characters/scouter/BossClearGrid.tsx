@@ -16,14 +16,13 @@ import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
-import { readCharacterToolData } from "../../tools/characterToolStorage";
-import { GRAND_SACRED_AREAS, SACRED_AREAS } from "../../tools/symbols/symbol-data";
-import type { SymbolState } from "../../tools/symbols/useSymbolState";
 import { BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./bossGrouping";
 import { computeBossClear, isEstimatedBoss, minimumClearHexa, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
 import type { BossClearInputs, ScouterResultEntry } from "./scouterResult";
+import { maxedSacredSymbols, savedMaxedSymbols } from "./sacredSymbols";
+import type { StoredScouterBuffs } from "../model/charactersStore";
 
 // Icon ids looked up by hand from manifests/v271/ui-boss.json, renamed from boss.json as of
 // v269 (see the Image Policy in the root CLAUDE.md), cross-checked against the same bosses
@@ -408,8 +407,10 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <span style={{ minWidth: 48, textAlign: "right", color: statusText(theme, "warning") }}>{line.lossPercent !== null ? `-${line.lossPercent}%` : ""}</span>
         </div>
       ))}
-      {result.sacredSymbol && result.sacredSymbol.level < result.sacredSymbol.maxLevel && (
-        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 2 }}>Edit symbols in the Gear bookmark.</div>
+      {result.sacredSymbol && !result.sacredSymbol.maxed && (
+        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 2 }}>
+          {result.sacredSymbol.source === "symbols" ? "Edit symbols in the Gear bookmark." : "Set Maxed Symbols in MapleScouter Setup."}
+        </div>
       )}
       {result.estimated && (
         <>
@@ -880,8 +881,8 @@ function NavArrowButton({ theme, direction, disabled, onClick }: {
  *  no damage. Requirement-relevant stats are returned even at no loss, so the UI can show a
  *  quiet boss-versus-you reference line for players checking whether they meet a requirement,
  *  not only when something is wrong. */
-function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number; yourValue: number; lossPercent: number | null }[] } {
-  const gaps: { label: string; bossValue: number; yourValue: number; gapDmg: number; gapCeiling: number }[] = [
+function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number | string; yourValue: number | string; lossPercent: number | null }[] } {
+  const gaps: { label: string; bossValue: number | string; yourValue: number | string; gapDmg: number; gapCeiling: number }[] = [
     { label: "Level", bossValue: result.bossLevel, yourValue: result.characterLevel, gapDmg: result.levelGapDmg, gapCeiling: result.levelGapCeiling },
   ];
   if (result.bossArcaneForce !== null) {
@@ -894,8 +895,8 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
   const symbol = result.sacredSymbol;
   if (symbol) {
     gaps.push({
-      label: `${symbol.area} Symbol`, bossValue: symbol.maxLevel, yourValue: symbol.level,
-      gapDmg: symbol.level >= symbol.maxLevel ? symbol.boost : 1, gapCeiling: symbol.boost,
+      label: `${symbol.area} Symbol`, bossValue: "11", yourValue: symbol.maxed ? "11" : "<11",
+      gapDmg: symbol.maxed ? symbol.boost : 1, gapCeiling: symbol.boost,
     });
   }
   // Loss is relative to each stat's own bonus ceiling rather than to 1. Sitting exactly at a
@@ -1131,26 +1132,22 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  Spotlight's selected boss is owned by CharacterProfileOverviewScreen rather than local
  *  state, so the page header can read the same value directly instead of BossClearGrid
  *  reporting it back up through an effect. See resolveBossDisplayName. */
-const SACRED_AREA_NAMES = [...SACRED_AREAS, ...GRAND_SACRED_AREAS].map((a) => a.name);
-
-/** The character's saved Sacred Symbol levels, or undefined when none are saved (Boss Clear then
- *  keeps the Buffs step's all-or-nothing "Lv. 11 Sacred Symbols" answer for every boss). The
- *  in-memory record first, as the Overview does, since a setup Finish saves it before storage. */
-function sacredSymbolLevels(character: StoredCharacterRecord): Partial<Record<string, number>> | undefined {
-  type Saved = { symbols?: Record<string, SymbolState | undefined> };
-  const saved = (character.tools?.symbols as Saved | undefined) ?? readCharacterToolData<Saved>(character.characterName, "symbols");
-  const symbols = saved?.symbols;
-  if (!symbols || !SACRED_AREA_NAMES.some((name) => symbols[name])) return undefined;
-  return Object.fromEntries(SACRED_AREA_NAMES.map((name) => [name, symbols[name]?.level ?? 0]));
-}
-
-function withSymbolLevels(inputs: BossClearInputs | undefined, levels: Partial<Record<string, number>> | undefined): BossClearInputs | undefined {
-  return inputs && levels ? { ...inputs, sacredSymbolLevels: levels } : inputs;
+/** Boss Clear inputs with the character's Maxed Symbols: the Simulator's buffs while one is
+ *  applied, otherwise their saved buffs, falling back to saved symbol levels for a character saved
+ *  before Maxed Symbols existed. */
+function withMaxedSymbols(inputs: BossClearInputs | undefined, character: StoredCharacterRecord, buffsOverride: StoredScouterBuffs | undefined): BossClearInputs | undefined {
+  if (!inputs) return inputs;
+  const saved = savedMaxedSymbols(character);
+  return {
+    ...inputs,
+    sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, saved),
+    sacredSource: saved ? "symbols" : "buffs",
+  };
 }
 
 export default function BossClearGrid({
   theme, character, entry, realEntry, view, onViewChange, selectedIndex, onSelectedIndexChange,
-  levelOverride, arcaneForceOverride, authenticForceOverride, simulated, onOpenSimulator,
+  levelOverride, arcaneForceOverride, authenticForceOverride, buffsOverride, simulated, onOpenSimulator,
 }: {
   theme: AppTheme;
   character: StoredCharacterRecord;
@@ -1170,6 +1167,8 @@ export default function BossClearGrid({
   levelOverride?: number;
   arcaneForceOverride?: number;
   authenticForceOverride?: number;
+  /** The Scouter Simulator's buffs while one is applied, for Maxed Symbols. */
+  buffsOverride?: StoredScouterBuffs;
   /** Whether a Scouter Simulator "what if" is currently applied. Swaps the Quick View filter
    *  row's launcher button label from "Simulator" to "Edit". */
   simulated: boolean;
@@ -1180,7 +1179,7 @@ export default function BossClearGrid({
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
   // MapleScouter's own estimate (inputs.scouterInputs) keeps its single switch on purpose.
-  const inputs = withSymbolLevels(entry.bossClearInputs, sacredSymbolLevels(character));
+  const inputs = withMaxedSymbols(entry.bossClearInputs, character, buffsOverride);
   const grouped = BOSS_CLEAR_GROUPS;
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
 

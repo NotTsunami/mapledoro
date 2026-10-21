@@ -1,0 +1,62 @@
+/*
+  Sacred Symbols and the bosses they boost. Each region's symbol gives +20% damage to its own boss
+  at Lv 11, Grand Sacred included (Tallahart Baldrix, Geardock Jupiter). MapleScouter has a single
+  switch for all of them (doping.authenticDmg), which MapleDoro still sends for the HEXA figure;
+  Boss Clear applies each boss's own symbol instead (bossClearFormula.ts).
+*/
+
+import type { StoredCharacterRecord, StoredScouterBuffs } from "../model/charactersStore";
+import { readCharacterToolData } from "../../tools/characterToolStorage";
+
+export interface SacredSymbolBoss {
+  /** Symbol region, as named in the Symbols tool (symbol-data.ts). */
+  area: string;
+  /** Item id of the symbol, for its icon. */
+  itemId: string;
+  /** Boss Clear data name of the boss it boosts. */
+  boss: string;
+  bossLabel: string;
+  grand: boolean;
+}
+
+export const SACRED_SYMBOL_BOSSES: readonly SacredSymbolBoss[] = [
+  { area: "Cernium", itemId: "01713000", boss: "seren", bossLabel: "Seren", grand: false },
+  { area: "Hotel Arcus", itemId: "01713001", boss: "kalos", bossLabel: "Kalos", grand: false },
+  { area: "Odium", itemId: "01713002", boss: "adversary", bossLabel: "First Adversary", grand: false },
+  { area: "Shangri-La", itemId: "01713003", boss: "kaling", bossLabel: "Kaling", grand: false },
+  { area: "Arteria", itemId: "01713004", boss: "maleficStar", bossLabel: "Malefic Star", grand: false },
+  { area: "Carcion", itemId: "01713005", boss: "limbo", bossLabel: "Limbo", grand: false },
+  { area: "Tallahart", itemId: "01714000", boss: "bardrix", bossLabel: "Baldrix", grand: true },
+  { area: "Geardock", itemId: "01714001", boss: "jupiter", bossLabel: "Jupiter", grand: true },
+];
+
+export const SACRED_SYMBOL_MAX_LEVEL = 11;
+
+/** Areas whose symbol is Lv 11 in saved symbol levels, or null when none of them are saved. */
+export function maxedSymbolsFromLevels(symbols: Partial<Record<string, { level?: number } | undefined>> | undefined): string[] | null {
+  if (!symbols || !SACRED_SYMBOL_BOSSES.some((s) => symbols[s.area])) return null;
+  return SACRED_SYMBOL_BOSSES.filter((s) => (symbols[s.area]?.level ?? 0) >= SACRED_SYMBOL_MAX_LEVEL).map((s) => s.area);
+}
+
+/** Which symbols count as maxed: the Buffs step's Maxed Symbols, kept in step with saved symbol
+ *  levels by Full Setup. Characters saved before that list existed fall back to their saved
+ *  symbol levels, then to the old single "Lv. 11 Sacred Symbols" answer (all or nothing). */
+export function maxedSacredSymbols(buffs: StoredScouterBuffs | undefined, savedLevels?: string[] | null): string[] {
+  if (buffs?.maxedSymbols) return buffs.maxedSymbols;
+  if (savedLevels) return savedLevels;
+  return buffs?.maxedSacredSymbol ? SACRED_SYMBOL_BOSSES.map((s) => s.area) : [];
+}
+
+/** MapleScouter's single switch: on when all six regular regions are maxed, as MapleDoro has
+ *  always sent it. */
+export function sacredSwitchOn(maxed: readonly string[]): boolean {
+  return SACRED_SYMBOL_BOSSES.filter((s) => !s.grand).every((s) => maxed.includes(s.area));
+}
+
+/** maxedSymbolsFromLevels for a character's saved symbol levels: the in-memory record first, since
+ *  a setup Finish saves it before storage, then storage. */
+export function savedMaxedSymbols(character: StoredCharacterRecord): string[] | null {
+  type Saved = { symbols?: Partial<Record<string, { level?: number } | undefined>> };
+  const saved = (character.tools?.symbols as Saved | undefined) ?? readCharacterToolData<Saved>(character.characterName, "symbols");
+  return maxedSymbolsFromLevels(saved?.symbols);
+}

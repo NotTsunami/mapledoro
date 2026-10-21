@@ -22,7 +22,7 @@ import {
   getStatPotionTiers, primaryStatForClass,
   type BuffsDraft, type BoolBuffId, type BoolBuffEntry, type GuildBuffId, type RenownStatId,
 } from "../setup/data/buffsData";
-import { BuffIconImage, BoolBuffTile, RenownCol } from "../setup/components/BuffsSetupStep";
+import { BuffIconImage, BoolBuffTile, MaxedSymbolTiles, RenownCol } from "../setup/components/BuffsSetupStep";
 import { boolTileStyle, pickOneGroupStyle, pickOneLabelStyle, buffIconOverride, buffSecondIconOverride, boolBuffLabel } from "../setup/components/buffTileHelpers";
 import { LeveledIconTile } from "../setup/components/LeveledIconTile";
 import SectionLabel from "../setup/components/SectionLabel";
@@ -129,10 +129,10 @@ function tileRowStyle(): CSSProperties {
 // ── Buffs tab ────────────────────────────────────────────────────────────────
 
 // Same ordering and filtering as BuffsSetupStep.tsx's own ungroupedBools, with Advanced Stat
-// Potion inserted after Sparkling Red Star rather than appended. maxedSacredSymbol is always
-// included, since the real step's showMaxedSacredSymbol gate is about which setup flow is
-// running, which doesn't apply to this popup. extremeGreenPotion is always excluded, being a
-// Hurricane-class-only tile and out of scope for this condensed tab.
+// Potion inserted after Sparkling Red Star rather than appended. Maxed Symbols is always shown,
+// since the real step's gate on it is about which setup flow is running, which doesn't apply to
+// this popup. extremeGreenPotion is always excluded, being a Hurricane-class-only tile and out of
+// scope for this condensed tab.
 const UNGROUPED_BUFFS = BOOL_BUFFS.filter((b) => !b.group && b.id !== "extremeGreenPotion");
 const STAT_POTION_INSERT_IDX = UNGROUPED_BUFFS.findIndex((b) => b.id === "sparklingRedStar") + 1;
 
@@ -207,6 +207,10 @@ function BuffsTab({ theme, draft, onChange, primaryStat, jobName }: {
         </div>
       ))}
 
+      <div>
+        <p style={sectionLabelStyle(theme)}>Maxed Symbols</p>
+        <MaxedSymbolTiles theme={theme} selected={draft.symbols} onToggle={(area) => onChange({ ...draft, symbols: { ...draft.symbols, [area]: !draft.symbols[area] } })} />
+      </div>
       <div>
         <p style={sectionLabelStyle(theme)}>Champion&apos;s Renown</p>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

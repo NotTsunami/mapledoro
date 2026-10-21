@@ -106,11 +106,5 @@ export function boolBuffLabel(id: BoolBuffEntry["id"], primaryStat: ReturnType<t
       <span style={{ opacity: 0.7, color: theme.muted }}>Buff from the Genesis Pass, only applies to Arcane River bosses</span>
     </div>
   );
-  if (id === "maxedSacredSymbol") return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span>Lv. 11 Sacred Symbols</span>
-      <span style={{ opacity: 0.7, color: theme.muted }}>+20% DMG vs. each region&apos;s boss</span>
-    </div>
-  );
   return undefined;
 }

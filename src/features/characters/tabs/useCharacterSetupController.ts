@@ -37,7 +37,8 @@ import { deriveWeaponHandFromWeapon } from "../setup/data/classBranch";
 import { hexaStatHasData, type HexaStatNode, type HexaStatEntry, type HexaStatSlot } from "../setup/data/hexaStatData";
 import { deriveInnerAbilityLine, innerAbilityHasData } from "../setup/data/innerAbilityData";
 import { propagateLinkSkillFloors, syncLinkSkillToSiblings } from "../setup/data/linkSkillsData";
-import { ARCANE_AREAS, ALL_SACRED_AREAS, SACRED_AREAS, SACRED_MAX_LEVEL, type SymbolArea, type SymbolType } from "../../tools/symbols/symbol-data";
+import { ARCANE_AREAS, ALL_SACRED_AREAS, type SymbolArea, type SymbolType } from "../../tools/symbols/symbol-data";
+import { maxedSymbolsFromLevels } from "../scouter/sacredSymbols";
 import type { SymbolState } from "../../tools/symbols/useSymbolState";
 import {
   pruneAndReadSetupDrafts,
@@ -49,7 +50,7 @@ import {
   type SetupDraft,
   writeSetupDraft,
 } from "../model/setupDraftStorage";
-import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredCharacterStats, StoredLegionArtifact, StoredScouterLegion } from "../model/charactersStore";
+import type { ImportSectionId, OverviewSectionId, StoredCharacterRecord, StoredCharacterStats, StoredLegionArtifact, StoredScouterBuffs, StoredScouterLegion } from "../model/charactersStore";
 import {
   convertStatsStepDraftToStored, deriveHasRuinForceShield, deriveIsLiberatedFromWeapon, marriageDraftToStored,
   parseStatsStepDraft, serializeStatsStepDraft, storedStatsToStatsStepDraft,
@@ -582,15 +583,16 @@ function applyMapleScouterFlow(
   return created;
 }
 
-// "Lv. 11 Sacred Symbols", the Buffs step's maxedSacredSymbol tile, is MapleScouter's single
-// switch for every symbol's +20% boss damage, and it feeds the Boss 380 HEXA figure. It follows
-// the 6 regular regions. Each symbol, Grand Sacred included, only boosts its own boss (Tallahart
-// Baldrix, Geardock Jupiter), which Boss Clear applies per boss from the saved levels instead (see
-// bossClearFormula.ts). full_setup already has this data from the Equipment step's Symbols
-// substep, so it is derived here rather than from a separate manual toggle.
-function deriveMaxedSacredSymbol(symbolsData: SavedSymbols | null): boolean {
-  if (!symbolsData) return false;
-  return SACRED_AREAS.every((a) => (symbolsData.symbols[a.name]?.level ?? 0) >= SACRED_MAX_LEVEL);
+// The Buffs step's Maxed Symbols (scouter/sacredSymbols.ts): which Sacred Symbols are at Lv 11,
+// each boosting its own boss. full_setup already has the real levels from the Equipment step's
+// Symbols substep, so it derives the list here, both ways, rather than asking again; the old
+// all-or-nothing maxedSacredSymbol answer is dropped once the list exists.
+function withDerivedMaxedSymbols(buffs: StoredScouterBuffs | undefined, symbolsData: SavedSymbols | null): StoredScouterBuffs | undefined {
+  const maxedSymbols = symbolsData ? maxedSymbolsFromLevels(symbolsData.symbols) : null;
+  if (!maxedSymbols) return buffs;
+  const next: StoredScouterBuffs = { ...buffs, maxedSymbols };
+  delete next.maxedSacredSymbol;
+  return next;
 }
 
 // Hyper Stat and Inner Ability activePreset always convert to 0 from the draft (see
@@ -702,11 +704,10 @@ function buildFullSetupRecord(
   // Based on the existing stored buffs rather than buffsConverted alone. Buffs backfills on
   // mount (see BuffsSetupStep's own effect), so a step that was visited and finished already
   // has the full state in buffsConverted. But if Buffs was never visited this session,
-  // leaving buffsConverted null, and the character's Sacred Symbols happen to be maxed,
-  // forcing maxedSacredSymbol true without this base would replace the whole `buffs` object
-  // with that one flag and drop everything else already saved.
-  const buffs = deriveMaxedSacredSymbol(symbolsData)
-    ? { ...existing?.scouter?.buffs, ...buffsConverted, maxedSacredSymbol: true as const }
+  // leaving buffsConverted null, writing the derived symbol list onto that alone would replace
+  // the whole `buffs` object with it and drop everything else already saved.
+  const buffs = symbolsData && maxedSymbolsFromLevels(symbolsData.symbols)
+    ? withDerivedMaxedSymbols({ ...existing?.scouter?.buffs, ...buffsConverted }, symbolsData)
     : buffsConverted;
   // Same derive-over-manual-answer rule as applyStatsDraftToRoster and applyMapleScouterFlow.
   // Real Inner Ability card data wins when it exists, otherwise fall back to this session's
@@ -763,15 +764,10 @@ function applyEquipmentDraftToRoster(
   if (!existing) return;
   preserveExistingEquipmentActivePreset(equipment, existing);
   const symbolsData = buildSymbolsToolDataForRecord(character, equipmentJson);
-  // Same resync buildFullSetupRecord does on a full Setup finish (see its own
-  // deriveMaxedSacredSymbol comment). Without it, editing Symbols from the Equipment
-  // bookmark's pencil, outside Setup entirely, could cross the Lv. 11 Sacred Symbols
-  // threshold and leave this flag stale until the next full Setup run touched it.
-  // Positive-only, never clearing back to unset, matching buildFullSetupRecord's behavior
-  // for the same flag.
-  const scouterBuffs = symbolsData && deriveMaxedSacredSymbol(symbolsData)
-    ? { ...existing.scouter?.buffs, maxedSacredSymbol: true as const }
-    : existing.scouter?.buffs;
+  // Same resync buildFullSetupRecord does on a full Setup finish (see withDerivedMaxedSymbols).
+  // Without it, editing Symbols from the Equipment bookmark's pencil, outside Setup entirely,
+  // could cross Lv 11 and leave Maxed Symbols stale until the next full Setup run touched it.
+  const scouterBuffs = withDerivedMaxedSymbols(existing.scouter?.buffs, symbolsData);
   upsertFn({
     ...existing,
     equipment,

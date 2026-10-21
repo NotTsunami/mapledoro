@@ -3282,6 +3282,7 @@ function ScouterBookmark({ theme, character, label, disabled, view, onViewChange
             levelOverride={simulated?.overrides.level}
             arcaneForceOverride={simulated?.overrides.arcaneForceOverride}
             authenticForceOverride={simulated?.overrides.authenticForceOverride}
+            buffsOverride={simulated?.overrides.dopingOverrides}
             simulated={simulated !== null}
             onOpenSimulator={() => setSimulatorDialogOpen(true)}
           />
