@@ -196,9 +196,13 @@ function groupFactors(rows, keyOf) {
 
 function runReport() {
   const { clears: logged } = readJson(CLEARS_FILE);
-  // A temporary event skill inflates a clear, so event clears never count toward a class factor.
-  const clears = logged.filter((clear) => !clear.eventSkill);
-  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill clear(s) left out.\n`);
+  // A temporary event skill inflates a clear, and other regions differ from GMS in attack speed cap,
+  // patch state and MapleScouter's class data, so neither counts toward a class factor.
+  const clears = logged.filter((clear) => !clear.eventSkill && (clear.region ?? "GMS") === "GMS");
+  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill or non-GMS clear(s) left out.`);
+  const unknownRegion = clears.filter((clear) => clear.region == null).length;
+  if (unknownRegion > 0) console.log(`${unknownRegion} clear(s) have no region yet and are counted as GMS until confirmed.`);
+  console.log();
   const probes = readJson(PROBES_FILE, {});
   const rows = clears.map((clear) => ({ clear, r: evaluateClear(clear, probes) }));
 
