@@ -133,7 +133,7 @@ function predictionProblem(p: EnginePrediction): string | null {
   const broken = (Object.keys(p.groups) as (keyof EnginePrediction["groups"])[]).filter((k) => !Number.isFinite(p.groups[k]));
   if (broken.length > 0) return `Some of this character's ${broken.map((k) => GROUP_LABEL[k]).join(", ")} aren't valid numbers. Check MapleScouter Setup.`;
   if (p.hexa === null || p.hexa300 === null) return "This class's HEXA curves are missing from the Scouter data.";
-  if (!(p.damage > 0) || p.hexa <= 0) return "These stats work out to no damage. Check main stat and ATT in MapleScouter Setup.";
+  if (p.damage <= 0 || p.hexa <= 0) return "These stats work out to no damage. Check main stat and ATT in MapleScouter Setup.";
   return null;
 }
 
