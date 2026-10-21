@@ -66,7 +66,17 @@ const ERROR_REASON_TOOLTIP: Record<ScouterErrorReason, string> = {
 /** The figure's own tooltip: what the number is when there is one, otherwise why there's none. */
 function figureTooltip(status: ScouterFigureStatus, theme: AppTheme): ReactNode {
   switch (status.kind) {
-    case "ready": return "Boss 380 HEXA";
+    case "ready": {
+      const scouter = status.entry.scouterFigures;
+      if (!scouter) return "Boss 380 HEXA";
+      return (
+        <>
+          Boss 380 HEXA, adjusted for how this class clears bosses in practice
+          <br />
+          <span style={{ color: theme.muted }}>MapleScouter est.: {formatFigure(scouter.boss380Hexa)}</span>
+        </>
+      );
+    }
     case "unsupported": return "Scouter doesn't support this class yet.";
     case "incomplete": return `Fill out MapleScouter Setup's ${status.gap === "quickQuestions" ? "Quick Questions" : "Character Info"} to see this.`;
     case "loading": return "Calculating…";

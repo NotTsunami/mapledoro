@@ -8,6 +8,7 @@
 
 import type { ScouterStat, ScouterUserStat } from "../scouterApi";
 import type { BossClearInputs, ScouterErrorReason, ScouterResultEntry, ScouterSpecEfficiency } from "../scouterResult";
+import { CLASS_CLEAR_FACTOR } from "./classClearFactors";
 import { coreAtt, coreAttAt, createEngine, type EngineData, type EnginePrediction, type ScouterEngine } from "./scouterEngine";
 
 const ENGINE_DATA_URL = "/data/scouter-engine.json";
@@ -100,14 +101,14 @@ function specEfficiency(eng: ScouterEngine, u: ScouterUserStat, base: EnginePred
   };
 }
 
-function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction): BossClearInputs | undefined {
+function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, factor: number): BossClearInputs | undefined {
   const c = eng.classData(base.classId);
   if (!c?.spline300 || !c.spline380) return undefined;
   return {
-    calculatedHexaDamage300: base.damage300,
-    calculatedHexaDamage380: base.damage,
-    calculatedDamage380: eng.predictNormal(u).damage,
-    calculatedHexaDamageKaling: eng.predictKaling(u),
+    calculatedHexaDamage300: base.damage300 * factor,
+    calculatedHexaDamage380: base.damage * factor,
+    calculatedDamage380: eng.predictNormal(u).damage * factor,
+    calculatedHexaDamageKaling: eng.predictKaling(u) * factor,
     ascentConst: eng.ascentShare(u),
     ignoreDefConst300: base.ign300,
     ignoreDefConst380: base.ign380,
@@ -140,6 +141,26 @@ function predictionProblem(p: EnginePrediction): string | null {
   return null;
 }
 
+type ScouterFigures = Pick<ScouterResultEntry, "boss300Normal" | "boss300Hexa" | "boss380Normal" | "boss380Hexa">;
+
+/** The four HEXA figures for a class with a clear factor (classClearFactors.ts): its damage scaled
+ *  by the factor before turning into HEXA. MapleScouter's own figures ride along for display. */
+function clearFactorFigures(
+  eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction, normal: EnginePrediction, factor: number, scouterFigures: ScouterFigures,
+): ScouterFigures & Pick<ScouterResultEntry, "clearFactor" | "scouterFigures"> {
+  const cooldownSeconds = Number(u.stat.coolTimeReduce) || 0;
+  const hexa = (p: EnginePrediction, figure: "damage" | "damage300", fallback: number) =>
+    eng.hexaFor(p.classId, p[figure] * factor, cooldownSeconds, figure === "damage" ? "spline380" : "spline300") ?? fallback;
+  return {
+    boss300Normal: hexa(normal, "damage300", scouterFigures.boss300Normal),
+    boss300Hexa: hexa(base, "damage300", scouterFigures.boss300Hexa),
+    boss380Normal: hexa(normal, "damage", scouterFigures.boss380Normal),
+    boss380Hexa: hexa(base, "damage", scouterFigures.boss380Hexa),
+    clearFactor: factor,
+    scouterFigures,
+  };
+}
+
 function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
   try {
     if (!eng.classOf(u)) return { ok: false, reason: "bad_response", detail: "MapleDoro's Scouter has no data for this class yet." };
@@ -148,14 +169,13 @@ function compute(eng: ScouterEngine, u: ScouterUserStat): ScouterComputeResult {
     if (problem || base.hexa === null || base.hexa300 === null || normal.hexa === null || normal.hexa300 === null) {
       return { ok: false, reason: "bad_response", detail: problem ?? undefined };
     }
+    const scouterFigures = { boss300Normal: normal.hexa300, boss300Hexa: base.hexa300, boss380Normal: normal.hexa, boss380Hexa: base.hexa };
+    const factor = CLASS_CLEAR_FACTOR[base.classId] ?? 1;
     return {
       ok: true,
       entry: {
-        boss300Normal: normal.hexa300,
-        boss300Hexa: base.hexa300,
-        boss380Normal: normal.hexa,
-        boss380Hexa: base.hexa,
-        bossClearInputs: bossClearInputs(eng, u, base),
+        ...(factor === 1 ? scouterFigures : clearFactorFigures(eng, u, base, normal, factor, scouterFigures)),
+        bossClearInputs: bossClearInputs(eng, u, base, factor),
         specEfficiency: specEfficiency(eng, u, base),
       },
     };

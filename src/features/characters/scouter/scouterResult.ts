@@ -50,6 +50,10 @@ export interface ScouterResultEntry {
   boss300Hexa: number;
   boss380Normal: number;
   boss380Hexa: number;
+  /** Set for a class with a clear factor (engine/classClearFactors.ts), which the four figures
+   *  above already include. scouterFigures are the same four as MapleScouter itself shows. */
+  clearFactor?: number;
+  scouterFigures?: Pick<ScouterResultEntry, "boss300Normal" | "boss300Hexa" | "boss380Normal" | "boss380Hexa">;
   bossClearInputs?: BossClearInputs;
   specEfficiency?: ScouterSpecEfficiency;
 }

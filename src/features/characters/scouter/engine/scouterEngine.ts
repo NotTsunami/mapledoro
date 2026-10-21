@@ -587,7 +587,10 @@ export function createEngine(data: EngineData) {
     return full.damage * ((1 + KALING_ASCENT_WEIGHT * a) / (1 + KALING_ASCENT_WEIGHT * A));
   }
 
-  return { predict, predictNormal, predictKaling, ascentShare, classOf, groups, classData: (classId: string): EngineClassData | undefined => classes[classId] };
+  return {
+    predict, predictNormal, predictKaling, ascentShare, classOf, groups, hexaFor,
+    classData: (classId: string): EngineClassData | undefined => classes[classId],
+  };
 }
 
 export type ScouterEngine = ReturnType<typeof createEngine>;
