@@ -36,11 +36,8 @@ export interface BossClearInputs {
   sacredBonusOn?: boolean;
   sacredBoost?: number;
   /** Sacred Symbol regions at Lv 11 (sacredSymbols.ts). Boss Clear gives each boss the bonus only
-   *  if its own region's symbol is in here (see bossClearFormula.ts). Where that answer can be
-   *  changed, for the tooltip's hint: the Gear bookmark when it comes from saved symbol levels,
-   *  otherwise MapleScouter Setup's Buffs step. */
+   *  if its own region's symbol is in here (see bossClearFormula.ts). */
   sacredMaxed?: readonly string[];
-  sacredSource?: "symbols" | "buffs";
 }
 
 /** The Stat Efficiency bookmark's table, MapleScouter's `specEfficiency` rebuilt by the local

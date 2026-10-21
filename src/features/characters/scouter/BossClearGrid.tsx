@@ -367,6 +367,7 @@ function chipTooltipDividerStyle(theme: AppTheme): CSSProperties {
 }
 function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; difficulty: string; result: BossClearResult }) {
   const { combinedLossPercent, lines: losses } = lossBreakdown(result);
+  const anyLoss = losses.some((line) => line.lossPercent !== null);
   return (
     <div style={{ minWidth: 168, textAlign: "left" }}>
       <div style={{ fontWeight: 800 }}>{difficulty}</div>
@@ -399,19 +400,16 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
       {combinedLossPercent > 0 && (
         <div style={{ color: statusText(theme, "warning"), fontWeight: 800 }}>{combinedLossPercent}% FD Loss</div>
       )}
-      {/* One row per gap: the character's value over the boss's requirement, then the loss. */}
+      {/* One row per gap: the character's value over the boss's requirement, then the loss. The
+          loss column only exists when some row has one, so with none the values right-align with
+          the figures above. */}
       {losses.map((line) => (
         <div key={line.label} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
           <span style={{ flex: 1, color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
           <span style={{ color: theme.muted, fontWeight: 500 }}>{line.yourValue} / {line.bossValue}</span>
-          <span style={{ minWidth: 48, textAlign: "right", color: statusText(theme, "warning") }}>{line.lossPercent !== null ? `-${line.lossPercent}%` : ""}</span>
+          {anyLoss && <span style={{ minWidth: 48, textAlign: "right", color: statusText(theme, "warning") }}>{line.lossPercent !== null ? `-${line.lossPercent}%` : ""}</span>}
         </div>
       ))}
-      {result.sacredSymbol && !result.sacredSymbol.maxed && (
-        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 2 }}>
-          {result.sacredSymbol.source === "symbols" ? "Edit symbols in the Gear bookmark." : "Set Maxed Symbols in MapleScouter Setup."}
-        </div>
-      )}
       {result.estimated && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
@@ -1137,12 +1135,7 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  before Maxed Symbols existed. */
 function withMaxedSymbols(inputs: BossClearInputs | undefined, character: StoredCharacterRecord, buffsOverride: StoredScouterBuffs | undefined): BossClearInputs | undefined {
   if (!inputs) return inputs;
-  const saved = savedMaxedSymbols(character);
-  return {
-    ...inputs,
-    sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, saved),
-    sacredSource: saved ? "symbols" : "buffs",
-  };
+  return { ...inputs, sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, savedMaxedSymbols(character)) };
 }
 
 export default function BossClearGrid({

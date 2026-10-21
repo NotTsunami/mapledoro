@@ -308,9 +308,9 @@ export interface BossClearResult {
   /** The HEXA this character needs for 100% here (minimumClearHexa). Filled in by the Boss Clear
    *  grid. */
   minimumHexa?: number;
-  /** This boss's own Sacred Symbol: whether it is maxed, the bonus a maxed one gives, and where
-   *  that answer comes from (for the tooltip's hint). Shown as a damage loss when not maxed. */
-  sacredSymbol: { area: string; maxed: boolean; boost: number; source: "symbols" | "buffs" } | null;
+  /** This boss's own Sacred Symbol: whether it is maxed and the bonus a maxed one gives. Shown
+   *  as a damage loss when not maxed. */
+  sacredSymbol: { area: string; maxed: boolean; boost: number } | null;
 }
 
 /** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */
@@ -326,7 +326,7 @@ const BOSS_SACRED_SYMBOL: Readonly<Record<string, string>> = Object.fromEntries(
 function sacredSymbolOf(entry: BossCutEntry, inputs: BossClearInputs): BossClearResult["sacredSymbol"] {
   const area = BOSS_SACRED_SYMBOL[entry.name];
   if (!area || !inputs.sacredMaxed || inputs.sacredBoost === undefined) return null;
-  return { area, maxed: inputs.sacredMaxed.includes(area), boost: inputs.sacredBoost, source: inputs.sacredSource ?? "buffs" };
+  return { area, maxed: inputs.sacredMaxed.includes(area), boost: inputs.sacredBoost };
 }
 
 /** Corrects the shared Sacred Symbol switch to this boss's own symbol: the bonus added if the
