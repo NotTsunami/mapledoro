@@ -400,17 +400,16 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
       {combinedLossPercent > 0 && (
         <div style={{ color: statusText(theme, "warning"), fontWeight: 800 }}>{combinedLossPercent}% FD Loss</div>
       )}
+      {/* One row per gap: the character's value over the boss's requirement, then the loss. */}
       {losses.map((line) => (
-        <div key={line.label} style={{ marginTop: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
-            {line.lossPercent !== null && <span style={{ color: statusText(theme, "warning") }}>-{line.lossPercent}%</span>}
-          </div>
-          <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
+        <div key={line.label} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
+          <span style={{ flex: 1, color: line.lossPercent === null ? theme.muted : theme.text }}>{line.label}</span>
+          <span style={{ color: theme.muted, fontWeight: 500 }}>{line.yourValue} / {line.bossValue}</span>
+          <span style={{ minWidth: 48, textAlign: "right", color: statusText(theme, "warning") }}>{line.lossPercent !== null ? `-${line.lossPercent}%` : ""}</span>
         </div>
       ))}
       {result.sacredSymbol && result.sacredSymbol.level < result.sacredSymbol.maxLevel && (
-        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 4 }}>Update symbol levels in the Gear bookmark.</div>
+        <div style={{ color: theme.muted, fontWeight: 500, marginTop: 2 }}>Edit symbols in the Gear bookmark.</div>
       )}
       {result.estimated && (
         <>
