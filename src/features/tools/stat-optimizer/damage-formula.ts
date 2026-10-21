@@ -131,7 +131,7 @@ export interface KernelDelta {
  * potion settings, Champion's Renown and seed-ring uptime into the same buckets
  * before optimizing. Those are additive constants, so the whole gap collapses to
  * one offset per bucket (`scouter-calibration.ts` solves them from the character's
- * cached Scouter efficiency table). All zero = the raw stat window, unchanged.
+ * Scouter efficiency table). All zero = the raw stat window, unchanged.
  */
 export interface KernelCalibration {
   /** Added to (4*main + sub) inside the stat factor. */

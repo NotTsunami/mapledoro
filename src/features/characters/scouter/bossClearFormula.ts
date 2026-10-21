@@ -16,7 +16,7 @@
 */
 
 import { BOSSCUT_DATA, type BossCutEntry } from "./bosscut-data.generated";
-import type { BossClearInputs } from "./scouterCache";
+import type { BossClearInputs } from "./scouterResult";
 
 interface Spline {
   x: number[];

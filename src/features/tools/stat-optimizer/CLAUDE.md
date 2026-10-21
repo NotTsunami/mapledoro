@@ -181,15 +181,16 @@ uptime). Those are all additive constants inside the same buckets, so the entire
 gap is one offset per bucket, and each bucket's size is exactly what one field of
 scouter's own `specEfficiency` table reports (`eff = d(bucket)/bucket` inverts to
 the bucket). `calibrateFromSpecEfficiency` solves those offsets from the character's
-cached Scouter entry (`peekScouterCache`, cache-only, no network call) into a
+Scouter result (`scouterResultFor`, the local engine's rebuild of that table) into a
 `KernelCalibration` the kernel adds alongside `dpm*`. All-zero = the raw stat
-window, which is also the fallback whenever there's no cached entry — the panel
-says so, since results then won't line up with scouter.
+window, which is also the fallback whenever there's no result — the panel says so,
+since results then won't line up with scouter. The engine's data loads once per page,
+so a character picked before it arrives is seeded again when it does.
 
 When calibration doesn't happen the seed carries a `CalibrationNotice` naming the
 reason, so the panel can point at the fix instead of only disclaiming: `"setup"`
-(Scouter setup unfinished, the actionable case), `"refresh"` (set up, but no cached
-figure matches the character's current stats), `"unavailable"` (class scouter doesn't
+(Scouter setup unfinished, the actionable case), `"pending"` (set up, but the engine
+hasn't produced figures yet, or failed to), `"unavailable"` (class scouter doesn't
 cover, or a Demon Avenger). Standalone entry gets `null` — typed stats are taken at
 face value, so there's nothing to warn about.
 
@@ -305,18 +306,15 @@ Three rules that aren't obvious from the code:
   writing the allocation alone can leave a preset costing more than
   `availableHyperPoints(record.level)` — and the Boss 380 HEXA figure reported
   afterwards is recomputed off `record.level` in both modes either way.
-- **The Boss 380 HEXA figure is not ours to compute.** MapleScouter derives it
-  server-side, so the apply re-runs `refreshScouterResult` against the stat window
-  it just wrote and reports what came back. A `stale` "ok" is the *last good*
-  entry handed back after a failed refetch, i.e. the allocation just replaced --
-  never report it as the recomputed figure.
+- **The Boss 380 HEXA figure comes from the Scouter engine**, so the apply runs
+  `loadScouterResultFor` against the stat window it just wrote and reports what came
+  back.
 
 The panel re-seeds from the store **after** that lookup, not before: re-seeding is
 what moves the Now column onto what was just written (so the gain settles at
-"already optimized"), and the refresh is what leaves a cache entry matching the
-new payload hash -- re-seeding first would drop every apply straight into the
-uncalibrated warning. Applying to a non-active hyper preset also makes it active,
-since the stat window written alongside it is only true with that preset equipped.
+"already optimized") and recalibrates against the new allocation's Scouter result.
+Applying to a non-active hyper preset also makes it active, since the stat window
+written alongside it is only true with that preset equipped.
 
 The apply writes a node for every HEXA core, including blank shells for the ones
 it doesn't fill, so **`readCore` must derive `unlocked` from a core's DATA, never

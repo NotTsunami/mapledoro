@@ -20,7 +20,7 @@ import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-d
 import { BOSS_DISPLAY_NAME, groupByBoss, type BossEntryList } from "./bossGrouping";
 import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
-import type { ScouterResultEntry } from "./scouterCache";
+import type { ScouterResultEntry } from "./scouterResult";
 
 // Icon ids looked up by hand from manifests/v271/ui-boss.json, renamed from boss.json as of
 // v269 (see the Image Policy in the root CLAUDE.md), cross-checked against the same bosses
@@ -496,8 +496,8 @@ function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
   const content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: theme.muted }}>{label}</span>
-      {/* Value and delta stack rather than sit side by side -- Converted's 9-digit figure plus
-          its own 9-digit delta can't share one line inside a 2-column strip at 360px. */}
+      {/* Value and delta stack rather than sit side by side, so a figure and its delta never
+          have to share one line inside a 2-column strip at 360px. */}
       <span style={{ fontSize: 14, fontWeight: 800, color: theme.text, fontFamily: "var(--font-heading)" }}>{formatFigure(value)}</span>
       {realValue !== undefined && <PowerStripDelta theme={theme} value={value} realValue={realValue} />}
       {fdEquiv != null && <PowerStripFdEquiv theme={theme} pct={fdEquiv} />}
@@ -531,27 +531,21 @@ function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv }: {
 // below, so they read as this view's header rather than an unrelated sibling.
 function PowerStrip({ theme, entry, realEntry }: { theme: AppTheme; entry: ScouterResultEntry; realEntry?: ScouterResultEntry }) {
   // A simulation touching only level, Arcane Force or Sacred Power reuses the character's
-  // cached result untouched, since those fields never reach MapleScouter, so the power figures
-  // are identical. Skip the "was" tooltip line and the always-zero chip in that case.
+  // cached result untouched, since those fields don't enter the damage calculation, so the power
+  // figures are identical. Skip the "was" tooltip line and the always-zero chip in that case.
   const showDeltas = realEntry !== undefined && (
     Math.round(entry.boss300Hexa) !== Math.round(realEntry.boss300Hexa) ||
-    Math.round(entry.boss380Hexa) !== Math.round(realEntry.boss380Hexa) ||
-    Math.round(entry.convertedPowerHexa) !== Math.round(realEntry.convertedPowerHexa) ||
-    Math.round(entry.dojoPower) !== Math.round(realEntry.dojoPower)
+    Math.round(entry.boss380Hexa) !== Math.round(realEntry.boss380Hexa)
   );
   const real = showDeltas ? realEntry : undefined;
   const fdEquiv300 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage300, entry.bossClearInputs?.calculatedHexaDamage300) : null;
   const fdEquiv380 = real ? fdEquivalentPercent(real.bossClearInputs?.calculatedHexaDamage380, entry.bossClearInputs?.calculatedHexaDamage380) : null;
   return (
-    <div className="power-strip" style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
-      {/* Grid, not flex-wrap: Converted's long value skews flex column widths. 4 columns on
-          desktop, 2 on narrow panels (.power-strip-grid's container query in styles.ts). */}
-      <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 / Converted shown as HEXA</span>
-      <div className="power-strip-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 14px", background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 12 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>Boss 300 / 380 shown as HEXA</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
         <PowerStripItem theme={theme} label="Boss 300" value={entry.boss300Hexa} sub={entry.boss300Normal} realValue={real?.boss300Hexa} fdEquiv={fdEquiv300} />
         <PowerStripItem theme={theme} label="Boss 380" value={entry.boss380Hexa} sub={entry.boss380Normal} realValue={real?.boss380Hexa} fdEquiv={fdEquiv380} />
-        <PowerStripItem theme={theme} label="Converted" value={entry.convertedPowerHexa} sub={entry.convertedPowerNormal} realValue={real?.convertedPowerHexa} />
-        <PowerStripItem theme={theme} label="Dojo" value={entry.dojoPower} realValue={real?.dojoPower} />
       </div>
     </div>
   );

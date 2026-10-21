@@ -1,4 +1,5 @@
-// Builds engine-data.json, the per-class constants predict.mjs runs on, from raw calibration data
+// Builds public/data/scouter-engine.json, the per-class constants the local damage engine runs on
+// (src/features/characters/scouter/engine/scouterEngine.ts), from raw calibration data
 // kept outside the repo: the probe results (class-sweep.json), MapleScouter's per-class splines
 // (class-probes.json) and the sheet every probe was taken from (probe-payload.json).
 //
@@ -8,16 +9,15 @@
 // the reference sheet's total for that group. Taking the reference sheet's own inputs back out of
 // each total leaves the class's hidden amount (passives and built-in bonuses), which is what the
 // engine stores; one overall scale per class is set so the reference sheet reproduces its measured
-// damage. Nothing from the reference sheet itself ends up in engine-data.json.
+// damage. Nothing from the reference sheet itself ends up in the output.
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  CORES, CORE_ATT, coreAtt, coreAttAt, buffs, statWeights, soulAtkPct, contAtt, contBoss, sheetDmg, critOver, CRIT_CONVERSION,
-  restraintPts, splineEval, hexaAt, tableBonus, createEngine,
-} from "./predict.mjs";
+import { ENGINE_DATA_FILE, engineModule } from "./predict.mjs";
 
-const DIR = path.dirname(fileURLToPath(import.meta.url));
+const {
+  CORE_ATT, coreAtt, coreAttAt, buffs, statWeights, soulAtkPct, contAtt, contBoss, sheetDmg, critOver, CRIT_RATE_TO_CRIT_DMG,
+  restraintPts, splineEval, hexaAt, tableBonus, createEngine,
+} = engineModule;
 const args = process.argv.slice(2), dataDir = args[args.indexOf("--data") + 1];
 if (!args.includes("--data") || !dataDir) {
   console.error("usage: node scripts/scouter-calibration/build-engine-data.mjs --data <dir with class-sweep.json, class-probes.json, probe-payload.json>");
@@ -151,7 +151,7 @@ for (const [classId, { koreanName, probes: p }] of Object.entries(SWEEP)) {
     restraint,
     dmg: dmgT - sheetDmg(T.stat) - (contBoss(T) + bT.dmg) / 100 - dmgPerBuffDuration * durT,
     dmgPerBuffDuration,
-    crit: critT - (n(T.stat.criticalDmg) + (CRIT_CONVERSION[classId] ?? 0) * critOver(T) + bT.crit) / 100,
+    crit: critT - (n(T.stat.criticalDmg) + (CRIT_RATE_TO_CRIT_DMG[classId] ?? 0) * critOver(T) + bT.crit) / 100,
     defenseK: kT / bT.iedKeep,
     toggles: {
       isReboot: onOff("isReboot=true", true),
@@ -184,5 +184,5 @@ for (const [classId, c] of Object.entries(classes)) {
 }
 // Toggles a class has no probe for drop out of the JSON.
 for (const c of Object.values(classes)) for (const k of Object.keys(c.toggles)) if (c.toggles[k] === undefined) delete c.toggles[k];
-writeFileSync(path.join(DIR, "engine-data.json"), `${JSON.stringify(data)}\n`);
-console.log(`wrote engine-data.json for ${Object.keys(classes).length} classes`);
+writeFileSync(ENGINE_DATA_FILE, `${JSON.stringify(data)}\n`);
+console.log(`wrote ${path.relative(process.cwd(), ENGINE_DATA_FILE)} for ${Object.keys(classes).length} classes`);

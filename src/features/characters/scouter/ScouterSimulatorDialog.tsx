@@ -36,7 +36,7 @@ import {
   SIMULATOR_HEXA_CORE_MAX, simulatorStatLabels,
   type ScouterSimulatorOverrides, type SimulatorHexaCoreField, type SimulatorInputOverrides,
 } from "./scouterApi";
-import type { ScouterErrorReason } from "./scouterCache";
+import type { ScouterErrorReason } from "./scouterResult";
 import type { ScouterSimulatorApplyResult } from "./useScouterSimulator";
 import { useScouterSimulatorDraft, type InfoDraft, type ScouterSimulatorDraft, type SimulatorTab } from "./useScouterSimulatorDraft";
 import { hexaCoreFields } from "./hexaSimulatorFields";
@@ -45,10 +45,8 @@ import { hexaCoreFields } from "./hexaSimulatorFields";
 // CharacterProfileOverviewScreen.tsx), kept as a small local copy rather than a shared export,
 // matching how those two files each keep their own.
 const SIMULATOR_ERROR_TEXT: Record<ScouterErrorReason, string> = {
-  rate_limited: "You're refreshing too fast. Wait a moment and try again.",
-  timeout: "MapleScouter's API timed out. Try again in a moment.",
-  bad_response: "MapleScouter's API returned something unexpected. Try again in a moment.",
-  network: "Couldn't reach MapleScouter's API. Try again in a moment.",
+  bad_response: "Couldn't calculate the Scouter figures for these stats. Try again in a moment.",
+  network: "Couldn't load the Scouter data. Check your connection and try again.",
 };
 
 const TAB_OPTIONS: { value: SimulatorTab; label: string }[] = [

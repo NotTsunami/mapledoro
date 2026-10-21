@@ -9,7 +9,7 @@
 import type { StoredCharacterRecord } from "../../characters/model/charactersStore";
 import type { HexaStatNode, HexaStatType } from "../../characters/setup/data/hexaStatData";
 import { hasMinimalScouterSetup, isScouterSupportedClass } from "../../characters/scouter/scouterApi";
-import type { ScouterSpecEfficiency } from "../../characters/scouter/scouterCache";
+import type { ScouterSpecEfficiency } from "../../characters/scouter/scouterResult";
 import {
   prefillFromStats,
   resolveClassDamageProfile,
@@ -45,8 +45,9 @@ const VALID_TYPES: HexaStatType[] = [
 export type CalibrationNotice =
   /** Scouter setup isn't finished for this character — the actionable case. */
   | "setup"
-  /** Set up, but no cached figure matches the character's current stats yet. */
-  | "refresh"
+  /** Set up, but the Scouter figures aren't calculated yet (engine data still loading, or the
+   *  calculation failed). */
+  | "pending"
   /** Calibration can't apply here at all (class scouter doesn't cover, or a
    *  Demon Avenger, whose HP-based stat factor the table can't invert). */
   | "unavailable";
@@ -70,7 +71,7 @@ export interface CharacterSeed {
   cores: HexaCore[];
   /** Stored in-game Hyper Stat presets; 0 greys out the panel's preset picker. */
   presetCount: number;
-  /** Buffed-state corrections solved from the character's cached Scouter data.
+  /** Buffed-state corrections solved from the character's Scouter efficiency table.
    *  Bossing only: mobbing is valued off the typed inputs alone. */
   calibration: KernelCalibration;
   calibrationNotice: CalibrationNotice | null;
@@ -81,7 +82,7 @@ export interface CharacterSeed {
  *  character that could be calibrated is always told the specific step to take. */
 function noticeFor(record: StoredCharacterRecord, profile: ClassDamageProfile): CalibrationNotice {
   if (profile.isHpBased || !isScouterSupportedClass(record.jobName)) return "unavailable";
-  return hasMinimalScouterSetup(record) ? "refresh" : "setup";
+  return hasMinimalScouterSetup(record) ? "pending" : "setup";
 }
 
 function readHexaNodes(record: StoredCharacterRecord): HexaStatNode[] {

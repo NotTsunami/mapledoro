@@ -968,8 +968,7 @@ function applyInputOverrides(stat: ScouterStat, input: SimulatorInputOverrides |
 }
 
 /** Builds a real ScouterUserStat with a Scouter Simulator popup's full overrides applied, for
- *  POSTing straight to /api/scouter (MapleScouter's plain /calc/dmg) instead of the api-key-
- *  gated simulator endpoint. Returns null under the same conditions buildScouterPayload does
+ *  the local engine (the same shape as the real payload). Returns null under the same conditions buildScouterPayload does
  *  (class unsupported). `cridmgeff1` is the character's own specEfficiency rate (from their
  *  last computed Scouter result), needed only when finalDmgPercent is set. */
 export function buildDirectScouterPayload(
