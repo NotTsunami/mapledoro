@@ -48,6 +48,10 @@ const SHOWN_PERCENT_TOLERANCE = 0.03;
 // forward after the next update that changes cuts or class numbers.
 const sinceIndex = process.argv.indexOf("--since");
 const LAST_SCOUTER_UPDATE = sinceIndex >= 0 ? process.argv[sinceIndex + 1] : "2026-05-27";
+// Bosses reworked since then: their earlier clears were against an easier or different fight.
+// Kaling (2026-09-09): its perils can no longer all be hit at once.
+const BOSS_CHANGED = { kaling: "2026-09-09" };
+const clearCutoff = (clear) => [LAST_SCOUTER_UPDATE, BOSS_CHANGED[clear.boss] ?? ""].sort().at(-1);
 // Level gaps cap at 5 levels above the boss; an unknown level is assumed capped (endgame clears).
 const LEVEL_GAP_CAP = 5;
 // Destiny-tier clears always have Sacred Power past the cap, so the Authentic gap is maxed.
@@ -215,8 +219,8 @@ function runReport() {
   // A temporary event skill inflates a clear, and other regions differ from GMS in attack speed cap,
   // patch state and MapleScouter's class data, so neither counts toward a class factor.
   const clears = logged.filter((clear) => !clear.eventSkill && (clear.region ?? "GMS") === "GMS"
-    && !(clear.uploaded && clear.uploaded < LAST_SCOUTER_UPDATE));
-  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill, non-GMS or pre-${LAST_SCOUTER_UPDATE} clear(s) left out.`);
+    && !(clear.uploaded && clear.uploaded < clearCutoff(clear)));
+  if (clears.length < logged.length) console.log(`${logged.length - clears.length} event-skill, non-GMS or outdated (before ${LAST_SCOUTER_UPDATE}, or before a boss rework) clear(s) left out.`);
   const unknownRegion = clears.filter((clear) => clear.region == null).length;
   if (unknownRegion > 0) console.log(`${unknownRegion} clear(s) have no region yet and are counted as GMS until confirmed.`);
   console.log();
