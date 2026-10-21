@@ -3,7 +3,10 @@
 // records MapleScouter's damage figure. Raw results go to class-sweep.json after every request, so
 // a stopped batch resumes where it left off and nothing already measured is sent twice.
 //
-//   node scripts/scouter-calibration/sweep.mjs --data <dir> <classId...> [--max 100] [--set base|interaction|pairs|special|curves|curvespot|buffs|summon|down]
+//   node scripts/scouter-calibration/sweep.mjs --data <dir> <classId...> [--max 100] [--set base|interaction|pairs|special|curves|curvespot|buffs|summon|down|all] [--into <file>]
+//
+// --set all re-sends every probe the class already has; --into writes the answers to <file> in the
+// data folder instead of class-sweep.json, so a re-measure can be compared with the old answers.
 //
 // <dir> holds the private calibration data, never committed: probe-payload.json (the reference
 // sheet; every probe in class-sweep.json must come from the same one) and class-sweep.json.
@@ -21,7 +24,9 @@ if (!dataDir) {
   console.error("usage: node scripts/scouter-calibration/sweep.mjs --data <dir> <classId...> [--max 100] [--set ...]");
   process.exit(1);
 }
-const RESULTS_FILE = path.join(dataDir, "class-sweep.json");
+const RESULTS_FILE_DEFAULT = path.join(dataDir, "class-sweep.json");
+const intoIndex = process.argv.indexOf("--into");
+const RESULTS_FILE = intoIndex >= 0 ? path.join(dataDir, process.argv[intoIndex + 1]) : RESULTS_FILE_DEFAULT;
 const TEMPLATE_FILE = path.join(dataDir, "probe-payload.json");
 const CALC_URL = "https://api.maplescouter.com/api/calc/dmg";
 const PAUSE_MS = 1500;
@@ -219,6 +224,51 @@ const PROBE_SETS = {
   }),
 };
 
+// A probe rebuilt from its name alone, for names no probe set above produces (one-off probes:
+// "mainStatPer=0", "atkPercent=0,atkBase=855,coolTimeReduce=3", "only reinCore1+reinCore2",
+// "link kanna=2", "special.continuosRing=0"). Null for a name it can't read.
+function mutatorFromName(name) {
+  const steps = [];
+  for (const token of name.split(/[, ]+/)) {
+    const only = token === "only" ? null : name.match(/^only (\S+)$/);
+    if (only) {
+      const on = only[1].split("+");
+      return (u) => { for (const core of CORES) u.hexa[core] = on.includes(core) ? "30" : "0"; };
+    }
+    if (token === "allCores=0") { steps.push(PROBES["allCores=0"]); continue; }
+    const link = name.match(/^link (\w+)=(\d+)$/);
+    if (link) return (u) => { u.linkSkill[link[1]] = link[2]; };
+    const delta = token.match(/^(\w+)([+-])(\d+(?:\.\d+)?)$/);
+    if (delta) { steps.push(add(delta[1], Number(delta[3]) * (delta[2] === "-" ? -1 : 1))); continue; }
+    const set = token.match(/^(?:(\w+)\.)?(\w+)=(.+)$/);
+    if (!set) return null;
+    const [, group, field, raw] = set;
+    const value = raw === "true" ? true : raw === "false" ? false : raw;
+    steps.push((u) => {
+      const target = group ? u[group] : [u.hexa, u.special, u.doping, u.stat].find((g) => field in g);
+      if (!target) throw new Error(`${name}: no field ${field}`);
+      if (target === u.special && u.seedRing[field]) setRing(field, value)(u);
+      else target[field] = value;
+    });
+  }
+  return (u) => { for (const step of steps) step(u); };
+}
+
+// Every probe a class already has in class-sweep.json, rebuilt by name: re-measures a whole
+// class after MapleScouter changes it (write it elsewhere with --into to compare old and new).
+function allProbesFor(_probes, classId) {
+  const existing = readJson(RESULTS_FILE_DEFAULT, {})[classId]?.probes ?? {};
+  const named = Object.assign({}, ...Object.entries(PROBE_SETS).filter(([set]) => set !== "all").map(([, set]) => set(existing, classId)));
+  const out = {};
+  for (const key of Object.keys(existing)) {
+    const mutate = named[key] ?? mutatorFromName(key);
+    if (mutate) out[key] = mutate;
+    else console.log(`${classId} ${key}: can't rebuild this probe from its name, skipped`);
+  }
+  return out;
+}
+PROBE_SETS.all = allProbesFor;
+
 function readJson(file, fallback) {
   try {
     return JSON.parse(readFileSync(file, "utf8"));
@@ -242,10 +292,24 @@ function levelsSet(spec) {
 }
 const setName = setIndex >= 0 ? args[setIndex + 1] : "base";
 const probeSet = setName.startsWith("levels:") ? levelsSet(setName) : PROBE_SETS[setName];
-const classIds = args.filter((a, i) => !a.startsWith("--") && i !== maxIndex + 1 && i !== setIndex + 1 && args[i - 1] !== "--data");
+const classIds = args.filter((a, i) => !a.startsWith("--") && i !== maxIndex + 1 && i !== setIndex + 1 && !["--data", "--into"].includes(args[i - 1]));
 if (classIds.length === 0 || !probeSet) {
   console.error(`usage: node scripts/scouter-calibration/sweep.mjs <classId...> [--max 100] [--set ${Object.keys(PROBE_SETS).join("|")}]`);
   process.exit(1);
+}
+
+// --adopt <file>: replace the listed classes' probes in class-sweep.json with a re-sweep's answers
+// from <file> (written by --set all --into <file>), sending nothing.
+const adoptIndex = args.indexOf("--adopt");
+if (adoptIndex >= 0) {
+  const fresh = readJson(path.join(dataDir, args[adoptIndex + 1]), {}), all = readJson(RESULTS_FILE_DEFAULT, {});
+  for (const classId of classIds.filter((id) => id !== args[adoptIndex + 1])) {
+    if (!fresh[classId]) { console.log(`${classId}: not in ${args[adoptIndex + 1]}, skipped`); continue; }
+    all[classId] = fresh[classId];
+    console.log(`${classId}: adopted ${Object.keys(fresh[classId].probes).length} probes`);
+  }
+  writeFileSync(RESULTS_FILE_DEFAULT, `${JSON.stringify(all, null, 2)}\n`);
+  process.exit(0);
 }
 
 const template = readJson(TEMPLATE_FILE);
