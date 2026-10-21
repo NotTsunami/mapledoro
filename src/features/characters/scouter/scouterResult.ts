@@ -31,6 +31,13 @@ export interface BossClearInputs {
   genePassConst: number;
   /** MapleScouter's own inputs, for a class whose clear factor these include. */
   scouterInputs?: BossClearInputs;
+  /** Whether the damage above includes the maxed Sacred Symbol bonus (+20 damage), and how much
+   *  that bonus multiplies this character's damage by. */
+  sacredBonusOn?: boolean;
+  sacredBoost?: number;
+  /** The character's saved Sacred Symbol levels by region, when known. Boss Clear then gives each
+   *  boss the bonus only if its own region's symbol is maxed (see bossClearFormula.ts). */
+  sacredSymbolLevels?: Partial<Record<string, number>>;
 }
 
 /** The Stat Efficiency bookmark's table, MapleScouter's `specEfficiency` rebuilt by the local

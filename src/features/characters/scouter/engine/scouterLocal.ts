@@ -122,7 +122,17 @@ function bossClearInputs(eng: ScouterEngine, u: ScouterUserStat, base: EnginePre
     spline380: c.spline380,
     // 1 on every sheet MapleScouter has answered for.
     genePassConst: 1,
+    sacredBonusOn: u.doping.authenticDmg,
+    sacredBoost: sacredBoost(eng, u, base),
   };
+}
+
+/** How much the maxed Sacred Symbol bonus multiplies this character's 380 damage by. */
+function sacredBoost(eng: ScouterEngine, u: ScouterUserStat, base: EnginePrediction): number {
+  const toggled = structuredClone(u);
+  toggled.doping.authenticDmg = !u.doping.authenticDmg;
+  const other = eng.predict(toggled).damage;
+  return u.doping.authenticDmg ? base.damage / other : other / base.damage;
 }
 
 /** MapleScouter's own inputs ride inside MapleDoro's, for a class with a clear factor, so every

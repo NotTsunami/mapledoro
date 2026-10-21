@@ -582,10 +582,12 @@ function applyMapleScouterFlow(
   return created;
 }
 
-// "Lv. 11 Sacred Symbols", the Buffs step's maxedSacredSymbol tile, is about the 6 boss
-// regions' Sacred Symbols specifically. Grand Sacred is excluded because it grants EXP, meso
-// and drop rather than a boss bonus. full_setup already has this data from the Equipment
-// step's Symbols substep, so it is derived here rather than from a separate manual toggle.
+// "Lv. 11 Sacred Symbols", the Buffs step's maxedSacredSymbol tile, is MapleScouter's single
+// switch for every symbol's +20% boss damage, and it feeds the Boss 380 HEXA figure. It follows
+// the 6 regular regions. Each symbol, Grand Sacred included, only boosts its own boss (Tallahart
+// Baldrix, Geardock Jupiter), which Boss Clear applies per boss from the saved levels instead (see
+// bossClearFormula.ts). full_setup already has this data from the Equipment step's Symbols
+// substep, so it is derived here rather than from a separate manual toggle.
 function deriveMaxedSacredSymbol(symbolsData: SavedSymbols | null): boolean {
   if (!symbolsData) return false;
   return SACRED_AREAS.every((a) => (symbolsData.symbols[a.name]?.level ?? 0) >= SACRED_MAX_LEVEL);

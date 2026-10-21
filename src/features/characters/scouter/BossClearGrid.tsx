@@ -16,11 +16,14 @@ import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
+import { readCharacterToolData } from "../../tools/characterToolStorage";
+import { GRAND_SACRED_AREAS, SACRED_AREAS } from "../../tools/symbols/symbol-data";
+import type { SymbolState } from "../../tools/symbols/useSymbolState";
 import { BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./bossGrouping";
 import { computeBossClear, isEstimatedBoss, minimumClearHexa, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
-import type { ScouterResultEntry } from "./scouterResult";
+import type { BossClearInputs, ScouterResultEntry } from "./scouterResult";
 
 // Icon ids looked up by hand from manifests/v271/ui-boss.json, renamed from boss.json as of
 // v269 (see the Image Policy in the root CLAUDE.md), cross-checked against the same bosses
@@ -1118,6 +1121,23 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  Spotlight's selected boss is owned by CharacterProfileOverviewScreen rather than local
  *  state, so the page header can read the same value directly instead of BossClearGrid
  *  reporting it back up through an effect. See resolveBossDisplayName. */
+const SACRED_AREA_NAMES = [...SACRED_AREAS, ...GRAND_SACRED_AREAS].map((a) => a.name);
+
+/** The character's saved Sacred Symbol levels, or undefined when none are saved (Boss Clear then
+ *  keeps the Buffs step's all-or-nothing "Lv. 11 Sacred Symbols" answer for every boss). The
+ *  in-memory record first, as the Overview does, since a setup Finish saves it before storage. */
+function sacredSymbolLevels(character: StoredCharacterRecord): Partial<Record<string, number>> | undefined {
+  type Saved = { symbols?: Record<string, SymbolState | undefined> };
+  const saved = (character.tools?.symbols as Saved | undefined) ?? readCharacterToolData<Saved>(character.characterName, "symbols");
+  const symbols = saved?.symbols;
+  if (!symbols || !SACRED_AREA_NAMES.some((name) => symbols[name])) return undefined;
+  return Object.fromEntries(SACRED_AREA_NAMES.map((name) => [name, symbols[name]?.level ?? 0]));
+}
+
+function withSymbolLevels(inputs: BossClearInputs | undefined, levels: Partial<Record<string, number>> | undefined): BossClearInputs | undefined {
+  return inputs && levels ? { ...inputs, sacredSymbolLevels: levels } : inputs;
+}
+
 export default function BossClearGrid({
   theme, character, entry, realEntry, view, onViewChange, selectedIndex, onSelectedIndexChange,
   levelOverride, arcaneForceOverride, authenticForceOverride, simulated, onOpenSimulator,
@@ -1149,7 +1169,8 @@ export default function BossClearGrid({
   onOpenSimulator: () => void;
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
-  const inputs = entry.bossClearInputs;
+  // MapleScouter's own estimate (inputs.scouterInputs) keeps its single switch on purpose.
+  const inputs = withSymbolLevels(entry.bossClearInputs, sacredSymbolLevels(character));
   const grouped = BOSS_CLEAR_GROUPS;
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
 

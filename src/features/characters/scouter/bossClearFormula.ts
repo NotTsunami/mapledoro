@@ -314,6 +314,26 @@ export function isEstimatedBoss(entry: BossCutEntry): entry is EstimatedBossEntr
   return "entryLevel" in entry;
 }
 
+// Each Sacred Symbol region's +20% damage applies only to its own boss once the symbol is maxed.
+// MapleScouter has one switch for all of them, so when the character's real symbol levels are
+// known, each boss gets the bonus from its own symbol instead.
+const BOSS_SACRED_SYMBOL: Readonly<Record<string, string>> = {
+  seren: "Cernium", kalos: "Hotel Arcus", adversary: "Odium", kaling: "Shangri-La",
+  maleficStar: "Arteria", limbo: "Carcion", bardrix: "Tallahart", jupiter: "Geardock",
+};
+const SACRED_SYMBOL_MAX_LEVEL = 11;
+
+/** Corrects the shared Sacred Symbol switch to this boss's own symbol: the bonus added if the
+ *  symbol is maxed but the switch is off, removed if the switch is on but it isn't. */
+function sacredSymbolFactor(entry: BossCutEntry, inputs: BossClearInputs): number {
+  const area = BOSS_SACRED_SYMBOL[entry.name];
+  const levels = inputs.sacredSymbolLevels;
+  if (!area || !levels || inputs.sacredBoost === undefined || inputs.sacredBonusOn === undefined) return 1;
+  const maxed = (levels[area] ?? 0) >= SACRED_SYMBOL_MAX_LEVEL;
+  if (maxed === inputs.sacredBonusOn) return 1;
+  return maxed ? inputs.sacredBoost : 1 / inputs.sacredBoost;
+}
+
 /** Damage against a boss under 300% defense, relative to the 300% figure. Defense scales damage
  *  by 1 - defense x (1 - IED), so the character's own 300% multiplier gives any other. */
 function lowDefenseFactor(guard: number, ignoreDefConst300: number): number {
@@ -428,7 +448,8 @@ export function computeBossClear(
   let arcaneCorrection = 1;
   if (hasArcaneReq) arcaneCorrection = entry.boss === "검은 마법사" ? 1.1 : 1.5;
 
-  const rawDamage = adjustedHexaDamage(entry.boss, guard, inputs) * lowDefenseFactor(entry.guard, inputs.ignoreDefConst300);
+  const rawDamage = adjustedHexaDamage(entry.boss, guard, inputs) * lowDefenseFactor(entry.guard, inputs.ignoreDefConst300)
+    * sacredSymbolFactor(entry, inputs);
   const arcaneGap = arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750));
   const authenticGap = authenticGapDmg(entry.authenticForce, characterAuthenticForce);
   const levelGap = levelGapDmg(characterLevel, entry.level);
