@@ -18,7 +18,7 @@ import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
 import { BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
 import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./bossGrouping";
-import { computeBossClear, isEstimatedBoss, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
+import { computeBossClear, isEstimatedBoss, minimumClearHexa, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
 import type { ScouterResultEntry } from "./scouterResult";
 
@@ -320,7 +320,8 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
     const result = computeBossClear(entry, level, arcaneForce, authenticForce, inputs);
     if (result && (filter === "all" || isRelevant(result.clearRate, result.isPartyBoss, result.partyLimit))) {
       const scouter = inputs.scouterInputs && computeBossClear(entry, level, arcaneForce, authenticForce, inputs.scouterInputs);
-      tiles.push({ entry, result: scouter ? { ...result, scouterEstimatePercent: scouter.clearRatePercent } : result });
+      const minimumHexa = minimumClearHexa(entry, level, arcaneForce, authenticForce, inputs) ?? undefined;
+      tiles.push({ entry, result: { ...result, minimumHexa, ...(scouter ? { scouterEstimatePercent: scouter.clearRatePercent } : {}) } });
     }
     return tiles;
   }, []);
@@ -354,6 +355,11 @@ function chipTagColor(theme: AppTheme, status: PillStatus): string {
 // one-line labels, which suits those but turns a multi-row breakdown into an unscannable wall
 // of centered text, so this overrides text-align through HoverTooltip's style prop. Difficulty
 // and clear percent are left out, since both are already visible on the chip being hovered.
+// Below 1,000 the HEXA scale stops meaning anything (a low-end boss can need almost none).
+function formatMinimumHexa(hexa: number): string {
+  return hexa < 1000 ? "under 1,000" : formatFigure(hexa);
+}
+
 function chipTooltipDividerStyle(theme: AppTheme): CSSProperties {
   return { borderTop: `1px solid ${theme.border}`, margin: "4px 0" };
 }
@@ -371,6 +377,12 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
           <span style={{ color: theme.muted }}>MapleScouter est.</span>
           <span style={{ color: theme.muted }}>{formatClearPercent({ ...result, clearRatePercent: result.scouterEstimatePercent })}</span>
+        </div>
+      )}
+      {result.minimumHexa !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: theme.muted }}>{result.isPartyBoss ? "Solo 100% at" : "100% at"}</span>
+          <span>{formatMinimumHexa(result.minimumHexa)}</span>
         </div>
       )}
       {/* Whichever scale the chip ISN'T showing -- the party figure once the boss has flipped to

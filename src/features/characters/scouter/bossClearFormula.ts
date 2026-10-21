@@ -304,6 +304,9 @@ export interface BossClearResult {
   /** MapleScouter's own clear % for a class with a clear factor, which clearRatePercent includes.
    *  Filled in by the Boss Clear grid from the inputs' scouterInputs. */
   scouterEstimatePercent?: number;
+  /** The HEXA this character needs for 100% here (minimumClearHexa). Filled in by the Boss Clear
+   *  grid. */
+  minimumHexa?: number;
 }
 
 /** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */
@@ -472,4 +475,42 @@ export function computeBossClear(
     soloable: shown.soloable,
     estimated: isEstimatedBoss(entry),
   };
+}
+
+/** The HEXA this character would need to read exactly 100% on this boss, with its own level,
+ *  force and Ascent: Boss 380 HEXA, or Boss 300 HEXA for a boss under 380% defense. A party-only
+ *  boss's 100% is on the solo scale (soloScaleDivisor), so it reads as the solo minimum. Found by
+ *  scaling the character's damage until the clear rate is 1, then turning that damage back into
+ *  HEXA. Null when the formula has no result for the boss. */
+export function minimumClearHexa(
+  entry: BossCutEntry,
+  characterLevel: number,
+  characterArcaneForce: number,
+  characterAuthenticForce: number,
+  inputs: BossClearInputs,
+): number | null {
+  const rateAt = (scale: number) => {
+    const result = computeBossClear(entry, characterLevel, characterArcaneForce, characterAuthenticForce, {
+      ...inputs,
+      calculatedHexaDamage300: inputs.calculatedHexaDamage300 * scale,
+      calculatedHexaDamage380: inputs.calculatedHexaDamage380 * scale,
+      calculatedDamage380: inputs.calculatedDamage380 * scale,
+      calculatedHexaDamageKaling: inputs.calculatedHexaDamageKaling * scale,
+    });
+    if (!result) return null;
+    return result.isPartyBoss && result.soloScalePercent !== null ? result.soloScalePercent / 100 : result.clearRate;
+  };
+  if (rateAt(1) === null) return null;
+  // Damage scale, searched on a log scale between 1/1000x and 1000x the character's own.
+  let lo = Math.log(1e-3);
+  let hi = Math.log(1e3);
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if ((rateAt(Math.exp(mid)) ?? 0) < 1) lo = mid;
+    else hi = mid;
+  }
+  const scale = Math.exp(hi);
+  return entry.guard >= 380
+    ? splineInverse(inputs.spline380, inputs.calculatedHexaDamage380 * scale)
+    : splineInverse(inputs.spline300, inputs.calculatedHexaDamage300 * scale);
 }
