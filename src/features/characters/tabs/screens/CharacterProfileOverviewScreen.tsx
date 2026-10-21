@@ -51,8 +51,7 @@ import { useScouterSimulator, type ScouterSimulatorController } from "../../scou
 import ScouterSimulatorDialog from "../../scouter/ScouterSimulatorDialog";
 import { dialogBtnColors } from "../../../../components/themes";
 import type { ScouterResultEntry } from "../../scouter/scouterResult";
-import { groupByBoss, resolveBossDisplayName } from "../../scouter/bossGrouping";
-import { BOSSCUT_DATA } from "../../scouter/bosscut-data.generated";
+import { BOSS_CLEAR_GROUPS, resolveBossDisplayName } from "../../scouter/bossGrouping";
 import InfoTooltip, { type TooltipContent } from "../../setup/components/InfoTooltip";
 import { ReadOnlySlotTile, ReadOnlySymbolTile } from "../../setup/components/EquipmentSetupStep";
 import { ReadOnlyLeveledIconTile } from "../../setup/components/LeveledIconTile";
@@ -3580,7 +3579,7 @@ function BookmarkPageBody({
   // constraint ScouterFigure has on Overview, so the null check happens at this call site
   // rather than inside ScouterBookmark.
   if (active.id === "scouter") {
-    const scouterSpotlightBoss = resolveBossDisplayName(groupByBoss(BOSSCUT_DATA), scouterSelectedBossIndex);
+    const scouterSpotlightBoss = resolveBossDisplayName(BOSS_CLEAR_GROUPS, scouterSelectedBossIndex);
     const scouterHeaderLabel = scouterBookmarkHeaderLabel(scouterView, active.pageLabel, scouterSpotlightBoss);
     if (!character) {
       return <BookmarkPageHeader theme={theme} label={scouterHeaderLabel} onEdit={null} disabled={setup.isUiLocked} />;

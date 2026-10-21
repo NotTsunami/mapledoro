@@ -16,6 +16,7 @@
 */
 
 import { BOSSCUT_DATA, type BossCutEntry } from "./bosscut-data.generated";
+import type { EstimatedBossEntry } from "./lowend-boss-data.generated";
 import type { BossClearInputs } from "./scouterResult";
 
 interface Spline {
@@ -112,8 +113,9 @@ const ENTRY_LEVEL_BY_DIFFICULTY: Record<string, Record<string, number>> = {
 const ENTRY_LEVEL_DEFAULT: Record<string, number> = {
   유피테르: 295, 발드릭스: 290, 림보: 285, 카링: 275, 대적자: 270, 칼로스: 265, 세렌: 260,
 };
-function cannotEnter(bossName: string, difficulty: string, characterLevel: number): boolean {
-  const required = ENTRY_LEVEL_BY_DIFFICULTY[bossName]?.[difficulty] ?? ENTRY_LEVEL_DEFAULT[bossName] ?? 200;
+function cannotEnter(entry: BossCutEntry, characterLevel: number): boolean {
+  const required = (isEstimatedBoss(entry) ? entry.entryLevel : undefined)
+    ?? ENTRY_LEVEL_BY_DIFFICULTY[entry.boss]?.[entry.difficulty] ?? ENTRY_LEVEL_DEFAULT[entry.boss] ?? 200;
   return required > characterLevel;
 }
 
@@ -297,6 +299,20 @@ export interface BossClearResult {
   /** True once a party-only boss has flipped to the solo scale (clearRatePercent and the tag
    *  are then solo-scale, and the party-scale figure is clearRate x100). */
   soloable: boolean;
+  /** MapleScouter has no cut for this boss: MapleDoro's estimate from boss HP. */
+  estimated: boolean;
+}
+
+/** A boss from lowend-boss-data.generated.ts, which MapleScouter doesn't cover. */
+export function isEstimatedBoss(entry: BossCutEntry): entry is EstimatedBossEntry {
+  return "entryLevel" in entry;
+}
+
+/** Damage against a boss under 300% defense, relative to the 300% figure. Defense scales damage
+ *  by 1 - defense x (1 - IED), so the character's own 300% multiplier gives any other. */
+function lowDefenseFactor(guard: number, ignoreDefConst300: number): number {
+  if (guard >= 300) return 1;
+  return (1 - (1 - ignoreDefConst300) * (guard / 300)) / ignoreDefConst300;
 }
 
 const LEVEL_GAP_CEILING = 1.2;
@@ -382,7 +398,7 @@ function gapAdjustedDamage(
 
 /** Computes one boss+difficulty tile's clear rate, tag, and color for a character, or null if
  *  the character's cached Scouter result doesn't have Boss Clear inputs yet (needs a refresh) or
- *  the entry is missing required fields (bossCut/partyBossCut, or guard isn't 300/380).
+ *  the entry is missing required fields (bossCut/partyBossCut, or a guard above 300 other than 380).
  *  characterLevel/characterArcaneForce/characterAuthenticForce can be a Scouter Simulator
  *  override (a player-typed "what if I had X Arcane Force" value) rather than the character's
  *  real saved stat. computeBossClear doesn't know which, and the gap math is the same
@@ -395,7 +411,9 @@ export function computeBossClear(
   characterAuthenticForce: number,
   inputs: BossClearInputs,
 ): BossClearResult | null {
-  if (entry.guard !== 300 && entry.guard !== 380) return null;
+  // Below 300% defense (only the estimated low-end bosses) is scored on the 300 curve.
+  const guard = entry.guard < 300 ? 300 : entry.guard;
+  if (guard !== 300 && guard !== 380) return null;
   const cutThreshold = entry.bossCut ?? entry.partyBossCut;
   if (cutThreshold === null) return null;
 
@@ -404,13 +422,13 @@ export function computeBossClear(
   let arcaneCorrection = 1;
   if (hasArcaneReq) arcaneCorrection = entry.boss === "검은 마법사" ? 1.1 : 1.5;
 
-  const rawDamage = adjustedHexaDamage(entry.boss, entry.guard, inputs);
+  const rawDamage = adjustedHexaDamage(entry.boss, guard, inputs) * lowDefenseFactor(entry.guard, inputs.ignoreDefConst300);
   const arcaneGap = arcaneGapDmg(entry.arcaneForce, Math.min(characterArcaneForce, 1750));
   const authenticGap = authenticGapDmg(entry.authenticForce, characterAuthenticForce);
   const levelGap = levelGapDmg(characterLevel, entry.level);
   const damage = gapAdjustedDamage(rawDamage, arcaneGap, authenticGap, levelGap, arcaneCorrection, hasAuthenticReq);
 
-  const spline = entry.guard === 300 ? inputs.spline300 : inputs.spline380;
+  const spline = guard === 300 ? inputs.spline300 : inputs.spline380;
   const cutInDamageSpace = splineEval(spline, cutThreshold);
   const bossStat = splineInverse(spline, damage);
 
@@ -426,7 +444,7 @@ export function computeBossClear(
   const isPartyBoss = !!entry.partyBossCut;
   const partyLimit = entry.partyLimit || 6;
   const shown = presentation(clearRate, isPartyBoss, partyLimit);
-  const tier = cannotEnter(entry.boss, entry.difficulty, characterLevel) ? CANNOT_ENTER_TIER : shown.tier;
+  const tier = cannotEnter(entry, characterLevel) ? CANNOT_ENTER_TIER : shown.tier;
 
   return {
     clearRate,
@@ -449,5 +467,6 @@ export function computeBossClear(
     scouterClearRatePercent,
     soloScalePercent: shown.soloScalePercent,
     soloable: shown.soloable,
+    estimated: isEstimatedBoss(entry),
   };
 }

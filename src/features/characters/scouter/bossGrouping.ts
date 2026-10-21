@@ -1,4 +1,5 @@
-import type { BossCutEntry } from "./bosscut-data.generated";
+import { BOSSCUT_DATA, type BossCutEntry } from "./bosscut-data.generated";
+import { LOWEND_BOSS_DATA } from "./lowend-boss-data.generated";
 
 export type BossEntryList = [string, BossCutEntry[]];
 
@@ -10,7 +11,7 @@ export const BOSS_DISPLAY_NAME: Record<string, string> = {
   카이: "Kai",
 };
 
-export function groupByBoss(entries: BossCutEntry[]): BossEntryList[] {
+function groupByBoss(entries: BossCutEntry[]): BossEntryList[] {
   const byBoss = new Map<string, BossCutEntry[]>();
   for (const e of entries) {
     const list = byBoss.get(e.boss);
@@ -26,6 +27,10 @@ export function groupByBoss(entries: BossCutEntry[]): BossEntryList[] {
     return minDiff !== 0 ? minDiff : Math.max(...b.map((e) => e.level)) - Math.max(...a.map((e) => e.level));
   });
 }
+
+/** Every boss in the Boss Clear grid: MapleScouter's, then the low-end bosses MapleDoro
+ *  estimates itself, which always sort below them. */
+export const BOSS_CLEAR_GROUPS: BossEntryList[] = [...groupByBoss(BOSSCUT_DATA), ...groupByBoss(LOWEND_BOSS_DATA)];
 
 /** Resolves a grouped-list index to the boss's display name, clamping out-of-range indexes
  *  (e.g. stale selection after a boss list update) to the last entry. Shared between

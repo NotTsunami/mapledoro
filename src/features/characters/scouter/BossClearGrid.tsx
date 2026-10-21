@@ -16,9 +16,9 @@ import { DropdownChevron, NavChevron } from "../DropdownChevron";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import { secondaryButtonStyle } from "../tabs/components/uiStyles";
-import { BOSSCUT_DATA, BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
-import { BOSS_DISPLAY_NAME, groupByBoss, type BossEntryList } from "./bossGrouping";
-import { computeBossClear, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
+import { BOSSCUT_SCRAPED_AT, type BossCutEntry } from "./bosscut-data.generated";
+import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./bossGrouping";
+import { computeBossClear, isEstimatedBoss, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
 import type { ScouterResultEntry } from "./scouterResult";
 
@@ -30,6 +30,12 @@ const BOSS_ICON_ID: Record<string, string> = {
   듄켈: "27", "검은 마법사": "25", 세렌: "28", 칼로스: "30", 대적자: "35", 흉성: "37",
   카링: "31", 림보: "33", 발드릭스: "34", 유피테르: "38", 가엔슬: "29", 카이: "36",
 };
+
+/** The low-end bosses MapleDoro estimates carry their own icon id. */
+function bossIconId(boss: string, entries: BossCutEntry[]): string | undefined {
+  const first = entries[0];
+  return BOSS_ICON_ID[boss] ?? (isEstimatedBoss(first) ? first.iconId : undefined);
+}
 
 // Easiest to hardest. Champion and Destiny are solo variants of a party tier, nearly always
 // Hard, and sit below Extreme on every boss that has one. Lotus, Black Mage, Seren and
@@ -319,8 +325,15 @@ function relevantTiles(entries: BossCutEntry[], level: number, arcaneForce: numb
 // Trailing * flags a clear% mapledoro deliberately corrects away from MapleScouter's own figure
 // (Champion Black Mage, see bossClearFormula.ts's effectiveEasyRate) so a player comparing the
 // two sites sees at a glance that the mismatch is intended, with the hover tooltip explaining it.
+// A leading ~ marks MapleDoro's own estimate for a boss MapleScouter doesn't cover. Past
+// CLEAR_PERCENT_CAP the exact figure says nothing (a low-end boss reads in the billions), so it
+// shows as the cap with a +.
+const CLEAR_PERCENT_CAP = 9999;
 function formatClearPercent(result: BossClearResult): string {
-  return `${result.clearRatePercent.toFixed(2)}%${result.scouterClearRatePercent === null ? "" : "*"}`;
+  const value = result.clearRatePercent > CLEAR_PERCENT_CAP
+    ? `${CLEAR_PERCENT_CAP.toLocaleString()}%+`
+    : `${result.clearRatePercent.toFixed(2)}%`;
+  return `${result.estimated ? "~" : ""}${value}${result.scouterClearRatePercent === null ? "" : "*"}`;
 }
 
 // Status-colored TEXT on a neutral card (statusText), not a filled/saturated pill.
@@ -371,6 +384,15 @@ function ChipTooltipContent({ theme, difficulty, result }: { theme: AppTheme; di
           <div style={{ color: theme.muted, fontWeight: 500 }}>Boss {line.bossValue} · You {line.yourValue}</div>
         </div>
       ))}
+      {result.estimated && (
+        <>
+          <div style={chipTooltipDividerStyle(theme)} />
+          <div style={{ color: theme.muted, fontWeight: 500 }}>
+            Estimate. MapleScouter doesn&apos;t cover this boss, so MapleDoro works it out from the
+            boss&apos;s HP and time limit.
+          </div>
+        </>
+      )}
       {result.scouterClearRatePercent !== null && (
         <>
           <div style={chipTooltipDividerStyle(theme)} />
@@ -426,7 +448,7 @@ function BossQuickViewRow({
   const tiles = relevantTiles(entries, level, arcaneForce, authenticForce, inputs, filter);
   if (tiles.length === 0) return null;
 
-  const iconId = BOSS_ICON_ID[boss];
+  const iconId = bossIconId(boss, entries);
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
 
   return (
@@ -973,7 +995,7 @@ function BossSpotlight({
   inputs: NonNullable<ScouterResultEntry["bossClearInputs"]>; onBack: () => void;
 }) {
   const [boss, entries] = grouped[selectedIndex];
-  const iconId = BOSS_ICON_ID[boss];
+  const iconId = bossIconId(boss, entries);
   const displayName = BOSS_DISPLAY_NAME[boss] ?? boss;
   const artPosition = SPOTLIGHT_ART_POSITION[boss] ?? DEFAULT_ART_POSITION;
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -1113,13 +1135,13 @@ export default function BossClearGrid({
 }) {
   const [filter, setFilter] = useState<BossFilter>("relevant");
   const inputs = entry.bossClearInputs;
-  const grouped = groupByBoss(BOSSCUT_DATA);
+  const grouped = BOSS_CLEAR_GROUPS;
   const clampedIndex = Math.min(selectedIndex, grouped.length - 1);
 
   if (!inputs) {
     return (
       <p style={{ margin: 0, fontSize: "0.75rem", color: theme.muted, textAlign: "center", padding: "2rem 0" }}>
-        Boss Clear data isn&apos;t available yet. Refresh the Scouter figure on Overview to compute it.
+        Boss Clear data isn&apos;t available for this class yet.
       </p>
     );
   }
