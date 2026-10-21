@@ -559,8 +559,11 @@ interface HexaBuildResult {
   solJanusLevel: number;
 }
 
-function buildHexa(characterName: string, isHexaEligible: boolean, koreanClassName: string): HexaBuildResult {
-  const saved = readCharacterToolData<{ levels?: HexaSkillLevels }>(characterName, "hexaSkills");
+function buildHexa(character: StoredCharacterRecord, isHexaEligible: boolean, koreanClassName: string): HexaBuildResult {
+  // The record's own copy first: right after a setup Finish, the in-memory record already has
+  // the new levels while storage still holds the old ones until the roster persists.
+  const saved = (character.tools?.hexaSkills as { levels?: HexaSkillLevels } | undefined)
+    ?? readCharacterToolData<{ levels?: HexaSkillLevels }>(character.characterName, "hexaSkills");
   const cores = hexaCoreLevels(saved?.levels, isHexaEligible);
   const solJanusLevel = SOL_JANUS_INDEX >= 0 ? (saved?.levels?.common[SOL_JANUS_INDEX] ?? 0) : 0;
   const solHecateLevel = SOL_HECATE_INDEX >= 0 ? (saved?.levels?.common[SOL_HECATE_INDEX] ?? 0) : 0;
@@ -748,7 +751,7 @@ export function buildScouterPayload(
 
   const legion = ctx.scouterLegionByWorld[String(character.worldID)];
   const isHexaEligible = character.level >= 260 && !classData.isLegacy;
-  const { hexa, solJanusLevel } = buildHexa(character.characterName, isHexaEligible, koreanClassName);
+  const { hexa, solJanusLevel } = buildHexa(character, isHexaEligible, koreanClassName);
 
   return {
     doping: buildDoping(overrides?.dopingOverrides ?? character.scouter?.buffs),
