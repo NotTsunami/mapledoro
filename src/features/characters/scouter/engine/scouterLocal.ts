@@ -133,6 +133,9 @@ function predictionProblem(p: EnginePrediction): string | null {
   const broken = (Object.keys(p.groups) as (keyof EnginePrediction["groups"])[]).filter((k) => !Number.isFinite(p.groups[k]));
   if (broken.length > 0) return `Some of this character's ${broken.map((k) => GROUP_LABEL[k]).join(", ")} aren't valid numbers. Check MapleScouter Setup.`;
   if (p.hexa === null || p.hexa300 === null) return "This class's HEXA curves are missing from the Scouter data.";
+  // Damage scales with 1 - 3.8 x (1 - IED) against a 380% defense boss, which is below zero (no
+  // damage at all, as in-game) until ignore defense is high enough for the class.
+  if (p.groups.def <= 0) return "Ignore Enemy DEF is too low to damage a 380% defense boss at all. Raise it in MapleScouter Setup.";
   if (p.damage <= 0 || p.hexa <= 0) return "These stats are too low to register a HEXA score. Check main stat and ATT in MapleScouter Setup.";
   return null;
 }
