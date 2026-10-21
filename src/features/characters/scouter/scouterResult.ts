@@ -38,6 +38,8 @@ export interface BossClearInputs {
   /** Sacred Symbol regions at Lv 11 (sacredSymbols.ts). Boss Clear gives each boss the bonus only
    *  if its own region's symbol is in here (see bossClearFormula.ts). */
   sacredMaxed?: readonly string[];
+  /** Saved Sacred Symbol levels by region, when known, so the tooltip can show the real level. */
+  sacredLevels?: Partial<Record<string, number>>;
 }
 
 /** The Stat Efficiency bookmark's table, MapleScouter's `specEfficiency` rebuilt by the local

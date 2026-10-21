@@ -21,7 +21,7 @@ import { BOSS_CLEAR_GROUPS, BOSS_DISPLAY_NAME, type BossEntryList } from "./boss
 import { computeBossClear, isEstimatedBoss, minimumClearHexa, type BossClearResult, type ClearColorTier } from "./bossClearFormula";
 import { formatFigure } from "./scouterFormat";
 import type { BossClearInputs, ScouterResultEntry } from "./scouterResult";
-import { maxedSacredSymbols, savedMaxedSymbols } from "./sacredSymbols";
+import { maxedSacredSymbols, savedMaxedSymbols, savedSacredLevels } from "./sacredSymbols";
 import type { StoredScouterBuffs } from "../model/charactersStore";
 
 // Icon ids looked up by hand from manifests/v271/ui-boss.json, renamed from boss.json as of
@@ -879,6 +879,13 @@ function NavArrowButton({ theme, direction, disabled, onClick }: {
  *  no damage. Requirement-relevant stats are returned even at no loss, so the UI can show a
  *  quiet boss-versus-you reference line for players checking whether they meet a requirement,
  *  not only when something is wrong. */
+/** The symbol's level for its loss row: the saved level when it agrees with Maxed Symbols, else
+ *  "<11" (ticked off without saved levels, or unticked in the Simulator despite a maxed save). */
+function sacredSymbolLevelText(symbol: NonNullable<BossClearResult["sacredSymbol"]>): string {
+  if (symbol.maxed) return "11";
+  return symbol.level !== null && symbol.level < 11 ? String(symbol.level) : "<11";
+}
+
 function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; lines: { label: string; bossValue: number | string; yourValue: number | string; lossPercent: number | null }[] } {
   const gaps: { label: string; bossValue: number | string; yourValue: number | string; gapDmg: number; gapCeiling: number }[] = [
     { label: "Level", bossValue: result.bossLevel, yourValue: result.characterLevel, gapDmg: result.levelGapDmg, gapCeiling: result.levelGapCeiling },
@@ -893,7 +900,7 @@ function lossBreakdown(result: BossClearResult): { combinedLossPercent: number; 
   const symbol = result.sacredSymbol;
   if (symbol) {
     gaps.push({
-      label: `${symbol.area} Symbol`, bossValue: "11", yourValue: symbol.maxed ? "11" : "<11",
+      label: `${symbol.area} Symbol`, bossValue: "11", yourValue: sacredSymbolLevelText(symbol),
       gapDmg: symbol.maxed ? symbol.boost : 1, gapCeiling: symbol.boost,
     });
   }
@@ -1135,7 +1142,11 @@ export type ScouterBookmarkView = "quickView" | "spotlight";
  *  before Maxed Symbols existed. */
 function withMaxedSymbols(inputs: BossClearInputs | undefined, character: StoredCharacterRecord, buffsOverride: StoredScouterBuffs | undefined): BossClearInputs | undefined {
   if (!inputs) return inputs;
-  return { ...inputs, sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, savedMaxedSymbols(character)) };
+  return {
+    ...inputs,
+    sacredMaxed: maxedSacredSymbols(buffsOverride ?? character.scouter?.buffs, savedMaxedSymbols(character)),
+    sacredLevels: savedSacredLevels(character) ?? undefined,
+  };
 }
 
 export default function BossClearGrid({

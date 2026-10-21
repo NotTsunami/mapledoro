@@ -54,10 +54,23 @@ export function sacredSwitchOn(maxed: readonly string[]): boolean {
   return SACRED_SYMBOL_BOSSES.filter((s) => !s.grand).every((s) => maxedSet.has(s.area));
 }
 
-/** maxedSymbolsFromLevels for a character's saved symbol levels: the in-memory record first, since
- *  a setup Finish saves it before storage, then storage. */
+type SavedSymbols = Partial<Record<string, { level?: number } | undefined>>;
+
+/** A character's saved symbol levels by region: the in-memory record first, since a setup Finish
+ *  saves it before storage, then storage. */
+function savedSymbols(character: StoredCharacterRecord): SavedSymbols | undefined {
+  type Saved = { symbols?: SavedSymbols };
+  return ((character.tools?.symbols as Saved | undefined) ?? readCharacterToolData<Saved>(character.characterName, "symbols"))?.symbols;
+}
+
+/** maxedSymbolsFromLevels for a character's saved symbol levels. */
 export function savedMaxedSymbols(character: StoredCharacterRecord): string[] | null {
-  type Saved = { symbols?: Partial<Record<string, { level?: number } | undefined>> };
-  const saved = (character.tools?.symbols as Saved | undefined) ?? readCharacterToolData<Saved>(character.characterName, "symbols");
-  return maxedSymbolsFromLevels(saved?.symbols);
+  return maxedSymbolsFromLevels(savedSymbols(character));
+}
+
+/** Saved Sacred Symbol levels by region, or null when none are saved. */
+export function savedSacredLevels(character: StoredCharacterRecord): Partial<Record<string, number>> | null {
+  const symbols = savedSymbols(character);
+  if (!symbols || !SACRED_SYMBOL_BOSSES.some((s) => symbols[s.area])) return null;
+  return Object.fromEntries(SACRED_SYMBOL_BOSSES.map((s) => [s.area, symbols[s.area]?.level ?? 0]));
 }
