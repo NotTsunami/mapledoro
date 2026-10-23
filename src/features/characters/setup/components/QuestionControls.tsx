@@ -215,21 +215,20 @@ export function ChecklistCheckbox({ label, checked, onToggle, theme, tooltip, lo
   disabled?: boolean;
 }) {
   return (
-    <div
-      role="checkbox"
-      aria-checked={checked === true}
-      aria-disabled={disabled}
-      tabIndex={disabled ? -1 : 0}
-      onClick={() => { if (!disabled) onToggle(!checked); }}
-      onKeyDown={(e) => {
-        if (!disabled && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onToggle(!checked);
-        }
-      }}
+    // A native checkbox under a <label>: the label forwards clicks to the input, but not
+    // clicks on the InfoTooltip buttons nested in it (interactive content is exempt from
+    // label activation), and unlike role="checkbox" those buttons stay exposed to AT.
+    <label
       className="checklist-row checklist-checkbox-row"
       style={{ ...checklistRowStyle(theme, "0"), display: "grid", ...(disabled ? { cursor: "default" } : {}) }}
     >
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked === true}
+        disabled={disabled}
+        onChange={() => onToggle(!checked)}
+      />
       <span style={checklistBoxStyle(theme, checked === true, disabled)}>
         {checked === true && <span style={checklistMarkStyle(disabled ? theme.muted : theme.accent)}>✓</span>}
       </span>
@@ -239,10 +238,7 @@ export function ChecklistCheckbox({ label, checked, onToggle, theme, tooltip, lo
         {tooltip && (
           <>
             {" "}
-            <span
-              style={{ display: "inline-flex", verticalAlign: "middle" }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
               <InfoTooltip content={tooltip} theme={theme} />
             </span>
           </>
@@ -250,16 +246,13 @@ export function ChecklistCheckbox({ label, checked, onToggle, theme, tooltip, lo
         {disabled && lockTooltip && (
           <>
             {" "}
-            <span
-              style={{ display: "inline-flex", verticalAlign: "middle" }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <span style={{ display: "inline-flex", verticalAlign: "middle" }}>
               <InfoTooltip content={lockTooltip} theme={theme} icon={<LockGlyph />} label="Why this is locked" bordered={false} />
             </span>
           </>
         )}
       </span>
-    </div>
+    </label>
   );
 }
 

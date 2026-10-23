@@ -557,6 +557,11 @@ textarea:focus-visible {
 .checklist-checkbox-row {
   margin-bottom: 0.15rem;
 }
+/* ChecklistCheckbox's native input is visually hidden; ring the visible box instead. */
+.checklist-checkbox-row > input:focus-visible + span {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
 @media (max-width: 860px) {
   .checklist-row {
     min-height: 44px;
