@@ -332,13 +332,14 @@ function parseDraft(raw: string, classDef: HexaClassDef): HexaDraft {
       while (result.length < len) result.push("");
       return result;
     };
+    const levelText = (v: unknown) => (typeof v === "number" || typeof v === "string" ? String(v) : "");
     const rawSlots = Array.isArray(parsed.hexaStat) ? (parsed.hexaStat as unknown[]) : [];
     return {
-      origin: clampLevelInput(String(parsed.origin ?? ""), MAX_LEVEL, 1),
+      origin: clampLevelInput(levelText(parsed.origin), MAX_LEVEL, 1),
       mastery: padBlank(parsed.mastery, classDef.mastery.length),
       enhancement: padBlank(parsed.enhancement, classDef.enhancement.length),
       common: padBlank(parsed.common, commonSkillsFor(classDef.className).length),
-      ascent: clampLevelInput(String(parsed.ascent ?? ""), MAX_LEVEL),
+      ascent: clampLevelInput(levelText(parsed.ascent), MAX_LEVEL),
       hexaStat: [parseNode(rawSlots[0]), parseNode(rawSlots[1]), parseNode(rawSlots[2])],
     };
   } catch { return empty; }

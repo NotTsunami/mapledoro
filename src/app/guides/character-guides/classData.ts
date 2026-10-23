@@ -83,9 +83,9 @@ const NUM_BLUE = "#4a9eff";
 
 /** Highlight numbers and "Lv" prefixes in blue for readability. */
 export function highlightNumbers(text: string): React.ReactNode[] {
-  const parts = text.split(/(Lv\d+|\+?\-?\d[\d,.]*%?s?)/g);
+  const parts = text.split(/(Lv\d+|\+?-?\d[\d,.]*%?s?)/g);
   return parts.map((part, i) =>
-    /\d/.test(part) || /^Lv/.test(part)
+    /\d/.test(part) || part.startsWith("Lv")
       ? React.createElement("span", { key: i, style: { color: NUM_BLUE, fontWeight: 700 } }, part)
       : React.createElement("span", { key: i }, part),
   );
@@ -96,7 +96,7 @@ export function highlightNumbers(text: string): React.ReactNode[] {
 function classSlug(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[()\/]/g, "")
+    .replace(/[()/]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 }

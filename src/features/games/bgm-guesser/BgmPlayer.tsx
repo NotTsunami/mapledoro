@@ -102,6 +102,7 @@ export default function BgmPlayer({
           .bgm-player .bgm-duration { display: none; }
         }
       `}</style>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- instrumental BGM for a guessing game; there's no speech to caption, and a track title would give the answer away */}
       <audio
         // Callback ref rather than an effect: sets the starting volume the moment
         // the element exists, without a mount-time setState.
