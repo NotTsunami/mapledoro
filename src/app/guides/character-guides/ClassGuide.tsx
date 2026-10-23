@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -171,8 +172,9 @@ function SkillImage({ skill, size }: { skill: Skill; size: number }) {
   return <FallbackImg src={resourceImageUrl("skill", skill.iconId, "icon.png")} letter={letter} size={size} />;
 }
 
-// Tooltip-triggering wrapper around any icon content. Reachable by keyboard;
-// tapping a focusable element also surfaces the tooltip on touch devices.
+// Tooltip trigger around any icon content: a real button, so it's reachable by keyboard,
+// and a tap shows the tooltip on touch (iOS doesn't focus a tapped button, so focus alone
+// wouldn't). The shared tooltip closes on an outside press, scroll, or Escape.
 function SkillTrigger({
   skill,
   className,
@@ -186,20 +188,18 @@ function SkillTrigger({
 }) {
   const tip = useTip();
   return (
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the handlers only show and hide the tooltip; this is an image, not a control
-    <span
-      className={className}
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so keyboard users can reveal the tooltip too
-      tabIndex={0}
-      role="img"
+    <button
+      type="button"
+      className={cx(styles.trigger, className)}
       aria-label={ariaLabel ?? skill.name}
       onMouseEnter={(e) => tip.show(skill, e.currentTarget)}
       onMouseLeave={tip.hide}
       onFocus={(e) => tip.show(skill, e.currentTarget)}
       onBlur={tip.hide}
+      onClick={(e) => tip.show(skill, e.currentTarget)}
     >
       {children}
-    </span>
+    </button>
   );
 }
 
@@ -634,10 +634,13 @@ function CommunityResources({ config }: { config: ClassConfig }) {
 
 export function ClassGuide({ config, theme }: { config: ClassConfig; theme: AppTheme }) {
   const [tip, setTip] = useState<TipState | null>(null);
+  // The trigger showing the tooltip, so a press anywhere else can close it.
+  const anchorRef = useRef<HTMLElement | null>(null);
 
   const api = useMemo<TipApi>(
     () => ({
       show: (skill, el) => {
+        anchorRef.current = el;
         const r = el.getBoundingClientRect();
         const cxPos = Math.max(140, Math.min(r.left + r.width / 2, window.innerWidth - 140));
         const below = r.top < 140;
@@ -653,11 +656,16 @@ export function ClassGuide({ config, theme }: { config: ClassConfig; theme: AppT
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setTip(null);
     };
+    const onPointerDown = (e: PointerEvent) => {
+      if (!anchorRef.current?.contains(e.target as Node)) setTip(null);
+    };
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
     return () => {
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
     };
   }, []);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import HoverTooltip from "../../components/HoverTooltip";
+import { Toggletip } from "../../components/Tooltip";
 import Panel from "../../components/Panel";
 import { STATUS, statusText } from "../../components/statusColors";
 import type { AppTheme } from "../../components/themes";
@@ -240,7 +240,7 @@ function TimerRowCard({ theme, row }: { theme: AppTheme; row: TimerRow }) {
   );
 }
 
-const tooltipWrapStyle: CSSProperties = { display: "block" };
+const tooltipWrapStyle: CSSProperties = { display: "block", width: "100%" };
 
 /** Ursus / daily / weekly / event countdowns in one panel. Owns its own clock so a
  *  per-second tick re-renders these rows alone, not the whole dashboard. */
@@ -252,9 +252,9 @@ export default function ResetTimersPanel({ theme }: { theme: AppTheme }) {
     <Panel theme={theme} icon="⏱" title="Timers">
       <div className="timer-rows">
         {rows.map((row) => (
-          <HoverTooltip key={row.key} theme={theme} label={row.tooltip} style={tooltipWrapStyle}>
+          <Toggletip key={row.key} theme={theme} label={row.tooltip} style={tooltipWrapStyle}>
             <TimerRowCard theme={theme} row={row} />
-          </HoverTooltip>
+          </Toggletip>
         ))}
       </div>
     </Panel>

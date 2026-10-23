@@ -6,6 +6,7 @@ import { numericKeyDown } from "../../../../lib/inputUtils";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import { Tooltip } from "../../../../components/Tooltip";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
 import { CLASS_SKILL_DATA } from "../data/classSkillData";
@@ -159,13 +160,15 @@ export function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, sec
   const secondIcon = secondIconOverride ?? entry.secondIcon;
   const resolvedAriaLabel = ariaLabel ?? entry.name;
   return (
-    <HoverTooltip label={label ?? entry.name} theme={theme}>
-      <button type="button" onClick={onToggle} aria-label={resolvedAriaLabel} aria-pressed={active} style={boolTileStyle(active, theme)}>
-        {secondIcon
-          ? <StackedBuffIcon icon={icon} secondIcon={secondIcon} thirdIcon={entry.thirdIcon} active={active} name={entry.name} theme={theme} />
-          : renderIcon(icon, 32, active, entry.name, theme)}
-      </button>
-    </HoverTooltip>
+    <Tooltip label={label ?? entry.name} theme={theme} describe={label !== undefined}>
+      {(tip) => (
+        <button type="button" {...tip} onClick={onToggle} aria-label={resolvedAriaLabel} aria-pressed={active} style={boolTileStyle(active, theme)}>
+          {secondIcon
+            ? <StackedBuffIcon icon={icon} secondIcon={secondIcon} thirdIcon={entry.thirdIcon} active={active} name={entry.name} theme={theme} />
+            : renderIcon(icon, 32, active, entry.name, theme)}
+        </button>
+      )}
+    </Tooltip>
   );
 }
 

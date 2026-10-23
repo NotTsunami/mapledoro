@@ -8,6 +8,7 @@ import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import { useTooltip } from "../../../../components/Tooltip";
 import { NavChevron } from "../../DropdownChevron";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
@@ -600,6 +601,9 @@ function FamiliarSlotCard({
   const isOpen = openId === slotId;
   const isEmpty = !slot.name;
   const displayName = slot.name.replace(/ Familiar$/i, "");
+  // The sprite sits inside this card, a control, so the card is the tooltip's trigger. The
+  // sprite's alt already names the familiar, so it adds no description.
+  const spriteTip = useTooltip(displayName, theme, false);
   const matchedEntry = FAMILIARS.find((f) => f.id === slot.familiarId);
   const cardId = matchedEntry?.cardId ?? "";
   const spriteMobId = matchedEntry?.spriteMobId ?? slot.mobId;
@@ -656,6 +660,7 @@ function FamiliarSlotCard({
       <div
         role="button"
         tabIndex={0}
+        {...(isEmpty ? {} : spriteTip.triggerProps)}
         onClick={(e) => { if (isStrayClick(e)) { return; } onOpen(); }}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
         style={cardStyle}
@@ -664,9 +669,7 @@ function FamiliarSlotCard({
           <span style={{ fontSize: 24, color: theme.muted, lineHeight: 1, fontWeight: 300 }}>+</span>
         ) : (
           <>
-            <HoverTooltip label={displayName} theme={theme}>
-              <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE} theme={theme} />
-            </HoverTooltip>
+            <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE} theme={theme} />
             {slot.tier && (
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
                 <LinePicker
@@ -699,6 +702,7 @@ function FamiliarSlotCard({
             )}
           </>
         )}
+        {!isEmpty && spriteTip.layer}
       </div>
 
       {isOpen && typeof document !== "undefined" && createPortal(

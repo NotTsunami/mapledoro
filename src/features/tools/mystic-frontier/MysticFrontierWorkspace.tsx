@@ -7,7 +7,7 @@ import { ToolHeader } from "../../../components/ToolHeader";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { CharacterSyncPanel } from "../../../components/CharacterSyncPanel";
 import { ItemIcon } from "../../../components/ResourceImage";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip } from "../../../components/Tooltip";
 import { toolStyles } from "../tool-styles";
 import { Field } from "../shared-ui";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
@@ -173,9 +173,9 @@ function EpicLineNotch({ theme }: { theme: AppTheme }) {
       <div style={notchClipStyle} aria-hidden="true">
         <div style={notchTriangleStyle} />
       </div>
-      <HoverTooltip theme={theme} label={EPIC_NOTCH_NOTE} style={notchHoverStyle}>
+      <Toggletip theme={theme} label={EPIC_NOTCH_NOTE} describe={false} style={notchHoverStyle}>
         <span role="img" aria-label={EPIC_NOTCH_NOTE} style={notchMarkStyle}>!</span>
-      </HoverTooltip>
+      </Toggletip>
     </>
   );
 }

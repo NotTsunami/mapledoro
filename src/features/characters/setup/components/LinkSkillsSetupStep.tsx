@@ -7,7 +7,7 @@ import Image from "next/image";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Tooltip } from "../../../../components/Tooltip";
 import { linkSkillsStoredToDraftString, type StoredCharacterRecord, type LinkSkillId, type LinkSkillsData } from "../../model/charactersStore";
 import { LINK_SKILLS, computeLinkSkillsFromRoster, linkSkillFloorsForCharacter, bestKnownLinkSkillFloors, type LinkSkillDef } from "../data/linkSkillsData";
 import { LINK_SKILL_TO_SCOUTER_KEY } from "../../scouter/scouterLinkSkills";
@@ -217,17 +217,20 @@ export function LinkSkillRow({
       background: theme.bg,
       ...(fullWidth ? { gridColumn: "1 / -1" } : {}),
     }}>
-      <HoverTooltip label={`Set to max (${skill.maxLevel})`} theme={theme} style={{ flexShrink: 0 }}>
-        <button
-          type="button"
-          className="link-skill-max-btn"
-          aria-label={`Set ${skill.name} to max level (${skill.maxLevel})`}
-          onClick={handleMaxClick}
-          style={flashing ? { ...linkSkillMaxButtonStyle, outline: `2px solid ${theme.accent}` } : linkSkillMaxButtonStyle}
-        >
-          <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
-        </button>
-      </HoverTooltip>
+      <Tooltip label={`Set to max (${skill.maxLevel})`} theme={theme} describe={false}>
+        {(tip) => (
+          <button
+            type="button"
+            {...tip}
+            className="link-skill-max-btn"
+            aria-label={`Set ${skill.name} to max level (${skill.maxLevel})`}
+            onClick={handleMaxClick}
+            style={{ ...linkSkillMaxButtonStyle, flexShrink: 0, ...(flashing ? { outline: `2px solid ${theme.accent}` } : {}) }}
+          >
+            <LinkSkillIcon iconId={skill.iconId} name={skill.name} theme={theme} />
+          </button>
+        )}
+      </Tooltip>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 800, color: theme.text, lineHeight: 1.2 }}>
           {skill.name}

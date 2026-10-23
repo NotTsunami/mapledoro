@@ -7,6 +7,7 @@ import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
 import WarningIcon from "../../../../components/WarningIcon";
 import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip } from "../../../../components/Tooltip";
 import { statusText } from "../../../../components/statusColors";
 import { characterExpPercent, isExpTrackingAvailable, resolveExpDelta, type ExpDelta } from "../../model/expProgress";
 
@@ -124,19 +125,19 @@ function GenderMarriageIcons({
   return (
     <span className="gender-marriage-icons" style={genderMarriageIconRowStyle}>
       {gender === "male" && (
-        <HoverTooltip theme={theme} label="Male">
-          <span aria-label="Male" style={{ color: genderSymbolColor(theme, "male"), fontSize: "1.02rem", lineHeight: 1 }}>♂</span>
-        </HoverTooltip>
+        <Toggletip theme={theme} label="Male" describe={false}>
+          <span role="img" aria-label="Male" style={{ color: genderSymbolColor(theme, "male"), fontSize: "1.02rem", lineHeight: 1 }}>♂</span>
+        </Toggletip>
       )}
       {gender === "female" && (
-        <HoverTooltip theme={theme} label="Female">
-          <span aria-label="Female" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♀</span>
-        </HoverTooltip>
+        <Toggletip theme={theme} label="Female" describe={false}>
+          <span role="img" aria-label="Female" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♀</span>
+        </Toggletip>
       )}
       {married && (
-        <HoverTooltip theme={theme} label={partnerName ? `Married to ${partnerName}` : "Married"}>
-          <span aria-label="Married" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♥</span>
-        </HoverTooltip>
+        <Toggletip theme={theme} label={partnerName ? `Married to ${partnerName}` : "Married"} describe={Boolean(partnerName)}>
+          <span role="img" aria-label="Married" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♥</span>
+        </Toggletip>
       )}
     </span>
   );
