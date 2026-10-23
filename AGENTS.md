@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MapleDoro — MapleStory community web app (character tracking, gameplay tools, live event info). All user data lives in localStorage; server-side caching uses Redis. Not affiliated with Nexon.
+MapleDoro, a MapleStory community web app. Features, local setup, and env vars (Redis, Discord webhook, Google Drive) are in `README.md`.
 
 ## Tech Stack
 
