@@ -939,6 +939,7 @@ function NewPlayersContent({ theme }: { theme: AppTheme }) {
   const toggleSection = (id: string) =>
     setProgress((prev) => {
       const next = { ...prev, [id]: !prev[id] };
+      // react-doctor-disable-next-line no-side-effect-in-state-updater-function -- project convention (see root CLAUDE.md); a replayed write stores the same value
       saveGuideProgress(next);
       return next;
     });

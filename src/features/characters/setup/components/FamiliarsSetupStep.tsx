@@ -1056,7 +1056,6 @@ export default function FamiliarsSetupStep({
     if (initialValueRef.current) return;
     if (!confirmedCharacterName) return;
     const saved = selectCharacterByIgn(readCharactersStore(), confirmedCharacterName)?.familiars as FamiliarsValue | undefined;
-    // react-doctor-disable-next-line no-pass-data-to-parent
     if (saved) onChange(JSON.stringify(saved));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
