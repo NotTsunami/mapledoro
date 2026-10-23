@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { AppTheme } from "./themes";
 
 /** Fired on `window` every time a ModalShell-based dialog opens -- see HoverTooltip.tsx,
@@ -15,28 +15,38 @@ export const MODAL_OPENED_EVENT = "mapledoro:modal-opened";
 export default function ModalShell({
   theme,
   ariaLabel,
+  labelledBy,
   onClose,
+  initialFocusRef,
   className,
   style,
   children,
 }: {
   theme: AppTheme;
-  ariaLabel: string;
+  /** Pass one: a literal name, or the id of a visible title. */
+  ariaLabel?: string;
+  labelledBy?: string;
   onClose: () => void;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
-  // Mounted fresh per session, so open once on mount. Backdrop click-to-close
-  // is a pointer-only convenience (keyboard users dismiss via Escape/cancel),
-  // so it lives here as a native listener rather than an interactive handler
-  // on the non-interactive <dialog> element.
+  // Mounted fresh per session, so open once on mount.
   useEffect(() => {
     const dlg = dialogRef.current;
-    if (!dlg) return;
-    if (!dlg.open) dlg.showModal();
+    if (!dlg) return undefined;
+    // Unmounting removes the dialog rather than close()-ing it, which skips the
+    // browser's own focus restore, so hand focus back to the opener here.
+    // A ref, set only when showModal() runs, so StrictMode's second mount pass
+    // (dialog already open, focus inside it) keeps the real opener.
+    if (!dlg.open) {
+      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dlg.showModal();
+    }
     // showModal() makes everything behind this dialog inert, so a HoverTooltip whose trigger
     // opened this same dialog stops receiving the mouse/focus events it'd normally rely on to
     // close itself, leaving its bubble stuck floating over the modal. Broadcasting this lets
@@ -46,7 +56,17 @@ export default function ModalShell({
     // ring on whatever control happens to be first (a character row, a Cancel
     // button) as if the user had tabbed to it. Focus the dialog itself instead:
     // the accessible name is still announced and Tab still walks the contents.
-    dlg.focus();
+    // A consumer can name a control to start on instead, such as a name input.
+    (initialFocusRef?.current ?? dlg).focus();
+    return () => openerRef.current?.focus();
+  }, [initialFocusRef]);
+
+  // Backdrop click-to-close is a pointer-only convenience (keyboard users
+  // dismiss via Escape/cancel), so it lives here as a native listener rather
+  // than an interactive handler on the non-interactive <dialog> element.
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!dlg) return undefined;
     const onBackdropClick = (e: MouseEvent) => {
       if (e.target === dlg) onClose();
     };
@@ -94,6 +114,7 @@ export default function ModalShell({
       tabIndex={-1}
       className={className ? `modal-shell ${className}` : "modal-shell"}
       aria-label={ariaLabel}
+      aria-labelledby={labelledBy}
       onCancel={onClose}
       style={{ ...baseStyle, ...style }}
     >

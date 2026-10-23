@@ -36,15 +36,8 @@ export function AddCharacterNameDialog({
   } = picker;
   const hasAvailable = available.length > 0;
   const styles = toolStyles(theme);
-  // Focus once on mount only — re-running this on every render would fight the
-  // user for focus (e.g. after they click away to select text elsewhere).
-  const hasAutoFocusedRef = useRef(false);
-  const focusOnce = (el: HTMLInputElement | null) => {
-    if (el && !hasAutoFocusedRef.current) {
-      hasAutoFocusedRef.current = true;
-      el.focus();
-    }
-  };
+  // Whichever name input renders takes focus when the dialog opens.
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const canProceed = Boolean(pendingName) && !nameTaken;
   const footer = (
@@ -83,7 +76,7 @@ export function AddCharacterNameDialog({
   ) : null;
 
   return (
-    <ToolDialog theme={theme} title="Add Character" onClose={onClose} footer={footer}>
+    <ToolDialog theme={theme} title="Add Character" onClose={onClose} footer={footer} initialFocusRef={inputRef}>
       <style>{`.char-pick-row:hover { border-color: ${theme.accent} !important; }`}</style>
 
       {hasAvailable ? (
@@ -113,7 +106,7 @@ export function AddCharacterNameDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canProceed) onNext();
               }}
-              ref={focusOnce}
+              ref={inputRef}
               className="tool-input"
               style={{
                 ...styles.inputStyle,
@@ -172,7 +165,7 @@ export function AddCharacterNameDialog({
           onKeyDown={(e) => {
             if (e.key === "Enter" && typedName.trim()) onNext();
           }}
-          ref={focusOnce}
+          ref={inputRef}
           className="tool-input"
           style={{ ...styles.inputStyle, width: "100%" }}
         />

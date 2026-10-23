@@ -573,6 +573,13 @@ textarea:focus-visible {
   }
 }
 
+/* ToolDialog's column layout, scoped to [open] so the closed <dialog> stays
+   display:none until showModal() runs. */
+dialog.tool-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Thin, translucent scrollbar for scroll areas inside tool dialogs. Matches
    the character-sync dropdown; theme-neutral so it reads in light and dark. */
 .tool-dialog-scroll {

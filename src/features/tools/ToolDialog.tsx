@@ -1,54 +1,24 @@
 "use client";
 
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { AppTheme } from "../../components/themes";
-import { Z } from "./zIndex";
+import ModalShell from "../../components/ModalShell";
 
-// One backdrop dim shared by every tool dialog, so multi-step flows (name then
-// tasks/bosses) don't flicker between two different opacities.
-const BACKDROP = "rgba(0,0,0,0.5)";
-
-const overlayStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: BACKDROP,
-  zIndex: Z.modal,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "1rem",
-};
-
-function panelStyle(theme: AppTheme, maxWidth: number): CSSProperties {
+function panelStyle(maxWidth: number): CSSProperties {
   return {
-    background: theme.panel,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 16,
     maxWidth,
     width: "100%",
     maxHeight: "85vh",
-    display: "flex",
-    flexDirection: "column",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
     padding: "1.5rem",
   };
 }
 
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function focusableWithin(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (el) => el.offsetParent !== null,
-  );
-}
-
 /**
- * Accessible modal shell shared by the manually-populated trackers. Real dialog
- * semantics: `role="dialog"` + `aria-modal`, Escape to close, backdrop click to
- * close, a focus trap, and focus restored to the opener on unmount. Consumers
- * supply the title, optional description, body, and footer actions; the body
- * region flexes and scrolls (wrap it in `.tool-dialog-scroll`).
+ * Titled modal shared by the manually-populated trackers, built on ModalShell's native
+ * <dialog> (focus trap, Escape, backdrop click, inert background). Consumers supply the
+ * title, optional description, body, and footer actions; the body region flexes and
+ * scrolls (wrap it in `.tool-dialog-scroll`). `initialFocusRef` names the control to
+ * focus on open, such as a name input; otherwise the dialog itself takes focus.
  */
 export function ToolDialog({
   theme,
@@ -58,6 +28,7 @@ export function ToolDialog({
   footer,
   children,
   maxWidth = 600,
+  initialFocusRef,
 }: {
   theme: AppTheme;
   title: ReactNode;
@@ -66,90 +37,39 @@ export function ToolDialog({
   footer: ReactNode;
   children: ReactNode;
   maxWidth?: number;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const titleId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return undefined;
-    const opener = document.activeElement as HTMLElement | null;
-
-    // Move focus into the dialog unless a child already claimed it (e.g. an
-    // input that focuses itself on mount).
-    if (!panel.contains(document.activeElement)) {
-      (focusableWithin(panel)[0] ?? panel).focus();
-    }
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const focusables = focusableWithin(panel);
-      if (focusables.length === 0) {
-        e.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === panel)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      opener?.focus();
-    };
-  }, [onClose]);
 
   return (
-    // react-doctor-disable-next-line no-static-element-interactions, click-events-have-key-events -- backdrop dismissal is a pointer-only convenience; keyboard users close with Escape (handled above), and per ARIA APG the backdrop must stay out of the tab order rather than announce itself as a control
-    <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={overlayStyle}
+    <ModalShell
+      theme={theme}
+      labelledBy={titleId}
+      onClose={onClose}
+      initialFocusRef={initialFocusRef}
+      className="tool-dialog"
+      style={panelStyle(maxWidth)}
     >
       <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        style={panelStyle(theme, maxWidth)}
+        id={titleId}
+        style={{
+          fontFamily: "var(--font-heading)",
+          fontSize: "1.15rem",
+          color: theme.text,
+          marginBottom: description ? "0.25rem" : "1rem",
+        }}
       >
-        <div
-          id={titleId}
-          style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: "1.15rem",
-            color: theme.text,
-            marginBottom: description ? "0.25rem" : "1rem",
-          }}
-        >
-          {title}
-        </div>
-        {description && (
-          <div style={{ fontSize: "0.75rem", color: theme.muted, marginBottom: "1rem" }}>
-            {description}
-          </div>
-        )}
-        {children}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-          {footer}
-        </div>
+        {title}
       </div>
-    </div>
+      {description && (
+        <div style={{ fontSize: "0.75rem", color: theme.muted, marginBottom: "1rem" }}>
+          {description}
+        </div>
+      )}
+      {children}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+        {footer}
+      </div>
+    </ModalShell>
   );
 }
