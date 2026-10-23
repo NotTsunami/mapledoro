@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import type { AppTheme } from "../../../components/themes";
 import { ProgressBar } from "../../../components/ProgressBar";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip, Tooltip } from "../../../components/Tooltip";
 import ConfirmModal from "../../../components/ConfirmModal";
 import { SkillIcon } from "./hexa-ui";
 import { fmtNum } from "./hexa-format";
@@ -169,21 +169,23 @@ function GuideTile({ step, rank, theme, onClick }: { step: GuideStep; rank: numb
   // button: clicking it would "mark as done" something the tracker doesn't hold a level for.
   if (step.kind === "hexaStat") {
     return (
-      <HoverTooltip theme={theme} label={<GuideTip step={step} rank={rank} theme={theme} />}>
+      <Toggletip theme={theme} label={<GuideTip step={step} rank={rank} theme={theme} />}>
         <div style={tileStyle}>
           <SkillIcon iconId={step.iconId} iconUrl={step.iconUrl} name={step.name} theme={theme} />
           <span style={{ ...guideLevelText, color: theme.muted }}>Stat</span>
         </div>
-      </HoverTooltip>
+      </Toggletip>
     );
   }
 
   return (
-    <HoverTooltip theme={theme} label={<GuideTip step={step} rank={rank} theme={theme} />}>
-      <button type="button" onClick={onClick} style={tileStyle}>
-        {body}
-      </button>
-    </HoverTooltip>
+    <Tooltip theme={theme} label={<GuideTip step={step} rank={rank} theme={theme} />}>
+      {(tip) => (
+        <button {...tip} type="button" onClick={onClick} style={tileStyle}>
+          {body}
+        </button>
+      )}
+    </Tooltip>
   );
 }
 

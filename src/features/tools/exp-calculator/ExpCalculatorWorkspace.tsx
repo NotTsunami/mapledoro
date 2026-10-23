@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CharacterDropdown } from "../../../components/CharacterSyncPanel";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip, Tooltip } from "../../../components/Tooltip";
 import { ErdaSkillIcon, ItemIcon, MarkIcon, MobSprite, SkillIcon } from "../../../components/ResourceImage";
 import { SegmentedToggle } from "../../../components/SegmentedToggle";
 import type { AppTheme } from "../../../components/themes";
@@ -711,17 +711,20 @@ function BuffsTab({
           {ADDITIVE_BUFF_GROUP.buffs.map((buff) => {
             const selected = Boolean(buffs.additive[buff.id]);
             return (
-              <HoverTooltip key={buff.id} theme={theme} label={buff.label}>
-                <button
-                  type="button"
-                  aria-label={buff.label}
-                  aria-pressed={selected}
-                  onClick={() => updateBuffs((state) => toggleAdditiveBuff(state, buff, !selected))}
-                  style={dailyTileStyle(theme, selected)}
-                >
-                  <BuffIcon icon={buff.icon} label={buff.label} />
-                </button>
-              </HoverTooltip>
+              <Tooltip key={buff.id} theme={theme} label={buff.label} announce="none">
+                {(tip) => (
+                  <button
+                    {...tip}
+                    type="button"
+                    aria-label={buff.label}
+                    aria-pressed={selected}
+                    onClick={() => updateBuffs((state) => toggleAdditiveBuff(state, buff, !selected))}
+                    style={dailyTileStyle(theme, selected)}
+                  >
+                    <BuffIcon icon={buff.icon} label={buff.label} />
+                  </button>
+                )}
+              </Tooltip>
             );
           })}
         </div>
@@ -1239,21 +1242,24 @@ function AllInOneTab({ theme, imported }: { theme: AppTheme; imported: ImportedF
               // react-doctor-disable-next-line js-set-map-lookups -- dailyIds is the player's pick from DAILY_EXP_CONTENT's 17 entries, checked once per tile per render; a Set per render would cost more than the scan.
               const selected = input.dailyIds.includes(daily.id);
               return (
-                <HoverTooltip
+                <Tooltip
                   key={daily.id}
                   theme={theme}
                   label={<TileTooltipLabel theme={theme} title={daily.label} detail={`Lv. ${daily.minLevel}`} />}
-                >
-                  <button
-                    type="button"
-                    aria-label={`${daily.label} (Lv. ${daily.minLevel})`}
-                    aria-pressed={selected}
-                    onClick={() => toggleDaily(daily.id)}
-                    style={dailyTileStyle(theme, selected)}
-                  >
-                    <BuffIcon icon={daily.icon} label={daily.label} />
-                  </button>
-                </HoverTooltip>
+                 announce="none">
+                  {(tip) => (
+                    <button
+                      {...tip}
+                      type="button"
+                      aria-label={`${daily.label} (Lv. ${daily.minLevel})`}
+                      aria-pressed={selected}
+                      onClick={() => toggleDaily(daily.id)}
+                      style={dailyTileStyle(theme, selected)}
+                    >
+                      <BuffIcon icon={daily.icon} label={daily.label} />
+                    </button>
+                  )}
+                </Tooltip>
               );
             })}
           </div>
@@ -1997,11 +2003,11 @@ function IconLevelTile({
   const active = value > 0;
   return (
     <div style={levelTileStyle(theme, active)}>
-      <HoverTooltip theme={theme} label={tooltip}>
+      <Toggletip theme={theme} label={tooltip}>
         <div style={tileIconStyle(active)}>
           <BuffIcon icon={icon} label={ariaLabel} />
         </div>
-      </HoverTooltip>
+      </Toggletip>
       <ToolNumberInput
         className="tool-input no-spinner"
         min={0}
@@ -2058,22 +2064,25 @@ function ExpNodeTile({
   onToggle: () => void;
 }) {
   return (
-    <HoverTooltip theme={theme} label={<TileTooltipLabel theme={theme} title={tile.label} detail={tile.detail} />}>
-      <button
-        type="button"
-        aria-label={tile.label}
-        aria-pressed={selected}
-        onClick={onToggle}
-        style={{ ...levelTileStyle(theme, selected), font: "inherit", cursor: "pointer" }}
-      >
-        <div style={tileIconStyle(selected)}>
-          <BuffIcon icon={tile.icon} label={tile.label} />
-        </div>
-        <span style={{ fontSize: "0.75rem", fontWeight: 800, padding: "4px 0", color: selected ? theme.accentText : theme.muted }}>
-          {tile.short}
-        </span>
-      </button>
-    </HoverTooltip>
+    <Tooltip theme={theme} label={<TileTooltipLabel theme={theme} title={tile.label} detail={tile.detail} />}>
+      {(tip) => (
+        <button
+          {...tip}
+          type="button"
+          aria-label={tile.label}
+          aria-pressed={selected}
+          onClick={onToggle}
+          style={{ ...levelTileStyle(theme, selected), font: "inherit", cursor: "pointer" }}
+        >
+          <div style={tileIconStyle(selected)}>
+            <BuffIcon icon={tile.icon} label={tile.label} />
+          </div>
+          <span style={{ fontSize: "0.75rem", fontWeight: 800, padding: "4px 0", color: selected ? theme.accentText : theme.muted }}>
+            {tile.short}
+          </span>
+        </button>
+      )}
+    </Tooltip>
   );
 }
 

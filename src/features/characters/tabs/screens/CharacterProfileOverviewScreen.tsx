@@ -41,7 +41,7 @@ import { isRebootWorld, rebootFinalDamageBonusPercent } from "../../setup/data/r
 import { TIER_COLORS as IA_TIER_COLORS, TIER_COLORS as FAMILIAR_TIER_COLORS, FAMILIARS, familiarStatBonuses, type FamiliarStatBonus, type FamiliarTier } from "../../setup/data/familiarsData";
 import { statusText } from "../../../../components/statusColors";
 import { ItemIcon } from "../../../../components/ResourceImage";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip, Tooltip } from "../../../../components/Tooltip";
 import ScouterFigure from "../../scouter/ScouterFigure";
 import ScouterEngineNotice from "../../scouter/ScouterEngineNotice";
 import { useScouterResult, type ScouterErrorReason } from "../../scouter/useScouterResult";
@@ -160,18 +160,21 @@ function BookmarkPageHeader({ theme, label, onEdit, disabled, extraAction }: {
         {extraAction}
       </div>
       {onEdit !== null && (
-        <HoverTooltip label={`Edit ${label}`} theme={theme}>
-          <button
-            type="button"
-            className="tap-target-44"
-            aria-label={`Edit ${label}`}
-            disabled={disabled}
-            onClick={onEdit}
-            style={pencilButtonStyle(theme)}
-          >
-            <PencilIcon />
-          </button>
-        </HoverTooltip>
+        <Tooltip label={`Edit ${label}`} theme={theme} announce="none">
+          {(tip) => (
+            <button
+              {...tip}
+              type="button"
+              className="tap-target-44"
+              aria-label={`Edit ${label}`}
+              disabled={disabled}
+              onClick={onEdit}
+              style={pencilButtonStyle(theme)}
+            >
+              <PencilIcon />
+            </button>
+          )}
+        </Tooltip>
       )}
     </div>
   );
@@ -292,18 +295,21 @@ function BiographyBlock({ theme, icon, label, caption, filled, onClick, disabled
 }) {
   return (
     <div style={biographyBlockStyle(theme, filled)}>
-      <HoverTooltip label={`Edit ${label}`} theme={theme} style={{ position: "absolute", top: 8, right: 8 }}>
-        <button
-          type="button"
-          className="tap-target-44"
-          aria-label={`Edit ${label}`}
-          disabled={disabled}
-          onClick={onClick}
-          style={pencilButtonStyle(theme)}
-        >
-          <PencilIcon />
-        </button>
-      </HoverTooltip>
+      <Tooltip label={`Edit ${label}`} theme={theme} announce="none">
+        {(tip) => (
+          <button
+            {...tip}
+            type="button"
+            className="tap-target-44"
+            aria-label={`Edit ${label}`}
+            disabled={disabled}
+            onClick={onClick}
+            style={{ ...pencilButtonStyle(theme), position: "absolute", top: 8, right: 8 }}
+          >
+            <PencilIcon />
+          </button>
+        )}
+      </Tooltip>
       <div style={{ color: filled ? theme.accentText : theme.muted }}>{icon}</div>
       <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}>{label}</div>
       <div style={{ fontSize: 13, color: theme.muted }}>{caption}</div>
@@ -478,11 +484,13 @@ function WseSlot({ label, item, theme, onNavigate }: {
 }) {
   const name = item?.name;
   return (
-    <HoverTooltip label={name ? `${label}: ${name}` : `${label}: not set up`} theme={theme}>
-      <button type="button" onClick={onNavigate} style={wseSlotButtonStyle(theme, Boolean(item))}>
-        {item?.id ? <ItemIcon id={item.id} size={36} /> : <span style={{ fontSize: 12, fontWeight: 800, color: theme.muted }}>{label[0]}</span>}
-      </button>
-    </HoverTooltip>
+    <Tooltip label={name ? `${label}: ${name}` : `${label}: not set up`} theme={theme} announce="name">
+      {(tip) => (
+        <button {...tip} type="button" onClick={onNavigate} style={wseSlotButtonStyle(theme, Boolean(item))}>
+          {item?.id ? <ItemIcon id={item.id} size={36} /> : <span style={{ fontSize: 12, fontWeight: 800, color: theme.muted }}>{label[0]}</span>}
+        </button>
+      )}
+    </Tooltip>
   );
 }
 
@@ -618,18 +626,22 @@ function OverviewGroupHeader({ label, theme, onNavigate, bookmarkLabel, toolHref
 }) {
   return (
     <div style={overviewGroupHeaderRowStyle(theme)}>
-      <HoverTooltip label={`View in ${bookmarkLabel} bookmark`} theme={theme}>
-        <button type="button" onClick={onNavigate} style={overviewGroupHeaderButtonStyle(theme)}>
-          {label}
-          <span aria-hidden="true" style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 700, lineHeight: 1 }}>›</span>
-        </button>
-      </HoverTooltip>
+      <Tooltip label={`View in ${bookmarkLabel} bookmark`} theme={theme}>
+        {(tip) => (
+          <button {...tip} type="button" onClick={onNavigate} style={overviewGroupHeaderButtonStyle(theme)}>
+            {label}
+            <span aria-hidden="true" style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 700, lineHeight: 1 }}>›</span>
+          </button>
+        )}
+      </Tooltip>
       {toolHref && (
-        <HoverTooltip label={`Open in ${toolLabel ?? label}`} theme={theme}>
-          <Link href={toolHref} aria-label={`Open in ${toolLabel ?? label}`} style={overviewToolLinkStyle(theme)}>
-            <OverviewToolLinkIcon />
-          </Link>
-        </HoverTooltip>
+        <Tooltip label={`Open in ${toolLabel ?? label}`} theme={theme} announce="none">
+          {(tip) => (
+            <Link {...tip} href={toolHref} aria-label={`Open in ${toolLabel ?? label}`} style={overviewToolLinkStyle(theme)}>
+              <OverviewToolLinkIcon />
+            </Link>
+          )}
+        </Tooltip>
       )}
     </div>
   );
@@ -756,7 +768,7 @@ const overviewLevelBadgeStyle: CSSProperties = {
 function OverviewLevelTile({ icon, name, level, theme }: { icon: ReactNode; name: string; level: number; theme: Theme }) {
   const active = level > 0;
   return (
-    <HoverTooltip label={name} theme={theme}>
+    <Toggletip label={name} theme={theme}>
       <div style={{
         position: "relative", width: OVERVIEW_TILE_SIZE, height: OVERVIEW_TILE_SIZE, flexShrink: 0,
         borderRadius: 8, border: `1px solid ${active ? theme.accent : theme.border}`, background: theme.bg,
@@ -766,7 +778,7 @@ function OverviewLevelTile({ icon, name, level, theme }: { icon: ReactNode; name
         {icon}
         {active && <div style={overviewLevelBadgeStyle}>{level}</div>}
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 
@@ -1014,7 +1026,7 @@ function OverviewFamiliarTile({ slot, theme }: { slot: StoredFamiliarSlot; theme
     </>
   ) : "Empty";
   return (
-    <HoverTooltip label={tooltipLabel} theme={theme}>
+    <Toggletip label={tooltipLabel} theme={theme} announce="name">
       <div style={{
         width: OVERVIEW_FAMILIAR_TILE_SIZE, height: OVERVIEW_FAMILIAR_TILE_SIZE, flexShrink: 0,
         borderRadius: 8, border: `1px solid ${tier ? FAMILIAR_TIER_COLORS[tier].border : theme.border}`, background: theme.bg,
@@ -1026,7 +1038,7 @@ function OverviewFamiliarTile({ slot, theme }: { slot: StoredFamiliarSlot; theme
           <span style={{ fontSize: 12, fontWeight: 800, color: theme.muted }}>?</span>
         )}
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 
@@ -1303,16 +1315,19 @@ function OverviewBookmark({ model, onNavigateToBookmark, onNavigateToGearSlot, o
     <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: theme.text }}>Overview</h3>
-        <HoverTooltip label="Customize Layout" theme={theme}>
-          <button
-            type="button"
-            aria-label="Customize Layout"
-            onClick={() => setCustomizing(true)}
-            style={pencilButtonStyle(theme)}
-          >
-            <CustomizeLayoutIcon />
-          </button>
-        </HoverTooltip>
+        <Tooltip label="Customize Layout" theme={theme} announce="none">
+          {(tip) => (
+            <button
+              {...tip}
+              type="button"
+              aria-label="Customize Layout"
+              onClick={() => setCustomizing(true)}
+              style={pencilButtonStyle(theme)}
+            >
+              <CustomizeLayoutIcon />
+            </button>
+          )}
+        </Tooltip>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>

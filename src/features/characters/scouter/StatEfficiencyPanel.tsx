@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { AppTheme } from "../../../components/themes";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip } from "../../../components/Tooltip";
 import { clampNumber } from "../../../lib/inputUtils";
 import { critRateToCritDmg } from "../../tools/stat-optimizer/scouter-class-data";
 import type { StoredCharacterRecord } from "../model/charactersStore";
@@ -62,7 +62,7 @@ function Section({ theme, heading, caption, children }: {
 /* Within a column, one shared 3-track grid for its rows (source | meter | answer) rather than
    a tile each: the sources and answers are different lengths, so per-row boxes came out ragged
    and put every meter at a different width and offset. Each row is a subgrid spanning all 3
-   tracks, the same pattern (and the same reason for setting gridColumn on the HoverTooltip
+   tracks, the same pattern (and the same reason for setting gridColumn on the Toggletip
    wrapper) as BossClearGrid's SpotlightTile. */
 const comparisonGridStyle: CSSProperties = {
   display: "grid",
@@ -99,10 +99,10 @@ function emphasisBandStyle(row: MainEfficiencyRow, theme: AppTheme): CSSProperti
 
 function ComparisonRow({ theme, row, isLast }: { theme: AppTheme; row: MainEfficiencyRow; isLast: boolean }) {
   return (
-    <HoverTooltip
+    <Toggletip
       theme={theme}
       label={row.hint}
-      style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid" }}
+      style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", width: "100%" }}
     >
       <div style={{ ...comparisonRowStyle, borderBottom: isLast ? "none" : `1px solid ${theme.border}` }}>
         <span style={{ ...sourceCellStyle, color: theme.text }}>{row.source}</span>
@@ -114,7 +114,7 @@ function ComparisonRow({ theme, row, isLast }: { theme: AppTheme; row: MainEffic
           {row.value} <span style={{ color: theme.muted, fontWeight: 700 }}>{row.unit}</span>
         </span>
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 

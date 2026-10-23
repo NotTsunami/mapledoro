@@ -9,7 +9,7 @@ import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip, useTooltip } from "../../../../components/Tooltip";
 import type { SetupStepDefinition } from "../steps";
 import CharacterAvatar from "../../tabs/components/CharacterAvatar";
 import SetupStepFrame from "./SetupStepFrame";
@@ -194,7 +194,7 @@ const pickerItemStyle = (theme: AppTheme, isCurrent: boolean, isHighlighted: boo
   fontSize: "0.8rem", fontWeight: 600, color: theme.text, textAlign: "left",
 });
 
-// Deliberately no opacity on this container: it wraps a HoverTooltip bubble (a real DOM
+// Deliberately no opacity on this container: it wraps a tooltip bubble (a real DOM
 // child, not a native title), and CSS opacity compounds onto descendants, so a dimmed tile
 // renders its own tooltip washed out on hover. Locked already reads as distinct via the
 // icon's own dimming (below), the muted "Lv X+" badge, and the missing input.
@@ -592,16 +592,21 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
   picker?: ReactNode;
 }) {
   const { ref: wrapperRef, portalRef } = usePickerCoords(isActive, PICKER_WIDTH);
+  // The item name is already in the button's aria-label, so the tooltip adds no description.
+  // Its handlers run alongside the slot's own hover and focus styling, and only once filled.
+  const tip = useTooltip(item?.name, theme, "none");
+  const tipProps = item ? tip.triggerProps : null;
   const button = (
     <button
       type="button"
+      ref={tipProps?.ref}
       data-slot={slotKey}
       aria-label={item ? `${SLOT_LABELS[slotKey]}: ${item.name}` : `Set ${SLOT_LABELS[slotKey]}`}
       onClick={(e) => { e.stopPropagation(); if (isStrayClick(e)) { return; } onClick(); }}
-      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.borderColor = `${theme.accent}88`; }}
-      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.borderColor = theme.border; }}
-      onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-      onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
+      onMouseEnter={(e) => { tipProps?.onMouseEnter(); if (!isActive) e.currentTarget.style.borderColor = `${theme.accent}88`; }}
+      onMouseLeave={(e) => { tipProps?.onMouseLeave(); if (!isActive) e.currentTarget.style.borderColor = theme.border; }}
+      onFocus={(e) => { tipProps?.onFocus(e); e.currentTarget.style.outlineColor = theme.accent; }}
+      onBlur={(e) => { tipProps?.onBlur(e); e.currentTarget.style.outlineColor = "transparent"; }}
       style={slotCellStyle(theme, isActive)}
     >
       {item ? (
@@ -615,7 +620,8 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
   );
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: SLOT_SIZE, flexShrink: 0 }}>
-      {item ? <HoverTooltip label={item.name} theme={theme}>{button}</HoverTooltip> : button}
+      {button}
+      {item && tip.layer}
       {isActive && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
@@ -649,7 +655,7 @@ export function ReadOnlySlotTile({ slotKey, item, theme }: {
       )}
     </div>
   );
-  return item ? <HoverTooltip label={item.name} theme={theme}>{box}</HoverTooltip> : box;
+  return item ? <Toggletip label={item.name} theme={theme} announce="none">{box}</Toggletip> : box;
 }
 
 /** Read-only counterpart to SymbolLevelTile for the profile Gear bookmark. Same icon tile,
@@ -678,14 +684,15 @@ export function ReadOnlySymbolTile({ area, level, theme, locked, loadImage = tru
   const label = locked ? `Lv. ${area.requiredLevel}+` : `Lv. ${level}`;
   const iconOpacity = symbolTileIconOpacity(locked, placed);
   return (
-    <HoverTooltip label={area.name} theme={theme}>
+    // The icon's alt names the area; without the image only "Lv. N" is left, so describe it.
+    <Toggletip label={area.name} theme={theme} announce={loadImage ? "none" : "description"}>
       <div style={readOnlySymbolTileStyle(theme, locked)}>
         <div style={{ opacity: iconOpacity, filter: locked ? "grayscale(1)" : "none", lineHeight: 0 }}>
           {loadImage ? <EquipItemIcon id={area.itemId} name={area.name} theme={theme} size={32} /> : <div style={{ width: 32, height: 32 }} />}
         </div>
         <span style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "0.8rem", color: placed ? theme.text : theme.muted }}>{label}</span>
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 
@@ -735,11 +742,11 @@ function SymbolLevelTile({ area, level, maxLevel, theme, onLevel }: {
   const placed = (Number(level) || 0) >= 1;
   return (
     <div style={symbolTileStyle(theme, placed)}>
-      <HoverTooltip label={area.name} theme={theme}>
+      <Toggletip label={area.name} theme={theme} announce="none">
         <div style={{ opacity: placed ? 1 : 0.3, filter: placed ? "none" : "grayscale(1)", lineHeight: 0, cursor: "pointer" }}>
           <EquipItemIcon id={area.itemId} name={area.name} theme={theme} size={32} />
         </div>
-      </HoverTooltip>
+      </Toggletip>
       <input
         type="text"
         inputMode="numeric"

@@ -9,7 +9,7 @@ import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import { alpha } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip } from "../../../../components/Tooltip";
 import WarningIcon from "../../../../components/WarningIcon";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
@@ -263,7 +263,7 @@ function SkillIconBadge({ skill, theme, size = 32, style }: { skill: BuffSkill; 
     <div style={{ width: size, height: size, borderRadius: "6px", background: theme.border }} />
   );
   return (
-    <HoverTooltip
+    <Toggletip
       label={<>
         <div>{skill.skillName}</div>
         <div style={{ color: theme.muted, fontWeight: 600, fontStyle: "italic" }}>{formatJobAdvancement(skill.jobAdvancement)}</div>
@@ -296,7 +296,7 @@ function SkillIconBadge({ skill, theme, size = 32, style }: { skill: BuffSkill; 
           </div>
         </>
       ) : placeholder}
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 

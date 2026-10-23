@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip } from "../../../../components/Tooltip";
 import type { ExpDelta } from "../../model/expProgress";
 
 function formatPercent(value: number): string {
@@ -29,8 +29,8 @@ export default function ExpDeltaBadge({ theme, delta, fontSize = "0.75rem" }: { 
   );
   if (delta.levelDelta <= 0) return badge;
   return (
-    <HoverTooltip theme={theme} label={`+${delta.levelDelta} Lv`}>
+    <Toggletip theme={theme} label={`+${delta.levelDelta} Lv`}>
       {badge}
-    </HoverTooltip>
+    </Toggletip>
   );
 }

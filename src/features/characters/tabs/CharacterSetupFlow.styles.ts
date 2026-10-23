@@ -1063,7 +1063,7 @@ export function getCharacterSetupFlowStyles(theme: AppTheme) {
         }
         /* 1 row on desktop so content vertically centers in a single-row-tall box (align-items:
            center on .spotlight-tile handles the centering itself); 2 rows on mobile since the
-           wrapped layout below needs the full 2-row height. Applies to both the HoverTooltip
+           wrapped layout below needs the full 2-row height. Applies to both the Toggletip
            wrapper and its inner div -- both carry this class (see SpotlightTile). */
         .spotlight-tile {
           grid-row: span 1;

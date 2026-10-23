@@ -6,7 +6,6 @@ import { secondaryButtonStyle } from "../components/uiStyles";
 import CharacterAvatar from "../components/CharacterAvatar";
 import RefreshSpinnerIcon from "../components/RefreshSpinnerIcon";
 import WarningIcon from "../../../../components/WarningIcon";
-import HoverTooltip from "../../../../components/HoverTooltip";
 import { Toggletip } from "../../../../components/Tooltip";
 import { statusText } from "../../../../components/statusColors";
 import { characterExpPercent, isExpTrackingAvailable, resolveExpDelta, type ExpDelta } from "../../model/expProgress";
@@ -125,17 +124,17 @@ function GenderMarriageIcons({
   return (
     <span className="gender-marriage-icons" style={genderMarriageIconRowStyle}>
       {gender === "male" && (
-        <Toggletip theme={theme} label="Male" describe={false}>
+        <Toggletip theme={theme} label="Male" announce="none">
           <span role="img" aria-label="Male" style={{ color: genderSymbolColor(theme, "male"), fontSize: "1.02rem", lineHeight: 1 }}>♂</span>
         </Toggletip>
       )}
       {gender === "female" && (
-        <Toggletip theme={theme} label="Female" describe={false}>
+        <Toggletip theme={theme} label="Female" announce="none">
           <span role="img" aria-label="Female" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♀</span>
         </Toggletip>
       )}
       {married && (
-        <Toggletip theme={theme} label={partnerName ? `Married to ${partnerName}` : "Married"} describe={Boolean(partnerName)}>
+        <Toggletip theme={theme} label={partnerName ? `Married to ${partnerName}` : "Married"} announce={partnerName ? "description" : "none"}>
           <span role="img" aria-label="Married" style={{ color: genderSymbolColor(theme, "female"), fontSize: "1.02rem", lineHeight: 1 }}>♥</span>
         </Toggletip>
       )}
@@ -160,9 +159,9 @@ function ExpPercentIndicator({ theme, percent, delta }: { theme: SearchPaneModel
   );
   if (!delta) return content;
   return (
-    <HoverTooltip theme={theme} label={expDeltaTooltipLabel(theme, delta)}>
+    <Toggletip theme={theme} label={expDeltaTooltipLabel(theme, delta)}>
       {content}
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 
@@ -249,8 +248,9 @@ export default function CharacterProfileScreen({
         <div className="confirmed-summary-info">
           {/* Name centered as the sole flex child; gender/marriage icons are absolutely
               positioned off its right edge (same pattern as the Level/% row below) so their
-              width doesn't pull the name itself off-center. A div, not a <p> -- HoverTooltip
-              (inside GenderMarriageIcons) renders a <div>, invalid inside a <p>. textAlign
+              width doesn't pull the name itself off-center. A div, not a <p> -- the Toggletips
+              (inside GenderMarriageIcons) carry their label, which can be block content, and a
+              block is invalid inside a <p>. textAlign
               (on top of the flex justifyContent, which only centers the name+icons span as
               a whole box) is what actually centers the icons once they wrap onto their own
               line below the name on a narrow viewport (.gender-marriage-icons switches to
@@ -270,8 +270,8 @@ export default function CharacterProfileScreen({
           <p style={{ margin: 0, width: "100%", fontSize: "0.95rem", color: theme.muted, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
             {resolveDisplayJobName(profile.confirmedCharacter.jobName)}
           </p>
-          {/* A div, not a <p> -- HoverTooltip (inside ExpPercentIndicator) renders a <div>,
-              which isn't valid inside a <p> and causes a hydration mismatch. */}
+          {/* A div, not a <p> -- the Toggletip inside ExpPercentIndicator carries its label,
+              which can be block content, and a block inside a <p> causes a hydration mismatch. */}
           <div style={{ margin: 0, width: "100%", fontSize: "0.95rem", color: theme.muted, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
             Level {profile.confirmedCharacter.level}
           </div>

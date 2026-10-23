@@ -3,7 +3,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { AppTheme } from "./themes";
 
-/** Fired on `window` every time a ModalShell-based dialog opens -- see HoverTooltip.tsx,
+/** Fired on `window` every time a ModalShell-based dialog opens -- see Tooltip.tsx,
  *  which listens for this to force-close a bubble stuck open by its own trigger. */
 export const MODAL_OPENED_EVENT = "mapledoro:modal-opened";
 
@@ -47,10 +47,10 @@ export default function ModalShell({
       openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       dlg.showModal();
     }
-    // showModal() makes everything behind this dialog inert, so a HoverTooltip whose trigger
+    // showModal() makes everything behind this dialog inert, so a tooltip whose trigger
     // opened this same dialog stops receiving the mouse/focus events it'd normally rely on to
     // close itself, leaving its bubble stuck floating over the modal. Broadcasting this lets
-    // HoverTooltip force-close on any modal open without ModalShell needing to know it exists.
+    // tooltips force-close on any modal open without ModalShell needing to know it exists.
     window.dispatchEvent(new Event(MODAL_OPENED_EVENT));
     // showModal() focuses the first focusable descendant, which paints a focus
     // ring on whatever control happens to be first (a character row, a Cancel

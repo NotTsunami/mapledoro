@@ -7,8 +7,7 @@ import { isInsidePicker, usePickerCoords } from "../../../../lib/usePickerCoords
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
-import HoverTooltip from "../../../../components/HoverTooltip";
-import { useTooltip } from "../../../../components/Tooltip";
+import { Toggletip, useTooltip } from "../../../../components/Tooltip";
 import { NavChevron } from "../../DropdownChevron";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
@@ -602,8 +601,8 @@ function FamiliarSlotCard({
   const isEmpty = !slot.name;
   const displayName = slot.name.replace(/ Familiar$/i, "");
   // The sprite sits inside this card, a control, so the card is the tooltip's trigger. The
-  // sprite's alt already names the familiar, so it adds no description.
-  const spriteTip = useTooltip(displayName, theme, false);
+  // sprite itself is decorative (empty alt), so the familiar's name becomes the card's name.
+  const spriteTip = useTooltip(displayName, theme, "name");
   const matchedEntry = FAMILIARS.find((f) => f.id === slot.familiarId);
   const cardId = matchedEntry?.cardId ?? "";
   const spriteMobId = matchedEntry?.spriteMobId ?? slot.mobId;
@@ -800,15 +799,16 @@ function FamiliarSlotCard({
   );
 }
 
-// Wrapped in HoverTooltip (only once a line is actually set) so a truncated potential line
+// Wrapped in a Toggletip (only once a line is actually set) so a truncated potential line
 // can still be read in full on hover/tap, matching the sprite/badge tooltips already on this card.
+// The chip's own text is the full line, so the tooltip adds nothing for screen readers.
 function ReadOnlyLineChip({ value, theme }: { value: string; theme: AppTheme }) {
   const chip = (
     <div style={{ ...lineSelectStyle, borderColor: theme.border, background: theme.bg, color: value ? theme.text : theme.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
       {value || "—"}
     </div>
   );
-  return value ? <HoverTooltip label={value} theme={theme}>{chip}</HoverTooltip> : chip;
+  return value ? <Toggletip label={value} theme={theme} announce="none">{chip}</Toggletip> : chip;
 }
 
 /** Read-only counterpart to FamiliarSlotCard for the profile Familiars bookmark. Same sprite
@@ -835,20 +835,20 @@ export function ReadOnlyFamiliarSlotCard({ slot, theme }: { slot: StoredFamiliar
   const sprite = tier ? (
     // flex: 1 so the sprite grows to fill whatever vertical room the card has past the chips
     // below it, instead of sitting at a fixed size with dead space under it. position: relative
-    // plus the HoverTooltip wrapper below pinned via inset: 0 rather than width/height: 100%.
+    // plus the Toggletip wrapper below pinned via inset: 0 rather than width/height: 100%.
     // .hover-tip is inline-flex and shrink-wraps its own box, so percentage sizing chained
     // through it is circular, with it and FamiliarCardSprite's fill mode each waiting on the
     // other's size. Absolute positioning sidesteps that, since inset: 0 sizes directly off
     // this div's real box however that box's size was determined.
     <div style={{ flex: 1, minHeight: 0, width: "100%", position: "relative" }}>
-      <HoverTooltip label={displayName} theme={theme} style={{ position: "absolute", inset: 0 }}>
+      <Toggletip label={displayName} theme={theme} announce="name" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
         <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} fill theme={theme} />
-      </HoverTooltip>
+      </Toggletip>
     </div>
   ) : (
-    <HoverTooltip label={displayName} theme={theme}>
+    <Toggletip label={displayName} theme={theme} announce="name">
       <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={FAM_CARD_SIZE_READONLY} theme={theme} />
-    </HoverTooltip>
+    </Toggletip>
   );
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1037,7 +1037,7 @@ export function ReadOnlyBadgeSlot({ badge, theme }: { badge: string; theme: AppT
       )}
     </div>
   );
-  return badge ? <HoverTooltip label={badge} theme={theme}>{pentagon}</HoverTooltip> : pentagon;
+  return badge ? <Toggletip label={badge} theme={theme} announce="none">{pentagon}</Toggletip> : pentagon;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────

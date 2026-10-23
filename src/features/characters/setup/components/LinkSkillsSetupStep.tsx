@@ -217,7 +217,7 @@ export function LinkSkillRow({
       background: theme.bg,
       ...(fullWidth ? { gridColumn: "1 / -1" } : {}),
     }}>
-      <Tooltip label={`Set to max (${skill.maxLevel})`} theme={theme} describe={false}>
+      <Tooltip label={`Set to max (${skill.maxLevel})`} theme={theme} announce="none">
         {(tip) => (
           <button
             type="button"

@@ -664,14 +664,14 @@ dialog.tool-dialog[open] {
 }
 
 /* Hover/tap/focus tooltip bubble: portalled to document.body (position: fixed, JS-computed
-   coordinates in HoverTooltip.tsx) so it isn't clipped by an ancestor's overflow:hidden.
+   coordinates in Tooltip.tsx) so it isn't clipped by an ancestor's overflow:hidden.
    Visibility is conditional rendering, not CSS toggling; shape/typography here, position
    and colors inline. */
 /* inline-flex, not the block default -- a bare block div stretches to its parent's full
    width whenever nothing else in that context constrains it (e.g. ReadOnlySlotTile sitting
    directly in a plain <div>), which throws off the bubble's horizontal centering in
-   HoverTooltip.tsx (computed from this wrapper's own midpoint). inline-flex always
-   shrink-wraps to the wrapped icon/button instead, regardless of surrounding context. */
+   Tooltip.tsx (computed from the Toggletip's own midpoint). inline-flex always
+   shrink-wraps to the wrapped icon instead, regardless of surrounding context. */
 .hover-tip {
   position: relative;
   display: inline-flex;

@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type Ref } from "react";
+import { useImperativeHandle, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { useMounted } from "../../../../lib/useMounted";
 import { useScrollEdges, edgeFadeMask } from "../../../../lib/useScrollEdges";
 import { WORLD_NAMES } from "../../model/constants";
@@ -21,12 +21,9 @@ import type { AppTheme } from "../../../../components/themes";
 import { statusText } from "../../../../components/statusColors";
 import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
 import CharacterAvatar, { FALLBACK_SRC } from "../components/CharacterAvatar";
+import { Toggletip, Tooltip } from "../../../../components/Tooltip";
 
 type LegionSection = "artifact" | "linkSkills";
-
-// Module-level so useSyncExternalStore gets a stable reference: an inline arrow would be a
-// new function every render and make it resubscribe each time.
-const emptySubscribe = () => () => undefined;
 
 // Lets the header's Save button (see LegionPanel) trigger whichever *EditPanel is
 // currently mounted, without lifting its local draft state up out of the component
@@ -117,22 +114,19 @@ function ArtifactStatRow({ theme, label, level, wasted, wastedCrystals, value }:
     </>
   ) : undefined;
   const wastedPlural = wasted === 1 ? "" : "s";
-  const wastedAriaLabel = wastedCrystals?.length
-    ? `${wasted} level${wastedPlural} wasted. ${wastedCrystals.join(", ")} have this stat assigned. Reassign these to stop wasting levels.`
-    : undefined;
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${theme.border}` }}>
       <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         {level !== undefined && wasted && wastedCrystals?.length ? (
-          <HoverTooltip
+          <LegionTip
             theme={theme}
             label={`${wasted} level${wastedPlural} wasted`}
             sublabel={wastedSublabel}
-            ariaLabel={wastedAriaLabel}
             wrapSublabel
+            announce="description"
           >
             {levelBadge}
-          </HoverTooltip>
+          </LegionTip>
         ) : (level !== undefined && levelBadge)}
         <span style={{ fontSize: 12, color: theme.muted }}>{label}</span>
       </span>
@@ -201,12 +195,12 @@ function CrystalTile({ theme, index, def, crystal, unlocked }: {
     .filter((name): name is string => Boolean(name));
 
   return (
-    <HoverTooltip theme={theme} label={def.name} sublabel={statNames.join(" · ")} wrapperStyle={{ width: "100%" }}>
+    <LegionTip theme={theme} label={def.name} sublabel={statNames.join(" · ")} style={{ width: "100%" }}>
       <div className="legion-crystal-tile" style={crystalTileStyle(theme, true)}>
         <CrystalPips level={level} theme={theme} />
         <CrystalIcon src={iconSrc} name={def.name} theme={theme} />
       </div>
-    </HoverTooltip>
+    </LegionTip>
   );
 }
 
@@ -416,104 +410,31 @@ function LegionArtifactSection({ theme, worldId, editing, onEditDone, editorRef 
   );
 }
 
-// Centered above the trigger and shrink-wrapped to its own text (not the setup wizard's
-// InfoTooltip popup, which is left-anchored and fixed-width for its own "?" button
-// context), nudging sideways via shiftX only when centering would clip past the
-// viewport edge, same idea as InfoTooltip's own edge-avoidance but centered by default.
-function hoverTooltipPopupStyle(theme: AppTheme, shiftX: number, wrapSublabel?: boolean): CSSProperties {
-  return {
-    position: "absolute", bottom: "calc(100% + 0.4rem)", left: "50%",
-    transform: `translateX(calc(-50% + ${shiftX}px))`,
-    zIndex: 200, background: theme.bg, border: `1px solid ${theme.border}`,
-    borderRadius: 10, padding: "0.4rem 0.6rem",
-    width: wrapSublabel ? 220 : "max-content", maxWidth: "calc(100vw - 16px)",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.15)", textAlign: "center",
-  };
-}
-
-function HoverTooltip({ theme, label, sublabel, ariaLabel, wrapSublabel, wrapperStyle, children }: {
-  theme: AppTheme; label: string; sublabel?: ReactNode; ariaLabel?: string; wrapSublabel?: boolean;
-  wrapperStyle?: CSSProperties; children: ReactNode;
+// A bold label over an optional muted sublabel, in the shared Toggletip. By default the
+// label and sublabel name the trigger, since its content is an image or a bare badge;
+// pass announce="description" when the content's own text is the better name.
+function LegionTip({ theme, label, sublabel, wrapSublabel, announce = "name", style, children }: {
+  theme: AppTheme; label: string; sublabel?: ReactNode; wrapSublabel?: boolean;
+  announce?: "description" | "name"; style?: CSSProperties; children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const [shiftX, setShiftX] = useState(0);
-  // Touch devices have no hover at all, so mouseenter/mouseleave never fire there,
-  // so fall back to tap-to-toggle instead. Hover support doesn't change mid-session for
-  // any real device this app needs to support. Read via useSyncExternalStore (not a lazy
-  // useState initializer) since this value feeds an unconditional inline style below. A
-  // plain useState would seed the server's `false` and never reconcile it against the
-  // client's real value, causing a hydration mismatch on hover-capable devices.
-  const supportsHover = useSyncExternalStore(
-    emptySubscribe,
-    () => typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches,
-    () => false,
-  );
-  const containerRef = useRef<HTMLDivElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const container = containerRef.current;
-    const popup = popupRef.current;
-    if (!container || !popup) return;
-    const margin = 8;
-    const centerX = container.getBoundingClientRect().left + container.offsetWidth / 2;
-    const halfPopup = popup.offsetWidth / 2;
-    if (centerX - halfPopup < margin) {
-      setShiftX(margin - (centerX - halfPopup));
-    } else if (centerX + halfPopup > window.innerWidth - margin) {
-      setShiftX(window.innerWidth - margin - (centerX + halfPopup));
-    } else {
-      setShiftX(0);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (supportsHover || !open) return;
-    function handleOutsideTap(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutsideTap);
-    return () => document.removeEventListener("mousedown", handleOutsideTap);
-  }, [supportsHover, open]);
-
-  const triggerProps = supportsHover
-    ? { onMouseEnter: () => setOpen(true), onMouseLeave: () => setOpen(false) }
-    : { onClick: () => setOpen((o) => !o) };
-
-  return (
-    <div
-      ref={containerRef}
-      role="button"
-      tabIndex={0}
-      aria-label={ariaLabel ?? (typeof sublabel === "string" ? `${label}, ${sublabel}` : label)}
-      style={{ position: "relative", display: "inline-flex", cursor: supportsHover ? "default" : "pointer", minWidth: 0, ...wrapperStyle }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); }
-      }}
-      {...triggerProps}
-    >
-      {children}
-      {open && (
-        <div
-          ref={popupRef}
-          style={hoverTooltipPopupStyle(theme, shiftX, wrapSublabel)}
-        >
-          <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 800, color: theme.text, whiteSpace: "nowrap" }}>{label}</p>
-          {sublabel && (
-            <p style={{ margin: 0, marginTop: "0.1rem", fontSize: "0.75rem", color: theme.muted, whiteSpace: wrapSublabel ? "normal" : "nowrap" }}>{sublabel}</p>
-          )}
-        </div>
+  const content = (
+    <span style={{ display: "flex", flexDirection: "column", alignItems: "center", whiteSpace: "normal" }}>
+      <span style={{ fontSize: "0.8rem", fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+      {sublabel && (
+        <span style={{ marginTop: "0.1rem", fontWeight: 600, color: theme.muted, whiteSpace: wrapSublabel ? "normal" : "nowrap" }}>{sublabel}</span>
       )}
-    </div>
+    </span>
+  );
+  return (
+    <Toggletip theme={theme} label={content} announce={announce} style={{ minWidth: 0, ...style }}>
+      {children}
+    </Toggletip>
   );
 }
 
 function MissingCharacterSlot({ theme, size }: { theme: AppTheme; size: number }) {
   return (
-    <HoverTooltip theme={theme} label="No tracked character">
+    <LegionTip theme={theme} label="No tracked character">
       <div style={{ width: size, height: size, opacity: 0.6 }}>
         <CharacterAvatar
           src={FALLBACK_SRC}
@@ -523,7 +444,7 @@ function MissingCharacterSlot({ theme, size }: { theme: AppTheme; size: number }
           style={{ objectFit: "contain", objectPosition: "center bottom" }}
         />
       </div>
-    </HoverTooltip>
+    </LegionTip>
   );
 }
 
@@ -538,7 +459,7 @@ function SpriteRow({ theme, characters, missingCount, size }: {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 }}>
       {characters.map((c) => (
-        <HoverTooltip key={c.characterName} theme={theme} label={c.characterName} sublabel={`Lv. ${c.level}`}>
+        <LegionTip key={c.characterName} theme={theme} label={c.characterName} sublabel={`Lv. ${c.level}`}>
           <div style={{ width: size, height: size, flexShrink: 0 }}>
             <CharacterAvatar
               src={c.characterImgURL}
@@ -548,7 +469,7 @@ function SpriteRow({ theme, characters, missingCount, size }: {
               style={{ objectFit: "contain", objectPosition: "center bottom" }}
             />
           </div>
-        </HoverTooltip>
+        </LegionTip>
       ))}
       {Array.from({ length: missingCount }, (_, i) => (
         // react-doctor-disable-next-line no-array-index-as-key -- interchangeable placeholder slots, no identity to key on
@@ -849,11 +770,13 @@ export default function LegionPanel({ theme, worldId, worldCharacters, onBack }:
         {section === "artifact" && (editing
           ? <button type="button" onClick={() => editorRef.current?.save()} style={saveButtonStyle(theme)}>Save</button>
           : (
-            <HoverTooltip label={`Edit ${sectionLabel}`} theme={theme}>
-              <button type="button" aria-label={`Edit ${sectionLabel}`} onClick={() => setEditing(true)} style={pencilButtonStyle(theme)}>
-                <PencilIcon />
-              </button>
-            </HoverTooltip>
+            <Tooltip label={`Edit ${sectionLabel}`} theme={theme} announce="none">
+              {(tip) => (
+                <button {...tip} type="button" aria-label={`Edit ${sectionLabel}`} onClick={() => setEditing(true)} style={pencilButtonStyle(theme)}>
+                  <PencilIcon />
+                </button>
+              )}
+            </Tooltip>
           ))}
       </div>
 

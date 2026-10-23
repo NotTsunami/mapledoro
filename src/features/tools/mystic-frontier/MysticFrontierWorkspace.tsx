@@ -173,7 +173,7 @@ function EpicLineNotch({ theme }: { theme: AppTheme }) {
       <div style={notchClipStyle} aria-hidden="true">
         <div style={notchTriangleStyle} />
       </div>
-      <Toggletip theme={theme} label={EPIC_NOTCH_NOTE} describe={false} style={notchHoverStyle}>
+      <Toggletip theme={theme} label={EPIC_NOTCH_NOTE} announce="none" style={notchHoverStyle}>
         <span role="img" aria-label={EPIC_NOTCH_NOTE} style={notchMarkStyle}>!</span>
       </Toggletip>
     </>

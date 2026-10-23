@@ -9,7 +9,7 @@ import { bossDifficultyIconUrl, bossSplashUrl } from "../../../lib/mapleResource
 import { searchAndRank } from "../../../lib/searchMatch";
 import { useKeyboardListNav } from "../../../lib/useKeyboardListNav";
 import { useScrollEdges, edgeFadeMask } from "../../../lib/useScrollEdges";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip, Tooltip } from "../../../components/Tooltip";
 import { PillGroup } from "../../tools/shared-ui";
 import { usePickerCoords } from "../../../lib/usePickerCoords";
 import { DropdownChevron, NavChevron } from "../DropdownChevron";
@@ -296,17 +296,20 @@ function openSimulatorButtonStyle(theme: AppTheme, active: boolean): React.CSSPr
 }
 function OpenSimulatorButton({ theme, simulated, onOpen }: { theme: AppTheme; simulated: boolean; onOpen: () => void }) {
   return (
-    <HoverTooltip theme={theme} label={simulated ? "Edit your custom stats set." : "Preview your HEXA with custom stats set."}>
-      <button
-        type="button"
-        className="tool-btn"
-        aria-pressed={simulated}
-        onClick={onOpen}
-        style={openSimulatorButtonStyle(theme, simulated)}
-      >
-        {simulated ? "Edit Simulator" : "Simulator"}
-      </button>
-    </HoverTooltip>
+    <Tooltip theme={theme} label={simulated ? "Edit your custom stats set." : "Preview your HEXA with custom stats set."}>
+      {(tip) => (
+        <button
+          type="button"
+          {...tip}
+          className="tool-btn"
+          aria-pressed={simulated}
+          onClick={onOpen}
+          style={openSimulatorButtonStyle(theme, simulated)}
+        >
+          {simulated ? "Edit Simulator" : "Simulator"}
+        </button>
+      )}
+    </Tooltip>
   );
 }
 
@@ -355,7 +358,7 @@ function chipTagColor(theme: AppTheme, status: PillStatus): string {
 
 // Sectioned, left-aligned tooltip content. The default hover-tip-bubble CSS centers short
 // one-line labels, which suits those but turns a multi-row breakdown into an unscannable wall
-// of centered text, so this overrides text-align through HoverTooltip's style prop. Difficulty
+// of centered text, so this overrides text-align on its own wrapper. Difficulty
 // and clear percent are left out, since both are already visible on the chip being hovered.
 // Below 1,000 the HEXA scale stops meaning anything (a low-end boss can need almost none).
 function formatMinimumHexa(hexa: number): string {
@@ -442,7 +445,7 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
 }) {
   const tagColor = chipTagColor(theme, pillStatus(result.colorTier));
   return (
-    <HoverTooltip
+    <Toggletip
       theme={theme}
       label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
     >
@@ -460,7 +463,7 @@ function DifficultyChip({ theme, iconId, displayName, entry, result }: {
           <span style={{ fontSize: 12, fontWeight: 700, color: theme.muted }}>{formatClearPercent(result)}</span>
         </div>
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 
@@ -560,7 +563,7 @@ function PowerStripItem({ theme, label, value, sub, realValue, fdEquiv, scouterV
       {/* Value and delta stack rather than sit side by side, so a figure and its delta never
           have to share one line inside a 2-column strip at 360px. The tooltip wraps only the
           figure, sized to it, so its bubble opens over the number rather than the whole cell. */}
-      {tooltip === null ? figure : <HoverTooltip theme={theme} label={tooltip} style={{ alignSelf: "flex-start" }}>{figure}</HoverTooltip>}
+      {tooltip === null ? figure : <Toggletip theme={theme} label={tooltip} style={{ alignSelf: "flex-start" }}>{figure}</Toggletip>}
       {realValue !== undefined && <PowerStripDelta theme={theme} value={value} realValue={realValue} />}
       {fdEquiv != null && <PowerStripFdEquiv theme={theme} pct={fdEquiv} />}
     </div>
@@ -946,7 +949,7 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
 }) {
   const tagColor = chipTagColor(theme, pillStatus(result.colorTier));
   return (
-    <HoverTooltip
+    <Toggletip
       theme={theme}
       // `.hover-tip` is inline-flex and shrink-wraps its own box by default (see globals.css,
       // and FamiliarsSetupStep.tsx's sprite for the same issue), so without an explicit
@@ -956,7 +959,7 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
       // vertically in a one-row box, and 2 rows on mobile where it wraps. An inline gridRow
       // would beat the container query that switches between them.
       className="spotlight-tile"
-      style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", gridTemplateRows: "subgrid" }}
+      style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", gridTemplateRows: "subgrid", width: "100%" }}
       label={<ChipTooltipContent theme={theme} difficulty={entry.difficulty} result={result} />}
     >
       <div
@@ -999,7 +1002,7 @@ function SpotlightTile({ theme, iconId, displayName, entry, result }: {
           </span>
         </span>
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
 

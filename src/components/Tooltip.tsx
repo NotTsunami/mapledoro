@@ -25,6 +25,7 @@ function isHoverCapable(): boolean {
 type TriggerProps = {
   ref: (el: HTMLElement | null) => void;
   "aria-describedby"?: string;
+  "aria-labelledby"?: string;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onFocus: (e: FocusEvent<HTMLElement>) => void;
@@ -32,24 +33,32 @@ type TriggerProps = {
 };
 
 /**
+ * How assistive tech hears the label: as the trigger's description (the default, for text
+ * that adds to its name), as its name (for a trigger with none of its own, like a decorative
+ * sprite), or not at all (when its name already says the same thing).
+ */
+type Announce = "description" | "name" | "none";
+
+/**
  * The bubble both trigger kinds share, and the hook a component calls to make one of its
- * own controls the trigger: spread `triggerProps` onto it and render `layer` beside it. Shows on hover (fine pointers), on keyboard focus,
- * or while `tapOpen` is set by a Toggletip tap. Closes on Escape, scroll, an outside press,
- * or any ModalShell opening (its showModal() turns the trigger inert mid-interaction).
+ * own controls the trigger: spread `triggerProps` onto it and render `layer` beside it.
+ * Shows on hover (fine pointers), on keyboard focus, or while `tapOpen` is set by a
+ * Toggletip tap. Closes on Escape, scroll, an outside press, or any ModalShell opening (its
+ * showModal() turns the trigger inert mid-interaction).
  *
  * The bubble portals to document.body (position: fixed) so `overflow` ancestors can't clip
  * it, or into the trigger's open <dialog>, whose top layer would otherwise cover it. It is
- * aria-hidden: assistive tech gets the same text from a hidden description the trigger
+ * aria-hidden: assistive tech gets the same text from a hidden element the trigger
  * references, which exists before the bubble does, so it's announced on focus.
  */
-export function useTooltip(label: ReactNode, theme: AppTheme, describe = true) {
+export function useTooltip(label: ReactNode, theme: AppTheme, announce: Announce = "description") {
   const [hoverOpen, setHoverOpen] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
   const [tapOpen, setTapOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
-  const descriptionId = useId();
+  const labelId = useId();
   const open = hoverOpen || focusOpen || tapOpen;
 
   const setTrigger = useCallback((el: HTMLElement | null) => { triggerRef.current = el; }, []);
@@ -106,7 +115,8 @@ export function useTooltip(label: ReactNode, theme: AppTheme, describe = true) {
 
   const triggerProps: TriggerProps = {
     ref: setTrigger,
-    "aria-describedby": describe ? descriptionId : undefined,
+    "aria-describedby": announce === "description" ? labelId : undefined,
+    "aria-labelledby": announce === "name" ? labelId : undefined,
     onMouseEnter: () => {
       if (!isHoverCapable()) return;
       measure();
@@ -123,7 +133,7 @@ export function useTooltip(label: ReactNode, theme: AppTheme, describe = true) {
 
   const layer = (
     <>
-      {describe && <span id={descriptionId} hidden>{label}</span>}
+      {announce !== "none" && <span id={labelId} hidden>{label}</span>}
       {open && pos && createPortal(
         <div
           ref={clampBubble}
@@ -157,21 +167,21 @@ export function useTooltip(label: ReactNode, theme: AppTheme, describe = true) {
 
 /**
  * Tooltip for a control that already exists: spread the props onto that control and it
- * becomes the trigger, describing itself with `label`. Its own click does its own thing,
- * so there's no tap toggle. Pass `describe={false}` when the control's accessible name
- * already says the same thing, so screen readers don't hear it twice.
+ * becomes the trigger. Its own click does its own thing, so there's no tap toggle. Pass
+ * `announce="none"` when the control's accessible name already says the same thing, so
+ * screen readers don't hear it twice.
  *
  *   <Tooltip theme={theme} label="Copy preset">
  *     {(tip) => <button type="button" {...tip} onClick={copy}>…</button>}
  *   </Tooltip>
  */
-export function Tooltip({ label, theme, describe = true, children }: {
+export function Tooltip({ label, theme, announce = "description", children }: {
   label: ReactNode;
   theme: AppTheme;
-  describe?: boolean;
+  announce?: Announce;
   children: (triggerProps: TriggerProps) => ReactNode;
 }) {
-  const { triggerProps, layer } = useTooltip(label, theme, describe);
+  const { triggerProps, layer } = useTooltip(label, theme, announce);
   return (
     <>
       {children(triggerProps)}
@@ -191,19 +201,20 @@ const toggletipStyle: CSSProperties = {
 
 /**
  * Tooltip for content that isn't a control (an icon, a glyph, a status row): wraps it in
- * a real <button> so it's reachable by keyboard and tappable on touch. The content stays
- * the button's name and `label` its description. Never nest one inside another control;
- * give that control a Tooltip instead.
+ * a real <button> so it's reachable by keyboard and tappable on touch. The content's own
+ * text or alt is the button's name; use `announce="name"` when the content has none (a
+ * decorative sprite), so the label names it instead. Never nest one inside another
+ * control; give that control a Tooltip instead.
  */
-export function Toggletip({ label, theme, describe = true, className, style, children }: {
+export function Toggletip({ label, theme, announce = "description", className, style, children }: {
   label: ReactNode;
   theme: AppTheme;
-  describe?: boolean;
+  announce?: Announce;
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
 }) {
-  const { triggerProps, layer, toggleOnTap } = useTooltip(label, theme, describe);
+  const { triggerProps, layer, toggleOnTap } = useTooltip(label, theme, announce);
   return (
     <button
       type="button"

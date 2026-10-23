@@ -5,7 +5,6 @@ import Image from "next/image";
 import { numericKeyDown } from "../../../../lib/inputUtils";
 import { resourceImageUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
-import HoverTooltip from "../../../../components/HoverTooltip";
 import { Tooltip } from "../../../../components/Tooltip";
 import type { SetupStepDefinition } from "../steps";
 import type { SetupFlowId } from "../flows";
@@ -160,7 +159,7 @@ export function BoolBuffTile({ entry, active, onToggle, theme, iconOverride, sec
   const secondIcon = secondIconOverride ?? entry.secondIcon;
   const resolvedAriaLabel = ariaLabel ?? entry.name;
   return (
-    <Tooltip label={label ?? entry.name} theme={theme} describe={label !== undefined}>
+    <Tooltip label={label ?? entry.name} theme={theme} announce={label === undefined ? "none" : "description"}>
       {(tip) => (
         <button type="button" {...tip} onClick={onToggle} aria-label={resolvedAriaLabel} aria-pressed={active} style={boolTileStyle(active, theme)}>
           {secondIcon
@@ -186,7 +185,7 @@ export function MaxedSymbolTiles({ theme, selected, onToggle }: {
       {SACRED_SYMBOL_BOSSES.map((symbol) => {
         const active = selected[symbol.area] ?? false;
         return (
-          <HoverTooltip
+          <Tooltip
             key={symbol.area}
             theme={theme}
             label={
@@ -197,10 +196,12 @@ export function MaxedSymbolTiles({ theme, selected, onToggle }: {
               </div>
             }
           >
-            <button type="button" onClick={() => onToggle(symbol.area)} aria-label={`${symbol.area} symbol at Lv. 11`} aria-pressed={active} style={boolTileStyle(active, theme)}>
-              {renderIcon({ kind: "item", id: symbol.itemId }, 32, active, symbol.area, theme)}
-            </button>
-          </HoverTooltip>
+            {(tip) => (
+              <button {...tip} type="button" onClick={() => onToggle(symbol.area)} aria-label={`${symbol.area} symbol at Lv. 11`} aria-pressed={active} style={boolTileStyle(active, theme)}>
+                {renderIcon({ kind: "item", id: symbol.itemId }, 32, active, symbol.area, theme)}
+              </button>
+            )}
+          </Tooltip>
         );
       })}
     </div>
@@ -354,7 +355,7 @@ export default function BuffsSetupStep({
               />
             ))}
             {/* Advanced Stat Potion — always tier X (+30), tooltip lists all class stats */}
-            <HoverTooltip
+            <Tooltip
               label={(() => {
                 const stats = classMainStats.length > 0 ? classMainStats : [primaryStat];
                 return (
@@ -374,18 +375,21 @@ export default function BuffsSetupStep({
               })()}
               theme={theme}
             >
-              <button
-                type="button"
-                onClick={toggleStatPotion}
-                aria-label="Advanced Stat Potion (Tier X)"
-                aria-pressed={statPotionActive}
-                style={boolTileStyle(statPotionActive, theme)}
-              >
-                <div style={{ opacity: statPotionActive ? 1 : 0.32, filter: statPotionActive ? "none" : "grayscale(1)", lineHeight: 0, display: "flex" }}>
-                  <BuffIconImage icon={{ kind: "item", id: statPotionTier10.itemId }} name={statPotionTier10.name} theme={theme} size={32} />
-                </div>
-              </button>
-            </HoverTooltip>
+              {(tip) => (
+                <button
+                  {...tip}
+                  type="button"
+                  onClick={toggleStatPotion}
+                  aria-label="Advanced Stat Potion (Tier X)"
+                  aria-pressed={statPotionActive}
+                  style={boolTileStyle(statPotionActive, theme)}
+                >
+                  <div style={{ opacity: statPotionActive ? 1 : 0.32, filter: statPotionActive ? "none" : "grayscale(1)", lineHeight: 0, display: "flex" }}>
+                    <BuffIconImage icon={{ kind: "item", id: statPotionTier10.itemId }} name={statPotionTier10.name} theme={theme} size={32} />
+                  </div>
+                </button>
+              )}
+            </Tooltip>
             {ungroupedBools.slice(statPotionInsertIdx).map((b) => (
               <BoolBuffTile
                 key={b.id}

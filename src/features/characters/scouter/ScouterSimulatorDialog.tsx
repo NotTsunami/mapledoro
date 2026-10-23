@@ -4,7 +4,7 @@ import { useState, type CSSProperties, type KeyboardEvent } from "react";
 import ModalShell from "../../../components/ModalShell";
 import { dialogBtnColors, dialogPrimaryBtnColors, type AppTheme } from "../../../components/themes";
 import { statusText } from "../../../components/statusColors";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Tooltip } from "../../../components/Tooltip";
 import { ItemIcon } from "../../../components/ResourceImage";
 import { PillGroup } from "../../tools/shared-ui";
 import { sanitizeDigitsInput, sanitizeDecimalInput, numericKeyDown, decimalKeyDown, clampNumber } from "../../../lib/inputUtils";
@@ -183,13 +183,15 @@ function BuffsTab({ theme, draft, onChange, primaryStat, jobName }: {
         <p style={sectionLabelStyle(theme)}>Buffs</p>
         <div style={tileRowStyle()}>
           {UNGROUPED_BUFFS.slice(0, STAT_POTION_INSERT_IDX).map(renderBuffTile)}
-          <HoverTooltip theme={theme} label={`${statTier10.name} (Tier X)`}>
-            <button type="button" onClick={toggleStatPotion} aria-label="Advanced Stat Potion (Tier X)" aria-pressed={statPotionTier > 0} style={boolTileStyle(statPotionTier > 0, theme)}>
-              <div style={{ opacity: statPotionTier > 0 ? 1 : 0.32, filter: statPotionTier > 0 ? "none" : "grayscale(1)", lineHeight: 0 }}>
-                <BuffIconImage icon={{ kind: "item", id: statTier10.itemId }} name={statTier10.name} theme={theme} size={32} />
-              </div>
-            </button>
-          </HoverTooltip>
+          <Tooltip theme={theme} label={`${statTier10.name} (Tier X)`}>
+            {(tip) => (
+              <button type="button" {...tip} onClick={toggleStatPotion} aria-label="Advanced Stat Potion (Tier X)" aria-pressed={statPotionTier > 0} style={boolTileStyle(statPotionTier > 0, theme)}>
+                <div style={{ opacity: statPotionTier > 0 ? 1 : 0.32, filter: statPotionTier > 0 ? "none" : "grayscale(1)", lineHeight: 0 }}>
+                  <BuffIconImage icon={{ kind: "item", id: statTier10.itemId }} name={statTier10.name} theme={theme} size={32} />
+                </div>
+              </button>
+            )}
+          </Tooltip>
           {UNGROUPED_BUFFS.slice(STAT_POTION_INSERT_IDX).map(renderBuffTile)}
         </div>
       </div>

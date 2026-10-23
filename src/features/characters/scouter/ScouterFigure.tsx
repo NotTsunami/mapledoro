@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { AppTheme } from "../../../components/themes";
-import HoverTooltip from "../../../components/HoverTooltip";
+import { Toggletip } from "../../../components/Tooltip";
 import { statusText } from "../../../components/statusColors";
 import type { StoredCharacterRecord } from "../model/charactersStore";
 import InfoTooltip, { type TooltipContent } from "../setup/components/InfoTooltip";
@@ -118,11 +118,11 @@ export default function ScouterFigure({ character, theme, simulator }: { charact
         <span style={betaTagStyle(theme)}>Beta</span>
         <InfoTooltip content={SCOUTER_INFO} theme={theme} />
       </div>
-      <HoverTooltip label={tooltip} theme={theme}>
+      <Toggletip label={tooltip} theme={theme}>
         <div style={{ fontSize: 20, fontWeight: 800, color: valueColor, lineHeight: 1, fontFamily: "var(--font-heading)" }}>
           {value}
         </div>
-      </HoverTooltip>
+      </Toggletip>
     </div>
   );
 }

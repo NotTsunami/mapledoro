@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { numericKeyDown } from "../../../../lib/inputUtils";
 import type { AppTheme } from "../../../../components/themes";
-import HoverTooltip from "../../../../components/HoverTooltip";
+import { Toggletip } from "../../../../components/Tooltip";
 
 const leveledIconTileStyle = (theme: AppTheme, active: boolean): CSSProperties => ({
   width: 68, flexShrink: 0,
@@ -50,11 +50,11 @@ export function LeveledIconTile({ icon, name, level, onLevel, max, min = 0, them
   const active = (Number.parseInt(level || "0", 10) || 0) > 0;
   return (
     <div style={leveledIconTileStyle(theme, active)}>
-      <HoverTooltip label={name} theme={theme}>
+      <Toggletip label={name} theme={theme} announce="name">
         <div style={{ opacity: active ? 1 : 0.35, filter: active ? "none" : "grayscale(1)", lineHeight: 0 }}>
           {icon}
         </div>
-      </HoverTooltip>
+      </Toggletip>
       <input
         type="number"
         inputMode="numeric"
@@ -86,7 +86,7 @@ export function ReadOnlyLeveledIconTile({ icon, name, level, max, theme }: {
 }) {
   const active = level > 0;
   return (
-    <HoverTooltip label={name} theme={theme}>
+    <Toggletip label={name} theme={theme}>
       <div style={readOnlyLeveledIconTileStyle(theme)}>
         <div style={{ opacity: active ? 1 : 0.35, filter: active ? "none" : "grayscale(1)", lineHeight: 0 }}>
           {icon}
@@ -95,6 +95,6 @@ export function ReadOnlyLeveledIconTile({ icon, name, level, max, theme }: {
           {level}/{max}
         </span>
       </div>
-    </HoverTooltip>
+    </Toggletip>
   );
 }
