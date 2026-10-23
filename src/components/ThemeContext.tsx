@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, use, useEffect, useMemo, type ReactNode } from "react";
-import { ACCENT_THEMES, composeTheme, type AppTheme, type ColorMode } from "./themes";
+import { ACCENT_THEMES, composeTheme, themeCssVars, type AppTheme, type ColorMode } from "./themes";
 import { usePersistedThemeKey } from "./usePersistedThemeKey";
 import { usePersistedColorMode } from "./usePersistedColorMode";
 
@@ -37,12 +37,14 @@ export function ThemeProvider({
 
   const theme = composeTheme(themeKey, colorMode);
 
-  // Keep the <html> background and color-scheme (both set server-side in
-  // layout.tsx) in sync with theme changes.
+  // Keep the <html> background, color-scheme and --theme-* variables (all set
+  // server-side in layout.tsx) in sync with theme changes.
   useEffect(() => {
-    document.documentElement.style.background = theme.bg;
-    document.documentElement.style.colorScheme = theme.colorMode;
-  }, [theme.bg, theme.colorMode]);
+    const root = document.documentElement.style;
+    root.background = theme.bg;
+    root.colorScheme = theme.colorMode;
+    for (const [name, value] of Object.entries(themeCssVars(theme))) root.setProperty(name, value);
+  }, [theme]);
 
   const value = useMemo(
     () => ({ themeKey, theme, setThemeKey, colorMode, setColorMode }),

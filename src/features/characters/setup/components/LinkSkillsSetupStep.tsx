@@ -135,7 +135,7 @@ const linkSkillMaxButtonStyle: CSSProperties = {
   borderRadius: "8px",
   cursor: "pointer",
   display: "flex",
-  outline: "2px solid transparent",
+  outline: "2px solid var(--focus-ring, transparent)",
   outlineOffset: "1px",
   transition: "outline-color 0.15s ease",
 };
@@ -151,7 +151,7 @@ const linkLevelInputStyle = (theme: AppTheme): CSSProperties => ({
   fontWeight: 700,
   padding: "0.25rem 0.35rem",
   textAlign: "center",
-  outline: "2px solid transparent",
+  outline: "2px solid var(--focus-ring, transparent)",
   outlineOffset: "2px",
   transition: "outline-color 0.15s ease",
 });
@@ -257,9 +257,7 @@ export function LinkSkillRow({
             if (!isNaN(n) && n > skill.maxLevel) { onUpdate(skill.id, String(skill.maxLevel)); return; }
             onUpdate(skill.id, sanitized);
           }}
-          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
           onBlur={(e) => {
-            e.currentTarget.style.outlineColor = "transparent";
             const raw = e.currentTarget.value;
             if (raw === "") return;
             const parsed = parseInt(raw, 10);

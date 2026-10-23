@@ -36,6 +36,11 @@ const menuStyle = (theme: AppTheme, openAbove: boolean): CSSProperties => ({
   boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
 });
 
+function menuItemBackground(theme: AppTheme, active: boolean, disabled: boolean): string {
+  if (disabled) return "none";
+  return active ? `${theme.accent}18` : "var(--hover-bg, none)";
+}
+
 function menuItemStyle(theme: AppTheme, active: boolean, disabled: boolean): CSSProperties {
   const activeColor = active ? theme.accent : theme.text;
   return {
@@ -45,7 +50,7 @@ function menuItemStyle(theme: AppTheme, active: boolean, disabled: boolean): CSS
     gap: "0.4rem",
     width: "100%",
     border: "none",
-    background: !disabled && active ? `${theme.accent}18` : "none",
+    background: menuItemBackground(theme, active, disabled),
     color: disabled ? theme.muted : activeColor,
     opacity: disabled ? 0.5 : 1,
     fontFamily: "inherit",
@@ -130,7 +135,7 @@ function substepItemStyle(theme: AppTheme, disabled: boolean): CSSProperties {
     display: "block",
     width: "100%",
     border: "none",
-    background: "none",
+    background: "var(--hover-bg, transparent)",
     color: disabled ? theme.muted : theme.text,
     opacity: disabled ? 0.5 : 1,
     fontFamily: "inherit",
@@ -195,7 +200,7 @@ function backToIntroItemStyle(theme: AppTheme): CSSProperties {
     border: "none",
     borderBottom: `1px solid ${theme.border}`,
     borderRadius: 0,
-    background: "none",
+    background: "var(--hover-bg, transparent)",
     color: theme.muted,
     fontFamily: "inherit",
     fontWeight: 700,
@@ -322,6 +327,7 @@ function HoverStepRow({
       type="button"
       disabled={step.disabled}
       onClick={onRowClick}
+      className="hover-tint-soft"
       style={menuItemStyle(theme, isActive, step.disabled)}
       onMouseEnter={onRowEnter}
       onMouseLeave={onRowLeave}
@@ -370,8 +376,7 @@ function SubstepFlyout({
           disabled={substep.disabled}
           onClick={() => onSelect(substepIndex)}
           style={substepItemStyle(theme, substep.disabled)}
-          onMouseEnter={(e) => { if (!substep.disabled) e.currentTarget.style.background = `${theme.accent}18`; }}
-          onMouseLeave={(e) => { if (!substep.disabled) e.currentTarget.style.background = "none"; }}
+          className="hover-tint-soft"
           onKeyDown={(e) => handleSubstepKeyDown(e, flyoutRef.current, rowButtonRefs.current.get(activeStepIndex))}
         >
           {substep.label}
@@ -594,8 +599,7 @@ export default function StepJumpMenu({
                 setOpen(false);
               }}
               style={backToIntroItemStyle(theme)}
-              onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}18`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+              className="hover-tint-soft"
               onKeyDown={handleBackToIntroKeyDown}
               data-jump-row="true"
             >
@@ -610,8 +614,7 @@ export default function StepJumpMenu({
                 setOpen(false);
               }}
               style={backToIntroItemStyle(theme)}
-              onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}18`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+              className="hover-tint-soft"
               onKeyDown={handleBackToIntroKeyDown}
               data-jump-row="true"
             >
@@ -644,14 +647,8 @@ export default function StepJumpMenu({
                 theme={theme} step={step} isActive={isActive} isFlyoutActive={isFlyoutActive}
                 rowButtonRefs={rowButtonRefs}
                 onRowClick={() => { onJumpStep(step.index); setOpen(false); }}
-                onRowEnter={(e) => {
-                  if (!step.disabled && !isActive) e.currentTarget.style.background = `${theme.accent}18`;
-                  handleRowEnter(step, e);
-                }}
-                onRowLeave={(e) => {
-                  if (!step.disabled && !isActive) e.currentTarget.style.background = "none";
-                  if (step.substeps) scheduleFlyoutClose();
-                }}
+                onRowEnter={(e) => handleRowEnter(step, e)}
+                onRowLeave={() => { if (step.substeps) scheduleFlyoutClose(); }}
                 onRowFocus={(e) => handleRowEnter(step, e)}
                 onRowBlur={() => { if (step.substeps) scheduleFlyoutClose(); }}
                 onRowKeyDown={(e) => handleRowKeyDown(e, step)}

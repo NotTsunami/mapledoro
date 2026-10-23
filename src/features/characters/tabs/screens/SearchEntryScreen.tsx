@@ -61,7 +61,7 @@ const searchInputStyle = (theme: Theme): CSSProperties => ({
   fontSize: "0.95rem",
   fontWeight: 600,
   padding: "0.8rem 0.9rem",
-  outline: "2px solid transparent",
+  outline: "2px solid var(--focus-ring, transparent)",
   outlineOffset: "2px",
   transition: "outline-color 0.2s ease",
 });
@@ -297,8 +297,6 @@ export default function SearchEntryScreen({ model, actions }: SearchEntryScreenP
           placeholder="In-Game Name"
           maxLength={MAX_QUERY_LENGTH}
           style={searchInputStyle(theme)}
-          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-          onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
         />
         <button
           type="submit"

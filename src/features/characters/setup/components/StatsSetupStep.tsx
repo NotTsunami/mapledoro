@@ -412,8 +412,6 @@ function TripleStatRow({
           <input type="text" inputMode="numeric" aria-label={`${label} base value`} value={d.base} style={sub}
             data-flagged-field={showBaseWarning || (requireFilled && !d.base.trim()) ? "true" : undefined}
             onChange={(e) => onUpdate(id, "base", sanitizeDigitsInput(e.target.value))}
-            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
             onKeyDown={numericKeyDown}
           />
           <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>Base Value</p>
@@ -423,8 +421,6 @@ function TripleStatRow({
             <input type="text" inputMode="numeric" aria-label={`${label} percent value`} value={d.percent} style={sub}
               data-flagged-field={requireFilled && !d.percent.trim() ? "true" : undefined}
               onChange={(e) => onUpdate(id, "percent", sanitizeDigitsInput(e.target.value))}
-              onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-              onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
               onKeyDown={numericKeyDown}
             />
           </div>
@@ -437,8 +433,6 @@ function TripleStatRow({
               <input type="text" inputMode="numeric" aria-label={`${label} percent not applied`} value={d.percentUnapplied} style={sub}
                 data-flagged-field={showPercentUnappliedWarning || (requireFilled && !d.percentUnapplied.trim()) ? "true" : undefined}
                 onChange={(e) => onUpdate(id, "percentUnapplied", sanitizeDigitsInput(e.target.value))}
-                onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-                onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
                 onKeyDown={numericKeyDown}
               />
             </div>
@@ -473,8 +467,6 @@ function SingleStatRow({
         <div style={{ gridColumn: 1 }}>
           <input type="text" inputMode="numeric" aria-label={`${label} value`} value={value} style={statInputStyle(theme)}
             onChange={(e) => onUpdate(id, sanitizeDigitsInput(e.target.value))}
-            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
             onKeyDown={numericKeyDown}
           />
           <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>Base Value</p>
@@ -503,8 +495,6 @@ function HyperStatCell({
         placeholder="0"
         style={{ ...statInputStyle(theme, "3.4rem"), textAlign: "center", flexShrink: 0 }}
         onChange={(e) => onUpdate(cat.id, e.target.value)}
-        onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-        onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
         onKeyDown={numericKeyDown}
       />
     </div>
@@ -531,8 +521,6 @@ function CooldownReductionCell({
           <input type="text" inputMode="numeric" aria-label={`${label} seconds`} value={cd.seconds} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
             data-flagged-field={requireFilled && !cd.seconds.trim() ? "true" : undefined}
             onChange={(e) => onUpdateCooldown("seconds", sanitizeDigitsInput(e.target.value))}
-            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
             onKeyDown={numericKeyDown}
           />
           <span style={inputSuffixStyle(theme)}>s</span>
@@ -541,8 +529,6 @@ function CooldownReductionCell({
           <input type="text" inputMode="numeric" aria-label={`${label} percent`} value={cd.percent} style={{ ...statInputStyle(theme, "2.9rem"), paddingRight: "1.05rem" }}
             data-flagged-field={requireFilled && !cd.percent.trim() ? "true" : undefined}
             onChange={(e) => onUpdateCooldown("percent", sanitizeDigitsInput(e.target.value))}
-            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
             onKeyDown={numericKeyDown}
           />
           <span style={inputSuffixStyle(theme)}>%</span>
@@ -588,8 +574,6 @@ function CombatStatCell({
             else if (allowsDecimal) onUpdate(id, sanitizeDecimalInput(e.target.value));
             else onUpdate(id, sanitizeDigitsInput(e.target.value));
           }}
-          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-          onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
           onKeyDown={allowsDecimal ? decimalKeyDown : numericKeyDown}
         />
         {!isRaw && <span style={inputSuffixStyle(theme)}>%</span>}

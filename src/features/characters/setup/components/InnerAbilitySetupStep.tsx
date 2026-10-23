@@ -51,28 +51,33 @@ const pickerClearRowStyle = (theme: AppTheme): CSSProperties => ({
 const iaGradeButtonStyle = (theme: AppTheme, c: SwatchColor | null): CSSProperties => ({
   display: "flex", alignItems: "center", gap: 8, width: "100%",
   padding: "0.5rem 0.7rem", borderRadius: 8,
-  border: `1px solid ${c ? c.border : theme.border}`,
-  background: c ? c.border : theme.bg,
+  border: `1px solid var(--hover-edge, ${c ? c.border : theme.border})`,
+  background: c ? c.border : `var(--hover-bg, ${theme.bg})`,
   color: c ? "#fff" : theme.muted,
+  // Hovered: an accent border, and a lifted panel fill while no grade colors it.
+  "--hover-edge-to": theme.accent,
+  "--hover-bg-to": theme.panel,
   fontFamily: "inherit", fontWeight: 800, fontSize: "0.9rem", cursor: "pointer", textAlign: "left",
   transition: "border-color 0.15s ease, background 0.15s ease",
 });
 
 function iaGradeOptionBackground(tc: SwatchColor, active: boolean, isHighlighted: boolean): string {
   if (active) return tc.border;
-  if (isHighlighted) return `${tc.border}33`;
-  return "transparent";
+  if (isHighlighted) return `var(--hover-bg, ${tc.border}33)`;
+  return "var(--hover-bg, transparent)";
 }
 
 const iaGradeOptionStyle = (theme: AppTheme, tc: SwatchColor, active: boolean, isHighlighted: boolean): CSSProperties => ({
   display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "0.45rem 0.6rem",
-  background: iaGradeOptionBackground(tc, active, isHighlighted), color: active ? "#fff" : theme.text,
+  background: iaGradeOptionBackground(tc, active, isHighlighted), color: active ? "#fff" : `var(--hover-ink, ${theme.text})`,
+  // Hovered, an unpicked grade previews its own tier color.
+  "--hover-bg-to": tc.border, "--hover-ink-to": "#fff",
   border: "none", borderBottom: `1px solid ${theme.border}`, cursor: "pointer",
   fontFamily: "inherit", fontWeight: 800, fontSize: "0.8rem", textAlign: "left",
 });
 
 const iaLineOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
-  display: "block", width: "100%", padding: "0.3rem 0.5rem", background: isHighlighted ? `${theme.accent}22` : "transparent",
+  display: "block", width: "100%", padding: "0.3rem 0.5rem", background: isHighlighted ? `${theme.accent}22` : "var(--hover-bg, transparent)",
   border: "none", borderBottom: `1px solid ${theme.border}`, cursor: "pointer",
   fontFamily: "inherit", fontSize: "0.75rem", fontWeight: 600, color: theme.text, textAlign: "left",
 });
@@ -139,8 +144,7 @@ function IAGradeHeader({ grade, openId, theme, onToggle, onClose, onPick, onClea
         type="button"
         onClick={(e) => { e.stopPropagation(); if (isStrayClick(e)) { return; } onToggle(); }}
         onKeyDown={handleTriggerKeyDown}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; if (!c) e.currentTarget.style.background = theme.panel; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c ? c.border : theme.border; if (!c) e.currentTarget.style.background = theme.bg; }}
+        className="hover-to"
         style={iaGradeButtonStyle(theme, c)}
       >
         <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
@@ -165,9 +169,8 @@ function IAGradeHeader({ grade, openId, theme, onToggle, onClose, onPick, onClea
             const active = grade === t;
             return (
               <button key={t} ref={itemRef(i)} type="button" onClick={() => onPick(t, false)}
-                style={iaGradeOptionStyle(theme, tc, active, i === highlightedIndex)}
-                onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = tc.border; e.currentTarget.style.color = "#fff"; } }}
-                onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = theme.text; } }}>
+                className="hover-to"
+                style={iaGradeOptionStyle(theme, tc, active, i === highlightedIndex)}>
                 <span style={{ width: 10, height: 10, borderRadius: 3, background: tc.border, flexShrink: 0 }} />
                 {IA_TIER_LABELS[t]} Ability
               </button>
@@ -235,8 +238,7 @@ function IALineOptions({ tier, currentValue, theme, onPick, onClose, onPrev, onN
         {filtered.map((line, i) => (
           <button key={line} ref={itemRef(i)} type="button" onClick={() => onPick(line, false)}
             style={iaLineOptionStyle(theme, i === highlightedIndex)}
-            onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            className="hover-tint">
             {line}
           </button>
         ))}

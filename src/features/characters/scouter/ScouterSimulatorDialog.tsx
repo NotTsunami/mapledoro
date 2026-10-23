@@ -462,11 +462,10 @@ function sanitizeLimitedInput(raw: string, limit: InputLimit): string {
 /** Draft-while-focused text input, shared by the Input tab's own fields and the Level/Arcane
  *  Force/Sacred Power row. It keeps raw keystrokes visible, so a trailing "." isn't stomped
  *  mid-type, while committing a clamped number on every change. Same division of labor as
- *  ToolNumberInput's own draft/commit split. Sets the focus outline color inline, following
- *  StatsSetupStep.tsx's pattern, rather than relying on :focus-visible, which lights up only
- *  for keyboard focus in most browsers and leaves a mouse click into the box unhighlighted. */
-function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }: {
-  theme: AppTheme; value: number; limit: InputLimit; onChange: (v: number) => void;
+ *  ToolNumberInput's own draft/commit split. Its outline comes from statInputStyle's
+ *  --focus-ring, which lights up on any focus, mouse included, unlike :focus-visible. */
+function LimitedNumberInput({ value, limit, onChange, style, ariaLabel }: {
+  value: number; limit: InputLimit; onChange: (v: number) => void;
   style: CSSProperties; ariaLabel: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -493,14 +492,13 @@ function LimitedNumberInput({ theme, value, limit, onChange, style, ariaLabel }:
       type="text" inputMode={limit.decimal ? "decimal" : "numeric"} aria-label={ariaLabel}
       value={draft ?? (value === 0 ? "" : String(value))} placeholder="0" style={style}
       onKeyDown={keyDown}
-      onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; e.currentTarget.select(); }}
+      onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => {
         const sanitized = sanitizeLimitedInput(e.target.value, limit);
         setDraft(sanitized);
         commit(sanitized);
       }}
       onBlur={(e) => {
-        e.currentTarget.style.outlineColor = "transparent";
         setDraft(null);
         commit(e.target.value);
       }}
@@ -514,7 +512,7 @@ function TripleInputBox({ label, sublabel, value, limit, onChange, inputStyle, t
 }) {
   return (
     <div>
-      <LimitedNumberInput theme={theme} value={value} limit={limit} onChange={onChange} ariaLabel={label} style={{ ...inputStyle, width: "100%" }} />
+      <LimitedNumberInput value={value} limit={limit} onChange={onChange} ariaLabel={label} style={{ ...inputStyle, width: "100%" }} />
       <p style={{ margin: 0, marginTop: "0.15rem", fontSize: "0.75rem", color: theme.muted, fontWeight: 700, textAlign: "center" }}>{sublabel}</p>
     </div>
   );
@@ -553,8 +551,7 @@ function InputGroupField({ theme, inputStyle, label, value, limit, onChange, suf
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", minWidth: 0 }}>
       <span style={{ fontSize: "0.78rem", color: theme.muted, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{label}</span>
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <LimitedNumberInput
-          theme={theme} value={value} limit={limit} onChange={onChange} ariaLabel={label}
+        <LimitedNumberInput value={value} limit={limit} onChange={onChange} ariaLabel={label}
           style={suffix ? { ...inputStyle, width: "4.6rem", paddingRight: "1.15rem" } : { ...inputStyle, width: "4.6rem" }}
         />
         {suffix && <span style={inputSuffixStyle(theme)}>{suffix}</span>}
@@ -769,7 +766,6 @@ function InfoTab({ theme, info, onChange, simulatedLevel, showWeaponHand, showRu
           </p>
           <div style={{ position: "relative", width: "5rem" }}>
             <LimitedNumberInput
-              theme={theme}
               value={info.artifactFinalAttackDmg}
               limit={FINAL_ATTACK_LIMIT}
               onChange={(v) => onChange("artifactFinalAttackDmg", v)}
@@ -970,15 +966,15 @@ export default function ScouterSimulatorDialog({
           <div className="scouter-sim-level-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, flex: 1 }}>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Level" short="Level" />
-              <LimitedNumberInput theme={theme} value={draft.level} limit={{ min: 1, max: MAX_CHARACTER_LEVEL, decimal: false }} onChange={draft.setLevel} ariaLabel="Simulated level" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput value={draft.level} limit={{ min: 1, max: MAX_CHARACTER_LEVEL, decimal: false }} onChange={draft.setLevel} ariaLabel="Simulated level" style={{ ...inputStyle, width: "100%" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Arcane Force" short="Arc. Force" />
-              <LimitedNumberInput theme={theme} value={draft.arcaneForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setArcaneForce} ariaLabel="Simulated Arcane Force" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput value={draft.arcaneForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setArcaneForce} ariaLabel="Simulated Arcane Force" style={{ ...inputStyle, width: "100%" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <LevelRowLabel full="Sacred Power" short="Sac. Power" />
-              <LimitedNumberInput theme={theme} value={draft.authenticForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setAuthenticForce} ariaLabel="Simulated Sacred Power" style={{ ...inputStyle, width: "100%" }} />
+              <LimitedNumberInput value={draft.authenticForce} limit={{ max: ARCANE_AND_SACRED_FORCE_MAX, decimal: false }} onChange={draft.setAuthenticForce} ariaLabel="Simulated Sacred Power" style={{ ...inputStyle, width: "100%" }} />
             </div>
           </div>
           <ResetLink theme={theme} onReset={draft.resetLevelRow} />

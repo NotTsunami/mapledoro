@@ -196,12 +196,12 @@ export const CENTER_BOTTOM_SLOTS: SlotKey[] = ["weapon", "secondary", "emblem"];
 
 export const slotCellStyle = (theme: AppTheme, isActive: boolean): CSSProperties => ({
   width: SLOT_SIZE, height: SLOT_SIZE,
-  border: `1px solid ${isActive ? theme.accent : theme.border}`,
+  border: `1px solid ${isActive ? theme.accent : `var(--hover-edge, ${theme.border})`}`,
   borderRadius: 8,
   background: isActive ? `${theme.accent}15` : theme.bg,
   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
   gap: 2, cursor: "pointer",
-  outline: "2px solid transparent", outlineOffset: 2,
+  outline: "2px solid var(--focus-ring, transparent)", outlineOffset: 2,
   transition: "border-color 0.15s, background 0.15s",
   overflow: "hidden", padding: "2px 3px", boxSizing: "border-box",
   font: "inherit", textAlign: "inherit",

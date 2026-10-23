@@ -23,7 +23,7 @@ export function statInputStyle(theme: AppTheme, width?: string): CSSProperties {
     fontSize: "0.82rem",
     fontWeight: 600,
     padding: "0.3rem 0.4rem",
-    outline: "2px solid transparent",
+    outline: "2px solid var(--focus-ring, transparent)",
     outlineOffset: "2px",
     transition: "outline-color 0.15s ease",
     width: width ?? "100%",
@@ -387,8 +387,6 @@ export function LegionFinalAttackField({ value, onUpdate, theme, required, locke
           readOnly={locked}
           style={{ ...statInputStyle(theme, "100%"), paddingRight: "1.15rem", ...(locked ? { borderColor: theme.muted, cursor: "default" } : {}) }}
           onChange={(e) => { if (!locked) onUpdate(clampFinalAttackInput(e.target.value)); }}
-          onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-          onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
           onKeyDown={numericKeyDown}
         />
         <span style={inputSuffixStyle(theme)}>%</span>

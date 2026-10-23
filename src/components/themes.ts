@@ -200,6 +200,19 @@ export function alpha(color: string, opacity: number): string {
   return `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 }
 
+// The color tokens published as CSS custom properties on <html>, so stylesheets and :hover
+// rules can use the theme without a `theme` prop: `accentText` becomes `--theme-accent-text`.
+const COLOR_TOKENS = [
+  "bg", "panel", "border", "text", "muted", "accent", "accentSoft", "accentText", "accentOn",
+  "sidebar", "sidebarAccent", "timerBg", "badge", "badgeText",
+] as const satisfies readonly (keyof AppTheme)[];
+
+export function themeCssVars(theme: AppTheme): Record<string, string> {
+  return Object.fromEntries(
+    COLOR_TOKENS.map((key) => [`--theme-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, theme[key]]),
+  );
+}
+
 export function composeTheme(accentKey: string, colorMode: ColorMode): AppTheme {
   const accent = ACCENT_THEMES[accentKey] ?? ACCENT_THEMES["default"];
   const base = COLOR_MODE_BASES[colorMode];

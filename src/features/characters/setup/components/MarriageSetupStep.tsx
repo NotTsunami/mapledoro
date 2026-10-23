@@ -53,7 +53,7 @@ function partnerInputStyle(theme: AppTheme) {
     fontSize: "0.88rem",
     padding: "0.5rem 0.75rem",
     marginBottom: "0.8rem",
-    outlineColor: "transparent",
+    outlineColor: "var(--focus-ring, transparent)",
   } as const;
 }
 
@@ -114,8 +114,6 @@ export default function MarriageSetupStep({
             placeholder="Partner's IGN (optional)"
             value={partnerName}
             onChange={(e) => handlePartnerName(e.target.value)}
-            onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-            onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
             minLength={MIN_QUERY_LENGTH}
             maxLength={12}
             style={partnerInputStyle(theme)}

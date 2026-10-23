@@ -6,7 +6,7 @@ MapleDoro, a MapleStory community web app. Features, local setup, and env vars (
 
 ## Tech Stack
 
-**Next.js 16** (App Router, typed routes), **React 19**, **TypeScript 7** (strict). Styling is inline styles for dynamic theming plus global CSS (no Tailwind, no CSS-in-JS). State is hooks + Context (theme) + localStorage. Server side: Redis (ioredis) char-lookup cache, Nexon CDN patch notes, Discord Sunny Sunday + Miracle Time. Lint is oxlint (type-aware via oxlint-tsgolint, cognitive complexity via oxlint-plugin-complexity), configured in `.oxlintrc.json`. Charts use `react-chartjs-2` / `chart.js`, with hand-rolled SVG for small one-offs.
+**Next.js 16** (App Router, typed routes), **React 19**, **TypeScript 7** (strict). Styling is inline styles plus global CSS (no Tailwind, no CSS-in-JS); the theme's colors are also CSS variables (`--theme-*` on `<html>`), so hover and focus states live in CSS via the `--focus-ring`/`--hover-*` helpers in `globals.css`, never in mouse or focus handlers. State is hooks + Context (theme) + localStorage. Server side: Redis (ioredis) char-lookup cache, Nexon CDN patch notes, Discord Sunny Sunday + Miracle Time. Lint is oxlint (type-aware via oxlint-tsgolint, cognitive complexity via oxlint-plugin-complexity), configured in `.oxlintrc.json`. Charts use `react-chartjs-2` / `chart.js`, with hand-rolled SVG for small one-offs.
 
 ## Behavioral Guidelines
 

@@ -178,8 +178,8 @@ const perStatTableStyle: CSSProperties = { width: "100%", borderCollapse: "colla
  *  wiped before it could ever become a real negative number. Draft string state (same pattern
  *  as ToolNumberInput) holds the in-progress text so a trailing "-" survives on screen; the
  *  Worth column still updates live off the same keystroke via onCommit's clamped parse. */
-function AmountInput({ theme, label, amount, style, onCommit }: {
-  theme: AppTheme; label: string; amount: number; style: CSSProperties; onCommit: (value: number) => void;
+function AmountInput({ label, amount, style, onCommit }: {
+  label: string; amount: number; style: CSSProperties; onCommit: (value: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
@@ -194,11 +194,8 @@ function AmountInput({ theme, label, amount, style, onCommit }: {
         onCommit(clampNumber(Number(e.target.value) || 0, 9999, -9999));
       }}
       onKeyDown={signedNumericKeyDown}
-      onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; e.currentTarget.select(); }}
-      onBlur={(e) => {
-        e.currentTarget.style.outlineColor = "transparent";
-        setDraft(null);
-      }}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={() => setDraft(null)}
     />
   );
 }
@@ -239,7 +236,6 @@ function PerStatColumn({ theme, eff, rows, unit, amounts, onAmount, inputStyle }
                 <td style={isLast ? lastCell : cell}>{row.label}</td>
                 <td style={isLast ? lastCell : cell}>
                   <AmountInput
-                    theme={theme}
                     label={row.label}
                     amount={amount}
                     style={inputStyle}

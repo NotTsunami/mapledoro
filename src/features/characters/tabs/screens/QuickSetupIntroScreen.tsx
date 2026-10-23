@@ -26,7 +26,7 @@ function skipButtonStyle(theme: AppTheme, disabled: boolean): CSSProperties {
     right: 0,
     border: "none",
     background: "none",
-    color: theme.muted,
+    color: `var(--hover-ink, ${theme.muted})`,
     fontFamily: "inherit",
     fontWeight: 700,
     fontSize: "0.8rem",
@@ -172,9 +172,8 @@ export default function QuickSetupIntroScreen({ model, actions }: SetupIntroScre
           type="button"
           disabled={setup.isUiLocked}
           onClick={() => actions.skipSetupEntirely()}
+          className="hover-ink"
           style={skipButtonStyle(theme, setup.isUiLocked)}
-          onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
         >
           Skip for now
         </button>

@@ -275,7 +275,7 @@ function rowStyle(isLast: boolean, theme: AppTheme): CSSProperties {
 // row's click target, so the target was scoped down.
 const bannerButtonStyle: CSSProperties = {
   background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", flexShrink: 0,
-  borderRadius: 10, transition: "transform 0.1s ease",
+  borderRadius: 10, transition: "transform 0.1s ease", "--hover-scale": 1.03,
 };
 
 type BossFilter = "relevant" | "all";
@@ -486,8 +486,7 @@ function BossQuickViewRow({
         type="button"
         aria-label={`View ${displayName} in Spotlight`}
         onClick={() => onSelect(boss)}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
+        className="hover-grow"
         style={bannerButtonStyle}
       >
         <BossBanner theme={theme} boss={boss} iconId={iconId} displayName={displayName} />
@@ -608,7 +607,7 @@ const bossPickerPopoverStyle: CSSProperties = { borderRadius: 10, boxShadow: "0 
 function bossOptionStyle(theme: AppTheme, isHighlighted: boolean): CSSProperties {
   return {
     display: "block", width: "100%", padding: "0.3rem 0.5rem",
-    background: isHighlighted ? `${theme.accent}22` : "transparent",
+    background: isHighlighted ? `${theme.accent}22` : "var(--hover-bg, transparent)",
     border: "none", borderBottom: `1px solid ${theme.border}`,
     cursor: "pointer", fontFamily: "inherit", fontSize: "0.75rem", fontWeight: 600,
     color: theme.text, textAlign: "left",
@@ -708,8 +707,7 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
                 type="button"
                 onClick={() => select(o.boss)}
                 style={bossOptionStyle(theme, i === highlightedIndex)}
-                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                className="hover-tint"
               >
                 {o.label}
               </button>

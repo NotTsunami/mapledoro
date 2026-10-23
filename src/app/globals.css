@@ -466,6 +466,59 @@ input[type="date"]::-webkit-datetime-edit {
   margin: 0 0 0.75rem;
 }
 
+/* Themed hover and focus feedback from the --theme-* variables on <html>, in place of
+   per-element mouse and focus handlers. A :hover or :focus rule can't override an inline
+   style, so an element's inline style reads one of these variables instead, and CSS sets
+   it only while that element is hovered or focused:
+     outline: 2px solid var(--focus-ring, transparent)
+     background: var(--hover-bg, <resting>)    with .hover-tint or .hover-tint-soft
+     color: var(--hover-ink, <resting>)        with .hover-ink
+     border-color: var(--hover-edge, <resting>) with .hover-edge
+   They don't inherit, so a focused container (a dialog, a listbox) doesn't light up the
+   inputs inside it. The strengths match the accent alphas they replace (hex 22, 18, 88). */
+@property --focus-ring {
+  syntax: "*";
+  inherits: false;
+}
+@property --hover-bg {
+  syntax: "*";
+  inherits: false;
+}
+@property --hover-ink {
+  syntax: "*";
+  inherits: false;
+}
+@property --hover-edge {
+  syntax: "*";
+  inherits: false;
+}
+:focus {
+  --focus-ring: var(--theme-accent);
+}
+.hover-tint:hover:not(:disabled) {
+  --hover-bg: color-mix(in srgb, var(--theme-accent) 13%, transparent);
+}
+.hover-tint-soft:hover:not(:disabled) {
+  --hover-bg: color-mix(in srgb, var(--theme-accent) 9%, transparent);
+}
+.hover-ink:hover {
+  --hover-ink: var(--theme-text);
+}
+.hover-edge:hover {
+  --hover-edge: color-mix(in srgb, var(--theme-accent) 53%, transparent);
+}
+/* For hover targets that vary per element (a tier color, a state-specific border): the
+   element names them inline as --hover-bg-to / --hover-edge-to / --hover-ink-to, and any it
+   leaves unset fall back to its resting value. */
+.hover-to:hover:not(:disabled) {
+  --hover-bg: var(--hover-bg-to);
+  --hover-edge: var(--hover-edge-to);
+  --hover-ink: var(--hover-ink-to);
+}
+.hover-grow:hover {
+  transform: scale(var(--hover-scale, 1.05));
+}
+
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {

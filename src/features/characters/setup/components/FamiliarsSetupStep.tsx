@@ -191,7 +191,7 @@ const clearRowStyle = (theme: AppTheme): CSSProperties => ({
 
 const lineOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
   display: "block", width: "100%", padding: "0.3rem 0.5rem",
-  background: isHighlighted ? `${theme.accent}22` : "transparent",
+  background: isHighlighted ? `${theme.accent}22` : "var(--hover-bg, transparent)",
   border: "none", borderBottom: `1px solid ${theme.border}`,
   cursor: "pointer", fontFamily: "inherit",
   fontSize: "0.75rem", fontWeight: 600, color: theme.text, textAlign: "left",
@@ -215,7 +215,7 @@ const tierOptionStyle = (theme: AppTheme, c: TierColor, isHighlighted: boolean):
 const selectedFamiliarRowStyle = (theme: AppTheme): CSSProperties => ({
   display: "flex", alignItems: "center", gap: 8, width: "100%",
   padding: "0.4rem 0.6rem", border: "none", borderBottom: `1px solid ${theme.border}`,
-  background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+  background: "var(--hover-bg, transparent)", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
 });
 
 const tierBadgeStyle = (c: TierColor): CSSProperties => ({
@@ -227,7 +227,7 @@ const tierBadgeStyle = (c: TierColor): CSSProperties => ({
 const familiarOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
   display: "flex", alignItems: "center", gap: 8,
   width: "100%", padding: "0.3rem 0.6rem",
-  background: isHighlighted ? `${theme.accent}22` : "transparent", border: "none",
+  background: isHighlighted ? `${theme.accent}22` : "var(--hover-bg, transparent)", border: "none",
   borderBottom: `1px solid ${theme.border}`,
   cursor: "pointer", fontFamily: "inherit",
 });
@@ -235,7 +235,7 @@ const familiarOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProper
 const badgeOptionStyle = (theme: AppTheme, isHighlighted: boolean): CSSProperties => ({
   display: "flex", alignItems: "center", gap: 6,
   width: "100%", padding: "0.3rem 0.6rem",
-  background: isHighlighted ? `${theme.accent}22` : "transparent", border: "none",
+  background: isHighlighted ? `${theme.accent}22` : "var(--hover-bg, transparent)", border: "none",
   borderBottom: `1px solid ${theme.border}`,
   cursor: "pointer", fontFamily: "inherit",
   textAlign: "left",
@@ -422,8 +422,7 @@ function LinePicker({ id, openId, onToggle, onClose, onPrev, onNext, value, tier
                 type="button"
                 onClick={() => select(line, false)}
                 style={lineOptionStyle(theme, i === highlightedIndex)}
-                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                className="hover-tint"
               >
                 {line}
               </button>
@@ -718,8 +717,7 @@ function FamiliarSlotCard({
                 if (entry) onSetPending(entry);
               }}
               style={selectedFamiliarRowStyle(theme)}
-              onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              className="hover-tint"
             >
               <FamiliarCardSprite mobId={spriteMobId} familiarId={slot.familiarId} cardId={cardId} name={displayName} size={28} theme={theme} />
               <div style={{ overflow: "hidden", flex: 1 }}>
@@ -780,8 +778,7 @@ function FamiliarSlotCard({
                     onClick={(e) => { e.stopPropagation(); onSetPending(entry); }}
                     title={getFamiliarDisplayLabel(entry)}
                     style={familiarOptionStyle(theme, i === highlightedIndex)}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    className="hover-tint"
                   >
                     <FamiliarCardSprite mobId={entry.spriteMobId ?? entry.mobId} familiarId={entry.id} cardId={entry.cardId} name={getFamiliarDisplayLabel(entry)} size={FAM_LIST_SIZE} theme={theme} />
                     <span style={{ fontSize: "0.75rem", fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1011,8 +1008,7 @@ function BadgeSlot({
                 type="button"
                 onClick={() => { onPick(name); onAdvance(false); }}
                 style={badgeOptionStyle(theme, i === highlightedIndex)}
-                onMouseEnter={(e) => { e.currentTarget.style.background = `${theme.accent}22`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                className="hover-tint"
               >
                 <FamiliarBadgeImage badge={name} size={20} theme={theme} style={{ objectFit: "contain" }} />
                 {name}

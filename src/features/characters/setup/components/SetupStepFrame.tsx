@@ -7,7 +7,7 @@ function quietLinkStyle(theme: AppTheme): CSSProperties {
   return {
     border: "none",
     background: "none",
-    color: theme.muted,
+    color: `var(--hover-ink, ${theme.muted})`,
     fontFamily: "inherit",
     fontWeight: 700,
     fontSize: "0.85rem",
@@ -23,11 +23,9 @@ function QuietButton({ theme, label, onClick, className }: {
   return (
     <button
       type="button"
-      className={className}
+      className={className ? `hover-ink ${className}` : "hover-ink"}
       onClick={onClick}
       style={quietLinkStyle(theme)}
-      onMouseEnter={(e) => { e.currentTarget.style.color = theme.text; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = theme.muted; }}
     >
       {label}
     </button>

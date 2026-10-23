@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { Nunito, Fredoka } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../components/ThemeContext";
-import { ACCENT_THEMES, composeTheme, type ColorMode } from "../components/themes";
+import { ACCENT_THEMES, composeTheme, themeCssVars, type ColorMode } from "../components/themes";
 import CookieConsentBanner from "../components/CookieConsentBanner";
 import StorageWriteFailureBanner from "../components/StorageWriteFailureBanner";
 import { RESOURCE_BASE } from "../lib/mapleResource";
@@ -53,15 +53,16 @@ export default async function RootLayout({
   // rubber-band reveal the theme color, not default white. `color-scheme` tells
   // the browser which way to paint native widget chrome it draws itself (the
   // date input's calendar icon, scrollbars, <select> menus) — without it they
-  // stay light and the dark icon disappears against a dark input. Both are kept
-  // in sync after theme changes by ThemeProvider.
-  const initialBg = composeTheme(initialThemeKey, initialColorMode).bg;
+  // stay light and the dark icon disappears against a dark input. The --theme-*
+  // color variables ride along so CSS can theme itself from the first paint. All
+  // are kept in sync after theme changes by ThemeProvider.
+  const initialTheme = composeTheme(initialThemeKey, initialColorMode);
 
   return (
     <html
       lang="en"
       className={`${nunito.variable} ${fredoka.variable}`}
-      style={{ background: initialBg, colorScheme: initialColorMode }}
+      style={{ background: initialTheme.bg, colorScheme: initialColorMode, ...themeCssVars(initialTheme) } as React.CSSProperties}
     >
       <head>
         {/* Nearly every page renders game art from the MapleResource host, but the

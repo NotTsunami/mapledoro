@@ -219,7 +219,7 @@ function levelRowLabelStyle(theme: AppTheme): CSSProperties {
 function popoverOptionBackground(theme: AppTheme, active: boolean, isHighlighted: boolean): string {
   if (active) return `${theme.accent}33`;
   if (isHighlighted) return `${theme.accent}22`;
-  return "transparent";
+  return "var(--hover-bg, transparent)";
 }
 
 function popoverOptionStyle(theme: AppTheme, active: boolean, isHighlighted: boolean): CSSProperties {
@@ -380,8 +380,7 @@ function StatSlotChip({
                   type="button"
                   onClick={() => { onPick(opt.id); onAdvance(false); }}
                   style={popoverOptionStyle(theme, isCurrent, i === highlightedIndex)}
-                  onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = `${theme.accent}22`; }}
-                  onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
+                  className="hover-tint"
                 >
                   {opt.label}
                 </button>

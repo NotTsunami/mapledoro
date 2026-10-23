@@ -182,7 +182,7 @@ const pickerSearchInputStyle = (theme: AppTheme, hasQuery: boolean): CSSProperti
 function pickerItemBackground(theme: AppTheme, isCurrent: boolean, isHighlighted: boolean): string {
   if (isCurrent) return `${theme.accent}33`;
   if (isHighlighted) return `${theme.accent}22`;
-  return "transparent";
+  return "var(--hover-bg, transparent)";
 }
 
 const pickerItemStyle = (theme: AppTheme, isCurrent: boolean, isHighlighted: boolean): CSSProperties => ({
@@ -565,8 +565,7 @@ function ItemPicker({
                 type="button"
                 onClick={() => selectItem({ id: item.id, name: item.name }, false)}
                 style={pickerItemStyle(theme, isCurrent, isHighlighted)}
-                onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = `${theme.accent}22`; }}
-                onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
+                className="hover-tint"
               >
                 <EquipItemIcon id={item.id} name={item.name} theme={theme} size={28} revealed={isAndroid} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
@@ -593,7 +592,7 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
 }) {
   const { ref: wrapperRef, portalRef } = usePickerCoords(isActive, PICKER_WIDTH);
   // The item name is already in the button's aria-label, so the tooltip adds no description.
-  // Its handlers run alongside the slot's own hover and focus styling, and only once filled.
+  // It only attaches once the slot is filled; hover and focus styling are CSS (.hover-edge).
   const tip = useTooltip(item?.name, theme, "none");
   const tipProps = item ? tip.triggerProps : null;
   const button = (
@@ -603,10 +602,11 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
       data-slot={slotKey}
       aria-label={item ? `${SLOT_LABELS[slotKey]}: ${item.name}` : `Set ${SLOT_LABELS[slotKey]}`}
       onClick={(e) => { e.stopPropagation(); if (isStrayClick(e)) { return; } onClick(); }}
-      onMouseEnter={(e) => { tipProps?.onMouseEnter(); if (!isActive) e.currentTarget.style.borderColor = `${theme.accent}88`; }}
-      onMouseLeave={(e) => { tipProps?.onMouseLeave(); if (!isActive) e.currentTarget.style.borderColor = theme.border; }}
-      onFocus={(e) => { tipProps?.onFocus(e); e.currentTarget.style.outlineColor = theme.accent; }}
-      onBlur={(e) => { tipProps?.onBlur(e); e.currentTarget.style.outlineColor = "transparent"; }}
+      className="hover-edge"
+      onMouseEnter={tipProps?.onMouseEnter}
+      onMouseLeave={tipProps?.onMouseLeave}
+      onFocus={tipProps?.onFocus}
+      onBlur={tipProps?.onBlur}
       style={slotCellStyle(theme, isActive)}
     >
       {item ? (

@@ -155,17 +155,11 @@ function ClassTile({
   return (
     <button
       type="button"
-      className="btn-reset class-picker-tile"
+      className="btn-reset class-picker-tile hover-grow"
       aria-expanded={selected}
       aria-controls={panelId}
       onClick={onToggle}
       style={{ transform: selected ? "scale(1.05)" : undefined }}
-      onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.transform = "scale(1.05)";
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) e.currentTarget.style.transform = "scale(1)";
-      }}
     >
       <div
         className="class-picker-icon"

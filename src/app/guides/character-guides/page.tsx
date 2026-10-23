@@ -39,10 +39,10 @@ function searchInputStyle(theme: AppTheme): CSSProperties {
     fontSize: "0.85rem",
     fontWeight: 600,
     borderRadius: "12px",
-    border: `1px solid ${theme.border}`,
+    border: `1px solid var(--focus-ring, ${theme.border})`,
     background: theme.panel,
     color: theme.text,
-    outline: "2px solid transparent",
+    outline: "2px solid var(--focus-ring, transparent)",
     outlineOffset: "2px",
     transition: "border-color 0.2s ease, outline-color 0.2s ease",
   };
@@ -217,12 +217,6 @@ function CharacterGuidesContent({ theme }: { theme: AppTheme }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={searchInputStyle(theme)}
-              onFocus={(e) => {
-                Object.assign(e.currentTarget.style, { borderColor: theme.accent, outlineColor: theme.accent });
-              }}
-              onBlur={(e) => {
-                Object.assign(e.currentTarget.style, { borderColor: theme.border, outlineColor: "transparent" });
-              }}
             />
           </div>
 

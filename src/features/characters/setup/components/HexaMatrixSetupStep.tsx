@@ -115,7 +115,7 @@ const levelRowInputStyle = (theme: AppTheme): React.CSSProperties => ({
   fontWeight: 700,
   padding: "0.25rem 0.35rem",
   textAlign: "center",
-  outline: "2px solid transparent",
+  outline: "2px solid var(--focus-ring, transparent)",
   outlineOffset: "2px",
   transition: "outline-color 0.15s ease",
 });
@@ -145,7 +145,7 @@ const statDropdownSearchInputStyle = (theme: AppTheme): React.CSSProperties => (
 function statDropdownOptionBackground(theme: AppTheme, isSelected: boolean, isHighlighted: boolean): string {
   if (isSelected) return `${theme.accent}33`;
   if (isHighlighted) return `${theme.accent}22`;
-  return "transparent";
+  return "var(--hover-bg, transparent)";
 }
 
 const statDropdownOptionStyle = (theme: AppTheme, isSelected: boolean, isHighlighted: boolean): React.CSSProperties => ({
@@ -388,8 +388,6 @@ function LevelInput({ value, onChange, theme, min = 0, max = MAX_LEVEL, label, t
         value={showBlank ? "" : String(value)}
         placeholder={String(min)}
         onChange={(e) => { onTouch?.(); onChange(clampNumber(Number(e.target.value) || 0, max, min)); }}
-        onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-        onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
         onKeyDown={numericKeyDown}
         style={levelRowInputStyle(theme)}
       />
@@ -506,7 +504,7 @@ function StatDropdown({ value, options, onChange, onAdvance, isOpen, onToggle, o
     color: selected ? theme.text : theme.muted,
     fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 700,
     padding: "0.25rem 0.5rem", cursor: "pointer",
-    outline: "2px solid transparent", outlineOffset: "2px",
+    outline: "2px solid var(--focus-ring, transparent)", outlineOffset: "2px",
     transition: "outline-color 0.15s ease",
   };
 
@@ -516,8 +514,6 @@ function StatDropdown({ value, options, onChange, onAdvance, isOpen, onToggle, o
         type="button"
         onClick={(e) => { if (isStrayClick(e)) { return; } onToggle(); }}
         onKeyDown={handleTriggerKeyDown}
-        onFocus={(e) => { e.currentTarget.style.outlineColor = theme.accent; }}
-        onBlur={(e) => { e.currentTarget.style.outlineColor = "transparent"; }}
         style={triggerStyle}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -561,8 +557,7 @@ function StatDropdown({ value, options, onChange, onAdvance, isOpen, onToggle, o
                   type="button"
                   onClick={() => pick(o.value, false)}
                   style={statDropdownOptionStyle(theme, isSelected, isHighlighted)}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = `${theme.accent}22`; }}
-                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
+                  className="hover-tint"
                 >
                   {o.label}
                 </button>
