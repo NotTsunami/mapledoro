@@ -705,8 +705,8 @@
   z-index: 90;
   max-width: 264px;
   background: var(--cg-panel2);
-  border: 1px solid var(--cg-line);
-  border-left: 3px solid var(--cg-accent);
+  /* The class accent tints the whole outline rather than a side stripe. */
+  border: 1px solid color-mix(in srgb, var(--cg-accent) 45%, var(--cg-line));
   border-radius: 10px;
   padding: 0.625rem 0.8125rem;
   font-size: 0.78rem;
