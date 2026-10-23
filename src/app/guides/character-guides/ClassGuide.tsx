@@ -186,8 +186,10 @@ function SkillTrigger({
 }) {
   const tip = useTip();
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the handlers only show and hide the tooltip; this is an image, not a control
     <span
       className={className}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so keyboard users can reveal the tooltip too
       tabIndex={0}
       role="img"
       aria-label={ariaLabel ?? skill.name}

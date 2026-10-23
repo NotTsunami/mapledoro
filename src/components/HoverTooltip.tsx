@@ -123,7 +123,7 @@ export default function HoverTooltip({ label, theme, style, className, children 
     // here. Keyboard visibility is instead handled by onFocus/onBlur below, which reveal
     // the bubble whenever a focusable descendant gains focus, with no risk of double-
     // toggling since it doesn't touch click logic.
-    // react-doctor-disable-next-line no-static-element-interactions, click-events-have-key-events
+    /* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */ /* react-doctor-disable-next-line no-static-element-interactions, click-events-have-key-events */
     <div
       ref={ref}
       className={className ? `hover-tip ${className}` : "hover-tip"}
