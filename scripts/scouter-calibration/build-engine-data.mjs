@@ -84,7 +84,12 @@ function coreTable(classId, p, atkT) {
 // Core level curves: share of a Lv 30 core's value at each level, measured on Ren (whose cores
 // simply add up).
 const renCores = coreTable("ren", SWEEP.ren.probes, 1);
-const curveTable = (core) => Array.from({ length: 31 }, (_, L) => (L === 0 ? 0 : L === 30 ? 1 : (renCores[`${core}=${L}`] - renCores[`${core}=0`]) / (1 - renCores[`${core}=0`])));
+const curveTable = (core) => Array.from({ length: 31 }, (_, L) => {
+  if (L === 0) return 0;
+  if (L === 30) return 1;
+  const zero = renCores[`${core}=0`];
+  return (renCores[`${core}=${L}`] - zero) / (1 - zero);
+});
 const curves = { skill1: curveTable("skillCore1"), skill2: curveTable("skillCore2"), mastery: curveTable("masteryCore1"), rein: curveTable("reinCore1"), general2: curveTable("generalCore2"), general3: curveTable("generalCore3") };
 
 // Cooldown reference tables: each probe's HEXA bonus over its no-cooldown HEXA, by strength row.
@@ -141,7 +146,10 @@ for (const [classId, { koreanName, probes: p }] of Object.entries(SWEEP)) {
   };
   const summonSlope = p["summonPersistTime=0"] ? (1 - r("summonPersistTime=0")) / n(T.stat.summonPersistTime) : 0;
   // On over off for a toggle, from a probe that flips the reference sheet's setting.
-  const onOff = (probe, probeTurnsOn) => (p[probe] ? (probeTurnsOn ? r(probe) : 1 / r(probe)) : undefined);
+  const onOff = (probe, probeTurnsOn) => {
+    if (!p[probe]) return undefined;
+    return probeTurnsOn ? r(probe) : 1 / r(probe);
+  };
 
   classes[classId] = {
     koreanName,

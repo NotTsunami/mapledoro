@@ -30,10 +30,17 @@ function rng(seed) {
 }
 const seedOf = (text) => [...text].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
+// Mid-progression level for one core: skill cores 10-30, mastery 1-30, the rest 0-20.
+function midLevel(core, r) {
+  if (core.startsWith("skill")) return 10 + Math.floor(r() * 21);
+  if (core.startsWith("mastery")) return 1 + Math.floor(r() * 30);
+  return Math.floor(r() * 21);
+}
+
 // Sheet kinds, cycled per class: anything goes, mid progression, and nearly maxed.
 const PROFILES = [
   (r) => Object.fromEntries(CORES.map((c) => [c, Math.floor(r() * 31)])),
-  (r) => Object.fromEntries(CORES.map((c) => [c, c.startsWith("skill") ? 10 + Math.floor(r() * 21) : c.startsWith("mastery") ? 1 + Math.floor(r() * 30) : Math.floor(r() * 21)])),
+  (r) => Object.fromEntries(CORES.map((c) => [c, midLevel(c, r)])),
   (r) => Object.fromEntries(CORES.map((c) => [c, r() < 0.3 ? 15 + Math.floor(r() * 15) : 30])),
 ];
 

@@ -243,7 +243,9 @@ function mutatorFromName(name) {
     const set = token.match(/^(?:(\w+)\.)?(\w+)=(.+)$/);
     if (!set) return null;
     const [, group, field, raw] = set;
-    const value = raw === "true" ? true : raw === "false" ? false : raw;
+    let value = raw;
+    if (raw === "true") value = true;
+    else if (raw === "false") value = false;
     steps.push((u) => {
       const target = group ? u[group] : [u.hexa, u.special, u.doping, u.stat].find((g) => field in g);
       if (!target) throw new Error(`${name}: no field ${field}`);
