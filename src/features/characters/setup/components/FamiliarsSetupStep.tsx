@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useEffect, type CSSProperties } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { usePickerCoords } from "../../../../lib/usePickerCoords";
+import { isInsidePicker, usePickerCoords } from "../../../../lib/usePickerCoords";
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
@@ -383,8 +383,7 @@ function LinePicker({ id, openId, onToggle, onClose, onPrev, onNext, value, tier
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+          data-picker
           style={pickerStyle}
         >
           {value && (
@@ -501,6 +500,7 @@ function TierPickerView({ entry, theme, onBack, onSelect }: {
   }
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the group takes focus on open and routes arrow keys across the rarity buttons inside it
     <div ref={containerRef} tabIndex={-1} role="group" aria-label="Pick rarity" onKeyDown={handleContainerKeyDown}
       style={{ padding: "0.65rem 0.7rem", display: "flex", flexDirection: "column", gap: 5, outline: "none" }}>
       <button
@@ -704,8 +704,7 @@ function FamiliarSlotCard({
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+          data-picker
           style={pickerStyle}
         >
           {!isEmpty && !pendingEntry && (
@@ -961,8 +960,7 @@ function BadgeSlot({
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+          data-picker
           style={badgePickerStyle}
         >
           {badge && (
@@ -1066,7 +1064,7 @@ export default function FamiliarsSetupStep({
   useEffect(() => {
     if (!openId) return;
     function handleMouseDown(e: MouseEvent) {
-      if (zoneRef.current && !zoneRef.current.contains(e.target as Node)) {
+      if (zoneRef.current && !zoneRef.current.contains(e.target as Node) && !isInsidePicker(e.target)) {
         setOpenId(null);
         setPickerQuery("");
         setPendingFamiliar(null);

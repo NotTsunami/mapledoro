@@ -32,6 +32,14 @@ function decideOpenAbove(el: HTMLElement, portalHeight: number): boolean {
   return portalHeight > 0 && spaceBelow < portalHeight + 4 && rect.top > spaceBelow;
 }
 
+/** True when `target` is inside an element marked `data-picker`: a picker's portal, or a
+ *  trigger that lives outside its owner's click zone. Portals render under <body>, so a
+ *  zone-scoped outside-click listener (`zone.contains(target)`) would otherwise read a press
+ *  inside one as an outside press and close it. */
+export function isInsidePicker(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("[data-picker]") !== null;
+}
+
 export function usePickerCoords(isOpen: boolean, width: number) {
   const ref = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);

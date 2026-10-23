@@ -171,7 +171,7 @@ export function FamiliarPicker({
         {children}
       </button>
       {isOpen && createPortal(
-        <div ref={portalRef} role="dialog" aria-label="Select familiar" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={pickerStyle}>
+        <div ref={portalRef} role="dialog" aria-label="Select familiar" data-picker style={pickerStyle}>
           {familiarId !== null && <ClearRow theme={theme} label="— Clear slot —" onClear={() => select(null)} />}
           <div style={{ padding: "0.4rem 0.5rem", borderBottom: `1px solid ${theme.border}` }}>
             <input
@@ -284,7 +284,7 @@ export function LinePicker({
         {selected ? selected.label : placeholder}
       </button>
       {isOpen && createPortal(
-        <div ref={portalRef} role="dialog" aria-label="Select potential line" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={pickerStyle}>
+        <div ref={portalRef} role="dialog" aria-label="Select potential line" data-picker style={pickerStyle}>
           {selected && <ClearRow theme={theme} label="— Clear line —" onClear={() => select(null)} />}
           <div style={{ padding: "0.4rem 0.5rem", borderBottom: `1px solid ${theme.border}` }}>
             <input
@@ -408,9 +408,9 @@ export function BonusItemPicker({
   };
 
   return (
-    // stopPropagation keeps the workspace's outside-click handler from intercepting the
+    // data-picker keeps the workspace's outside-click handler from intercepting the
     // trigger toggle (this picker lives outside the lineup's click zone).
-    <div ref={wrapperRef} onMouseDown={(e) => e.stopPropagation()} style={{ position: "relative", width: "100%" }}>
+    <div ref={wrapperRef} data-picker style={{ position: "relative", width: "100%" }}>
       <button
         ref={triggerRef}
         type="button"
@@ -422,7 +422,7 @@ export function BonusItemPicker({
         {children}
       </button>
       {isOpen && createPortal(
-        <div ref={portalRef} role="dialog" aria-label="Select bonus item" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={pickerStyle}>
+        <div ref={portalRef} role="dialog" aria-label="Select bonus item" data-picker style={pickerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.6rem", borderBottom: `1px solid ${theme.border}` }}>
             {family && (
               <button

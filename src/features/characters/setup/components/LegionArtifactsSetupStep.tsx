@@ -10,7 +10,7 @@ import { legionCrystalIconUrl } from "../../../../lib/mapleResource";
 import type { AppTheme } from "../../../../components/themes";
 import type { SetupStepDefinition } from "../steps";
 import type { StoredLegionArtifact } from "../../model/charactersStore";
-import { usePickerCoords } from "../../../../lib/usePickerCoords";
+import { isInsidePicker, usePickerCoords } from "../../../../lib/usePickerCoords";
 import {
   CRYSTAL_STAT_SLOTS,
   LEGION_ARTIFACT_STATS,
@@ -350,8 +350,7 @@ function StatSlotChip({
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+          data-picker
           style={{ ...popoverShellStyle, background: theme.panel, border: `1px solid ${theme.accent}` }}
         >
           {def && (
@@ -459,8 +458,7 @@ function CrystalTile({
       {isCardOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+          data-picker
           style={{ ...cardPopoverShellStyle, background: theme.panel, border: `1px solid ${theme.accent}` }}
         >
           <div style={cardPopoverHeaderRowStyle}>
@@ -536,7 +534,7 @@ export function LegionArtifactsEditor({
   useEffect(() => {
     if (openCardIndex === null && !openId) return;
     function handleMouseDown(e: MouseEvent) {
-      if ((e.target as HTMLElement).closest("[data-legion-trigger]")) return;
+      if ((e.target as HTMLElement).closest("[data-legion-trigger]") || isInsidePicker(e.target)) return;
       setOpenCardIndex(null);
       setOpenId(null);
     }

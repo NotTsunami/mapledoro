@@ -620,7 +620,6 @@ function SlotCell({ slotKey, item, theme, isActive, onClick, picker }: {
         <div
           ref={portalRef}
           data-equipment-picker
-          onClick={(e) => e.stopPropagation()}
           style={{ position: "absolute", width: PICKER_WIDTH, zIndex: 300, top: 0, left: 0 }}
         >
           {picker}

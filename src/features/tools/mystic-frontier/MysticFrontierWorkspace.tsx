@@ -13,6 +13,7 @@ import { Field } from "../shared-ui";
 import { replaceZeroOnDigit } from "../numberInputHandlers";
 import { useMysticFrontierState, type SlotState } from "./useMysticFrontierState";
 import { BonusItemPicker, FamiliarPicker, LinePicker } from "./pickers";
+import { isInsidePicker } from "../../../lib/usePickerCoords";
 import { FamiliarCardSprite } from "../../../components/FamiliarCardSprite";
 import { getMfFamiliar } from "./familiars";
 import { isPrepatchEpicLine } from "./potentialEngine";
@@ -547,7 +548,7 @@ export default function MysticFrontierWorkspace({ theme }: { theme: AppTheme }) 
   useEffect(() => {
     if (!openId) return;
     function onMouseDown(e: MouseEvent) {
-      if (zoneRef.current && !zoneRef.current.contains(e.target as Node)) setOpenId(null);
+      if (zoneRef.current && !zoneRef.current.contains(e.target as Node) && !isInsidePicker(e.target)) setOpenId(null);
     }
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);

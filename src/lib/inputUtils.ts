@@ -24,9 +24,13 @@ if (typeof window !== "undefined") {
  * tile still fires a genuine `click` on that tile. Guarding "open this picker"-style click
  * handlers with this turns that leaked click back into the no-op it should've been.
  * `e.detail === 0` marks a keyboard-triggered click (Enter/Space on a focused button),
- * which has no real preceding mousedown to compare against, so those are always let through.
+ * which has no real preceding mousedown to compare against, so those are let through unless
+ * they bubbled out of a portal.
  */
 export function isStrayClick(e: ReactMouseEvent): boolean {
+  // React bubbles a click on portal content (a picker's popover) through the component tree,
+  // so it reaches ancestors that don't contain it in the DOM. That's never a click on them.
+  if (!e.currentTarget.contains(e.target as Node)) return true;
   if (e.detail === 0) return false;
   return !!lastMouseDownTarget && !e.currentTarget.contains(lastMouseDownTarget as Node);
 }

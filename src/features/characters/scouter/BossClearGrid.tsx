@@ -683,7 +683,6 @@ function BossPicker({ theme, grouped, onSelectBoss }: {
       {isOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={portalRef}
-          onMouseDown={(e) => e.stopPropagation()}
           style={{ ...bossPickerPopoverStyle, position: "absolute", top: 0, left: 0, width: BOSS_PICKER_WIDTH, zIndex: 310, background: theme.panel, border: `1px solid ${theme.accent}` }}
         >
           <div style={{ padding: "0.3rem 0.4rem", borderBottom: `1px solid ${theme.border}` }}>

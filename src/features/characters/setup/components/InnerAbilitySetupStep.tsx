@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { usePickerCoords } from "../../../../lib/usePickerCoords";
+import { isInsidePicker, usePickerCoords } from "../../../../lib/usePickerCoords";
 import { useKeyboardListNav } from "../../../../lib/useKeyboardListNav";
 import { searchAndRank } from "../../../../lib/searchMatch";
 import { isStrayClick } from "../../../../lib/inputUtils";
@@ -153,7 +153,7 @@ function IAGradeHeader({ grade, openId, theme, onToggle, onClose, onPick, onClea
         </svg>
       </button>
       {isOpen && typeof document !== "undefined" && createPortal(
-        <div ref={portalRef} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
+        <div ref={portalRef} data-picker
           style={{ ...IA_POPOVER_SHELL, background: theme.panel, border: `1px solid ${theme.accent}` }}>
           {grade && (
             <button type="button" onClick={() => { onClear(); onClose(); }} style={pickerClearRowStyle(theme)}>
@@ -281,7 +281,7 @@ function IALineBar({ lineIdx, line, grade, openId, theme, onToggle, onClose, onS
         {label}
       </button>
       {isOpen && grade && typeof document !== "undefined" && createPortal(
-        <div ref={portalRef} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
+        <div ref={portalRef} data-picker
           style={{ ...IA_POPOVER_SHELL, background: theme.panel, border: `1px solid ${theme.accent}` }}>
           {showTierRow && (
             <div style={{ display: "flex", gap: 4, padding: "0.65rem 0.75rem", borderBottom: `1px solid ${theme.border}` }}>
@@ -406,11 +406,11 @@ export default function InnerAbilitySetupStep({ draft, onUpdate, theme, showActi
   }
 
   // Closes the line/grade picker on outside clicks, scoped to this section's zone
-  // (its portal popovers stop propagation, so they don't trigger this themselves).
+  // (its portal popovers are marked data-picker, so they don't trigger this themselves).
   useEffect(() => {
     if (!openId) return;
     function handleMouseDown(e: MouseEvent) {
-      if (zoneRef.current && !zoneRef.current.contains(e.target as Node)) setOpenId(null);
+      if (zoneRef.current && !zoneRef.current.contains(e.target as Node) && !isInsidePicker(e.target)) setOpenId(null);
     }
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
